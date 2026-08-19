@@ -81,6 +81,23 @@ Design notes
 Deploying to Cloudflare
 =======================
 
+Pushing to ``master`` deploys automatically through
+``.github/workflows/deploy.yml``. The workflow typechecks, lints, builds the
+OpenNext bundle, deploys with wrangler, then smoke tests the live routes and
+fails the run if any of them stops returning 200.
+
+Two repository secrets are required (Settings, Secrets and variables, Actions):
+
+===========================  ==================================================
+Secret                       Value
+===========================  ==================================================
+``CLOUDFLARE_API_TOKEN``     A Cloudflare API token with the "Edit Cloudflare
+                             Workers" template permissions
+``CLOUDFLARE_ACCOUNT_ID``    The Cloudflare account ID that owns the worker
+===========================  ==================================================
+
+To deploy by hand instead:
+
 .. code-block:: bash
 
    npm run preview   # build and preview through wrangler

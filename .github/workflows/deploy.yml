@@ -1,0 +1,93 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# One deploy at a time. A newer push supersedes a run that is still going.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SITE_URL: https://avhomes.uririnathaniel.workers.dev
+
+jobs:
+  deploy:
+    name: Verify and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # Fails in seconds with a readable message rather than letting the run
+      # spend minutes building only to hit a cryptic wrangler auth error.
+      - name: Check deploy credentials are present
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=""
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing. Add them under Settings, Secrets and variables, Actions."
+            exit 1
+          fi
+
+      - name: Check out the commit being deployed
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Verification runs before the deploy so a broken commit never ships.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build the Cloudflare bundle
+        run: npx opennextjs-cloudflare build
+
+      - name: Deploy
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Confirms the worker actually serves the new build rather than trusting
+      # that the upload succeeded. Fails the run if any route is not 200.
+      - name: Smoke test the deployment
+        run: |
+          set -euo pipefail
+          failed=0
+          for path in / /listings /blog /contact /terms /privacy "/listings?status=For+Sale" "/listings?status=For+Rent"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              --retry 5 --retry-delay 3 --retry-all-errors \
+              "${SITE_URL}${path}")
+            printf '%-34s %s\n' "$path" "$code"
+            [ "$code" = "200" ] || failed=1
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::One or more routes did not return 200 after deploy"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### Deployed ${GITHUB_SHA:0:7}"
+            echo ""
+            echo "<${SITE_URL}>"
+          } >> "$GITHUB_STEP_SUMMARY"
