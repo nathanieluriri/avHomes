@@ -1,0 +1,972 @@
+/*
+ * Blog reading surface. Warm paper and ink, one accent, generous type scale.
+ *
+ * Three rules govern this file:
+ *  1. Everything is scoped under .blog. The storefront runs its own Tailwind
+ *     theme, and the two systems meet at the blog boundary and nowhere else.
+ *     Tokens are declared on .blog, not :root, so nothing in the shop can
+ *     start depending on them by accident.
+ *  2. Light mode only, by decision rather than omission.
+ *  3. The prose class is .blog-prose, not .prose, so Tailwind Typography
+ *     cannot fight it over inline-code backticks, measure, or colour.
+ */
+
+.blog,
+.blog-scope {
+  color-scheme: light;
+
+  /* surfaces */
+  --paper: #fbfaf7;
+  --paper-raised: #ffffff;
+  --paper-sunken: #f2f0ea;
+  --paper-inset: #e8e5da;
+
+  /* ink. Every value below is at least 4.5:1 on --paper except --ink-5,
+     which is decorative only (rules, disabled glyphs, never body copy). */
+  --ink: #16150f;
+  --ink-2: #3a372d;
+  --ink-3: #5c584a;
+  --ink-4: #64604f;
+  --ink-5: #9a9384;
+
+  /* lines */
+  --rule: #e2ded2;
+  --rule-strong: #c7c0ae;
+
+  /* the pressable card: hard edge, hard offset, no blur */
+  --card-paper: #fbf7ec;
+  --card-line: #1f1d14;
+  --card-lift: 3px;
+
+  /* accent: deep botanical green */
+  --accent: #1c6b4b;
+  --accent-hover: #17573d;
+  --accent-soft: #e4efe9;
+  --accent-line: #b6d4c5;
+  --accent-ink: #ffffff;
+
+  /* state */
+  --danger: #962c1c;
+  --danger-soft: #f8ebe8;
+  --warn: #7a5610;
+  --warn-soft: #f6eeda;
+
+  /* code has its own dark surface. Hue does the separating, not brightness. */
+  --code-bg: #1b1a14;
+  --code-ink: #ece9dc;
+  --code-kw: #8fd3ae;
+  --code-str: #d9b87c;
+  --code-num: #e3a97f;
+  --code-fn: #9fc7dd;
+  --code-punc: #c0baa8;
+  --code-com: #a39c88;
+
+  /* type. --font-sans resolves to the site sans so the blog and the shop
+     share one UI face instead of loading a second one. */
+  --font-sans: var(--font-geist-sans, "Inter");
+  --font-display: var(--font-spectral, "Spectral"), "Iowan Old Style",
+    "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --font-ui: var(--font-sans, "Inter"), "Inter", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono, "JetBrains Mono"), "JetBrains Mono",
+    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* about a 1.2 minor third through the UI range, widening for display */
+  --step--2: 0.6875rem;
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.375rem;
+  --step-3: 1.6875rem;
+  --step-4: 2.125rem;
+  --step-5: 2.625rem;
+  --step-6: clamp(2.5rem, 1.6rem + 3.6vw, 4rem);
+
+  /* space, 4px base */
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+  --s8: 4rem;
+  --s9: 6rem;
+
+  --ctl-h: 2rem;
+  --ctl-h-lg: 2.25rem;
+  --ctl-pad-x: 0.75rem;
+  --ctl-pad-x-lg: 1rem;
+  --tap-min: 2.75rem;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+  --radius-full: 999px;
+
+  --shadow-1: 0 1px 2px rgba(22, 21, 15, 0.05), 0 1px 1px rgba(22, 21, 15, 0.03);
+  --shadow-2: 0 4px 16px -4px rgba(22, 21, 15, 0.1), 0 2px 4px rgba(22, 21, 15, 0.04);
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 340ms;
+
+  --measure: 42rem;
+  --shell-max: 76rem;
+}
+
+/* the surface itself */
+.blog {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-wrap: anywhere;
+  /* The editorial full-bleed cover is 100vw, which counts the scrollbar and
+     would otherwise push the page sideways. clip, not hidden: hidden makes a
+     scroll container and would kill the technical template's sticky rail. */
+  overflow-x: clip;
+}
+.blog :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+.blog ::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.blog a {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blog *,
+  .blog *::before,
+  .blog *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- templates ---------- */
+
+.blog .tpl {
+  --tpl-measure: calc(var(--measure) + 2 * var(--s5));
+  max-width: var(--tpl-measure);
+  margin: 0 auto;
+  padding: var(--s8) var(--s5) 0;
+}
+.blog .tpl__head {
+  margin-bottom: var(--s6);
+}
+
+.blog .tpl__kicker {
+  font-size: var(--step--2);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: var(--s3);
+}
+.blog .tpl__title {
+  font-family: var(--font-display);
+  font-size: var(--step-6);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.032em;
+  text-wrap: balance;
+  color: var(--ink);
+  margin: 0;
+}
+.blog .tpl__subtitle {
+  margin: var(--s4) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--step-3);
+  line-height: 1.4;
+  color: var(--ink-3);
+  letter-spacing: -0.012em;
+  text-wrap: pretty;
+}
+
+.blog .tpl__byline {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s6);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--rule);
+}
+.blog .tpl__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--paper-inset);
+  color: var(--ink-2);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  text-transform: uppercase;
+  flex: none;
+}
+.blog .tpl__author {
+  font-size: var(--step-0);
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+.blog .tpl__dateline,
+.blog .tpl__meta-line {
+  font-size: var(--step--1);
+  color: var(--ink-4);
+  margin: 1px 0 0;
+}
+
+.blog .tpl__cover {
+  margin: 0 0 var(--s7);
+}
+.blog .tpl__cover-img {
+  width: 100%;
+  height: auto;
+  max-height: 32rem;
+  object-fit: cover;
+  display: block;
+  border-radius: var(--radius-m);
+  background: var(--paper-sunken);
+}
+.blog .tpl__caption {
+  margin-top: var(--s3);
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  color: var(--ink-4);
+  line-height: 1.5;
+}
+
+.blog .tpl__body {
+  padding-bottom: var(--s7);
+}
+.blog .tpl__body > *:first-child {
+  margin-top: 0;
+}
+.blog .tpl__blank {
+  display: grid;
+  justify-items: center;
+  gap: var(--s4);
+  padding: var(--s8) 0;
+  color: var(--ink-4);
+  text-align: center;
+  border-top: 1px solid var(--rule);
+}
+.blog .tpl__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--rule);
+}
+
+/* chips: tags that navigate */
+.blog .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  border-radius: var(--radius-s);
+  padding: var(--s1) var(--s2);
+  font-size: var(--step--2);
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--paper-sunken);
+  color: var(--ink-3);
+  border: 1px solid transparent;
+  text-decoration: none;
+}
+.blog a.chip:hover {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+/* magazine: the cover breaks the measure on wide screens */
+@media (min-width: 900px) {
+  .blog .tpl--magazine .tpl__cover--wide {
+    width: calc(100% + 8rem);
+    margin-left: -4rem;
+  }
+}
+
+/* minimal: narrower measure, larger body, no cover */
+.blog .tpl--minimal {
+  --tpl-measure: calc(38rem + 2 * var(--s5));
+  padding-top: var(--s9);
+}
+.blog .tpl--minimal .tpl__title {
+  font-size: var(--step-4);
+  letter-spacing: -0.022em;
+  line-height: 1.18;
+}
+.blog .tpl--minimal .tpl__subtitle {
+  font-size: var(--step-2);
+  margin-top: var(--s3);
+}
+.blog .tpl--minimal .tpl__meta-line {
+  margin-top: var(--s5);
+  font-variant-numeric: tabular-nums;
+}
+.blog .tpl--minimal .tpl__head {
+  margin-bottom: var(--s7);
+}
+.blog .tpl--minimal .blog-prose {
+  font-size: var(--step-1);
+}
+
+/* editorial: full bleed cover, centred head, drop cap */
+.blog .tpl--editorial {
+  padding-top: 0;
+}
+.blog .tpl--editorial .tpl__cover--bleed {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-bottom: var(--s7);
+  border-radius: 0;
+}
+.blog .tpl--editorial .tpl__cover--bleed .tpl__cover-img {
+  border-radius: 0;
+  max-height: 24rem;
+}
+.blog .tpl__head--centred {
+  text-align: center;
+}
+.blog .tpl__head--centred .tpl__byline {
+  justify-content: center;
+  border-top: 0;
+  padding-top: 0;
+  text-align: left;
+}
+.blog .tpl__rule {
+  width: 4rem;
+  height: 2px;
+  background: var(--accent);
+  margin: var(--s5) auto 0;
+  border-radius: var(--radius-full);
+}
+/* drop cap, only where there is a real paragraph to drop into */
+.blog .tpl--editorial .tpl__body > .blog-prose > p:first-of-type::first-letter,
+.blog .tpl--editorial .tpl__body.blog-prose > p:first-of-type::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-size: 3.4em;
+  line-height: 0.82;
+  font-weight: 700;
+  padding: 0.08em 0.1em 0 0;
+  color: var(--ink);
+}
+
+/* technical: sticky fact rail, sans body */
+.blog .tpl--technical {
+  --tpl-measure: 60rem;
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr);
+  gap: var(--s7);
+  align-items: start;
+}
+.blog .tpl--technical .tpl__title {
+  font-family: var(--font-ui);
+  font-size: var(--step-5);
+  font-weight: 600;
+  letter-spacing: -0.028em;
+}
+.blog .tpl--technical .tpl__subtitle {
+  font-family: var(--font-ui);
+  font-size: var(--step-2);
+}
+.blog .tpl--technical .blog-prose {
+  font-family: var(--font-ui);
+  font-size: var(--step-1);
+  line-height: 1.68;
+  letter-spacing: 0;
+}
+.blog .tpl--technical .blog-prose h2,
+.blog .tpl--technical .blog-prose h3 {
+  font-family: var(--font-ui);
+  letter-spacing: -0.02em;
+}
+.blog .tpl--technical .tpl__rail {
+  position: sticky;
+  top: var(--s7);
+  display: grid;
+  gap: var(--s5);
+}
+.blog .tpl__facts {
+  display: grid;
+  gap: var(--s4);
+  margin: 0;
+  font-size: var(--step--1);
+}
+.blog .tpl__facts dt {
+  font-size: var(--step--2);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-bottom: 2px;
+}
+.blog .tpl__facts dd {
+  margin: 0;
+  color: var(--ink-2);
+}
+.blog .tpl__rail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--rule);
+}
+@media (max-width: 900px) {
+  .blog .tpl--technical {
+    grid-template-columns: 1fr;
+    gap: var(--s5);
+  }
+  .blog .tpl--technical .tpl__rail {
+    position: static;
+    order: 2;
+    padding-top: var(--s5);
+    border-top: 1px solid var(--rule);
+  }
+  .blog .tpl__facts {
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .blog .tpl {
+    padding: var(--s6) var(--s4) 0;
+  }
+  .blog .tpl--minimal {
+    padding-top: var(--s7);
+  }
+  .blog .tpl--editorial {
+    padding-top: 0;
+  }
+}
+
+/* the share row sits under whichever template rendered, on the same measure */
+.blog .blog-share {
+  max-width: calc(var(--measure) + 2 * var(--s5));
+  margin: 0 auto;
+  padding: 0 var(--s5) var(--s8);
+}
+@media (max-width: 640px) {
+  .blog .blog-share {
+    padding: 0 var(--s4) var(--s7);
+  }
+}
+.blog .share {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  padding-top: var(--s5);
+  border-top: 1px solid var(--rule, #e2ded2);
+}
+.blog .share__label {
+  font-size: var(--step--1);
+  color: var(--ink-4);
+}
+.blog .share__list {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.blog .share__link {
+  display: grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: var(--radius-full);
+  color: var(--ink-3);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.blog .share__link svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.blog .share__link:hover {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+/* ---------- prose ---------- */
+
+.blog .blog-prose {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1.72;
+  color: var(--ink);
+  letter-spacing: -0.003em;
+}
+.blog .blog-prose > * + * {
+  margin-top: 1.35em;
+}
+.blog .blog-prose p {
+  hyphens: auto;
+  margin-bottom: 0;
+}
+.blog .blog-prose h2,
+.blog .blog-prose h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  line-height: 1.22;
+  color: var(--ink);
+}
+.blog .blog-prose h2 {
+  font-size: var(--step-4);
+  margin-top: 2em;
+}
+.blog .blog-prose h3 {
+  font-size: var(--step-3);
+  margin-top: 1.7em;
+}
+.blog .blog-prose h2 + p,
+.blog .blog-prose h3 + p {
+  margin-top: 0.7em;
+}
+.blog .blog-prose strong {
+  font-weight: 700;
+}
+.blog .blog-prose em {
+  font-style: italic;
+}
+
+.blog .doc-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color var(--dur-1) var(--ease);
+}
+.blog .doc-link:hover {
+  color: var(--accent);
+}
+
+.blog .blog-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--paper-inset);
+  padding: 0.12em 0.35em;
+  border-radius: var(--radius-s);
+}
+.blog .doc-code {
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  line-height: 1.65;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: var(--s4) var(--s5);
+  border-radius: var(--radius-m);
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+}
+.blog .doc-code code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* the hljs ramp travels with the surface it was measured against, even though
+   code renders as plain text today */
+.blog .hljs-keyword,
+.blog .hljs-selector-tag,
+.blog .hljs-literal,
+.blog .hljs-type,
+.blog .hljs-built_in,
+.blog .hljs-name {
+  color: var(--code-kw);
+}
+.blog .hljs-string,
+.blog .hljs-regexp,
+.blog .hljs-symbol,
+.blog .hljs-quote,
+.blog .hljs-addition {
+  color: var(--code-str);
+}
+.blog .hljs-number,
+.blog .hljs-deletion,
+.blog .hljs-meta,
+.blog .hljs-link {
+  color: var(--code-num);
+}
+.blog .hljs-title,
+.blog .hljs-section,
+.blog .hljs-attr,
+.blog .hljs-attribute,
+.blog .hljs-variable,
+.blog .hljs-template-variable {
+  color: var(--code-fn);
+}
+.blog .hljs-punctuation,
+.blog .hljs-operator,
+.blog .hljs-tag,
+.blog .hljs-params,
+.blog .hljs-selector-attr,
+.blog .hljs-subst {
+  color: var(--code-punc);
+}
+.blog .hljs-comment,
+.blog .hljs-doctag {
+  color: var(--code-com);
+}
+
+/* tables: the table scrolls, never the page */
+.blog .doc-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.blog .doc-table-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.blog .blog-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  line-height: 1.5;
+}
+.blog .blog-prose :is(th, td) {
+  border: 1px solid var(--rule);
+  padding: var(--s2) var(--s3);
+  text-align: left;
+  vertical-align: top;
+  min-width: 4rem;
+  position: relative;
+}
+.blog .blog-prose th {
+  background: var(--paper-sunken);
+  font-weight: 600;
+  color: var(--ink);
+}
+.blog .blog-prose :is(th, td) > p {
+  margin: 0;
+}
+.blog .blog-prose :is(th, td) > p + p {
+  margin-top: 0.5em;
+}
+/* on a phone, dividing the measure by five columns produces five unreadable
+   columns. Size to content and let the wrapper scroll instead. */
+@media (max-width: 640px) {
+  .blog .blog-prose table {
+    table-layout: auto;
+    width: max-content;
+    min-width: 100%;
+  }
+}
+
+.blog .doc-quote {
+  border-left: 3px solid var(--accent);
+  padding: 0.15em 0 0.15em 1.35em;
+  font-style: italic;
+  color: var(--ink-2);
+  font-size: 1.06em;
+}
+.blog .doc-quote p + p {
+  margin-top: 0.8em;
+}
+
+.blog .doc-rule {
+  border: 0;
+  margin: 2.6em auto;
+  width: 6rem;
+  height: 1px;
+  background: none;
+  position: relative;
+}
+.blog .doc-rule::after {
+  content: "· · ·";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-4);
+  letter-spacing: 0.5em;
+  font-size: var(--step-0);
+}
+
+.blog .blog-prose ul,
+.blog .blog-prose ol {
+  padding-left: 1.3em;
+}
+/* Tailwind preflight zeroes list-style globally, so the ordered list has to
+   ask for its markers back. */
+.blog .blog-prose ol {
+  list-style: decimal;
+}
+.blog .blog-prose ol ol {
+  list-style: lower-alpha;
+}
+.blog .blog-prose li + li {
+  margin-top: 0.45em;
+}
+.blog .blog-prose li p {
+  margin: 0;
+}
+.blog .blog-prose ul {
+  list-style: none;
+  padding-left: 1.25em;
+}
+.blog .blog-prose ul > li {
+  position: relative;
+}
+.blog .blog-prose ul > li::before {
+  content: "";
+  position: absolute;
+  left: -0.95em;
+  top: 0.72em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+.blog .blog-prose ul ul > li::before {
+  background: none;
+  border: 1px solid var(--ink-4);
+}
+
+/* checklists: the DOM shape li > label(input + span) + div is what these
+   offsets are measured against */
+.blog .doc-tasks {
+  list-style: none;
+  --task-box: 0.85em;
+  --task-gap: 0.6em;
+}
+.blog .blog-prose .doc-tasks {
+  padding-left: 0;
+}
+.blog .doc-tasks .doc-tasks {
+  margin-top: 0.45em;
+}
+.blog .doc-tasks li {
+  display: flex;
+  gap: var(--task-gap);
+  align-items: flex-start;
+}
+.blog .doc-tasks li::before {
+  display: none;
+}
+.blog .doc-tasks li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.blog .doc-tasks li > label {
+  display: flex;
+  flex: none;
+  margin-top: calc((1.72em - var(--task-box)) / 2);
+}
+@supports (margin-top: 1lh) {
+  .blog .doc-tasks li > label {
+    margin-top: calc((1lh - var(--task-box)) / 2);
+  }
+}
+.blog .doc-tasks input[type="checkbox"] {
+  appearance: none;
+  flex: none;
+  margin: 0;
+  width: var(--task-box);
+  height: var(--task-box);
+  /* an unchecked box IS its border. WCAG 1.4.11 puts a 3:1 floor under it,
+     and --ink-4 is the value that clears it. */
+  border: 1.5px solid var(--ink-4);
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+}
+.blog .doc-tasks input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.blog .doc-tasks input[type="checkbox"]:checked::after {
+  content: "";
+  width: calc(var(--task-box) * 0.28);
+  height: calc(var(--task-box) * 0.52);
+  border: solid var(--accent-ink);
+  border-width: 0 calc(var(--task-box) * 0.1) calc(var(--task-box) * 0.1) 0;
+  transform: rotate(42deg)
+    translate(calc(var(--task-box) * -0.05), calc(var(--task-box) * -0.05));
+}
+.blog .doc-tasks li[data-checked="true"] > div {
+  color: var(--ink-4);
+  text-decoration: line-through;
+}
+
+.blog .doc-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-m);
+  margin-inline: auto;
+}
+.blog .doc-caption {
+  margin-top: var(--s3);
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  color: var(--ink-4);
+  line-height: 1.5;
+}
+.blog .doc-figure {
+  margin: 2em 0;
+}
+/* a figure is a plate, not an inline picture, except in the two templates
+   whose column IS the design */
+@media (min-width: 900px) {
+  .blog .tpl__body .doc-figure {
+    width: calc(100% + 6rem);
+    margin-left: -3rem;
+  }
+  .blog .tpl--technical .tpl__body .doc-figure,
+  .blog .tpl--minimal .tpl__body .doc-figure {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .blog .blog-prose {
+    font-size: var(--step-1);
+    line-height: 1.68;
+  }
+  .blog .blog-prose h2 {
+    font-size: var(--step-3);
+  }
+  .blog .blog-prose h3 {
+    font-size: var(--step-2);
+  }
+  .blog .doc-code {
+    padding: var(--s3);
+    font-size: var(--step--1);
+  }
+}
+
+/* ---------- index ---------- */
+
+.blog .idx {
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  padding: var(--s8) var(--s5) var(--s9);
+}
+.blog .idx__head {
+  max-width: var(--measure);
+  margin: 0 auto var(--s6);
+  text-align: center;
+}
+.blog .idx__h1 {
+  font-family: var(--font-display);
+  font-size: var(--step-5);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+  margin: 0;
+}
+.blog .idx__intro {
+  margin: var(--s4) 0 0;
+  color: var(--ink-3);
+  font-size: var(--step-1);
+  line-height: 1.6;
+}
+.blog .idx__tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s2);
+  margin-bottom: var(--s7);
+}
+.blog .idx__tags .chip[aria-current="page"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.blog .idx__grid {
+  display: grid;
+  gap: var(--s5);
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}
+.blog .idx__card {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
+  background: var(--paper-raised);
+  overflow: hidden;
+  transition: border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+}
+.blog .idx__card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+}
+.blog .idx__link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  height: 100%;
+}
+.blog .idx__thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: var(--paper-sunken);
+}
+.blog .idx__thumb--empty {
+  background: var(--paper-inset);
+}
+.blog .idx__body {
+  padding: var(--s4) var(--s5) var(--s5);
+}
+.blog .idx__title {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+  margin: 0;
+  text-wrap: pretty;
+}
+.blog .idx__excerpt {
+  margin: var(--s3) 0 0;
+  color: var(--ink-3);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.blog .idx__meta {
+  margin: var(--s4) 0 0;
+  font-size: var(--step--1);
+  color: var(--ink-4);
+}
+.blog .idx__empty {
+  text-align: center;
+  color: var(--ink-3);
+  padding: var(--s8) 0;
+}
+@media (max-width: 640px) {
+  .blog .idx {
+    padding: var(--s6) var(--s4) var(--s8);
+  }
+}

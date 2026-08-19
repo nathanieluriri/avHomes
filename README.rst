@@ -60,6 +60,33 @@ These are stand ins. Replace the paths in ``src/lib/demo-data.ts`` (or the live 
 payloads) with real photography and nothing else needs to change. A larger reference
 set is kept out of the build at ``reference/av-construction``.
 
+Blog reader
+===========
+
+The post reader lives at ``/posts/<slug>`` and follows a fixed contract so it
+can be pointed at the real admin service without a rewrite.
+
+- ``src/lib/blog/config.ts`` holds ``BLOG_MODE``. ``demo`` serves the fixture
+  posts in ``demo-posts.ts``, ``api`` fetches from the public blog API. Nothing
+  in there is secret, so it is committed rather than passed as an env var.
+- ``src/lib/blog/client.ts`` retries 5xx and network failures only, since a 4xx
+  is an answer rather than an outage. Detail pages revalidate at 3600s, lists at
+  300s.
+- Post bodies are TipTap JSON rendered by ``DocRenderer``. It never uses
+  ``dangerouslySetInnerHTML``: an unknown node renders its children so words
+  survive, and every href and image src passes an allow-list that rejects
+  ``//host`` and ``/\host``.
+- Cover images route through ``/images/blog/<id>``, which follows the upstream
+  presigned redirect server side and serves the bytes from a URL that never
+  changes. The presigned URL never reaches HTML.
+- A post carries its own ``template``: magazine, minimal, editorial or
+  technical. An unrecognised name falls back to magazine rather than throwing.
+- The blog stylesheet is scoped entirely under ``.blog`` and uses
+  ``.blog-prose`` rather than ``.prose`` so it cannot collide with the
+  storefront theme.
+
+``/blog`` and ``/blog/<slug>`` redirect to their ``/posts`` equivalents.
+
 Pages
 =====
 

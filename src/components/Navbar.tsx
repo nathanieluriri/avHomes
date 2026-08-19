@@ -10,7 +10,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/listings?status=For+Sale", label: "Buy" },
   { href: "/listings?status=For+Rent", label: "Rent" },
-  { href: "/blog", label: "Insights" },
+  { href: "/posts", label: "Insights" },
   { href: "/#about", label: "About Us" },
   { href: "/contact", label: "Contact" },
 ];
