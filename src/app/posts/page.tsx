@@ -31,9 +31,7 @@ function PostCard({ post }: { post: PublicPost }) {
             loading="lazy"
             decoding="async"
           />
-        ) : (
-          <div className="idx__thumb idx__thumb--empty" aria-hidden="true" />
-        )}
+        ) : null}
         <div className="idx__body">
           {post.category && <p className="tpl__kicker">{post.category}</p>}
           <h2 className="idx__title">{post.title.trim() || "Untitled"}</h2>

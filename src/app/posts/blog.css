@@ -1,5 +1,6 @@
 /*
- * Blog reading surface. Warm paper and ink, one accent, generous type scale.
+ * Blog reading surface. White paper, neutral ink, the site blue as the one
+ * accent, generous type scale.
  *
  * Three rules govern this file:
  *  1. Everything is scoped under .blog. The storefront runs its own Tailwind
@@ -15,51 +16,51 @@
 .blog-scope {
   color-scheme: light;
 
-  /* surfaces */
-  --paper: #fbfaf7;
+  /* surfaces: neutral white, no warm cast */
+  --paper: #ffffff;
   --paper-raised: #ffffff;
-  --paper-sunken: #f2f0ea;
-  --paper-inset: #e8e5da;
+  --paper-sunken: #f5f6f8;
+  --paper-inset: #e9ecf1;
 
   /* ink. Every value below is at least 4.5:1 on --paper except --ink-5,
      which is decorative only (rules, disabled glyphs, never body copy). */
-  --ink: #16150f;
-  --ink-2: #3a372d;
-  --ink-3: #5c584a;
-  --ink-4: #64604f;
-  --ink-5: #9a9384;
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --ink-3: #475569;
+  --ink-4: #5b6675;
+  --ink-5: #94a3b8;
 
   /* lines */
-  --rule: #e2ded2;
-  --rule-strong: #c7c0ae;
+  --rule: #e2e8f0;
+  --rule-strong: #cbd5e1;
 
   /* the pressable card: hard edge, hard offset, no blur */
-  --card-paper: #fbf7ec;
-  --card-line: #1f1d14;
+  --card-paper: #ffffff;
+  --card-line: #0f172a;
   --card-lift: 3px;
 
-  /* accent: deep botanical green */
-  --accent: #1c6b4b;
-  --accent-hover: #17573d;
-  --accent-soft: #e4efe9;
-  --accent-line: #b6d4c5;
+  /* accent: the AVHomes blue, so the reader matches the rest of the site */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --accent-line: #bfdbfe;
   --accent-ink: #ffffff;
 
   /* state */
-  --danger: #962c1c;
-  --danger-soft: #f8ebe8;
-  --warn: #7a5610;
-  --warn-soft: #f6eeda;
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --warn: #b54708;
+  --warn-soft: #fffaeb;
 
   /* code has its own dark surface. Hue does the separating, not brightness. */
-  --code-bg: #1b1a14;
-  --code-ink: #ece9dc;
-  --code-kw: #8fd3ae;
-  --code-str: #d9b87c;
-  --code-num: #e3a97f;
-  --code-fn: #9fc7dd;
-  --code-punc: #c0baa8;
-  --code-com: #a39c88;
+  --code-bg: #0f172a;
+  --code-ink: #e2e8f0;
+  --code-kw: #7dd3fc;
+  --code-str: #86efac;
+  --code-num: #fdba74;
+  --code-fn: #c4b5fd;
+  --code-punc: #cbd5e1;
+  --code-com: #94a3b8;
 
   /* type. --font-sans resolves to the site sans so the blog and the shop
      share one UI face instead of loading a second one. */
@@ -930,11 +931,12 @@
   object-fit: cover;
   background: var(--paper-sunken);
 }
-.blog .idx__thumb--empty {
-  background: var(--paper-inset);
-}
 .blog .idx__body {
   padding: var(--s4) var(--s5) var(--s5);
+}
+/* Text only cards would otherwise sit tight against the card edge. */
+.blog .idx__link > .idx__body:first-child {
+  padding-top: var(--s5);
 }
 .blog .idx__title {
   font-family: var(--font-display);
