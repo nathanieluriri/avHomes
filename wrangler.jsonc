@@ -2,8 +2,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "avhomes",
   "main": ".open-next/worker.js",
-  "compatibility_date": "2024-12-30",
-  "compatibility_flags": ["nodejs_compat"],
+  // The MongoDB driver needs node:net and node:tls, which Workers only gained
+  // in March 2025. Both the date and nodejs_compat_v2 are required for it.
+  "compatibility_date": "2025-03-20",
+  "compatibility_flags": ["nodejs_compat_v2"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
