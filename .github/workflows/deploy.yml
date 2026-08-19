@@ -73,20 +73,42 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       # Confirms the worker actually serves the new build rather than trusting
-      # that the upload succeeded. Fails the run if any route is not 200.
+      # that the upload succeeded. Each route asserts an expected status, so a
+      # redirect quietly turning into a 404 is caught as well as an outage.
       - name: Smoke test the deployment
         run: |
-          set -euo pipefail
+          set -uo pipefail
           failed=0
-          for path in / /listings /blog /contact /terms /privacy "/listings?status=For+Sale" "/listings?status=For+Rent"; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' \
-              --retry 5 --retry-delay 3 --retry-all-errors \
-              "${SITE_URL}${path}")
-            printf '%-34s %s\n' "$path" "$code"
-            [ "$code" = "200" ] || failed=1
-          done
+
+          check() {
+            path="$1"
+            want="$2"
+            got=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 --retry-all-errors "${SITE_URL}${path}")
+            if [ "$got" = "$want" ]; then
+              printf '  ok    %-46s %s\n' "$path" "$got"
+            else
+              printf '  FAIL  %-46s got %s, want %s\n' "$path" "$got" "$want"
+              failed=1
+            fi
+          }
+
+          check "/" 200
+          check "/listings" 200
+          check "/listings?status=For+Sale" 200
+          check "/listings?status=For+Rent" 200
+          check "/posts" 200
+          check "/posts/lagos-service-charge-explained" 200
+          check "/contact" 200
+          check "/terms" 200
+          check "/privacy" 200
+          # The old blog paths must keep redirecting, not start 404ing.
+          check "/blog" 307
+          check "/blog/lagos-service-charge-explained" 307
+          # An unknown post must 404 rather than render an empty shell.
+          check "/posts/no-such-post" 404
+
           if [ "$failed" -ne 0 ]; then
-            echo "::error::One or more routes did not return 200 after deploy"
+            echo "::error::One or more routes returned an unexpected status after deploy"
             exit 1
           fi
 
