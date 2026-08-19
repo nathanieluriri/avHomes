@@ -1,19 +1,18 @@
 import { Property, Testimonial, SiteStat, Insight } from "./types";
 import { demoProperties, demoTestimonials, demoStats, demoInsights } from "./demo-data";
+import { API_BASE_URL, IS_DEMO, REVALIDATE_SECONDS } from "./api-config";
 
 /**
  * Single data access layer. Pages never import demo data directly, so flipping
- * DATA_MODE to "api" switches the whole site to a live backend with no page edits.
+ * DATA_MODE in api-config.ts switches the whole site to a live backend with no
+ * page edits.
  */
-const DATA_MODE = process.env.DATA_MODE ?? "demo";
-const API_BASE_URL = process.env.API_BASE_URL ?? "";
-
-const isDemo = DATA_MODE !== "api";
+const isDemo = IS_DEMO;
 
 async function apiFetch<T>(path: string, fallback: T): Promise<T> {
   if (!API_BASE_URL) return fallback;
   try {
-    const res = await fetch(`${API_BASE_URL}${path}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${API_BASE_URL}${path}`, { next: { revalidate: REVALIDATE_SECONDS } });
     if (!res.ok) throw new Error(`API ${path} responded ${res.status}`);
     return (await res.json()) as T;
   } catch (err) {

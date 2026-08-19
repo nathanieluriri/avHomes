@@ -4,22 +4,19 @@ import SearchStrip from "@/components/SearchStrip";
 import FeaturedListings from "@/components/FeaturedListings";
 import WhyChooseUs from "@/components/WhyChooseUs";
 import LogoMarquee from "@/components/LogoMarquee";
-import Insights from "@/components/Insights";
 import Testimonials from "@/components/Testimonials";
 import CTABanner from "@/components/CTABanner";
 import {
   getFeaturedProperties,
   getStats,
   getTestimonials,
-  getInsights,
 } from "@/lib/data";
 
 export default async function Home() {
-  const [properties, stats, testimonials, insights] = await Promise.all([
+  const [properties, stats, testimonials] = await Promise.all([
     getFeaturedProperties(),
     getStats(),
     getTestimonials(),
-    getInsights(),
   ]);
 
   return (
@@ -34,7 +31,6 @@ export default async function Home() {
       </Suspense>
       <LogoMarquee />
       <WhyChooseUs stats={stats} />
-      <Insights insights={insights} />
       <Testimonials testimonials={testimonials} />
       <CTABanner />
     </>

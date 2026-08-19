@@ -38,19 +38,42 @@ export default async function ListingsPage({
     return true;
   });
 
+  // Buy and Rent are the same route with a different status, so the header
+  // shifts to make each one read as its own destination.
+  const header =
+    sp.status === "For Sale"
+      ? {
+          eyebrow: "Buy",
+          lead: "Homes For",
+          accent: "Sale",
+          sub: "Own it outright. Every sale listing is checked on site before it goes live.",
+        }
+      : sp.status === "For Rent"
+        ? {
+            eyebrow: "Rent",
+            lead: "Homes To",
+            accent: "Rent",
+            sub: "Yearly rentals across Lagos and Abuja, with no hidden agency fees.",
+          }
+        : {
+            eyebrow: "Listings",
+            lead: "Find A Home That",
+            accent: "Fits You",
+            sub: "Everything we have on the market right now, to buy and to rent.",
+          };
+
   return (
     <>
       <section className="border-b border-mist-200 bg-mist-50">
         <div className="mx-auto max-w-7xl px-6 py-14 text-center lg:px-10 lg:py-20">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">
-            Listings
+            {header.eyebrow}
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-navy-950 sm:text-4xl lg:text-5xl">
-            Find A Home That <span className="accent">Fits You</span>
+            {header.lead} <span className="accent">{header.accent}</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">
-            {filtered.length} {filtered.length === 1 ? "property" : "properties"} available
-            across Lagos and Abuja, each one vetted before it goes live.
+            {filtered.length} {filtered.length === 1 ? "property" : "properties"}. {header.sub}
           </p>
         </div>
       </section>

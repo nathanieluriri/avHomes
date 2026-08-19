@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { socialLinks } from "./SocialIcons";
 
 const columns: { title: string; links: { label: string; href: string }[] }[] = [
   {
@@ -8,7 +9,7 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
       { label: "Our Story", href: "#" },
       { label: "Careers", href: "#" },
       { label: "Press", href: "#" },
-      { label: "Blog", href: "#" },
+      { label: "Blog", href: "/blog" },
     ],
   },
   {
@@ -32,10 +33,10 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "Contact",
     links: [
-      { label: "Get in Touch", href: "#" },
-      { label: "Book a Viewing", href: "#" },
+      { label: "Get in Touch", href: "/contact" },
+      { label: "Book a Viewing", href: "/contact" },
       { label: "Agent Network", href: "#" },
-      { label: "Support", href: "#" },
+      { label: "Support", href: "/contact" },
     ],
   },
 ];
@@ -57,10 +58,14 @@ export default function Footer() {
         <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Link href="/" className="flex items-center gap-3">
-              <span className="relative block h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-white p-1">
-                <Image src="/brand/logo.png" alt="AVHomes" fill className="object-contain" />
-              </span>
-              <span className="text-xl font-bold tracking-tight text-white">
+              <Image
+                src="/brand/logo-mark.png"
+                alt="AVHomes"
+                width={1199}
+                height={844}
+                className="h-10 w-auto"
+              />
+              <span className="text-2xl font-extrabold tracking-tight text-white">
                 AVHomes
               </span>
             </Link>
@@ -116,23 +121,27 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 flex gap-3">
-          {["IN", "IG", "FB", "X"].map((s) => (
-            <span
-              key={s}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-[11px] font-semibold uppercase text-white/70 transition-colors hover:border-blue-500 hover:text-blue-500"
+          {socialLinks.map(({ label, href, Icon }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={label}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70 transition-colors hover:border-blue-500 hover:text-blue-500"
             >
-              {s}
-            </span>
+              <Icon className="h-4 w-4" />
+            </a>
           ))}
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/15 pt-8 text-xs text-white/50 sm:flex-row">
           <p>&copy; 2026 AVHomes. All rights reserved.</p>
           <div className="flex gap-6">
-            <Link href="#" className="transition-colors hover:text-blue-500">
+            <Link href="/terms" className="transition-colors hover:text-blue-500">
               Terms
             </Link>
-            <Link href="#" className="transition-colors hover:text-blue-500">
+            <Link href="/privacy" className="transition-colors hover:text-blue-500">
               Privacy
             </Link>
           </div>
