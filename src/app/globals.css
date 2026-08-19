@@ -1,26 +1,168 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
+  /* AVHomes palette: AV Constructions deep blue on a light, airy base */
+  --navy-950: #0b1a33;
+  --navy-900: #12294a;
+  --navy-800: #1a3a63;
+  --ink: #0f172a;
+  --blue-700: #1d4ed8;
+  --blue-600: #2563eb;
+  --blue-500: #3b82f6;
+  --blue-100: #dbeafe;
+  --blue-50: #eff6ff;
+  --mist-50: #f8fafc;
+  --mist-100: #f1f5f9;
+  --mist-200: #e2e8f0;
+  --mist-300: #cbd5e1;
+  --slate-500: #64748b;
+
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+  --primary: var(--navy-950);
+  --primary-foreground: #ffffff;
+  --secondary: var(--mist-100);
+  --secondary-foreground: var(--ink);
+  --muted: var(--mist-100);
+  --muted-foreground: var(--slate-500);
+  --accent: var(--blue-50);
+  --accent-foreground: var(--blue-700);
+  --destructive: #dc2626;
+  --border: var(--mist-200);
+  --input: var(--mist-200);
+  --ring: var(--blue-600);
+  --radius: 1rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-instrument-serif);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-navy-950: var(--navy-950);
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-ink: var(--ink);
+  --color-blue-700: var(--blue-700);
+  --color-blue-600: var(--blue-600);
+  --color-blue-500: var(--blue-500);
+  --color-blue-100: var(--blue-100);
+  --color-blue-50: var(--blue-50);
+  --color-mist-50: var(--mist-50);
+  --color-mist-100: var(--mist-100);
+  --color-mist-200: var(--mist-200);
+  --color-mist-300: var(--mist-300);
+  --color-slate-500: var(--slate-500);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+
+  --animate-marquee: marquee 40s linear infinite;
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  /* Hover depth comes from borders and lift, never a blurred shadow. */
+  *, *::before, *::after {
+    box-shadow: none !important;
+  }
+}
+
+/* Italic serif accent used on emphasis words in headings. */
+.accent {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--blue-600);
+  letter-spacing: -0.01em;
+}
+
+/* Soft card: subtle border, lifts and borders up on hover. No shadow. */
+.card-soft {
+  border: 1px solid var(--mist-200);
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+.card-soft:hover {
+  border-color: var(--blue-500);
+  transform: translateY(-4px);
+}
+
+/*
+ * Scroll reveal. Gated on scripting so content is never hidden when JS is off,
+ * and so browsers without the query simply render everything visible.
+ */
+@media (scripting: enabled) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .card-soft:hover { transform: none; }
+  html { scroll-behavior: auto; }
+  .marquee-track { animation: none !important; }
+}
+
+html { scroll-behavior: smooth; }
+
+/* Marquee needs the track duplicated in markup for a seamless loop. */
+.marquee-track { display: flex; width: max-content; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

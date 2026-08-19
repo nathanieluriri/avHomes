@@ -1,0 +1,110 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Search, MapPin } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const TYPES = [
+  "Villa",
+  "Apartment",
+  "Duplex",
+  "Penthouse",
+  "Townhouse",
+  "Terrace",
+  "Bungalow",
+  "Studio",
+  "Mansion",
+];
+
+/**
+ * Floating search card. The wrapper pulls it up so it straddles the hero and
+ * the section beneath, matching the AV Constructions layout.
+ */
+export default function SearchStrip() {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
+  const [type, setType] = useState("");
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (q.trim()) params.set("q", q.trim());
+    if (status) params.set("status", status);
+    if (type) params.set("type", type);
+    const qs = params.toString();
+    router.push(`/listings${qs ? `?${qs}` : ""}`);
+  }
+
+  return (
+    <div className="relative z-30 -mt-24 px-6 lg:px-10">
+      <form
+        onSubmit={submit}
+        className="mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-mist-200 bg-white p-3 lg:flex-row lg:items-center lg:gap-0 lg:rounded-full lg:p-2.5"
+      >
+        <div className="flex flex-1 items-center gap-2.5 px-4 py-2">
+          <MapPin className="h-4 w-4 shrink-0 text-blue-600" strokeWidth={1.8} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search in location..."
+            aria-label="Search by location"
+            className="w-full bg-transparent text-sm text-navy-950 outline-none placeholder:text-slate-500"
+          />
+        </div>
+
+        <div className="hidden h-8 w-px bg-mist-200 lg:block" />
+
+        <div className="px-1 lg:px-2">
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger
+              aria-label="Buy or rent"
+              className="w-full rounded-full border-0 bg-mist-100 text-sm shadow-none lg:w-[140px] lg:bg-transparent"
+            >
+              <SelectValue placeholder="Buy or Rent" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="For Sale">Buy</SelectItem>
+              <SelectItem value="For Rent">Rent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="hidden h-8 w-px bg-mist-200 lg:block" />
+
+        <div className="px-1 lg:px-2">
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger
+              aria-label="Property type"
+              className="w-full rounded-full border-0 bg-mist-100 text-sm shadow-none lg:w-[150px] lg:bg-transparent"
+            >
+              <SelectValue placeholder="Property type" />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <button
+          type="submit"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 lg:py-3"
+        >
+          <Search className="h-4 w-4" strokeWidth={2.2} />
+          Find Property
+        </button>
+      </form>
+    </div>
+  );
+}
