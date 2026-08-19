@@ -81,6 +81,7 @@ firebase-debug.log*
 # cloud / deploy platform
 .vercel
 .wrangler/
+.open-next/
 .cloudflare/
 .netlify/
 .amplify/
