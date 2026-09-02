@@ -57,7 +57,7 @@ export function SaveBar({
   return createPortal(
     <div
       role="status"
-      className="console-float fixed inset-x-0 bottom-0 z-[60] flex justify-center p-3 sm:p-4"
+      className="c-savebar console-float fixed inset-x-0 bottom-0 z-[60] flex justify-center p-3 sm:p-4"
     >
       <div className="pointer-events-auto flex w-full max-w-lg items-center gap-3 rounded-2xl bg-navy-950 py-2 pl-4 pr-2 shadow-pop">
         <AlertCircle className="hidden h-4 w-4 shrink-0 text-blue-100 sm:block" aria-hidden="true" />

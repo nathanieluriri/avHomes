@@ -278,10 +278,18 @@ function PropertyEditor({ initial }: { initial: Property }) {
           </Badge>
         }
         subtitle={property.slug ? `/listings/${property.slug}` : "No slug yet. It is derived when you publish."}
+        /*
+         * One Save at a time. While the bar is up it owns the act, and a second
+         * live Save in the header is two controls competing for the same click.
+         * Clean, the header keeps a disabled Save so the affordance does not
+         * disappear from the place a reader looks for it first.
+         */
         actions={
-          <Button onClick={save} disabled={busy || !dirty} size="lg">
-            {busy ? "Saving" : saved && !dirty ? "Saved" : "Save"}
-          </Button>
+          dirty ? undefined : (
+            <Button onClick={save} disabled size="lg">
+              {saved ? "Saved" : "Save"}
+            </Button>
+          )
         }
       />
 

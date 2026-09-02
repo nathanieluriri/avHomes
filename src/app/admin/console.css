@@ -235,6 +235,16 @@
   pointer-events: none;
 }
 
+/* The sheet makes room for the save bar while one is up, and gives it back when
+   it is not. The bar is fixed to the viewport, so without this it lands on the
+   last thing on the page: at 375px it covered two thirds of "Move to trash" on
+   an editor already scrolled to its end, which is a destructive control the
+   reader could not uncover. `:has()` is what lets the page respond to an
+   element portalled outside it. */
+body:has(.c-savebar) .c-sheet {
+  padding-bottom: 5.5rem;
+}
+
 /* ═══ THE DRAWER ══════════════════════════════════════════════════════════
    Below the breakpoint the rail becomes an off-canvas drawer. `visibility`
    plus `transform` rather than `display`, because display cannot animate and a

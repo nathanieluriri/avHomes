@@ -72,7 +72,7 @@ export function DataTable<T>({
           a spinner. The columns are known before the data is, so the wait can
           show the real shape and the page does not reflow on arrival. */}
       {loading ? (
-        <TableSkeleton columns={columns.length} />
+        <TableSkeleton columns={columns} />
       ) : rows.length === 0 ? (
         /* No empty means the caller knows why the list is empty and is saying
            so somewhere else. A failed load must not fall through to an
@@ -125,7 +125,10 @@ export function DataTable<T>({
                         }
                       : undefined
                   }
-                  className={`group border-b border-mist-100 last:border-0 hover:bg-blue-50/40 ${
+                  /* `focus-within` as well as `hover`: the whole row responds
+                     to a pointer, so it has to respond the same way when a
+                     keyboard reaches the link inside it. */
+                  className={`group border-b border-mist-100 last:border-0 hover:bg-blue-50/40 focus-within:bg-blue-50/40 ${
                     hrefFor ? "cursor-pointer" : ""
                   }`}
                 >
@@ -196,26 +199,75 @@ export function DataTable<T>({
         </>
       )}
 
-      {footer && !loading && rows.length > 0 && (
-        <div className="border-t border-mist-200 px-3 py-2.5">{footer}</div>
+      {footer && (loading || rows.length > 0) && (
+        <div className="border-t border-mist-200 px-3 py-2.5">
+          {loading ? <Skeleton className="h-7 w-full max-w-[16rem]" /> : footer}
+        </div>
       )}
     </div>
   );
 }
 
-function TableSkeleton({ columns }: { columns: number }) {
+/**
+ * The wait wears the table's own frame.
+ *
+ * The REAL header row, not a placeholder for it, because the columns are known
+ * before the rows are. Without it the header popped in on arrival and pushed
+ * every row down, which is the reflow a skeleton exists to prevent, and it made
+ * this the one screen in the console whose wait did not hold its shape.
+ */
+function TableSkeleton<T>({ columns }: { columns: readonly Column<T>[] }) {
   return (
-    <div className="p-4" aria-live="polite" aria-busy="true">
+    <div aria-live="polite" aria-busy="true">
       <span className="sr-only">Loading rows</span>
-      {Array.from({ length: 4 }, (_, row) => (
-        <div key={row} className="flex items-center gap-4 border-b border-mist-100 py-3 last:border-0">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
-          <Skeleton className="h-3.5 flex-1" />
-          {Array.from({ length: Math.max(0, columns - 2) }, (_, cell) => (
-            <Skeleton key={cell} className="hidden h-3.5 w-16 sm:block" />
+
+      <table className="hidden w-full text-[13px] sm:table">
+        <thead>
+          <tr className="border-b border-mist-200 bg-mist-50/60">
+            {columns.map((column) => (
+              <th
+                key={column.key}
+                scope="col"
+                className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 ${
+                  column.numeric ? "text-right" : "text-left"
+                }`}
+              >
+                {column.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 4 }, (_, row) => (
+            <tr key={row} className="border-b border-mist-100 last:border-0">
+              {columns.map((column, index) => (
+                <td key={column.key} className="px-4 py-2.5">
+                  {index === 0 ? (
+                    <span className="flex items-center gap-3">
+                      <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+                      <Skeleton className="h-3.5 w-40" />
+                    </span>
+                  ) : (
+                    <Skeleton className={`h-3.5 w-16 ${column.numeric ? "ml-auto" : ""}`} />
+                  )}
+                </td>
+              ))}
+            </tr>
           ))}
-        </div>
-      ))}
+        </tbody>
+      </table>
+
+      <ul className="sm:hidden">
+        {Array.from({ length: 4 }, (_, row) => (
+          <li key={row} className="flex items-center gap-3 border-b border-mist-100 px-4 py-3 last:border-0">
+            <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+            <span className="flex-1 space-y-1.5">
+              <Skeleton className="h-3.5 w-2/3" />
+              <Skeleton className="h-3 w-1/2" />
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
