@@ -24,6 +24,7 @@
       "@avhomes/content": ["./packages/content/src/index.ts"],
       "@avhomes/media": ["./packages/media/src/index.ts"],
       "@avhomes/enquiries": ["./packages/enquiries/src/index.ts"],
+      "@avhomes/analytics": ["./packages/analytics/src/index.ts"],
       "@avhomes/api": ["./packages/api/src/index.ts"]
     }
   },

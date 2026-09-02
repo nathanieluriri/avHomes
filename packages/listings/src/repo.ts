@@ -51,6 +51,26 @@ export interface ListQuery {
   agentUserId?: string | undefined;
   /** Admin lists see drafts and trash; the public list never does. */
   includeHidden?: boolean;
+  /**
+   * Substring matching instead of the text index. Admin lists only.
+   *
+   * `$text` is whole-word and stemmed, which is right for a visitor typing a
+   * finished query into the site's search box and wrong for an operator
+   * narrowing a table as they type: "trop" matched nothing until it became
+   * "tropical", so the screen went empty while the listing they wanted was on
+   * it. This is a filter, not a search, so it behaves like one.
+   */
+  substring?: boolean;
+}
+
+/**
+ * A caller's own text, made safe to put inside a RegExp.
+ *
+ * Without this a search for `(` is a syntax error thrown from inside a route,
+ * and one for `.*` is a filter that matches the whole collection.
+ */
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function buildFilter(query: ListQuery): Filter<PropertyDoc> {
@@ -79,12 +99,27 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
   }
 
   /*
-   * Text search and keyset paging do not compose: $text sorts by relevance,
-   * which is not a stored field, so there is no value to put in a cursor. A
-   * search is therefore a single bounded page, which is what a search box on
-   * this site actually needs.
+   * TWO SEARCHES, and which one runs is the caller's choice.
+   *
+   * `$text` is the public one: stemmed, relevance ranked, index backed. It does
+   * not compose with keyset paging, because relevance is not a stored field and
+   * there is nothing to put in a cursor, so a public search is one bounded page.
+   *
+   * `substring` is the admin one. It is a scan, and that is the deliberate
+   * trade: an authenticated screen with a bounded page size, in exchange for a
+   * filter that narrows on every keystroke, respects the sort the operator
+   * chose, and pages like every other view. `description` is left out on
+   * purpose, or a common word in one long body drags an unrelated listing to
+   * the top of the operator's table.
    */
-  if (query.q) and.push({ $text: { $search: query.q } } as Filter<PropertyDoc>);
+  if (query.q && query.substring) {
+    const like = new RegExp(escapeRegex(query.q), "iu");
+    and.push({
+      $or: [{ title: like }, { city: like }, { location: like }, { tagline: like }],
+    } as Filter<PropertyDoc>);
+  } else if (query.q) {
+    and.push({ $text: { $search: query.q } } as Filter<PropertyDoc>);
+  }
 
   const keyset = keysetFilter<PropertyDoc>(PROPERTY_SORTS[query.sort], query.cursor, query.sort);
   if (Object.keys(keyset).length > 0) and.push(keyset);
@@ -96,9 +131,13 @@ export async function listProperties(db: Db, query: ListQuery): Promise<Page<Pro
   const spec = PROPERTY_SORTS[query.sort];
   const filter = buildFilter(query);
 
+  // Only the text path forfeits the chosen sort. A substring filter is an
+  // ordinary query, so it keeps the operator's sort and its cursor.
+  const relevance = Boolean(query.q) && !query.substring;
+
   const docs = await properties(db)
     .find(filter, {
-      sort: query.q ? { score: { $meta: "textScore" } } : keysetSort(spec),
+      sort: relevance ? { score: { $meta: "textScore" } } : keysetSort(spec),
       // One extra, to answer "is there another page" without a count.
       limit: query.limit + 1,
     })
@@ -107,8 +146,9 @@ export async function listProperties(db: Db, query: ListQuery): Promise<Page<Pro
   const { items, nextCursor } = takePage(docs, query.limit, spec, query.sort);
   return {
     items: items.map(toProperty),
-    // A text search returns one page by construction, so it never offers a cursor.
-    nextCursor: query.q ? null : nextCursor,
+    // A text search returns one page by construction, so it never offers a
+    // cursor. A substring filter is keyset paged like any other list.
+    nextCursor: relevance ? null : nextCursor,
   };
 }
 

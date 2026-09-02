@@ -222,6 +222,21 @@ export interface Enquiry {
   revision: number;
 }
 
+/* ─────────────────────────────── analytics ────────────────────────────── */
+
+export interface SitePulse {
+  /** Sessions whose last beacon landed inside the live window (five minutes). */
+  live: number;
+  /** Sessions in the last 30 days. A session is a tab, not a person. */
+  sessions: number;
+  /** The 30 days before those, so a trend is two measured windows. */
+  previousSessions: number;
+  /** Exactly 30 entries, oldest first, UTC days, ZERO-FILLED. */
+  series: { day: string; sessions: number }[];
+  /** Page views across the sessions counted above. */
+  views: number;
+}
+
 /* ───────────────────────────── shared paging ──────────────────────────── */
 
 export interface Page<T> {

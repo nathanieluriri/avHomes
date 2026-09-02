@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { Building2 } from "lucide-react";
 import {
   PROPERTY_TYPES,
   parseMajor,
@@ -207,18 +207,24 @@ function PropertyEditor({ initial }: { initial: Property }) {
 
   return (
     <>
+      {/* `backTo` draws the breadcrumb, which replaces the old "Back" link in
+          the action row. The crumb says where you are AND takes you up, and it
+          sits where a reader looks for that rather than beside Save. */}
       <PageHeader
+        icon={Building2}
+        backTo="/admin/properties"
+        backLabel="Listings"
         title={property.title || "Untitled listing"}
+        badge={
+          <Badge tone={property.deletedAt ? "red" : "blue"}>
+            {property.deletedAt ? "In trash" : statusLabel(property.status)}
+          </Badge>
+        }
         subtitle={property.slug ? `/listings/${property.slug}` : "No slug yet. It is derived when you publish."}
         actions={
-          <>
-            <Link href="/admin/properties" className="text-sm text-muted-foreground underline underline-offset-2">
-              Back
-            </Link>
-            <Button onClick={save} disabled={busy}>
-              {busy ? "Saving" : saved ? "Saved" : "Save"}
-            </Button>
-          </>
+          <Button onClick={save} disabled={busy} size="lg">
+            {busy ? "Saving" : saved ? "Saved" : "Save"}
+          </Button>
         }
       />
 

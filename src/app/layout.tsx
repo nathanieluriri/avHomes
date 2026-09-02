@@ -45,6 +45,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      /*
+       * Next warns when `scroll-behavior: smooth` is set on <html> in CSS,
+       * because it silently changes how the router restores scroll position.
+       * This attribute is the framework's own way of saying the smoothness is
+       * deliberate, and it clears the warning that was logged on every page.
+       */
+      data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${spectral.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-white text-ink">{children}</body>

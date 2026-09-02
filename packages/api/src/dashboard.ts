@@ -3,14 +3,15 @@ import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { currentDb, type AppEnv } from "@avhomes/core";
 import { requireAuth } from "@avhomes/identity";
 import { enquiryCounts } from "@avhomes/enquiries";
+import { sitePulse } from "@avhomes/analytics";
 
 /**
  * The dashboard read.
  *
  * It lives HERE, in the composition root's package, because it is the one read
- * that spans listings, content and enquiries at once, and no feature package is
- * allowed to know about another. Putting it in any of the three would be the
- * cross-import the layout exists to prevent.
+ * that spans listings, content, enquiries and analytics at once, and no feature
+ * package is allowed to know about another. Putting it in any of the four would
+ * be the cross-import the layout exists to prevent.
  *
  * There is nothing to inject: every figure is a count over a collection that
  * already exists.
@@ -23,14 +24,15 @@ export function dashboardRoutes(): Hono<AppEnv> {
 
     // Issued together. They are independent counts and serialising them would
     // add a round trip to Atlas per tile on the first screen after sign-in.
-    const [listings, posts, enquiries, recent] = await Promise.all([
+    const [listings, posts, enquiries, recent, pulse] = await Promise.all([
       countsByStatus(db, COLLECTIONS.properties),
       countsByStatus(db, COLLECTIONS.posts),
       enquiryCounts(db),
       recentEnquiries(db),
+      sitePulse(db),
     ]);
 
-    return c.json({ listings, posts, enquiries, recentEnquiries: recent });
+    return c.json({ listings, posts, enquiries, recentEnquiries: recent, pulse });
   });
 
   return routes;

@@ -21,6 +21,29 @@
   --mist-300: #cbd5e1;
   --slate-500: #64748b;
 
+  /*
+   * Admin console chrome.
+   *
+   * A deep brand blue, not the marketing navy. `--navy-950` is so far towards
+   * black that a bar painted with it reads as black, which is what the owner
+   * asked us to stop doing. These three climb from the bar's foot to its head,
+   * because a flat fill at this darkness looks like a stripe of nothing and a
+   * two-stop gradient is what gives it a surface.
+   */
+  --chrome-900: #0a2350;
+  --chrome-800: #10306c;
+  --chrome-700: #1b4193;
+  --chrome-line: #2c4d8f;
+
+  /* The console's page ground. Cooler than --mist-50, so the working area
+     reads as belonging to the blue chrome rather than sitting on top of it. */
+  --haze: #f4f7fc;
+
+  /* Console ink. Both are measured against white: 5.9:1 and 4.8:1, so either
+     is legal for real text at 13px. --slate-500 is 4.6:1 and stays decorative. */
+  --slate-600: #55637a;
+  --slate-550: #64718a;
+
   --background: #ffffff;
   --foreground: var(--ink);
   --card: #ffffff;
@@ -63,6 +86,13 @@
   --color-mist-200: var(--mist-200);
   --color-mist-300: var(--mist-300);
   --color-slate-500: var(--slate-500);
+  --color-chrome-900: var(--chrome-900);
+  --color-chrome-800: var(--chrome-800);
+  --color-chrome-700: var(--chrome-700);
+  --color-chrome-line: var(--chrome-line);
+  --color-haze: var(--haze);
+  --color-slate-600: var(--slate-600);
+  --color-slate-550: var(--slate-550);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -87,6 +117,18 @@
   --radius-xl: 1.25rem;
   --radius-2xl: 1.5rem;
 
+  /*
+   * Console elevation, and it is nearly invisible on purpose. A card is white
+   * on haze: the hairline ring is most of its edge and the 1px throw is only
+   * there to say which of the two surfaces is on top. `pop` is for menus and
+   * popovers, where the depth has to survive being drawn over a table.
+   * Reachable as `shadow-card` and `shadow-pop`; both are inert outside the
+   * console, where the base layer strips box-shadow.
+   */
+  --shadow-card: 0 0 0 1px rgb(11 36 83 / 0.05), 0 1px 2px 0 rgb(11 36 83 / 0.06);
+  --shadow-pop: 0 0 0 1px rgb(11 36 83 / 0.07), 0 10px 28px -8px rgb(11 36 83 / 0.22),
+    0 2px 6px 0 rgb(11 36 83 / 0.08);
+
   --animate-marquee: marquee 40s linear infinite;
   @keyframes marquee {
     from { transform: translateX(0); }
@@ -101,8 +143,23 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
-  /* Hover depth comes from borders and lift, never a blurred shadow. */
-  *, *::before, *::after {
+  /*
+   * The marketing site draws depth with borders and a lift, never a blurred
+   * shadow. That instruction stands, and this is still how it is enforced.
+   *
+   * The admin console is exempt. Two reasons, and neither is taste: a console
+   * is a dense surface where elevation is the only thing that says a menu
+   * floats over a table rather than being part of it, and the blanket rule was
+   * also deleting every `ring-*` utility, because a ring compiles to a
+   * box-shadow. `inputClass` pairs `outline-none` with `focus:ring-2`, so until
+   * now an admin input had no visible focus state at all.
+   *
+   * `.console-float` covers surfaces portaled to document.body, which land
+   * outside the console's own subtree.
+   */
+  *:not(.console, .console *, .console-float, .console-float *),
+  *:not(.console, .console *, .console-float, .console-float *)::before,
+  *:not(.console, .console *, .console-float, .console-float *)::after {
     box-shadow: none !important;
   }
 }

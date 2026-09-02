@@ -1,0 +1,399 @@
+/* ---------------------------------------------------------------------------
+   The admin console's CSS, and only what Tailwind cannot express.
+
+   Everything with a utility for it stays in the markup. What is left here is
+   the set of things a utility class genuinely cannot reach: scrollbar
+   pseudo-elements, keyframes, the drawer's slide, the three stacked insets
+   that make a button read as machined rather than filled, and the focus ring.
+
+   Every class is prefixed `c-` and every one of them lives inside `.console`,
+   which is also the hook `globals.css` uses to exempt this subtree from the
+   marketing site's blanket box-shadow removal.
+--------------------------------------------------------------------------- */
+
+/* The bar's height is a token because the mobile drawer is positioned from it,
+   and a drawer that starts 4px above or below the bar reads as misaligned. */
+.console {
+  --c-topbar-h: 3.5rem;
+}
+
+@media (max-width: 47.99rem) {
+  .console {
+    --c-topbar-h: 3.25rem;
+  }
+}
+
+/* The bar is a gradient rather than a flat fill. At this darkness a single
+   value reads as a stripe of nothing; two stops give it a surface, and the
+   inset hairline along the top is the light landing on its edge. */
+.c-topbar {
+  background: linear-gradient(180deg, var(--chrome-800) 0%, var(--chrome-900) 100%);
+  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.07);
+}
+
+/* ═══ SCROLLBARS ══════════════════════════════════════════════════════════
+   Tinted with the chrome blue at low alpha rather than a flat grey, so one
+   value works on the haze page, on a white card and inside a menu. The
+   transparent border plus background-clip is what rounds the thumb and insets
+   it from the track: a thumb drawn edge to edge in a 10px gutter reads as a
+   bar of colour rather than as a handle.
+
+   THE TWO SETS ARE MUTUALLY EXCLUSIVE, AND THAT IS NOT STYLE. Chromium ignores
+   every `::-webkit-scrollbar` rule on an element whose `scrollbar-width` or
+   `scrollbar-color` is set to anything but `auto`. Declaring both, which is the
+   usual belt-and-braces move, therefore does not render the authored bar in
+   Chrome: it renders the plain native one and quietly drops the whole block
+   below. It also breaks every `.no-scrollbar` opt-out in the console, because
+   `display: none` on the pseudo-element is exactly one of the rules being
+   dropped, which is how a native scrollbar with stepper arrows ended up painted
+   through the status tabs on Listings.
+
+   So: the standard properties go to browsers with no `::-webkit-scrollbar` at
+   all, which today means Firefox, and Chromium gets the authored one. */
+@supports not selector(::-webkit-scrollbar) {
+  .console *,
+  .console-float * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(11 36 83 / 0.22) transparent;
+  }
+
+  /* Firefox needs the opt-out restated at console specificity: `.no-scrollbar`
+     in globals.css is (0,1,0), the rule above is (0,1,0), and this file loads
+     later. */
+  .console .no-scrollbar,
+  .console-float .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
+
+.console *::-webkit-scrollbar,
+.console-float *::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+.console *::-webkit-scrollbar-track,
+.console-float *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.console *::-webkit-scrollbar-thumb,
+.console-float *::-webkit-scrollbar-thumb {
+  background: rgb(11 36 83 / 0.22);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.console *::-webkit-scrollbar-thumb:hover,
+.console-float *::-webkit-scrollbar-thumb:hover {
+  background: rgb(11 36 83 / 0.38);
+  background-clip: content-box;
+}
+
+/* The corner where two bars meet, which defaults to a grey square. */
+.console *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* The opt-out, restated at a specificity that beats the `.console *` rules
+   above. A horizontal strip of pills scrolls, but an always-on scrollbar drawn
+   under them is a grey rule through the control. */
+.console .no-scrollbar::-webkit-scrollbar,
+.console-float .no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* The main scroller reserves its gutter, so a page that grows past the fold
+   does not shift its content sideways the moment the bar appears. */
+.c-main {
+  scrollbar-gutter: stable;
+}
+
+/* ═══ FOCUS ═══════════════════════════════════════════════════════════════
+   One declaration for the whole console, on `:focus-visible` rather than
+   `:focus`: a pointer user clicking a row does not want a ring and a keyboard
+   user cannot work without one.
+
+   `outline`, NOT a box-shadow ring, and the difference is not cosmetic. A
+   shadow ring replaces the element's own box-shadow, so a bevelled button lost
+   its bevel for exactly as long as it was focused, and it needed a radius of
+   its own, which squared off every pill it landed on. An outline composes with
+   whatever the element already draws and follows its border-radius by itself. */
+.console :focus-visible {
+  outline: 2px solid var(--blue-600);
+  outline-offset: 2px;
+}
+
+/* On the blue bar the ring has to be the light thing, not the blue one. */
+.c-topbar :focus-visible {
+  outline-color: #ffffff;
+}
+
+/* ═══ THE BUTTON BEVEL ════════════════════════════════════════════════════
+   Three inset shadows and no border, which is the whole difference between a
+   filled rectangle and a key you want to press:
+
+     · a dark hairline along the BOTTOM only, so the button has thickness
+     · a full 1px ring, so it has an edge
+     · a half-pixel white line across the TOP, 1.5px wide so it rounds into
+       the corners, so light lands on it
+
+   A `border` cannot say any of this, because a border is the same on all four
+   sides. Pressed, the top light goes out and the fill sinks. */
+.c-bevel {
+  box-shadow:
+    0 -1px 0 0 rgb(11 36 83 / 0.16) inset,
+    0 0 0 1px rgb(11 36 83 / 0.13) inset,
+    0 0.5px 0 1.5px #ffffff inset;
+}
+
+/* Over a saturated fill the ring is the fill's own shadow rather than a named
+   colour, so one class works for the blue primary and would work for any
+   other. */
+.c-bevel-primary {
+  box-shadow:
+    0 -1px 0 1px rgb(6 20 48 / 0.3) inset,
+    0 0 0 1px rgb(6 20 48 / 0.42) inset,
+    0 0.5px 0 1.5px rgb(255 255 255 / 0.3) inset;
+}
+
+.c-bevel-danger {
+  box-shadow:
+    0 -1px 0 1px rgb(0 0 0 / 0.2) inset,
+    0 0 0 1px #b91c1c inset,
+    0 0.5px 0 1.5px rgb(255 255 255 / 0.24) inset;
+}
+
+.c-bevel:active:not(:disabled),
+.c-bevel-primary:active:not(:disabled),
+.c-bevel-danger:active:not(:disabled) {
+  box-shadow:
+    0 2px 2px 0 rgb(11 36 83 / 0.14) inset,
+    0 0 0 1px rgb(11 36 83 / 0.14) inset;
+}
+
+/* ═══ THE RISE ════════════════════════════════════════════════════════════
+   Every screen arrives from below and settles just under the header, the way
+   a sheet does. The wrapper is keyed on the pathname, so React remounts it per
+   navigation and the animation replays without any JavaScript timing.
+
+   The highlight is what sells it: a hairline of light travels across the top
+   edge while the sheet is still moving and fades out as it lands, so the top
+   of the page reads as an edge that just arrived rather than as content that
+   faded in. */
+@keyframes c-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 26px, 0) scale(0.988);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes c-rise-edge {
+  from {
+    opacity: 0;
+    transform: scaleX(0.7);
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+.c-sheet {
+  position: relative;
+  transform-origin: 50% 0;
+  animation: c-rise 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* No `will-change`. It would be a small win on the 460ms of movement and a
+     permanent containing block for every fixed-position descendant, which is
+     how a modal ends up anchored to the page instead of to the viewport. */
+}
+
+.c-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0 8% auto;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--blue-500) 70%, transparent),
+    transparent
+  );
+  animation: c-rise-edge 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: none;
+}
+
+/* ═══ THE DRAWER ══════════════════════════════════════════════════════════
+   Below the breakpoint the rail becomes an off-canvas drawer. `visibility`
+   plus `transform` rather than `display`, because display cannot animate and a
+   drawer that teleports reads as a glitch where one that slides reads as a
+   thing you pushed. The visibility transition is delayed on the way OUT so the
+   slide finishes before the element leaves the accessibility tree. */
+@media (max-width: 63.99rem) {
+  .c-rail {
+    position: fixed;
+    inset: var(--c-topbar-h) auto 0 0;
+    z-index: 55;
+    width: min(17.5rem, 84vw);
+    transform: translateX(-104%);
+    visibility: hidden;
+    transition:
+      transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0s linear 240ms;
+  }
+
+  .c-rail[data-open="true"] {
+    transform: translateX(0);
+    visibility: visible;
+    transition:
+      transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0s;
+  }
+
+  /* Off the grid it needs its own surface. The radius is on the outer corner
+     only, so the drawer reads as sliding out from under the bar. */
+  .c-rail {
+    background: var(--haze);
+    border-right: 0;
+    border-top-right-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
+  }
+}
+
+@keyframes c-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.c-scrim {
+  animation: c-fade 200ms ease both;
+}
+
+/* ═══ SMALL THINGS WITH NO UTILITY ════════════════════════════════════════ */
+
+/* Tabular figures. On every column of numbers, or a scan for the largest value
+   fails because the digits do not line up. */
+.c-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* The live dot's expanding ring. Applied only to the non-zero dot, so a site
+   with nobody on it does not animate a heartbeat over a zero. PulseStrip
+   renders a different, static element for that case. */
+@keyframes c-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.c-ping::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: currentColor;
+  animation: c-ping 1.9s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* The sparkline draws itself once on arrival, left to right.
+   The last keyframe drops the dash pattern entirely, and that is not tidiness:
+   the chart stretches with `preserveAspectRatio="none"`, so the path's length
+   on screen is not the length measured in the viewBox, and a dasharray left in
+   place afterwards leaves a visible gap wherever the two disagree. Holding a
+   dash only for the duration of the draw makes the mismatch cost a few
+   milliseconds of timing instead of a broken line. */
+@keyframes c-draw {
+  from {
+    stroke-dasharray: var(--c-len);
+    stroke-dashoffset: var(--c-len);
+  }
+  99% {
+    stroke-dasharray: var(--c-len);
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+.c-spark {
+  animation: c-draw 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The skeleton shimmer. A moving highlight rather than a pulsing opacity,
+   because a block that fades in and out reads as broken where one that sweeps
+   reads as loading. */
+@keyframes c-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.c-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--mist-100);
+}
+
+.c-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.85), transparent);
+  animation: c-sweep 1.4s ease-in-out infinite;
+}
+
+/* ═══ REDUCED MOTION ══════════════════════════════════════════════════════
+   Everything above is decoration over a page that is already correct without
+   it, so all of it goes. The drawer keeps its transform (that is layout, not
+   decoration) and simply stops animating between the two positions. */
+@media (prefers-reduced-motion: reduce) {
+  .c-sheet,
+  .c-sheet::before,
+  .c-scrim,
+  .c-spark,
+  .c-ping::after,
+  .c-skeleton::after {
+    animation: none;
+  }
+
+  .c-sheet {
+    opacity: 1;
+    transform: none;
+  }
+
+  .c-sheet::before {
+    opacity: 0;
+  }
+
+  .c-rail {
+    transition: none;
+  }
+}

@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Cookie, X } from "lucide-react";
 
-const STORAGE_KEY = "avhomes.cookie-consent";
+export const CONSENT_KEY = "avhomes.cookie-consent";
+
+/**
+ * Dispatched on every choice. localStorage fires no `storage` event in the tab
+ * that wrote it, so anything gated on consent in THIS tab would otherwise wait
+ * for a reload to notice the visitor said yes.
+ */
+export const CONSENT_EVENT = "avhomes:cookie-consent";
 
 type Choice = "accepted" | "rejected";
 
@@ -17,10 +24,18 @@ export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    /*
+     * Never inside a frame. The console's dashboard embeds this page to draw its
+     * storefront preview, and a consent notice rendered in there is one the
+     * operator cannot dismiss and was never being asked to answer. The visitor's
+     * real banner is unaffected: the site is only ever framed by the console.
+     */
+    if (window.top !== window.self) return;
+
     // Reading storage in an effect keeps the server and client markup identical.
     let stored: string | null = null;
     try {
-      stored = window.localStorage.getItem(STORAGE_KEY);
+      stored = window.localStorage.getItem(CONSENT_KEY);
     } catch {
       // Storage can be blocked entirely, in which case just show the notice.
     }
@@ -32,10 +47,13 @@ export default function CookieBanner() {
 
   function choose(choice: Choice) {
     try {
-      window.localStorage.setItem(STORAGE_KEY, choice);
+      window.localStorage.setItem(CONSENT_KEY, choice);
     } catch {
       // A blocked store just means the notice returns next visit.
     }
+    // Announced even when the write failed, so the choice is honoured for this
+    // visit either way.
+    window.dispatchEvent(new CustomEvent(CONSENT_EVENT, { detail: choice }));
     setVisible(false);
   }
 

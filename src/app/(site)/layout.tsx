@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
+import SitePulse from "@/components/SitePulse";
 
 /**
  * The marketing site's chrome.
@@ -20,6 +21,8 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <main className="flex-1">{children}</main>
       <Footer />
       <CookieBanner />
+      {/* Counts storefront visits only, and only once the banner above is accepted. */}
+      <SitePulse />
     </>
   );
 }

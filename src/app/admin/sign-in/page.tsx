@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AuthUser } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
+import { homeFor } from "@/components/admin/nav";
 import { useAsync } from "@/lib/admin/hooks";
 import { Button, Card, ErrorNote, Field, Spinner, inputClass } from "@/components/admin/ui";
 
@@ -56,21 +57,23 @@ function PasswordDoor({ reason }: { reason: string }) {
     setBusy(true);
     setError(null);
     try {
-      if (mode === "login") {
-        await api.post<{ user: AuthUser }>("/auth/password/login", { email, password });
-      } else {
-        await api.post<{ user: AuthUser }>("/auth/password/claim", {
-          email,
-          password,
-          ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
-        });
-      }
+      const res =
+        mode === "login"
+          ? await api.post<{ user: AuthUser }>("/auth/password/login", { email, password })
+          : await api.post<{ user: AuthUser }>("/auth/password/claim", {
+              email,
+              password,
+              ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
+            });
+      // Not "/admin". The dashboard needs the `analytics` domain, so an editor
+      // sent there signs in and lands on a screen whose own API refuses them.
+      // The response already carries the role, so the destination is known
+      // before the navigation rather than after it.
       // A FULL navigation, not router.push. The session cookie just changed and
       // the shell stays mounted across a client-side route change, so its
       // useSession effect would never re-run and the app would render the old
       // identity.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/admin";
+      window.location.href = homeFor(res.user.role);
     } catch (err) {
       setError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
       setBusy(false);

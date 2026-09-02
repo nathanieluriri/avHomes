@@ -154,6 +154,10 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       q: q.q,
       agentUserId: q.mine === "1" ? user.id : undefined,
       includeHidden: true,
+      // The console's box is a filter that narrows as an operator types, not
+      // the site's whole-word search. See `substring` in the repo for the
+      // trade this buys and what it costs.
+      substring: true,
     };
     const page = await listProperties(db, query);
     // Only when asked. Paging deliberately avoids the count, and a screen that

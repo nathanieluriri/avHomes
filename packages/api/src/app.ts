@@ -29,6 +29,7 @@ import {
   type StoragePort,
 } from "@avhomes/media";
 import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
+import { analyticsPublicRoutes } from "@avhomes/analytics";
 import { dashboardRoutes } from "./dashboard";
 
 /**
@@ -220,7 +221,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   app.use(`${API_PREFIX}/*`, originGuard(deps.origins));
 
-  /* ═════════════════ 8. the public mutation, BELOW the guard ══════════ */
+  /* ═════════════════ 8. the public mutations, BELOW the guard ═════════ */
 
   /*
    * The contact form. A public write, so it is NOT in the cacheable router
@@ -231,6 +232,15 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * sessionMiddleware is not needed because it reads no session either way.
    */
   app.route(API_PREFIX, enquiriesPublicRoutes({ mailer }));
+
+  /*
+   * The visit beacon, in the same slot and for the same two reasons. It is a
+   * public mutation, so it must be BELOW originGuard or any page on the web
+   * could drive the site's own numbers; and it reads no cookie, so it must stay
+   * ABOVE sessionMiddleware, where being cookieless is structural rather than a
+   * thing the handler remembered.
+   */
+  app.route(API_PREFIX, analyticsPublicRoutes());
 
   /* ═════════════════ 9. session, then the domain gate ═════════════════ */
 
