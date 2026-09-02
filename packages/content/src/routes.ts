@@ -184,6 +184,9 @@ export function contentAdminRoutes(): Hono<AppEnv> {
       authorId: q.mine === "1" ? user.id : undefined,
       q: q.q,
       includeHidden: true,
+      // The console's box is a filter that narrows as a writer types, not the
+      // site's whole-word search. See `substring` in the repo.
+      substring: true,
     });
     return c.json(page);
   });

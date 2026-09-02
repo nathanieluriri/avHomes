@@ -14,7 +14,8 @@ import {
   type PropertyStatus,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { useAsync, useDebounced } from "@/lib/admin/hooks";
+import { useAsync, useDebounced, useCursorStack } from "@/lib/admin/hooks";
+import { shortDate } from "@/lib/admin/format";
 import {
   Badge,
   Button,
@@ -65,6 +66,7 @@ export default function PropertiesPage() {
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ApiError | null>(null);
+
   /*
    * Trimmed once, here, and every consumer reads this. Passing the raw box
    * through meant "lag " matched nothing while "lag" matched, and the empty
@@ -73,35 +75,13 @@ export default function PropertiesPage() {
    */
   const query = useDebounced(search).trim();
 
-  /*
-   * Paging is a cursor STACK, not a page number. Back is `slice(0, -1)`;
-   * forward pushes the cursor the server just handed back. That is what makes
-   * Previous work against an API that only ever answers with the next one.
-   *
-   * The stack resets whenever a filter or the sort changes, because a cursor is
-   * minted under one sort and the server refuses it under another. It has to:
-   * BSON orders across types, so a price cursor read as a timestamp returns a
-   * wrong page rather than an error.
-   */
-  const [cursors, setCursors] = useState<(string | null)[]>([null]);
-  const cursor = cursors[cursors.length - 1] ?? null;
+  /* Keyset paging, and the reset that comes with a changed filter, both live in
+     one hook so three list screens cannot drift apart. */
+  const paging = useCursorStack(query);
 
   function refilter(apply: () => void) {
     apply();
-    setCursors([null]);
-  }
-
-  /*
-   * The search box resets the stack when the DEBOUNCED query lands, not on every
-   * keystroke. Resetting per keystroke moved the stack 300ms before the query it
-   * belonged to, so typing while on page two fired a wasted request for page one
-   * of the PREVIOUS search and flashed its rows before the real answer arrived.
-   * During render, for the same reason `useAsync` resets there.
-   */
-  const [lastQuery, setLastQuery] = useState(query);
-  if (lastQuery !== query) {
-    setLastQuery(query);
-    setCursors([null]);
+    paging.reset();
   }
 
   const { data, error, loading, reload } = useAsync<Page<Property>>(
@@ -113,11 +93,11 @@ export default function PropertiesPage() {
           withTotal: "1",
           ...(tab === "all" ? {} : { status: tab }),
           ...(query ? { q: query } : {}),
-          ...(cursor ? { cursor } : {}),
+          ...(paging.cursor ? { cursor: paging.cursor } : {}),
         })}`,
         signal,
       ),
-    [tab, sort, query, cursor],
+    [tab, sort, query, paging.cursor],
   );
 
   async function create() {
@@ -326,11 +306,8 @@ export default function PropertiesPage() {
         }
         footer={
           <TablePager
-            note={pagerNote(rows.length, data?.total, cursors.length)}
-            canPrev={cursors.length > 1}
-            canNext={Boolean(data?.nextCursor)}
-            onPrev={() => setCursors((stack) => stack.slice(0, -1))}
-            onNext={() => setCursors((stack) => [...stack, data?.nextCursor ?? null])}
+            note={pagerNote(rows.length, data?.total, paging.page)}
+            {...paging.pager(data?.nextCursor)}
           />
         }
       />
@@ -350,17 +327,6 @@ function pagerNote(shown: number, total: number | undefined, page: number): stri
   if (total === undefined) return `${shown} ${noun} on this page`;
   const from = (page - 1) * 25 + 1;
   return `${from} to ${from + shown - 1} of ${total}`;
-}
-
-/** Epoch ms to a short date. Same year drops the year. */
-function shortDate(at: number): string {
-  const date = new Date(at);
-  const sameYear = date.getFullYear() === new Date().getFullYear();
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    ...(sameYear ? {} : { year: "numeric" }),
-  });
 }
 
 /**

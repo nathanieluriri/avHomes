@@ -13,6 +13,7 @@ import {
 import { hasDomain, type Domain, type SitePulse } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync, useSession } from "@/lib/admin/hooks";
+import { relative } from "@/lib/admin/format";
 import { Badge, Card, ErrorNote, Skeleton } from "@/components/admin/ui";
 import { PulseStrip } from "@/components/admin/PulseStrip";
 import { StorefrontCard } from "@/components/admin/StorefrontCard";
@@ -264,19 +265,6 @@ function summarise(data: Dashboard): string {
     parts.push(`${data.pulse.live} reading right now`);
   }
   return `${parts.join(", ")}.`;
-}
-
-/** Epoch ms to "2h ago". Anything past a week gets a date instead. */
-function relative(at: number): string {
-  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 /**

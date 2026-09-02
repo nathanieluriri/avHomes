@@ -24,6 +24,7 @@ import {
   type ReadingTemplate,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
+import { dateTime } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import { createEditorExtensions } from "@/components/admin/editor/extensions";
 import { AutoTextarea } from "@/components/admin/editor/AutoTextarea";
@@ -791,7 +792,7 @@ function HistoryPanel({
                 {r.note && <span className="text-muted-foreground"> · {r.note}</span>}
               </span>
               <span className="shrink-0 text-xs text-muted-foreground">
-                {new Date(r.createdAt).toLocaleString()}
+                {dateTime(r.createdAt)}
               </span>
             </div>
             {/* The title as it stood, so a choice between two entries is not a

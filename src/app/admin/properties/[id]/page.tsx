@@ -14,6 +14,7 @@ import {
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { SaveBar } from "@/components/admin/SaveBar";
+import { fullDate } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import {
@@ -166,6 +167,10 @@ function PropertyEditor({ initial }: { initial: Property }) {
    * whether anything is at stake. Comparing the draft against the listing it was
    * seeded from cannot drift.
    */
+  /* A trashed record cannot be patched at all, so nothing here is savable and
+     the save bar must not claim otherwise. */
+  const trashed = property.deletedAt !== null;
+
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(property));
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
@@ -258,7 +263,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
           the action row. The crumb says where you are AND takes you up, and it
           sits where a reader looks for that rather than beside Save. */}
       <SaveBar
-        when={dirty}
+        when={dirty && !trashed}
         saving={busy}
         onDiscard={() => {
           setDraft(toDraft(property));
@@ -285,13 +290,27 @@ function PropertyEditor({ initial }: { initial: Property }) {
          * disappear from the place a reader looks for it first.
          */
         actions={
-          dirty ? undefined : (
+          dirty || trashed ? undefined : (
             <Button onClick={save} disabled size="lg">
               {saved ? "Saved" : "Save"}
             </Button>
           )
         }
       />
+
+      {trashed && (
+        /* The server refuses a patch to a trashed record (`deletedAt: null` is
+           in the update filter), so the form cannot be saved and the console
+           says so instead of offering a Save that comes back 409. Restore is
+           the one move that still works, and it is in the rail. */
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
+          <p className="font-semibold">This is in the trash</p>
+          <p className="mt-1">
+            Nothing here can be saved while it is. Restore it first, from the panel on the
+            right, and the form comes back.
+          </p>
+        </div>
+      )}
 
       {saveError && (
         <div className="mb-4">
@@ -423,11 +442,11 @@ function PropertyEditor({ initial }: { initial: Property }) {
 
           <Card className="space-y-2 text-sm">
             <Row label="Revision" value={String(property.revision)} />
-            <Row label="Created" value={new Date(property.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} />
-            <Row label="Updated" value={new Date(property.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} />
+            <Row label="Created" value={fullDate(property.createdAt)} />
+            <Row label="Updated" value={fullDate(property.updatedAt)} />
             <Row
               label="Published"
-              value={property.publishedAt ? new Date(property.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Not yet"}
+              value={property.publishedAt ? fullDate(property.publishedAt) : "Not yet"}
             />
             <Row label="Agent" value={property.agent.name || "Unassigned"} />
           </Card>

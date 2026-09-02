@@ -1,23 +1,33 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { READING_TEMPLATES, type DocNode, type Post, type ReadingTemplate } from "@avhomes/contracts";
+import {
+  READING_TEMPLATES,
+  type DocNode,
+  type Post,
+  type PostStatus,
+  type ReadingTemplate,
+} from "@avhomes/contracts";
+import { Newspaper } from "lucide-react";
 import { ApiError, api } from "@/lib/admin/client";
+import { SaveBar } from "@/components/admin/SaveBar";
+import { fullDate, humanise } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import "../../rte.css";
 import RichText from "@/components/admin/RichText";
 import {
   Badge,
+  ButtonLink,
   Button,
   Card,
   ErrorNote,
   Field,
   PageHeader,
-  Spinner,
+  Skeleton,
   inputClass,
+  type Tone,
 } from "@/components/admin/ui";
 
 const LIFECYCLE: readonly { op: string; label: string; when: (p: Post) => boolean }[] = [
@@ -26,6 +36,14 @@ const LIFECYCLE: readonly { op: string; label: string; when: (p: Post) => boolea
   { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
   { op: "restore", label: "Restore", when: (p) => p.deletedAt !== null || p.status === "archived" },
 ];
+
+/** Status to tone, in one place, so the header chip and the sidebar chip
+ *  cannot disagree about what "draft" looks like. */
+const POST_TONE: Record<PostStatus, Tone> = {
+  published: "green",
+  draft: "amber",
+  archived: "neutral",
+};
 
 export default function PostEditorPage() {
   const params = useParams<{ id: string }>();
@@ -36,8 +54,34 @@ export default function PostEditorPage() {
     [id],
   );
 
-  if (loading) return <Spinner />;
-  if (error) return <ErrorNote error={error} onRetry={reload} />;
+  /* Both branches keep the header, so a failure does not also take away the
+     breadcrumb, and the rise never animates an empty sheet. */
+  if (loading) {
+    return (
+      <>
+        <PageHeader icon={Newspaper} backTo="/admin/posts" backLabel="Journal" title="Post" />
+        <div className="grid gap-4 lg:grid-cols-3" aria-busy="true">
+          <span className="sr-only">Loading this post</span>
+          <div className="space-y-4 lg:col-span-2">
+            <Skeleton className="h-56 rounded-2xl" />
+            <Skeleton className="h-96 rounded-2xl" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-44 rounded-2xl" />
+            <Skeleton className="h-52 rounded-2xl" />
+          </div>
+        </div>
+      </>
+    );
+  }
+  if (error) {
+    return (
+      <>
+        <PageHeader icon={Newspaper} backTo="/admin/posts" backLabel="Journal" title="Post" />
+        <ErrorNote error={error} onRetry={reload} />
+      </>
+    );
+  }
   if (!data) return null;
 
   /*
@@ -69,9 +113,74 @@ function PostEditor({ initial }: { initial: Post }) {
    * never touched, and blocking a title fix on it would be worse still.
    */
   const [bodyLocked, setBodyLocked] = useState(false);
+  /* Bumped to remount RichText, which hydrates once and documents `key` as the
+     way to reset it. */
+  const [bodyVersion, setBodyVersion] = useState(0);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  /*
+   * Dirty is derived from the fields against the post they were seeded from,
+   * never tracked by a flag. A flag drifts the first time somebody types a
+   * character and deletes it, and then the bar and the unload prompt disagree
+   * about whether anything is at stake. `body` is compared as JSON because the
+   * editor hands back a fresh object on every keystroke, so identity says
+   * nothing.
+   */
+  /* A trashed record cannot be patched at all, so nothing here is savable and
+     the save bar must not claim otherwise. */
+  const trashed = post.deletedAt !== null;
+
+  const dirty =
+    title !== post.title ||
+    subtitle !== post.subtitle ||
+    excerpt !== post.excerpt ||
+    category !== post.category ||
+    tags !== post.tags.join(", ") ||
+    template !== (post.template ?? "") ||
+    coverUrl !== (post.coverImage?.url ?? "") ||
+    coverAlt !== (post.coverImage?.alt ?? "") ||
+    (!bodyLocked && JSON.stringify(body) !== JSON.stringify(post.content));
+
+  /*
+   * EVERY WRITE RE-SEEDS THE FORM FROM WHAT THE SERVER ACTUALLY STORED.
+   *
+   * Adopting the response into `post` alone is not enough, because the server
+   * normalises two of these fields and the form would then differ from the post
+   * forever: `tags` comes back joined with a comma and a space whatever spacing
+   * was typed, and `excerpt` is re-derived from the body whenever its source is
+   * "derived", so an empty box comes back full. Either one pins `dirty` true
+   * with nothing on screen the writer can change to clear it, which leaves the
+   * save bar up and `beforeunload` armed for the rest of the session.
+   *
+   * The body is only replaced when the server's document actually differs from
+   * the one on screen. RichText hydrates once and is reset by remounting, so
+   * bumping its key on every save would throw the caret to the top of the
+   * article each time somebody pressed Save.
+   */
+  function seed(next: Post, { forceBody = false } = {}) {
+    setTitle(next.title);
+    setSubtitle(next.subtitle);
+    setExcerpt(next.excerpt);
+    setCategory(next.category);
+    setTags(next.tags.join(", "));
+    setTemplate(next.template ?? "");
+    setCoverUrl(next.coverImage?.url ?? "");
+    setCoverAlt(next.coverImage?.alt ?? "");
+    if (forceBody || JSON.stringify(next.content) !== JSON.stringify(body)) {
+      setBody(next.content);
+      setBodyVersion((version) => version + 1);
+    }
+    setSaveError(null);
+  }
+
+  function discard() {
+    // Always remounts. `setBody` alone changes state the editor never reads
+    // again, so the reverted document would stay on screen and the next save
+    // would send the stored one over the top of it.
+    seed(post, { forceBody: true });
+  }
 
   async function save(kind: "manual" | "autosave" = "manual") {
     setBusy(true);
@@ -98,6 +207,7 @@ function PostEditor({ initial }: { initial: Post }) {
         note: null,
       });
       setPost(res.post);
+      seed(res.post);
       setSaved(true);
     } catch (err) {
       setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
@@ -112,6 +222,7 @@ function PostEditor({ initial }: { initial: Post }) {
     try {
       const res = await api.post<{ post: Post }>(`/admin/posts/${post.id}/${op}`);
       setPost(res.post);
+      seed(res.post);
     } catch (err) {
       setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
     } finally {
@@ -134,28 +245,56 @@ function PostEditor({ initial }: { initial: Post }) {
 
   return (
     <>
+      <SaveBar
+        when={dirty && !trashed}
+        saving={busy}
+        onDiscard={discard}
+        onSave={() => void save()}
+      />
+
+      {/* The crumb replaces the old "Back" link in the action row: it says where
+          you are AND takes you up, from where a reader looks for that. */}
       <PageHeader
+        icon={Newspaper}
+        backTo="/admin/posts"
+        backLabel="Journal"
         title={post.title || "Untitled post"}
+        badge={
+          <Badge tone={post.deletedAt ? "red" : POST_TONE[post.status]}>
+            {post.deletedAt ? "In trash" : humanise(post.status)}
+          </Badge>
+        }
         subtitle={post.slug ? `/posts/${post.slug}` : "No slug yet. It is derived when you publish."}
         actions={
           <>
-            <Link href="/admin/posts" className="text-sm text-muted-foreground underline underline-offset-2">
-              Back
-            </Link>
             {/* The studio is the full-page writing surface. This screen stays
                 for quick metadata edits, which is what it is good at. */}
-            <Link
-              href={`/admin/posts/${post.id}/advanced`}
-              className="rounded-lg border border-mist-200 bg-white px-4 py-2 text-sm font-semibold text-navy-950 hover:bg-mist-50"
-            >
+            <ButtonLink href={`/admin/posts/${post.id}/advanced`} variant="ghost" size="lg">
               Advanced editor
-            </Link>
-            <Button onClick={() => save()} disabled={busy}>
-              {busy ? "Saving" : saved ? "Saved" : "Save"}
-            </Button>
+            </ButtonLink>
+            {/* One live Save at a time: while the bar is up it owns the act. */}
+            {!dirty && !trashed && (
+              <Button onClick={() => save()} disabled size="lg">
+                {saved ? "Saved" : "Save"}
+              </Button>
+            )}
           </>
         }
       />
+
+      {trashed && (
+        /* The server refuses a patch to a trashed record (`deletedAt: null` is
+           in the update filter), so the form cannot be saved and the console
+           says so instead of offering a Save that comes back 409. Restore is
+           the one move that still works, and it is in the rail. */
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
+          <p className="font-semibold">This is in the trash</p>
+          <p className="mt-1">
+            Nothing here can be saved while it is. Restore it first, from the panel on the
+            right, and the form comes back.
+          </p>
+        </div>
+      )}
 
       {saveError && (
         <div className="mb-4">
@@ -192,8 +331,16 @@ function PostEditor({ initial }: { initial: Post }) {
 
           <Card>
             <Field label="Body">
+              {/* Keyed on `bodyVersion` and fed the live `body`, not the
+                  document this component mounted with. RichText hydrates once
+                  and names `key` as the way to reset it, so without the key a
+                  discard leaves the reverted text on screen and the next save
+                  writes the stored document over the top of it. `initial` is
+                  also the wrong source after any save: it is the post as it was
+                  when the screen opened. */}
               <RichText
-                value={initial.content}
+                key={bodyVersion}
+                value={body}
                 onChange={(doc) => {
                   setBody(doc as DocNode);
                   setSaved(false);
@@ -208,8 +355,8 @@ function PostEditor({ initial }: { initial: Post }) {
           <Card className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
-              <Badge tone={post.deletedAt ? "red" : post.status === "published" ? "green" : "amber"}>
-                {post.deletedAt ? "In trash" : post.status}
+              <Badge tone={post.deletedAt ? "red" : POST_TONE[post.status]}>
+                {post.deletedAt ? "In trash" : humanise(post.status)}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -273,6 +420,11 @@ function PostEditor({ initial }: { initial: Post }) {
             <Row label="Words" value={String(post.wordCount)} />
             <Row label="Reading time" value={`${post.readingTime} min`} />
             <Row label="Author" value={post.author.name} />
+            <Row label="Updated" value={fullDate(post.updatedAt)} />
+            <Row
+              label="Published"
+              value={post.publishedAt ? fullDate(post.publishedAt) : "Not yet"}
+            />
           </Card>
 
           {post.deletedAt === null && (
@@ -280,6 +432,13 @@ function PostEditor({ initial }: { initial: Post }) {
               <Button variant="danger" className="w-full" disabled={busy} onClick={trash}>
                 Move to trash
               </Button>
+              {/* The listing editor explains the same action; this one did not.
+                  A destructive button with no sentence next to it makes a reader
+                  guess how final it is. */}
+              <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
+                Reversible. There is no permanent delete, and a trashed post keeps its
+                revisions, so it can be restored from this screen.
+              </p>
             </Card>
           )}
         </div>

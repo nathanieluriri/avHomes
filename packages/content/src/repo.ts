@@ -69,6 +69,20 @@ export interface PostListQuery {
   authorId?: string | undefined;
   q?: string | undefined;
   includeHidden?: boolean;
+  /**
+   * Substring matching instead of the text index. Admin lists only.
+   *
+   * Same trade the listings repo makes, and for the same reason: `$text` is
+   * whole-word and stemmed, which is right for a reader typing a finished query
+   * into the site's search and wrong for a writer narrowing their own list as
+   * they type. "mort" found nothing until it became "mortgage".
+   */
+  substring?: boolean;
+}
+
+/** A caller's own text, made safe to put inside a RegExp. */
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function buildFilter(query: PostListQuery): Filter<PostDoc> {
@@ -81,7 +95,22 @@ function buildFilter(query: PostListQuery): Filter<PostDoc> {
   if (query.category) and.push({ category: query.category });
   if (query.tag) and.push({ tags: query.tag });
   if (query.authorId) and.push({ authorId: query.authorId });
-  if (query.q) and.push({ $text: { $search: query.q } } as Filter<PostDoc>);
+  /*
+   * Two searches. `$text` is the public one: stemmed, relevance ranked, index
+   * backed, and it does not compose with keyset paging because relevance is not
+   * a stored field. `substring` is the admin one, a scan in exchange for a
+   * filter that narrows on every keystroke and keeps the writer's sort. The
+   * body is left out on purpose: a common word in one long article would drag
+   * it to the top of a list somebody is scanning by title.
+   */
+  if (query.q && query.substring) {
+    const like = new RegExp(escapeRegex(query.q), "iu");
+    and.push({
+      $or: [{ title: like }, { subtitle: like }, { excerpt: like }, { category: like }],
+    } as Filter<PostDoc>);
+  } else if (query.q) {
+    and.push({ $text: { $search: query.q } } as Filter<PostDoc>);
+  }
 
   const keyset = keysetFilter<PostDoc>(POST_SORTS[query.sort], query.cursor, query.sort);
   if (Object.keys(keyset).length > 0) and.push(keyset);
@@ -124,7 +153,9 @@ export async function listAdminPosts(db: Db, query: PostListQuery): Promise<Page
   const docs = await posts(db)
     .find(buildFilter({ ...query, includeHidden: true }), {
       projection: { content: 0, contentText: 0 },
-      sort: query.q ? { score: { $meta: "textScore" } } : keysetSort(spec),
+      // Only the text path forfeits the chosen sort. A substring filter is an
+      // ordinary query, so it keeps the writer's sort and its cursor.
+      sort: query.q && !query.substring ? { score: { $meta: "textScore" } } : keysetSort(spec),
       limit: query.limit + 1,
     })
     .toArray();
@@ -134,7 +165,7 @@ export async function listAdminPosts(db: Db, query: PostListQuery): Promise<Page
     // A list projection has no content; the empty doc keeps the shape honest
     // rather than letting `undefined` reach a renderer.
     items: items.map((d) => toPost({ ...d, content: emptyDoc() }, names.get(d.authorId) ?? UNKNOWN_AUTHOR)),
-    nextCursor: query.q ? null : nextCursor,
+    nextCursor: query.q && !query.substring ? null : nextCursor,
   };
 }
 

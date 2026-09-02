@@ -93,6 +93,9 @@ export function toPublicPostDetail(doc: PostDoc, authorName: string): PublicPost
 export function toPost(doc: PostDoc, authorName: string): Post {
   return {
     ...toPublicPost(doc, authorName),
+    // The raw value, overriding the public projection's id substitution. See
+    // the comment on `Post.slug` for why the two differ.
+    slug: doc.slug,
     status: doc.status,
     content: doc.content,
     publishedAt: doc.publishedAt,

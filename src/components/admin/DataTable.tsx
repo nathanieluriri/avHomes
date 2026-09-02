@@ -44,6 +44,7 @@ export function DataTable<T>({
   empty,
   toolbar,
   footer,
+  footerWhenEmpty = false,
   caption,
 }: {
   columns: readonly Column<T>[];
@@ -56,6 +57,10 @@ export function DataTable<T>({
   empty?: ReactNode;
   toolbar?: ReactNode;
   footer?: ReactNode;
+  /** Keep the footer even with no rows. For a screen whose empty is a CLIENT
+   *  filter over a page that still has rows and a next cursor: taking the pager
+   *  away there strands the record the reader is looking for. */
+  footerWhenEmpty?: boolean;
   /** Names the table for a screen reader. Not painted. */
   caption: string;
 }) {
@@ -199,7 +204,7 @@ export function DataTable<T>({
         </>
       )}
 
-      {footer && (loading || rows.length > 0) && (
+      {footer && (loading || rows.length > 0 || footerWhenEmpty) && (
         <div className="border-t border-mist-200 px-3 py-2.5">
           {loading ? <Skeleton className="h-7 w-full max-w-[16rem]" /> : footer}
         </div>

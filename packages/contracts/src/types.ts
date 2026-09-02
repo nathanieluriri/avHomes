@@ -166,7 +166,18 @@ export interface PublicPostList {
 }
 
 /** The admin projection. Carries drafts, ownership and the CAS token. */
-export interface Post extends Omit<PublicPost, "publishedAt"> {
+export interface Post extends Omit<PublicPost, "publishedAt" | "slug"> {
+  /**
+   * NULL UNTIL PUBLISH DERIVES ONE, unlike the public projection.
+   *
+   * `toPublicPost` substitutes the id when a slug is missing, which is right
+   * there: a published post always has one, and the fallback keeps a malformed
+   * row from crashing a page. The admin list is the opposite case. It carries
+   * drafts, so substituting the id makes every draft claim `/posts/<id>` as its
+   * address, which is a URL that answers 404, and it makes the "no slug yet"
+   * copy every admin screen writes for this case unreachable.
+   */
+  slug: string | null;
   status: PostStatus;
   content: DocNode;
   publishedAt: number | null;

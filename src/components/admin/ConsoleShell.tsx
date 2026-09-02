@@ -8,6 +8,7 @@ import { ExternalLink, LogOut, Menu as MenuIcon, Search, Store, X } from "lucide
 import { hasDomain, type AuthUser } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useSession } from "@/lib/admin/hooks";
+import { initials } from "@/lib/admin/format";
 import { NAV, homeFor, isSectionActive } from "./nav";
 import { Palette } from "./Palette";
 import { Spinner } from "./ui";
@@ -306,12 +307,6 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   );
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  if (parts.length === 0) return "AV";
-  return parts.map((part) => part[0]!.toUpperCase()).join("");
-}
-
 function UserMenu({ user }: { user: AuthUser }) {
   return (
     <DropdownMenu.Root>
@@ -321,7 +316,7 @@ function UserMenu({ user }: { user: AuthUser }) {
           className="flex h-9 items-center gap-2 rounded-lg pl-1 pr-1.5 transition-colors hover:bg-white/12 sm:pr-2.5"
         >
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-blue-500/25 text-[11px] font-bold text-white">
-            {initials(user.displayName)}
+            {initials(user.displayName, "AV")}
           </span>
           <span className="hidden max-w-[9rem] truncate text-sm font-medium text-white sm:block">
             {user.displayName}

@@ -115,3 +115,58 @@ export function useDebounced<T>(value: T, ms = 300): T {
   }, [value, ms]);
   return debounced;
 }
+
+export interface CursorStack {
+  /** The cursor for the request being made right now. */
+  cursor: string | null;
+  /** 1-based, for a pager note that wants to say which page this is. */
+  page: number;
+  /** Call from a tab or sort handler: a new filter starts at its first page. */
+  reset: () => void;
+  /** Spread onto `TablePager`. Takes the cursor the server just handed back. */
+  pager: (nextCursor: string | null | undefined) => {
+    canPrev: boolean;
+    canNext: boolean;
+    onPrev: () => void;
+    onNext: () => void;
+  };
+}
+
+/**
+ * Keyset paging as a STACK, not a page number.
+ *
+ * Back is `slice(0, -1)` and forward pushes the cursor the server just handed
+ * back, which is what makes Previous work against an API that only ever answers
+ * with the next one.
+ *
+ * `resetKey` is the debounced query, or anything else whose change invalidates
+ * the current position. It resets DURING RENDER, for the reason `useAsync`
+ * does: resetting in an effect leaves the stack one render ahead of the query it
+ * belongs to, which fires a wasted request for page one of the previous search
+ * and flashes its rows.
+ *
+ * This lives here because three list screens had their own copy, and copies
+ * drift. The formatting helpers next door were extracted after exactly that:
+ * four copies of one date function, two of which had stopped agreeing.
+ */
+export function useCursorStack(resetKey: string = ""): CursorStack {
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+
+  const [lastKey, setLastKey] = useState(resetKey);
+  if (lastKey !== resetKey) {
+    setLastKey(resetKey);
+    setCursors([null]);
+  }
+
+  return {
+    cursor: cursors[cursors.length - 1] ?? null,
+    page: cursors.length,
+    reset: useCallback(() => setCursors([null]), []),
+    pager: (nextCursor) => ({
+      canPrev: cursors.length > 1,
+      canNext: Boolean(nextCursor),
+      onPrev: () => setCursors((stack) => stack.slice(0, -1)),
+      onNext: () => setCursors((stack) => [...stack, nextCursor ?? null]),
+    }),
+  };
+}
