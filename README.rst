@@ -11,7 +11,8 @@ Getting started
 .. code-block:: bash
 
    npm install
-   cp .env.example .env.local     # fill in MONGODB_URI and SESSION_SECRET
+   cp .env.example .env.local     # fill in MONGODB_URI and SESSION_SECRET,
+                                  # and set IMAGE_STORAGE=local for uploads
    npm run db:migrate
    npm run db:bootstrap-owner -- --email you@example.com --name "Your Name" --password "twelve chars min" --apply
    npm run dev

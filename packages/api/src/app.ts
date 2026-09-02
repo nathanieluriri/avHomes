@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import {
   NotFoundError,
   databaseConfig,
+  getEnv,
   resendMailer,
   toResponse,
   type AppEnv,
@@ -20,7 +21,13 @@ import {
 } from "@avhomes/identity";
 import { listingsAdminRoutes, listingsPublicRoutes } from "@avhomes/listings";
 import { contentAdminRoutes, contentPublicRoutes } from "@avhomes/content";
-import { mediaRoutes, vercelBlobStorage, type StoragePort } from "@avhomes/media";
+import {
+  localFileStorage,
+  mediaPublicRoutes,
+  mediaRoutes,
+  vercelBlobStorage,
+  type StoragePort,
+} from "@avhomes/media";
 import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
 import { dashboardRoutes } from "./dashboard";
 
@@ -85,7 +92,26 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
         : async () => getDb(databaseConfig());
 
   const mailer = deps.mailer ?? resendMailer();
-  const storage = deps.storage ?? vercelBlobStorage();
+
+  /*
+   * The image store, chosen by configuration rather than by which token happens
+   * to be set. Guessing from a token's presence makes a missing token look like
+   * a deliberate choice, and the failure is uploads silently going somewhere
+   * nobody expects.
+   *
+   * `local` writes to a directory and serves it back through the public route
+   * below. It is a DEVELOPMENT store: a serverless filesystem is read only
+   * apart from a per-instance /tmp, so anything deployed needs `blob`.
+   *
+   * Resolved once at construction, not per request, so the whole application
+   * cannot disagree with itself about where an image went.
+   */
+  const env = getEnv();
+  const storage =
+    deps.storage ??
+    (env.IMAGE_STORAGE === "local"
+      ? localFileStorage(env.IMAGE_LOCAL_DIR, `${API_PREFIX}/public/images`)
+      : vercelBlobStorage());
 
   /* ═════════════════ 1. request id, before everything ═════════════════ */
 
@@ -177,6 +203,18 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    */
   app.route(API_PREFIX, listingsPublicRoutes());
   app.route(API_PREFIX, contentPublicRoutes());
+
+  /*
+   * Image bytes, when the active store keeps them somewhere only this process
+   * can see. Mounted here for the same reason as its neighbours: a public image
+   * must not be able to vary by who is asking, and above the session middleware
+   * it structurally cannot.
+   *
+   * Registered unconditionally. The route itself answers 404 when the store has
+   * no read path, which keeps the mount list the same on every deployment
+   * rather than making the route table depend on an environment variable.
+   */
+  app.route(API_PREFIX, mediaPublicRoutes({ storage }));
 
   /* ═════════════════ 7. the origin guard ══════════════════════════════ */
 

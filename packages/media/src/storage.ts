@@ -14,10 +14,33 @@ export interface StoredObject {
   contentType: string;
 }
 
+export interface StoredFile {
+  /**
+   * A plain ArrayBuffer, not a Uint8Array view.
+   *
+   * A Node Buffer is a view onto a POOLED allocation, so handing its `.buffer`
+   * to a Response would expose whatever else shares that pool. Copying into a
+   * standalone buffer is also the only form assignable to BodyInit.
+   */
+  body: ArrayBuffer;
+  contentType: string;
+}
+
 export interface StoragePort {
   assertConfigured(): void;
   put(key: string, body: ArrayBuffer, contentType: string): Promise<StoredObject>;
   remove(pathname: string): Promise<void>;
+  /**
+   * OPTIONAL, and its absence is meaningful.
+   *
+   * A store that hands out absolute public URLs (a CDN) needs no read path: the
+   * browser fetches the object directly and this application never touches the
+   * bytes again. A store that keeps files somewhere only this process can see
+   * has to serve them, so it implements this and the public image route becomes
+   * live. Presence of the method IS the switch, rather than a second flag that
+   * can disagree with the adapter.
+   */
+  read?(pathname: string): Promise<StoredFile | null>;
 }
 
 export function unconfiguredStorage(): StoragePort {

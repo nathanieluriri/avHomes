@@ -264,3 +264,7 @@ new file*
 
 # downloaded source material kept locally, not part of the app bundle
 /reference/
+
+# Local image uploads (IMAGE_STORAGE=local). Whatever somebody drags into the
+# admin lands here, so it must never be committable.
+.uploads/

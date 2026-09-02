@@ -74,6 +74,47 @@ const AltBody = z.object({ alt: str().max(500) }).strict();
  * function's body limit, that is the moment to add it, and the mount slot is
  * already documented in the composition root.
  */
+/**
+ * Serves locally stored images.
+ *
+ * Mounted in the PUBLIC router, above the session middleware, so it is
+ * cookieless by construction like every other public read. It exists only when
+ * the active store implements `read`: a CDN-backed store hands out absolute
+ * URLs the browser fetches directly, and this route would be dead weight in
+ * front of it.
+ */
+export function mediaPublicRoutes(deps: { storage: StoragePort }): Hono<AppEnv> {
+  const routes = new Hono<AppEnv>();
+
+  routes.get("/public/images/:file", async (c) => {
+    const read = deps.storage.read;
+    // A store with no read path means these URLs were never minted by us.
+    if (!read) throw new NotFoundError("local image serving is not enabled");
+
+    const name = pathParam(c, "file");
+    const file = await read.call(deps.storage, name);
+    if (!file) throw new NotFoundError(`image ${name}`);
+
+    return new Response(file.body, {
+      status: 200,
+      headers: {
+        "content-type": file.contentType,
+        // Safe as immutable: an id names one committed upload, so replacing a
+        // photo produces a new id and a new URL.
+        "cache-control": "public, max-age=31536000, immutable",
+        // The bytes were sniffed on the way in, but a browser must not be
+        // allowed to second-guess the type on the way out either.
+        "x-content-type-options": "nosniff",
+        // Belt and braces for a store that ever accepts SVG: served from our
+        // own origin, an SVG is a script document.
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      },
+    });
+  });
+
+  return routes;
+}
+
 export function mediaRoutes(deps: { storage: StoragePort }): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 

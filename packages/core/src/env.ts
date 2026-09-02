@@ -23,6 +23,9 @@ export interface Env {
   SITE_ORIGIN: string;
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
+  /** "local" writes to IMAGE_LOCAL_DIR; anything else uses Vercel Blob. */
+  IMAGE_STORAGE: string;
+  IMAGE_LOCAL_DIR: string;
   BLOB_READ_WRITE_TOKEN: string;
   RESEND_API_KEY: string;
   MAIL_FROM: string;
@@ -48,6 +51,8 @@ export function getEnv(): Env {
     SITE_ORIGIN: read("SITE_ORIGIN", read("NEXT_PUBLIC_SITE_ORIGIN", "http://localhost:3000")),
     CLERK_SECRET_KEY: read("CLERK_SECRET_KEY"),
     CLERK_PUBLISHABLE_KEY: read("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"),
+    IMAGE_STORAGE: read("IMAGE_STORAGE", "blob").toLowerCase(),
+    IMAGE_LOCAL_DIR: read("IMAGE_LOCAL_DIR", ".uploads"),
     BLOB_READ_WRITE_TOKEN: read("BLOB_READ_WRITE_TOKEN"),
     RESEND_API_KEY: read("RESEND_API_KEY"),
     MAIL_FROM: read("MAIL_FROM"),
