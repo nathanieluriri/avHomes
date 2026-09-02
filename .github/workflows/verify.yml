@@ -1,0 +1,44 @@
+name: Verify
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# One run at a time per ref. A newer push supersedes one still going.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Deliberately run with NO environment. Every read falls back to bundled
+      # fixtures and every optional capability answers 501, so a green build here
+      # proves the code compiles and renders rather than proving a secret exists.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+# Deployment is Vercel's Git integration, not this workflow. There is no token
+# here on purpose: a workflow that can deploy is a workflow whose compromise
+# deploys. This job is the gate; Vercel builds the same commit afterwards.
