@@ -94,6 +94,7 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
   const [enquiry, setEnquiry] = useState<Enquiry>(initial);
   const [note, setNote] = useState(enquiry.note ?? "");
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
 
   const dirty = note !== (enquiry.note ?? "");
@@ -121,7 +122,10 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
        * `setEnquiry` above still refreshes the revision, so the draft that
        * survives can be saved against the CAS token the move just bumped.
        */
-      if (body.note !== undefined) setNote(res.enquiry.note ?? "");
+      if (body.note !== undefined) {
+        setNote(res.enquiry.note ?? "");
+        setSaved(true);
+      }
     } catch (err) {
       setSaveError(
         err instanceof ApiError
@@ -158,7 +162,7 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
         actions={
           dirty ? undefined : (
             <Button onClick={() => {}} disabled size="lg">
-              Save
+              {saved ? "Saved" : "Save"}
             </Button>
           )
         }
@@ -186,7 +190,10 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
             </p>
             <textarea
               value={note}
-              onChange={(event) => setNote(event.target.value)}
+              onChange={(event) => {
+                setNote(event.target.value);
+                setSaved(false);
+              }}
               rows={4}
               placeholder="What was agreed, what is outstanding, who is picking it up."
               className="w-full resize-y rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-navy-950 outline-none transition-colors placeholder:text-slate-550 focus:border-blue-500"
@@ -266,10 +273,20 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
                 </Button>
               ))}
             </div>
-            <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
-              {MOVES[enquiry.status === "new" ? "open" : "closed"]}, or mark it spam if it is
-              not a real enquiry.
-            </p>
+            {/* Each button carries its own meaning, so the sentence under them
+                does not try to gloss a subset. Assembling one from two picked
+                statuses produced copy that named Spam after Spam had been
+                chosen and never mentioned Closed at all. */}
+            <dl className="mt-3 space-y-1 border-t border-mist-100 pt-3">
+              {ENQUIRY_STATUSES.filter((status) => status !== enquiry.status).map((status) => (
+                <div key={status} className="flex gap-2 text-[12px]">
+                  <dt className="w-14 shrink-0 font-semibold text-slate-600">
+                    {humanise(status)}
+                  </dt>
+                  <dd className="min-w-0 flex-1 text-slate-600">{MOVES[status]}</dd>
+                </div>
+              ))}
+            </dl>
 
             {enquiry.handledByName && (
               <p className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600">

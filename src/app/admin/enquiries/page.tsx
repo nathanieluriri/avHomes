@@ -203,9 +203,14 @@ export default function EnquiriesPage() {
               }
             />
           ) : (
+            /* Headlined for the whole account, because this grade only renders
+               on All with nothing typed. "No new enquiries" named a status that
+               is also a tab on this screen, so it read as a claim about one
+               bucket while sitting over an account with nothing in any of
+               them. */
             <EmptyState
-              title="No new enquiries"
-              hint="The contact form on the site and the enquiry button on every listing both land here. Nothing is waiting."
+              title="No enquiries yet"
+              hint="The contact form on the site and the enquiry button on every listing both land here. Nothing has come in."
               art={<InboxArt />}
             />
           )

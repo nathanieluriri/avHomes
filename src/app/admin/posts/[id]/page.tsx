@@ -30,9 +30,19 @@ import {
   type Tone,
 } from "@/components/admin/ui";
 
+/*
+ * Every move except Restore requires the record to be OUT of the trash.
+ * `transitionPost` has no `deletedAt` guard of its own, so offering Publish on a
+ * trashed post would publish a trashed post: live on the site, still flagged
+ * deleted, directly under a banner saying nothing here can be saved.
+ */
 const LIFECYCLE: readonly { op: string; label: string; when: (p: Post) => boolean }[] = [
-  { op: "publish", label: "Publish", when: (p) => p.status !== "published" },
-  { op: "unpublish", label: "Back to draft", when: (p) => p.status === "published" },
+  { op: "publish", label: "Publish", when: (p) => p.deletedAt === null && p.status !== "published" },
+  {
+    op: "unpublish",
+    label: "Back to draft",
+    when: (p) => p.deletedAt === null && p.status === "published",
+  },
   { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
   { op: "restore", label: "Restore", when: (p) => p.deletedAt !== null || p.status === "archived" },
 ];
@@ -220,9 +230,23 @@ function PostEditor({ initial }: { initial: Post }) {
     setBusy(true);
     setSaveError(null);
     try {
+      /*
+       * NO FORM RE-SEED HERE, and that is the point.
+       *
+       * A lifecycle op writes `status`, `publishedAt`, `slug` and `deletedAt`
+       * and touches no field on this form. Re-seeding from its response could
+       * therefore only ever do one of two things: overwrite the form with the
+       * values it already held, or throw away edits the operator had not saved.
+       * It did the second, silently, and the save bar disappeared in the same
+       * tick, so the screen reported itself clean immediately after losing the
+       * work. A body edit was unrecoverable, because remounting the editor takes
+       * its undo stack with it.
+       *
+       * Adopting the record is still right: it carries the new status and the
+       * bumped revision the next save has to quote.
+       */
       const res = await api.post<{ post: Post }>(`/admin/posts/${post.id}/${op}`);
       setPost(res.post);
-      seed(res.post);
     } catch (err) {
       setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
     } finally {
@@ -300,10 +324,28 @@ function PostEditor({ initial }: { initial: Post }) {
         <div className="mb-4">
           <ErrorNote error={saveError} />
           {theirs && (
-            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Their version is revision {theirs.revision}. Reload the page to take it, or copy your
-              changes out first.
-            </p>
+            /*
+             * A button, not an instruction to reload. The 409 body already
+             * carries the other person's whole post, so taking it needs no
+             * refetch, and "reload the page" was advice that walked straight
+             * into the browser's own leave-site prompt, because the save bar is
+             * still up at that moment. The listing editor has offered this since
+             * it was written.
+             */
+            <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
+              <span className="text-amber-900">
+                Their version is revision {theirs.revision}, titled {theirs.title || "Untitled"}.
+              </span>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setPost(theirs);
+                  seed(theirs, { forceBody: true });
+                }}
+              >
+                Load theirs
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -429,16 +471,15 @@ function PostEditor({ initial }: { initial: Post }) {
 
           {post.deletedAt === null && (
             <Card>
-              <Button variant="danger" className="w-full" disabled={busy} onClick={trash}>
-                Move to trash
-              </Button>
-              {/* The listing editor explains the same action; this one did not.
-                  A destructive button with no sentence next to it makes a reader
-                  guess how final it is. */}
-              <p className="mt-2 text-[12px] leading-relaxed text-slate-600">
+              {/* Above the button, the way the listing editor puts it: a reader
+                  should meet the explanation before the control, not after. */}
+              <p className="mb-2 text-[12px] leading-relaxed text-slate-600">
                 Reversible. There is no permanent delete, and a trashed post keeps its
                 revisions, so it can be restored from this screen.
               </p>
+              <Button variant="danger" className="w-full" disabled={busy} onClick={trash}>
+                Move to trash
+              </Button>
             </Card>
           )}
         </div>

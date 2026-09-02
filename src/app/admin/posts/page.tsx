@@ -36,7 +36,7 @@ import {
 const TABS = [
   { value: "all", label: "All" },
   { value: "published", label: "Published" },
-  { value: "draft", label: "Drafts" },
+  { value: "draft", label: "Draft" },
   { value: "archived", label: "Archived" },
 ] as const;
 

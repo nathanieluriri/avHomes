@@ -101,8 +101,17 @@ function EditorSkeleton() {
 }
 
 const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => boolean }[] = [
-  { op: "publish", label: "Publish", when: (p) => p.status === "draft" || p.status === "archived" },
-  { op: "unpublish", label: "Unpublish", when: (p) => p.status === "for-sale" || p.status === "for-rent" },
+  {
+    op: "publish",
+    label: "Publish",
+    // Out of the trash first. `transitionProperty` has no deletedAt guard.
+    when: (p) => p.deletedAt === null && (p.status === "draft" || p.status === "archived"),
+  },
+  {
+    op: "unpublish",
+    label: "Unpublish",
+    when: (p) => p.deletedAt === null && (p.status === "for-sale" || p.status === "for-rent"),
+  },
   { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
   { op: "restore", label: "Restore from trash", when: (p) => p.deletedAt !== null },
 ];
@@ -232,9 +241,23 @@ function PropertyEditor({ initial }: { initial: Property }) {
     setBusy(true);
     setSaveError(null);
     try {
+      /*
+       * NO FORM RE-SEED HERE, and that is the point.
+       *
+       * A lifecycle op writes `status`, `publishedAt`, `slug` and `deletedAt`
+       * and touches no field on this form. Re-seeding from its response could
+       * therefore only ever do one of two things: overwrite the form with the
+       * values it already held, or throw away edits the operator had not saved.
+       * It did the second, silently, and the save bar disappeared in the same
+       * tick, so the screen reported itself clean immediately after losing the
+       * work. A body edit was unrecoverable, because remounting the editor takes
+       * its undo stack with it.
+       *
+       * Adopting the record is still right: it carries the new status and the
+       * bumped revision the next save has to quote.
+       */
       const res = await api.post<{ property: Property }>(`/admin/properties/${property.id}/${op}`);
       setProperty(res.property);
-      setDraft(toDraft(res.property));
     } catch (err) {
       setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
     } finally {
