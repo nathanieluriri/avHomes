@@ -9,6 +9,7 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { Placeholder } from "@tiptap/extensions";
 import { isAllowedHref } from "@/lib/blog/utils";
+import { FindReplace } from "./find";
 
 /* ─────────────────────────── move a block ──────────────────────────────── */
 
@@ -152,5 +153,6 @@ export function createEditorExtensions(placeholder: string) {
     Placeholder.configure({ placeholder, showOnlyWhenEditable: true }),
     SlashCommand,
     BlockMove,
+    FindReplace,
   ];
 }

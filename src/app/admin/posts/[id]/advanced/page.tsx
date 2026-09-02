@@ -28,6 +28,7 @@ import { AutoTextarea } from "@/components/admin/editor/AutoTextarea";
 import { BlockMenu } from "@/components/admin/editor/BlockMenu";
 import { SlashMenu } from "@/components/admin/editor/SlashMenu";
 import { SelectionMenu } from "@/components/admin/editor/SelectionMenu";
+import { FindBar } from "@/components/admin/editor/FindBar";
 import DocRenderer from "@/components/blog/DocRenderer";
 import "./editor.css";
 
@@ -434,6 +435,7 @@ function Studio({ initial }: { initial: Post }) {
                   <BlockMenu editor={editor} onInsertImage={() => bodyImageInput.current?.click()} />
                   <SlashMenu editor={editor} onInsertImage={() => bodyImageInput.current?.click()} />
                   <SelectionMenu editor={editor} />
+                  <FindBar editor={editor} />
                   <DragHandle editor={editor} computePositionConfig={DRAG_HANDLE_POSITION}>
                     <div className="draghandle" aria-hidden="true">
                       <GripVertical />
@@ -505,7 +507,17 @@ function Studio({ initial }: { initial: Post }) {
                 post={post}
               />
             ) : (
-              <HistoryPanel postId={post.id} />
+              <HistoryPanel
+                postId={post.id}
+                onRestored={(restored) => {
+                  // The studio remounts on the new id-and-revision, so every
+                  // field and the editor itself re-seed from what was restored.
+                  setPost(restored);
+                  setPanel("none");
+                  router.refresh();
+                  window.location.reload();
+                }}
+              />
             )}
           </aside>
         </>
@@ -638,35 +650,91 @@ interface RevisionRow {
   kind: string;
   note: string | null;
   createdAt: number;
+  title: string;
 }
 
-function HistoryPanel({ postId }: { postId: string }) {
-  const { data, error, loading } = useAsync<{ items: RevisionRow[] }>(
+function HistoryPanel({
+  postId,
+  onRestored,
+}: {
+  postId: string;
+  onRestored: (post: Post) => void;
+}) {
+  const { data, error, loading, reload } = useAsync<{ items: RevisionRow[] }>(
     (signal) => api.get<{ items: RevisionRow[] }>(`/admin/revisions/${postId}`, signal),
     [postId],
   );
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<ApiError | null>(null);
+
+  async function restore(revisionId: string) {
+    setRestoring(revisionId);
+    setRestoreError(null);
+    try {
+      const res = await api.post<{ post: Post }>(
+        `/admin/revisions/${postId}/${revisionId}/restore`,
+      );
+      onRestored(res.post);
+    } catch (err) {
+      setRestoreError(
+        err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }),
+      );
+      setRestoring(null);
+    }
+  }
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading</p>;
-  if (error) return <p className="text-sm text-red-700">{error.message}</p>;
+  if (error) {
+    return (
+      <p className="text-sm text-red-700">
+        {error.message}{" "}
+        <button type="button" className="underline" onClick={reload}>
+          Try again
+        </button>
+      </p>
+    );
+  }
   if (!data || data.items.length === 0) {
     return <p className="text-sm text-muted-foreground">No saved revisions yet.</p>;
   }
 
   return (
-    <ol className="space-y-2 text-sm">
-      {data.items.map((r) => (
-        <li key={r.id} className="flex items-center justify-between gap-3 border-b border-mist-100 pb-2">
-          <span>
-            <span className="font-semibold text-navy-950">r{r.revision}</span>{" "}
-            <span className="text-muted-foreground">{r.kind}</span>
-            {r.note && <span className="text-muted-foreground"> · {r.note}</span>}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {new Date(r.createdAt).toLocaleString()}
-          </span>
-        </li>
-      ))}
-    </ol>
+    <>
+      {restoreError && (
+        <p className="mb-3 rounded-lg bg-red-50 p-2 text-sm text-red-800">{restoreError.message}</p>
+      )}
+      <p className="mb-3 text-xs text-muted-foreground">
+        Restoring writes an entry forward rather than rewinding, so what it replaces stays in this
+        list and a restore can itself be undone.
+      </p>
+      <ol className="space-y-3 text-sm">
+        {data.items.map((r) => (
+          <li key={r.id} className="border-b border-mist-100 pb-3 last:border-0">
+            <div className="flex items-baseline justify-between gap-3">
+              <span>
+                <span className="font-semibold text-navy-950">r{r.revision}</span>{" "}
+                <span className="text-muted-foreground">{r.kind}</span>
+                {r.note && <span className="text-muted-foreground"> · {r.note}</span>}
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {new Date(r.createdAt).toLocaleString()}
+              </span>
+            </div>
+            {/* The title as it stood, so a choice between two entries is not a
+                choice between two numbers. */}
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.title || "Untitled"}</p>
+            <button
+              type="button"
+              className="mt-1.5 text-xs font-semibold text-blue-600 underline underline-offset-2 disabled:text-mist-300"
+              disabled={restoring !== null}
+              onClick={() => void restore(r.id)}
+            >
+              {restoring === r.id ? "Restoring" : "Restore this version"}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }
 

@@ -302,6 +302,56 @@ export async function listRevisions(db: Db, postId: string, limit = 50): Promise
     .toArray();
 }
 
+/**
+ * Puts a stored snapshot back, as a NEW revision rather than by rewinding.
+ *
+ * Nothing is destroyed: restoring writes the old content forward, so the state
+ * it replaced is itself snapshotted first and appears in the list one row above.
+ * A restore is therefore undoable by restoring what is now the previous entry,
+ * which is the property that makes the button safe to press when you are not
+ * sure.
+ *
+ * `status`, `slug` and `publishedAt` are NOT part of a snapshot and are not
+ * touched here. Restoring the words a post used to say must not also unpublish
+ * it, and a slug change would break every link that already points at it.
+ */
+export async function restoreRevision(
+  db: Db,
+  postId: string,
+  revisionId: string,
+  actorId: string,
+): Promise<Post> {
+  const revision = await collection<PostRevisionDoc>(db, COLLECTIONS.postRevisions).findOne({
+    _id: revisionId,
+    // Scoped by post, so a revision id from another post is a 404 rather than a
+    // way to graft one post's body onto another.
+    postId,
+  });
+  if (!revision) throw new NotFoundError(`revision ${revisionId}`);
+
+  const current = await posts(db).findOne({ _id: postId });
+  if (!current || current.deletedAt !== null) throw new NotFoundError(`post ${postId}`);
+
+  const snapshot = revision.snapshot;
+  return savePost(
+    db,
+    postId,
+    {
+      title: snapshot.title,
+      subtitle: snapshot.subtitle,
+      excerpt: snapshot.excerpt,
+      content: snapshot.content,
+      coverImage: snapshot.coverImage,
+      tags: snapshot.tags,
+      category: snapshot.category,
+    },
+    current.revision,
+    "manual",
+    actorId,
+    `restored r${revision.revision}`,
+  );
+}
+
 export type PostLifecycleOp = "publish" | "unpublish" | "archive" | "restore";
 
 export async function transitionPost(

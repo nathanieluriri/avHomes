@@ -33,6 +33,7 @@ import {
   listCategories,
   listPublicPosts,
   listRevisions,
+  restoreRevision,
   savePost,
   transitionPost,
   trashPost,
@@ -263,8 +264,31 @@ export function contentAdminRoutes(): Hono<AppEnv> {
         note: r.note,
         authorId: r.authorId,
         createdAt: r.createdAt,
+        // The title as it stood, so a writer choosing between two entries has
+        // something to recognise other than a number and a timestamp.
+        title: r.snapshot.title,
       })),
     });
+  });
+
+  /**
+   * Puts a snapshot back, as a new revision rather than by rewinding.
+   *
+   * Author or admin, the same rule every other write on a post obeys. It is not
+   * admin-only: restoring is less destructive than the ordinary save a writer
+   * can already make, because the state it replaces is snapshotted first.
+   */
+  routes.post("/admin/revisions/:postId/:revisionId/restore", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const postId = pathParam(c, "postId");
+    const revisionId = pathParam(c, "revisionId");
+
+    const current = await getPostById(db, postId);
+    if (!current) throw new NotFoundError(`post ${postId}`);
+    assertMayWrite(current, currentUser(c));
+
+    const post = await restoreRevision(db, postId, revisionId, currentUser(c).id);
+    return c.json({ post });
   });
 
   routes.get("/admin/categories", requireAuth(), async (c) =>

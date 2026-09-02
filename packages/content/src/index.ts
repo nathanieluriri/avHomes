@@ -11,6 +11,8 @@ export {
   listAdminPosts,
   getPostById,
   listCategories,
+  listRevisions,
+  restoreRevision,
   type PostListQuery,
   type PostPatch,
   type PostLifecycleOp,
