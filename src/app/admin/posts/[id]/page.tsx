@@ -142,6 +142,14 @@ function PostEditor({ initial }: { initial: Post }) {
             <Link href="/admin/posts" className="text-sm text-muted-foreground underline underline-offset-2">
               Back
             </Link>
+            {/* The studio is the full-page writing surface. This screen stays
+                for quick metadata edits, which is what it is good at. */}
+            <Link
+              href={`/admin/posts/${post.id}/advanced`}
+              className="rounded-lg border border-mist-200 bg-white px-4 py-2 text-sm font-semibold text-navy-950 hover:bg-mist-50"
+            >
+              Advanced editor
+            </Link>
             <Button onClick={() => save()} disabled={busy}>
               {busy ? "Saving" : saved ? "Saved" : "Save"}
             </Button>
