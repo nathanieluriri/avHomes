@@ -11,6 +11,7 @@ import { Placeholder } from "@tiptap/extensions";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { isAllowedHref } from "@/lib/blog/utils";
 import { FindReplace } from "./find";
+import { PasteRepair } from "./paste";
 import { lowlight } from "@/lib/blog/highlight";
 
 /* ─────────────────────────── move a block ──────────────────────────────── */
@@ -165,5 +166,6 @@ export function createEditorExtensions(placeholder: string) {
     SlashCommand,
     BlockMove,
     FindReplace,
+    PasteRepair,
   ];
 }

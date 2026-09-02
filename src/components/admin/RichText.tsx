@@ -32,6 +32,7 @@ import type { DocNode, ImageRecord } from "@avhomes/contracts";
 import DocRenderer from "@/components/blog/DocRenderer";
 import { isAllowedHref } from "@/lib/blog/utils";
 import { ApiError, api } from "@/lib/admin/client";
+import { PasteRepair } from "./editor/paste";
 
 /**
  * The post body editor.
@@ -88,6 +89,8 @@ function buildExtensions(placeholder: string) {
     // URI would embed megabytes in the document body.
     DocImage.configure({ inline: false, allowBase64: false }),
     Placeholder.configure({ placeholder, showOnlyWhenEditable: true }),
+    // A Word paste is a Word paste whichever screen it lands on.
+    PasteRepair,
   ];
 }
 
