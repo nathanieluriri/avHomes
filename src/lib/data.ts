@@ -1,85 +1,129 @@
-import { Property, Testimonial, SiteStat, Insight } from "./types";
-import { demoProperties, demoTestimonials, demoStats, demoInsights } from "./demo-data";
-import { API_BASE_URL, IS_DEMO, REVALIDATE_SECONDS } from "./api-config";
+import type { Page, Property, SiteStat, Testimonial } from "@avhomes/contracts";
+import { apiBase, DETAIL_REVALIDATE, LIST_REVALIDATE } from "./api-config";
+import { demoProperties, demoStats, demoTestimonials } from "./demo-data";
 
 /**
- * Single data access layer. Pages never import demo data directly, so flipping
- * DATA_MODE in api-config.ts switches the whole site to a live backend with no
- * page edits.
+ * The single data access layer. Pages never fetch directly, so what the site
+ * reads and how it reads it stay one decision.
+ *
+ * EVERY READ FALLS BACK TO THE BUNDLED FIXTURES. That is not defensiveness, it
+ * is what makes `next build` work with no MONGODB_URI: static generation runs
+ * these functions, and a build that fails because a database is not wired yet is
+ * a build gate that tests the environment rather than the code. The fallback is
+ * logged loudly enough to find, and a deployed site with a working database
+ * never reaches it.
  */
-const isDemo = IS_DEMO;
 
-async function apiFetch<T>(path: string, fallback: T): Promise<T> {
-  if (!API_BASE_URL) return fallback;
+interface FetchOptions {
+  revalidate: number;
+  tags?: string[];
+}
+
+async function apiGet<T>(path: string, fallback: T, options: FetchOptions): Promise<T> {
+  const url = `${apiBase()}/api/public${path}`;
   try {
-    const res = await fetch(`${API_BASE_URL}${path}`, { next: { revalidate: REVALIDATE_SECONDS } });
-    if (!res.ok) throw new Error(`API ${path} responded ${res.status}`);
+    const res = await fetch(url, {
+      headers: { accept: "application/json" },
+      next: { revalidate: options.revalidate, ...(options.tags ? { tags: options.tags } : {}) },
+    });
+    if (!res.ok) {
+      // The body carries the error table's own diagnosis, including a requestId
+      // that ties this line to the server's log entry for the same failure.
+      const detail = await res.text().catch(() => "");
+      throw new Error(`${res.status} ${detail.slice(0, 300)}`);
+    }
     return (await res.json()) as T;
   } catch (err) {
-    console.error(`[data] falling back to demo data for ${path}:`, err);
+    console.warn(
+      `[data] ${path} unavailable, serving bundled fixtures:`,
+      err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    );
     return fallback;
   }
 }
 
 export async function getProperties(): Promise<Property[]> {
-  if (isDemo) return demoProperties;
-  return apiFetch<Property[]>("/properties", demoProperties);
+  const page = await apiGet<Page<Property>>(
+    "/properties?limit=48",
+    { items: demoProperties, nextCursor: null },
+    { revalidate: LIST_REVALIDATE, tags: ["properties"] },
+  );
+  return page.items;
 }
 
 export async function getFeaturedProperties(): Promise<Property[]> {
-  return (await getProperties()).filter((p) => p.featured);
+  const page = await apiGet<Page<Property>>(
+    "/properties?featured=1&limit=6",
+    { items: demoProperties.filter((p) => p.featured), nextCursor: null },
+    { revalidate: LIST_REVALIDATE, tags: ["properties"] },
+  );
+  return page.items;
+}
+
+export interface PropertyDetail {
+  property: Property;
+  similar: Property[];
+}
+
+/**
+ * The detail read returns its similar listings in the same response, so a
+ * property page is one round trip rather than two.
+ */
+export async function getPropertyDetail(slug: string): Promise<PropertyDetail | null> {
+  const fallbackProperty = demoProperties.find((p) => p.slug === slug);
+  const fallback: PropertyDetail | null = fallbackProperty
+    ? {
+        property: fallbackProperty,
+        similar: demoProperties
+          .filter((p) => p.id !== fallbackProperty.id && p.type === fallbackProperty.type)
+          .slice(0, 3),
+      }
+    : null;
+
+  const url = `${apiBase()}/api/public/properties/${encodeURIComponent(slug)}`;
+  try {
+    const res = await fetch(url, {
+      headers: { accept: "application/json" },
+      next: { revalidate: DETAIL_REVALIDATE, tags: ["properties", `property-${slug}`] },
+    });
+    // A 404 is an ANSWER, not an outage. Falling back to a fixture here would
+    // resurrect a listing the operator deliberately unpublished.
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`${res.status}`);
+    return (await res.json()) as PropertyDetail;
+  } catch (err) {
+    console.warn(
+      `[data] property ${slug} unavailable, serving bundled fixtures:`,
+      err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    );
+    return fallback;
+  }
 }
 
 export async function getPropertyBySlug(slug: string): Promise<Property | undefined> {
-  const fallback = demoProperties.find((p) => p.slug === slug);
-  if (isDemo) return fallback;
-  return apiFetch<Property | undefined>(`/properties/${slug}`, fallback);
+  return (await getPropertyDetail(slug))?.property;
 }
 
-export async function getSimilarProperties(current: Property, limit = 3): Promise<Property[]> {
-  const all = await getProperties();
-  const sameType = all.filter((p) => p.id !== current.id && p.type === current.type);
-  const sameCity = all.filter(
-    (p) => p.id !== current.id && p.city === current.city && p.type !== current.type
+interface SitePayload {
+  testimonials: Testimonial[];
+  stats: SiteStat[];
+}
+
+async function getSite(): Promise<SitePayload> {
+  return apiGet<SitePayload>(
+    "/site",
+    { testimonials: demoTestimonials, stats: demoStats },
+    { revalidate: DETAIL_REVALIDATE, tags: ["site"] },
   );
-  return [...sameType, ...sameCity].slice(0, limit);
 }
 
 export async function getTestimonials(): Promise<Testimonial[]> {
-  if (isDemo) return demoTestimonials;
-  return apiFetch<Testimonial[]>("/testimonials", demoTestimonials);
+  return (await getSite()).testimonials;
 }
 
 export async function getStats(): Promise<SiteStat[]> {
-  if (isDemo) return demoStats;
-  return apiFetch<SiteStat[]>("/stats", demoStats);
+  return (await getSite()).stats;
 }
 
-export async function getInsights(): Promise<Insight[]> {
-  if (isDemo) return demoInsights;
-  return apiFetch<Insight[]>("/insights", demoInsights);
-}
-
-export function isDemoMode() {
-  return isDemo;
-}
-
-/** Naira, no decimals. Rentals are quoted per year. */
-export function formatPrice(price: number, status: Property["status"]) {
-  const formatted = new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0,
-  }).format(price);
-  return status === "For Rent" ? `${formatted}/yr` : formatted;
-}
-
-/** Compact form for dense cards: 245000000 becomes 245M. */
-export function formatPriceShort(price: number, status: Property["status"]) {
-  const abs = Math.abs(price);
-  let out: string;
-  if (abs >= 1_000_000_000) out = `${(price / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "")}B`;
-  else if (abs >= 1_000_000) out = `${(price / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  else out = new Intl.NumberFormat("en-NG").format(price);
-  return status === "For Rent" ? `₦${out}/yr` : `₦${out}`;
-}
+/** Re-exported so components import their formatting from one place. */
+export { formatPrice, formatPriceShort, statusLabel } from "@avhomes/contracts";

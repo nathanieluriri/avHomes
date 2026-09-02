@@ -1,4 +1,19 @@
-import { Property, Testimonial, SiteStat, Agent, Insight } from "./types";
+import type { Agent, Property, SiteStat, Testimonial } from "@avhomes/contracts";
+
+/**
+ * Bundled fixtures.
+ *
+ * They exist so `next build` renders every page with no MONGODB_URI, and so a
+ * freshly cloned checkout looks like the real site before anyone has seeded a
+ * database. The data layer falls back to them and says so in the log; a
+ * deployment with a working database never reaches them.
+ *
+ * The literals below are written in READABLE units (naira, "For Sale", an ISO
+ * date) and normalised into the stored contract by `toProperty` at the bottom.
+ * Writing minor units and epoch milliseconds by hand is how a fixture quietly
+ * stops matching what the application actually stores.
+ */
+
 
 const L = "/images/library";
 const ext = (n: number) => `${L}/exterior-${String(n).padStart(2, "0")}.jpg`;
@@ -31,7 +46,26 @@ const agents: Agent[] = [
   },
 ];
 
-export const demoProperties: Property[] = [
+type PropertySeed = Omit<
+  Property,
+  | "priceMinor"
+  | "currency"
+  | "status"
+  | "createdAt"
+  | "updatedAt"
+  | "publishedAt"
+  | "deletedAt"
+  | "revision"
+  | "agentUserId"
+  | "featured"
+> & {
+  price: number;
+  status: "For Sale" | "For Rent" | "Sold";
+  createdAt: string;
+  featured?: boolean;
+};
+
+const propertySeeds: PropertySeed[] = [
   {
     id: "1",
     slug: "tropical-oasis-lekki",
@@ -316,7 +350,38 @@ export const demoProperties: Property[] = [
   },
 ];
 
-export const demoTestimonials: Testimonial[] = [
+/** Readable fixture units into the stored contract. */
+function toProperty(seed: PropertySeed): Property {
+  const published = Date.parse(`${seed.createdAt}T09:00:00Z`);
+  const { price, status, featured, ...rest } = seed;
+  const statusMap = {
+    "For Sale": "for-sale",
+    "For Rent": "for-rent",
+    Sold: "sold",
+  } as const;
+  const { createdAt: _isoDate, ...fields } = rest;
+  void _isoDate;
+  return {
+    ...fields,
+    // 100 kobo per naira. The fixture writes naira; the contract stores minor units.
+    priceMinor: price * 100,
+    currency: "NGN",
+    status: statusMap[status],
+    featured: featured ?? false,
+    agentUserId: null,
+    createdAt: published,
+    updatedAt: published,
+    publishedAt: published,
+    deletedAt: null,
+    revision: 1,
+  };
+}
+
+export const demoProperties: Property[] = propertySeeds.map(toProperty);
+
+
+/** `position` orders the carousel. The fixtures use their array order. */
+const testimonialSeeds: Omit<Testimonial, "position">[] = [
   {
     id: "t1",
     name: "Jessica Liu",
@@ -355,85 +420,21 @@ export const demoTestimonials: Testimonial[] = [
   },
 ];
 
-export const demoStats: SiteStat[] = [
+export const demoTestimonials: Testimonial[] = testimonialSeeds.map((t, i) => ({
+  ...t,
+  position: i,
+}));
+
+
+const statSeeds: Omit<SiteStat, "id" | "position">[] = [
   { value: 1500, label: "Properties managed", suffix: "+" },
   { value: 30, label: "Years of experience", suffix: "+" },
   { value: 98, label: "Client satisfaction", suffix: "%" },
   { value: 12, label: "Cities covered", suffix: "" },
 ];
 
-export const demoInsights: Insight[] = [
-  {
-    id: "i1",
-    slug: "lagos-service-charge-explained",
-    category: "Buying Guide",
-    title: "What service charge in Lagos actually covers, and what it should not",
-    excerpt:
-      "Service charge is the least understood line in any Lagos tenancy. Here is how to read one, what a fair figure looks like per square metre, and the four charges you should push back on.",
-    readMinutes: 6,
-    publishedAt: "2026-08-04",
-    author: "Adaeze Vincent",
-    image: int(1),
-    featured: true,
-  },
-  {
-    id: "i2",
-    slug: "off-plan-risk-checklist",
-    category: "Investing",
-    title: "Buying off plan without getting burned: a nine point checklist",
-    excerpt:
-      "Off plan can be the best value in the market or the fastest way to lose a deposit. The difference is almost always documentation.",
-    readMinutes: 8,
-    publishedAt: "2026-07-27",
-    author: "Tobi Ade-Johnson",
-    image: ext(4),
-  },
-  {
-    id: "i3",
-    slug: "governors-consent-timeline",
-    category: "Legal",
-    title: "Governor's consent: a realistic timeline for 2026",
-    excerpt:
-      "Everyone quotes three months. Almost nobody gets three months. Here is what the process actually looks like, stage by stage.",
-    readMinutes: 5,
-    publishedAt: "2026-07-15",
-    author: "Ifeanyi Okoro",
-    image: int(8),
-  },
-  {
-    id: "i4",
-    slug: "abuja-vs-lagos-yields",
-    category: "Market Report",
-    title: "Abuja versus Lagos rental yields, measured properly",
-    excerpt:
-      "Headline yields flatter Abuja and punish Lagos. Once you adjust for vacancy and service charge, the ranking flips in two of five segments.",
-    readMinutes: 9,
-    publishedAt: "2026-06-30",
-    author: "Tobi Ade-Johnson",
-    image: ext(2),
-  },
-  {
-    id: "i5",
-    slug: "snagging-list-handover",
-    category: "Buying Guide",
-    title: "The snagging list to bring to every handover inspection",
-    excerpt:
-      "Forty items, ordered by how expensive they get if you miss them. Print it, walk the house, and do not sign until it is clear.",
-    readMinutes: 4,
-    publishedAt: "2026-06-12",
-    author: "Adaeze Vincent",
-    image: int(6),
-  },
-  {
-    id: "i6",
-    slug: "solar-battery-payback",
-    category: "Sustainability",
-    title: "Solar and battery in a Lagos duplex: the real payback period",
-    excerpt:
-      "We instrumented three identical duplexes for a year. Diesel displaced, actual payback, and the sizing mistake almost everybody makes.",
-    readMinutes: 7,
-    publishedAt: "2026-05-29",
-    author: "Ifeanyi Okoro",
-    image: ext(10),
-  },
-];
+export const demoStats: SiteStat[] = statSeeds.map((s, i) => ({
+  ...s,
+  id: `stat-${i + 1}`,
+  position: i,
+}));

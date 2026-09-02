@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { Property } from "@/lib/types";
-import { formatPrice } from "@/lib/data";
+import { formatPrice, statusLabel } from "@/lib/data";
 
 const TRUST_LINES = [
   "Verified listing, checked by our team",
@@ -19,11 +19,11 @@ export default function AgentPanel({ property }: { property: Property }) {
     <div className="lg:sticky lg:top-28">
       <div className="rounded-2xl border border-mist-200 bg-white p-6 sm:p-7">
         <span className="inline-flex items-center rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-700">
-          {property.status}
+          {statusLabel(property.status)}
         </span>
 
         <p className="mt-4 break-words text-3xl font-bold leading-[1.05] tracking-tight text-navy-950 sm:text-4xl">
-          {formatPrice(property.price, property.status)}
+          {formatPrice(property.priceMinor, property.status, property.currency)}
         </p>
 
         <div className="mt-6 flex items-center gap-3 border-t border-mist-200 pt-6">

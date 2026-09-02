@@ -1,25 +1,17 @@
-import { BLOG_API_BASE } from "./config";
 import type { DocNode } from "./types";
 
-/** Matches only the public image endpoint, so pasted remote URLs fall through. */
-export function publicImageId(url: string): string | null {
-  const m = /^\/api\/public\/images\/([A-Za-z0-9_-]+)$/.exec(url);
-  return m ? m[1] : null;
-}
-
 /**
- * Public image ids route through the same origin proxy. The upstream endpoint
- * answers with a short lived presigned redirect, so its URL can never be
- * cached and must never reach HTML.
+ * Image URLs are now absolute Vercel Blob URLs written by our own upload route,
+ * so there is nothing to rewrite.
+ *
+ * This used to proxy through a same-origin route because the previous blog host
+ * answered with a short-lived presigned redirect whose credential could never
+ * reach HTML. That host is gone and so is the proxy. The function stays as the
+ * one place a URL passes through, so a future CDN or resizing hop has somewhere
+ * to live.
  */
 export function imageUrl(url: string): string {
-  const id = publicImageId(url);
-  if (id) return `/images/blog/${id}`;
-  if (url.startsWith("http")) return url;
-  // Site assets under /images are already same origin. Only genuinely
-  // relative API paths get the blog host prepended.
-  if (url.startsWith("/images/")) return url;
-  return `${BLOG_API_BASE}${url}`;
+  return url;
 }
 
 /**

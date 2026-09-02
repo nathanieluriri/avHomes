@@ -1,75 +1,37 @@
-export type PropertyStatus = "For Sale" | "For Rent" | "Sold";
+/**
+ * The site's domain types now live in @avhomes/contracts, which is the one
+ * package both the browser bundle and the API compile.
+ *
+ * This file stays as a re-export so existing imports keep working and so there
+ * is never a second, drifting definition of Property in the tree.
+ */
+export type {
+  Agent,
+  Category,
+  CoverImage,
+  DocNode,
+  Enquiry,
+  EnquiryStatus,
+  ImageRecord,
+  Page,
+  Post,
+  PostStatus,
+  Property,
+  PropertyStatus,
+  PropertyType,
+  PublicPost,
+  PublicPostDetail,
+  PublicPostList,
+  ReadingTemplate,
+  SiteStat,
+  Testimonial,
+} from "@avhomes/contracts";
 
-export type PropertyType =
-  | "Villa"
-  | "Apartment"
-  | "Duplex"
-  | "Townhouse"
-  | "Studio"
-  | "Penthouse"
-  | "Bungalow"
-  | "Mansion"
-  | "Terrace";
-
-export interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  phone: string;
-  email: string;
-  avatarUrl: string;
-}
-
-export interface Property {
-  id: string;
-  slug: string;
-  title: string;
-  tagline: string;
-  description: string;
-  price: number;
-  status: PropertyStatus;
-  type: PropertyType;
-  location: string;
-  city: string;
-  address: string;
-  bedrooms: number;
-  bathrooms: number;
-  areaSqft: number;
-  parkingSpaces: number;
-  yearBuilt: number;
-  featured?: boolean;
-  amenities: string[];
-  images: string[];
-  agent: Agent;
-  createdAt: string;
-}
-
-export interface Testimonial {
-  id: string;
-  name: string;
-  role: string;
-  quote: string;
-  rating: number;
-  initials: string;
-}
-
-export interface SiteStat {
-  /** Numeric target the counter animates toward. */
-  value: number;
-  label: string;
-  suffix?: string;
-  prefix?: string;
-}
-
-export interface Insight {
-  id: string;
-  slug: string;
-  category: string;
-  title: string;
-  excerpt: string;
-  readMinutes: number;
-  publishedAt: string;
-  author: string;
-  image: string;
-  featured?: boolean;
-}
+export {
+  PROPERTY_STATUSES,
+  PROPERTY_TYPES,
+  PUBLIC_PROPERTY_STATUSES,
+  POST_STATUSES,
+  READING_TEMPLATES,
+  ENQUIRY_STATUSES,
+} from "@avhomes/contracts";

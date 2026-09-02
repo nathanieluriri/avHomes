@@ -6,7 +6,7 @@ import { ChevronRight, Check, MapPin, ArrowUpRight } from "lucide-react";
 import {
   getProperties,
   getPropertyBySlug,
-  getSimilarProperties,
+  getPropertyDetail,
   formatPrice,
 } from "@/lib/data";
 import PropertyCard from "@/components/PropertyCard";
@@ -17,7 +17,9 @@ import AgentPanel from "@/components/AgentPanel";
 
 export async function generateStaticParams() {
   const properties = await getProperties();
-  return properties.map((property) => ({ slug: property.slug }));
+  return properties
+    .filter((property): property is typeof property & { slug: string } => property.slug !== null)
+    .map((property) => ({ slug: property.slug }));
 }
 
 export async function generateMetadata({
@@ -36,10 +38,11 @@ export default async function PropertyPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const property = await getPropertyBySlug(slug);
-  if (!property) notFound();
-
-  const similar = await getSimilarProperties(property);
+  // One request: the detail route answers with its similar listings, so the
+  // page does not pay a second round trip to render the strip at the bottom.
+  const detail = await getPropertyDetail(slug);
+  if (!detail) notFound();
+  const { property, similar } = detail;
   const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     property.address
   )}`;
@@ -86,7 +89,7 @@ export default async function PropertyPage({
 
           <div className="mt-8 shrink-0 border-t border-mist-200 pt-6 lg:mt-0 lg:border-t-0 lg:pt-0 lg:text-right">
             <p className="break-words text-3xl font-bold leading-none tracking-tight text-navy-950 sm:text-4xl">
-              {formatPrice(property.price, property.status)}
+              {formatPrice(property.priceMinor, property.status, property.currency)}
             </p>
           </div>
         </div>

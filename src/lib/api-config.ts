@@ -1,29 +1,38 @@
 /**
- * API configuration, committed to the repo on purpose.
+ * Where the site's server components fetch from, committed to the repo on
+ * purpose. None of this is a credential.
  *
- * The base URL is a public endpoint, not a credential, so there is nothing to
- * hide and no reason to route it through an environment variable. Editing this
- * file is the whole switch. If a real secret is ever needed (an API key, a
- * token) that still belongs in .env.local, which stays gitignored.
+ * The API is now part of THIS application, mounted at `/api`, so these fetches
+ * are same-origin. They still go over HTTP rather than importing the repository
+ * functions directly, and that is deliberate: the public read routes are mounted
+ * ABOVE the session middleware, which is what makes them structurally incapable
+ * of varying by cookie. A direct function call has no such guarantee, only a
+ * convention that somebody eventually breaks by passing a user in.
  *
- * The site currently runs in DEMO MODE: every getter in data.ts serves the
- * bundled fixtures from demo-data.ts and no network request is made, so
- * API_BASE_URL below is unused until DATA_MODE flips to "api".
+ * The cost is one self-invocation per revalidate window, not per visitor,
+ * because every fetch below carries `next: { revalidate }`.
  */
-
-export type DataMode = "demo" | "api";
 
 /**
- * "demo" serves bundled fixtures. "api" fetches from API_BASE_URL.
- * Widened with `as DataMode` so TypeScript does not narrow this to the literal
- * "demo" and then flag every mode comparison below as unreachable.
+ * An absolute base, because `fetch("/api/...")` has no origin to resolve
+ * against inside a server component.
+ *
+ * VERCEL_URL is the deployment's own host and is present on every Vercel
+ * runtime, including preview builds, which is what makes this work without an
+ * environment variable per environment.
  */
-export const DATA_MODE = "demo" as DataMode;
+export function apiBase(): string {
+  const explicit = process.env.SITE_ORIGIN ?? process.env.NEXT_PUBLIC_SITE_ORIGIN;
+  if (explicit) return explicit.replace(/\/+$/, "");
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return `http://localhost:${process.env.PORT ?? 3000}`;
+}
 
-/** Local backend. Ignored entirely while DATA_MODE is "demo". */
-export const API_BASE_URL = "http://localhost:8000";
+/** A published listing rarely changes. Lists move more often. */
+export const LIST_REVALIDATE = 300;
+export const DETAIL_REVALIDATE = 600;
 
-export const IS_DEMO = DATA_MODE !== "api";
-
-/** Seconds the fetch layer caches an API response. */
-export const REVALIDATE_SECONDS = 60;
+/** The canonical public origin for metadata, sitemaps and og:url. */
+export const SITE_DOMAIN =
+  process.env.NEXT_PUBLIC_SITE_ORIGIN ?? process.env.SITE_ORIGIN ?? "https://avhomes.example.com";
+export const SITE_NAME = "AVHomes";

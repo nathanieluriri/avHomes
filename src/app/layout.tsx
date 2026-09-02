@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Spectral, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import CookieBanner from "@/components/CookieBanner";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -36,18 +33,21 @@ export const metadata: Metadata = {
     "AVHomes lists vetted homes across Lagos and Abuja, backed by the build quality of AV Constructions.",
 };
 
+/**
+ * html, body, fonts and globals only.
+ *
+ * The marketing chrome lives in the (site) route group's layout, because one here
+ * composes into EVERY route and the admin console is not a marketing page. With
+ * the navbar at this level the admin rendered a "Find Property" button over its
+ * own sign-in form, and no child could opt out.
+ */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${spectral.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-white text-ink">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <CookieBanner />
-      </body>
+      <body className="flex min-h-full flex-col bg-white text-ink">{children}</body>
     </html>
   );
 }

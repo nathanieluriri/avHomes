@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Bed, Bath, Maximize } from "lucide-react";
 import { Property } from "@/lib/types";
-import { formatPriceShort } from "@/lib/data";
+import { formatPriceShort, statusLabel } from "@/lib/data";
 
 export default function PropertyCard({
   property,
@@ -26,7 +26,7 @@ export default function PropertyCard({
           className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.05]"
         />
         <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-navy-950 backdrop-blur">
-          {property.status}
+          {statusLabel(property.status)}
         </span>
       </div>
 
@@ -53,7 +53,7 @@ export default function PropertyCard({
 
         <div className="mt-auto flex items-center justify-between border-t border-mist-200 pt-4 mt-5">
           <span className="text-lg font-bold tracking-tight text-navy-950">
-            {formatPriceShort(property.price, property.status)}
+            {formatPriceShort(property.priceMinor, property.status, property.currency)}
           </span>
           <span className="text-sm font-medium text-blue-600 transition-transform duration-200 group-hover:translate-x-1">
             View
