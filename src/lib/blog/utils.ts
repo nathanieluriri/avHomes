@@ -15,15 +15,13 @@ export function imageUrl(url: string): string {
 }
 
 /**
- * A single slash followed by a non slash, non backslash character is root
- * relative. Everything a browser would read as "an authority follows" is
- * rejected: //host, ///host, /\host, \\host. Browsers normalise a leading
- * backslash to a forward slash, so /\evil.com resolves like //evil.com and a
- * bare startsWith("//") check is not enough.
+ * Re-exported, not redefined.
+ *
+ * The editor gates typed links with this, the reader strips anything that fails
+ * it, and the publish checklist counts what would be stripped. A second copy
+ * here would be a second answer to "is this link real", and the two would drift.
  */
-export function isAllowedHref(href: string): boolean {
-  return /^(https?:|mailto:|tel:)/i.test(href) || /^\/(?![\\/])/.test(href);
-}
+export { isAllowedHref } from "@avhomes/contracts";
 
 export function isExternalHref(href: string): boolean {
   return /^(https?:|mailto:|tel:)/i.test(href);

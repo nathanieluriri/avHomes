@@ -14,6 +14,8 @@ import {
 import {
   READING_TEMPLATES,
   docToText,
+  publishWarnings,
+  type PublishWarning,
   readingMinutes,
   wordCount,
   type DocNode,
@@ -29,6 +31,7 @@ import { BlockMenu } from "@/components/admin/editor/BlockMenu";
 import { SlashMenu } from "@/components/admin/editor/SlashMenu";
 import { SelectionMenu } from "@/components/admin/editor/SelectionMenu";
 import { FindBar } from "@/components/admin/editor/FindBar";
+import { CodeLangPicker } from "@/components/admin/editor/CodeLangPicker";
 import DocRenderer from "@/components/blog/DocRenderer";
 import "./editor.css";
 
@@ -109,6 +112,7 @@ function Studio({ initial }: { initial: Post }) {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [panel, setPanel] = useState<"none" | "details" | "history">("none");
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const text = docToText(body);
@@ -285,6 +289,18 @@ function Studio({ initial }: { initial: Post }) {
 
   const published = post.status === "published";
 
+  /*
+   * Recomputed from what is on screen, not from what was last saved, so the
+   * checklist describes the post the writer is about to publish.
+   */
+  const warnings: PublishWarning[] = publishWarnings({
+    title,
+    excerpt,
+    category,
+    content: body,
+    coverImage: cover,
+  });
+
   return (
     <div className="adv">
       <header className="adv__bar">
@@ -325,9 +341,23 @@ function Studio({ initial }: { initial: Post }) {
           type="button"
           className="adv__primary"
           disabled={busy}
-          onClick={() => void transition(published ? "unpublish" : "publish")}
+          onClick={() => {
+            if (published) {
+              void transition("unpublish");
+              return;
+            }
+            // Warnings are shown BEFORE publishing, never after, because after
+            // is the moment they stop being cheap to act on.
+            if (warnings.length > 0) setChecklistOpen(true);
+            else void transition("publish");
+          }}
         >
           {published ? "Unpublish" : "Publish"}
+          {!published && warnings.length > 0 && (
+            <span className="adv__warncount" aria-label={`${warnings.length} things to check`}>
+              {warnings.length}
+            </span>
+          )}
         </button>
         <button type="button" className="adv__icon" aria-label="Move to trash" onClick={() => void trash()}>
           <Trash2 aria-hidden="true" />
@@ -436,6 +466,7 @@ function Studio({ initial }: { initial: Post }) {
                   <SlashMenu editor={editor} onInsertImage={() => bodyImageInput.current?.click()} />
                   <SelectionMenu editor={editor} />
                   <FindBar editor={editor} />
+                  <CodeLangPicker editor={editor} />
                   <DragHandle editor={editor} computePositionConfig={DRAG_HANDLE_POSITION}>
                     <div className="draghandle" aria-hidden="true">
                       <GripVertical />
@@ -464,6 +495,49 @@ function Studio({ initial }: { initial: Post }) {
           }}
         />
       </div>
+
+      {checklistOpen && (
+        <div
+          className="linkdialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Before you publish"
+          onClick={() => setChecklistOpen(false)}
+        >
+          <div className="linkdialog__panel" onClick={(e) => e.stopPropagation()}>
+            <h2 className="adv__checktitle">Before you publish</h2>
+            <p className="adv__checknote">
+              None of these stops you. They are the things that get expensive to fix once a link to
+              this post is out in the world.
+            </p>
+            <ul className="adv__checklist">
+              {warnings.map((w) => (
+                <li key={w.id}>{w.message}</li>
+              ))}
+            </ul>
+            <div className="linkdialog__row">
+              <button
+                type="button"
+                className="linkdialog__btn"
+                disabled={busy}
+                onClick={() => {
+                  setChecklistOpen(false);
+                  void transition("publish");
+                }}
+              >
+                Publish anyway
+              </button>
+              <button
+                type="button"
+                className="linkdialog__btn linkdialog__btn--plain"
+                onClick={() => setChecklistOpen(false)}
+              >
+                Go back and fix
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {panel !== "none" && (
         <>

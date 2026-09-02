@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { DocNode } from "@/lib/blog/types";
 import { imageUrl, isAllowedHref, isExternalHref, plainText } from "@/lib/blog/utils";
+import { highlightCode } from "@/lib/blog/highlight";
 
 type DocMark = NonNullable<DocNode["marks"]>[number];
 
@@ -8,6 +9,53 @@ export default function DocRenderer({ doc }: { doc: DocNode | null | undefined }
   const content = doc?.content;
   if (!content || content.length === 0) return null;
   return <>{content.map((node, i) => renderNode(node, `n-${i}`))}</>;
+}
+
+/**
+ * A code block, coloured by the SAME registry the editor uses.
+ *
+ * Highlighting happens here rather than in the browser: this renders on the
+ * server, so the colour is in the HTML a reader receives and there is no
+ * flash of monochrome while a client-side highlighter loads.
+ *
+ * A block with no language, or one naming a grammar we do not carry, renders
+ * monochrome. It never guesses: a shell snippet becoming Perl in one paragraph
+ * and Ruby in the next is worse than plain text.
+ */
+function renderCodeBlock(node: DocNode, key: string): ReactNode {
+  const code = plainText(node);
+  const language = typeof node.attrs?.language === "string" ? node.attrs.language : null;
+  const tree = highlightCode(code, language);
+
+  return (
+    <pre key={key} className="doc-code" data-language={language ?? undefined}>
+      <code>{tree ? tree.children.map((child, i) => renderHast(child, `${key}-${i}`)) : code}</code>
+    </pre>
+  );
+}
+
+/**
+ * hast is a tiny tree, and highlighting only ever produces two shapes in it:
+ * text, and a span carrying highlight.js class names. Narrowed structurally
+ * rather than against hast's own types, so this file does not take a dependency
+ * on them for four fields.
+ */
+function renderHast(node: unknown, key: string): ReactNode {
+  if (node === null || typeof node !== "object") return null;
+  const n = node as { type?: unknown; value?: unknown; properties?: unknown; children?: unknown };
+
+  if (n.type === "text") return typeof n.value === "string" ? n.value : null;
+  if (n.type !== "element") return null;
+
+  const props = n.properties as { className?: unknown } | undefined;
+  const className = Array.isArray(props?.className) ? props.className.join(" ") : undefined;
+  const children = Array.isArray(n.children) ? n.children : [];
+
+  return (
+    <span key={key} className={className}>
+      {children.map((child, i) => renderHast(child, `${key}-${i}`))}
+    </span>
+  );
 }
 
 function renderChildren(node: DocNode, keyBase: string): ReactNode[] {
@@ -60,11 +108,7 @@ function renderNode(node: DocNode, key: string): ReactNode {
       return renderTaskItem(node, key);
 
     case "codeBlock":
-      return (
-        <pre key={key} className="doc-code">
-          <code>{plainText(node)}</code>
-        </pre>
-      );
+      return renderCodeBlock(node, key);
 
     case "table":
       return renderTable(node, key);

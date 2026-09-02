@@ -10,3 +10,4 @@ export * from "./types";
 export * from "./doc";
 export * from "./validate";
 export * from "./money";
+export * from "./publish-check";

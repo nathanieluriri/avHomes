@@ -8,8 +8,10 @@ import { TableKit } from "@tiptap/extension-table";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { Placeholder } from "@tiptap/extensions";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { isAllowedHref } from "@/lib/blog/utils";
 import { FindReplace } from "./find";
+import { lowlight } from "@/lib/blog/highlight";
 
 /* ─────────────────────────── move a block ──────────────────────────────── */
 
@@ -124,8 +126,17 @@ export function createEditorExtensions(placeholder: string) {
     StarterKit.configure({
       // The reader draws h2 and h3. An h1 would be a second title on the page.
       heading: { levels: [2, 3] },
+      // CodeBlockLowlight registers the same node name, so StarterKit's plain
+      // one has to stand down or the two collide when the schema is built.
+      codeBlock: false,
       link: false,
       underline: false,
+    }),
+    CodeBlockLowlight.configure({
+      lowlight,
+      // Every block with no language set resolves to this, and it is registered
+      // as a real no-op grammar so the editor cannot fall back to guessing.
+      defaultLanguage: "plaintext",
     }),
     Underline,
     Link.configure({

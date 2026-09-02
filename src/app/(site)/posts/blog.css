@@ -589,8 +589,12 @@
   color: inherit;
 }
 
-/* the hljs ramp travels with the surface it was measured against, even though
-   code renders as plain text today */
+/* The hljs ramp, and it is live: DocRenderer highlights on the server through
+   the same lowlight registry the editor uses, so a block cannot be coloured one
+   way while being written and another once published. A block with no language,
+   or one naming a grammar we do not carry, still renders monochrome, because
+   guessing turns a shell snippet into Perl in one paragraph and Ruby in the
+   next. */
 .blog .hljs-keyword,
 .blog .hljs-selector-tag,
 .blog .hljs-literal,
