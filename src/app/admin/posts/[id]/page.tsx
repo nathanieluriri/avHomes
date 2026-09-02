@@ -6,6 +6,7 @@ import { useState } from "react";
 import { READING_TEMPLATES, type Post, type ReadingTemplate } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
+import ImagePicker from "@/components/admin/ImagePicker";
 import { canEditAsText, docToEditable, editableToDoc } from "@/lib/admin/doc-text";
 import {
   Badge,
@@ -250,15 +251,26 @@ function PostEditor({ initial }: { initial: Post }) {
           </Card>
 
           <Card className="space-y-4">
-            <Field label="Cover image URL" hint="Upload in Images, then paste the URL.">
-              <input
-                className={`${inputClass} font-mono text-xs`}
-                value={coverUrl}
-                onChange={(e) => setCoverUrl(e.target.value)}
+            <Field label="Cover image">
+              <ImagePicker
+                value={coverUrl ? [coverUrl] : []}
+                onChange={(urls) => {
+                  setCoverUrl(urls[0] ?? "");
+                  setSaved(false);
+                }}
+                max={1}
               />
             </Field>
-            <Field label="Cover alt text">
-              <input className={inputClass} value={coverAlt} onChange={(e) => setCoverAlt(e.target.value)} />
+            <Field
+              label="Cover alt text"
+              hint="What the image shows, for a reader who cannot see it."
+            >
+              <input
+                className={inputClass}
+                value={coverAlt}
+                onChange={(e) => setCoverAlt(e.target.value)}
+                disabled={coverUrl === ""}
+              />
             </Field>
           </Card>
 

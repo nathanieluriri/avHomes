@@ -14,6 +14,7 @@ import {
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
+import ImagePicker from "@/components/admin/ImagePicker";
 import {
   Badge,
   Button,
@@ -55,7 +56,7 @@ type Draft = {
   yearBuilt: number;
   featured: boolean;
   amenities: string;
-  images: string;
+  images: string[];
 };
 
 function toDraft(p: Property): Draft {
@@ -76,7 +77,7 @@ function toDraft(p: Property): Draft {
     yearBuilt: p.yearBuilt,
     featured: p.featured,
     amenities: p.amenities.join("\n"),
-    images: p.images.join("\n"),
+    images: p.images,
   };
 }
 
@@ -161,7 +162,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
           yearBuilt: draft.yearBuilt,
           featured: draft.featured,
           amenities: splitLines(draft.amenities),
-          images: splitLines(draft.images),
+          images: draft.images,
         },
         baseRevision: property.revision,
       });
@@ -314,11 +315,11 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 onChange={(e) => set("amenities", e.target.value)}
               />
             </Field>
-            <Field label="Images" hint="One URL per line. Upload them in the Images screen and paste the URL here.">
-              <textarea
-                className={`${inputClass} min-h-32 font-mono text-xs`}
+            <Field label="Photos" hint="The first one leads the listing card and the gallery.">
+              <ImagePicker
                 value={draft.images}
-                onChange={(e) => set("images", e.target.value)}
+                onChange={(images) => set("images", images)}
+                coverLabel="Main photo"
               />
             </Field>
           </Card>
