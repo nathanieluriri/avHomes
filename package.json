@@ -11,8 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "node --experimental-strip-types packages/db/src/cli/migrate.ts",
-    "db:bootstrap-owner": "node --experimental-strip-types packages/identity/src/cli/bootstrap-owner.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env.local packages/db/src/cli/migrate.ts",
+    "db:bootstrap-owner": "tsx --env-file-if-exists=.env.local packages/identity/src/cli/bootstrap-owner.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.16.13",
@@ -39,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }
