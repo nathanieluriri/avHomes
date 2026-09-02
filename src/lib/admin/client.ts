@@ -31,53 +31,61 @@ export interface ApiErrorBody {
   [key: string]: unknown;
 }
 
+/**
+ * The sentence to put in front of a person.
+ *
+ * Server-supplied `detail` wins, because a route that took the trouble to
+ * explain a refusal knows more than this table does. Everything else falls back
+ * to a phrasing that says what to DO, not what went wrong internally.
+ *
+ * A FREE FUNCTION, CALLED BEFORE `super()`, and that is the whole point of its
+ * shape. This used to be a `get message()` on the class, and it never ran once:
+ * `super(...)` makes `Error` install `message` as an OWN data property on the
+ * instance, and an own property shadows a prototype accessor. So every screen
+ * in the console printed the raw code (`bad_request`, `forbidden`,
+ * `upstream_failed`) where its sentence was meant to go, and `ErrorNote` drew
+ * that token as its headline directly above the same token in its status chip.
+ * Twelve written sentences, dead from the day they were added.
+ */
+function sentenceFor(status: number, b: ApiErrorBody): string {
+  if (typeof b.detail === "string" && b.detail !== "") return b.detail;
+  switch (b.error) {
+    case "unauthenticated":
+      return "Your session has ended. Sign in again.";
+    case "forbidden":
+      return b.reason ?? "You do not have access to this.";
+    case "gone":
+      return "That no longer exists.";
+    case "bad_request":
+      return b.issues?.length
+        ? `Check ${b.issues.map((i) => i.path).join(", ")}.`
+        : "That request was not accepted.";
+    case "invalid_document":
+      return `The document is not valid at ${b.path ?? "an unknown position"}.`;
+    case "stale_write":
+      return "Someone else saved this while you were editing.";
+    case "precondition_failed":
+      return `That is not allowed right now (${b.operation ?? "refused"}).`;
+    case "duplicate":
+      return `That ${b.field ?? "value"} is already taken.`;
+    case "rate_limited":
+      return `Too many attempts. Try again in ${b.retryAfter ?? 60}s.`;
+    case "not_implemented":
+      return b.hint ? `Not configured: ${b.hint}` : "That feature is not configured.";
+    case "upstream_failed":
+      return "A service we depend on is not answering.";
+    default:
+      return status >= 500 ? "The server could not answer that." : "Something went wrong.";
+  }
+}
+
 export class ApiError extends Error {
   override readonly name = "ApiError";
   constructor(
     readonly status: number,
     readonly body: ApiErrorBody,
   ) {
-    super(body.error ?? `HTTP ${status}`);
-  }
-
-  /**
-   * The sentence to put in front of a person.
-   *
-   * Server-supplied `detail` wins, because a route that took the trouble to
-   * explain a refusal knows more than this table does. Everything else falls
-   * back to a phrasing that says what to DO, not what went wrong internally.
-   */
-  get message(): string {
-    const b = this.body;
-    if (typeof b.detail === "string" && b.detail !== "") return b.detail;
-    switch (b.error) {
-      case "unauthenticated":
-        return "Your session has ended. Sign in again.";
-      case "forbidden":
-        return b.reason ?? "You do not have access to this.";
-      case "gone":
-        return "That no longer exists.";
-      case "bad_request":
-        return b.issues?.length
-          ? `Check ${b.issues.map((i) => i.path).join(", ")}.`
-          : "That request was not accepted.";
-      case "invalid_document":
-        return `The document is not valid at ${b.path ?? "an unknown position"}.`;
-      case "stale_write":
-        return "Someone else saved this while you were editing.";
-      case "precondition_failed":
-        return `That is not allowed right now (${b.operation ?? "refused"}).`;
-      case "duplicate":
-        return `That ${b.field ?? "value"} is already taken.`;
-      case "rate_limited":
-        return `Too many attempts. Try again in ${b.retryAfter ?? 60}s.`;
-      case "not_implemented":
-        return b.hint ? `Not configured: ${b.hint}` : "That feature is not configured.";
-      case "upstream_failed":
-        return "A service we depend on is not answering.";
-      default:
-        return "Something went wrong.";
-    }
+    super(sentenceFor(status, body));
   }
 
   /** For a copy-to-clipboard button on an error toast. */

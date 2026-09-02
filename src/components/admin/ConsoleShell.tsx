@@ -79,8 +79,21 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
      so the browser's own restoration never sees it, and without this a phone
      user tapping through from the bottom of a long list lands mid-way down the
      next one and reads it as missing rows. */
+  const firstRender = useRef(true);
   useEffect(() => {
     mainRef.current?.scrollTo(0, 0);
+    /*
+     * And focus goes with it. Activating a row dropped focus back to <body>, so
+     * a keyboard operator restarted at the top of the topbar on every
+     * navigation: twelve tabs to reach the breadcrumb that takes them back.
+     * Skipped on the first render, because stealing focus from a fresh page
+     * load is its own bug.
+     */
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
 
   useEffect(() => {
@@ -121,6 +134,19 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="console fixed inset-0 z-40 flex flex-col bg-chrome-900">
+      {/* First tab stop in the console. The rail is up to eight links before
+          the content starts, and this is a tool somebody uses all day. */}
+      <a
+        href="#c-content"
+        onClick={(event) => {
+          event.preventDefault();
+          mainRef.current?.focus();
+        }}
+        className="sr-only rounded-lg bg-white px-4 py-2 text-[13px] font-semibold text-navy-950 focus:not-sr-only focus:absolute focus:left-3 focus:top-2.5 focus:z-[60]"
+      >
+        Skip to content
+      </a>
+
       <header className="c-topbar relative z-50 grid h-(--c-topbar-h) shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2 px-2 sm:gap-3 sm:px-4">
         <div className="flex items-center gap-1">
           <button
@@ -137,14 +163,18 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             )}
           </button>
 
+          {/* The mark stays at every width and the words drop, rather than the
+              whole thing vanishing below sm. A phone had no product name in the
+              chrome at all and no route home outside the drawer. */}
           <Link
             href={home}
-            className="hidden items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10 sm:flex"
+            aria-label="AVHomes console home"
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10"
           >
-            <span className="grid h-6 w-6 place-items-center rounded-md bg-white/15 text-[11px] font-bold text-white">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/15 text-[11px] font-bold text-white">
               AV
             </span>
-            <span className="text-sm font-bold tracking-tight text-white">
+            <span className="hidden text-sm font-bold tracking-tight text-white sm:block">
               AVHomes <span className="font-normal text-blue-100">console</span>
             </span>
           </Link>
@@ -255,7 +285,14 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           </div>
         </nav>
 
-        <main ref={mainRef} className="c-main min-w-0 overflow-y-auto">
+        <main
+          ref={mainRef}
+          id="c-content"
+          /* Programmatically focusable for the effect above, but not a tab stop
+             of its own, which -1 is exactly for. */
+          tabIndex={-1}
+          className="c-main min-w-0 overflow-y-auto outline-none"
+        >
           {/* Keyed on the pathname so React remounts it per navigation and the
               rise replays without any JavaScript timing. */}
           <div key={pathname} className="c-sheet mx-auto w-full max-w-[66rem] px-4 py-6 sm:px-6 sm:py-8">

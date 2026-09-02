@@ -74,7 +74,10 @@ export function DataTable<T>({
       {loading ? (
         <TableSkeleton columns={columns.length} />
       ) : rows.length === 0 ? (
-        <div className="p-2">{empty}</div>
+        /* No empty means the caller knows why the list is empty and is saying
+           so somewhere else. A failed load must not fall through to an
+           onboarding illustration. */
+        empty ? <div className="p-2">{empty}</div> : null
       ) : (
         <>
           <table className="hidden w-full text-[13px] sm:table">

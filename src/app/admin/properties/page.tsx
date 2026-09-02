@@ -279,8 +279,15 @@ export default function PropertiesPage() {
             }
           />
         }
+        /*
+         * Nothing at all when the load failed. The banner above already says the
+         * server is unreachable, and the first-run state would sit underneath it
+         * telling the operator their account is empty and inviting them to
+         * create a listing they may well already have. Two true-looking
+         * statements that contradict each other is worse than one.
+         */
         empty={
-          filtered ? (
+          error ? undefined : filtered ? (
             <EmptyState
               icon={Building2}
               title="Nothing matched"

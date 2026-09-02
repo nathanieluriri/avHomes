@@ -115,7 +115,32 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {error && <ErrorNote error={error} onRetry={reload} />}
+      {/*
+        A greeting above the banner, even when nothing loaded. A screen whose
+        whole body is a red box has thrown away every landmark on it, and the
+        rise then animates an empty sheet. The destinations below still work
+        without any data, so a failed dashboard is still a launcher.
+      */}
+      {error && (
+        <div className="space-y-4">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-navy-950">
+              {firstName ? `${firstName}, something is not answering` : "Something is not answering"}
+            </h1>
+            <p className="mt-1 text-[13px] text-slate-600">
+              The console is fine. The screens below still open.
+            </p>
+          </div>
+          <ErrorNote error={error} onRetry={reload} />
+          {user && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {DESTINATIONS.filter((item) => hasDomain(user.role, item.domain)).map((item) => (
+                <DestinationCard key={item.href} item={item} data={null} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/*
         `!user` is part of the loading condition, not a separate branch. The
@@ -162,7 +187,7 @@ export default function DashboardPage() {
               </div>
 
               {data.recentEnquiries.length === 0 ? (
-                <p className="py-2 text-[13px] text-slate-600">
+                <p className="rounded-xl bg-mist-50 px-4 py-6 text-center text-[13px] text-slate-600">
                   Nothing yet. The contact form on the site feeds this.
                 </p>
               ) : (
@@ -195,8 +220,10 @@ export default function DashboardPage() {
  * the screen twice. The kicker carries live state, so the card becomes a
  * notification without any extra chrome.
  */
-function DestinationCard({ item, data }: { item: Destination; data: Dashboard }) {
-  const kicker = item.kicker(data);
+function DestinationCard({ item, data }: { item: Destination; data: Dashboard | null }) {
+  // Null on the error branch: the destination still works, it just has no live
+  // state to advertise, and an invented kicker would be worse than none.
+  const kicker = data ? item.kicker(data) : null;
   return (
     <Link
       href={item.href}

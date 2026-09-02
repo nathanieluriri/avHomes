@@ -13,6 +13,7 @@ import {
   type PropertyType,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
+import { SaveBar } from "@/components/admin/SaveBar";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import {
@@ -22,7 +23,7 @@ import {
   ErrorNote,
   Field,
   PageHeader,
-  Spinner,
+  Skeleton,
   inputClass,
 } from "@/components/admin/ui";
 
@@ -81,6 +82,23 @@ function toDraft(p: Property): Draft {
   };
 }
 
+/** The editor's shape, so the wait does not reflow into it. */
+function EditorSkeleton() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]" aria-busy="true">
+      <span className="sr-only">Loading this listing</span>
+      <div className="space-y-4">
+        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-80 rounded-2xl" />
+      </div>
+      <div className="space-y-4">
+        <Skeleton className="h-44 rounded-2xl" />
+        <Skeleton className="h-56 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
 const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => boolean }[] = [
   { op: "publish", label: "Publish", when: (p) => p.status === "draft" || p.status === "archived" },
   { op: "unpublish", label: "Unpublish", when: (p) => p.status === "for-sale" || p.status === "for-rent" },
@@ -97,8 +115,28 @@ export default function PropertyEditorPage() {
     [id],
   );
 
-  if (loading) return <Spinner />;
-  if (error) return <ErrorNote error={error} onRetry={reload} />;
+  /*
+   * Both branches KEEP THE HEADER. A screen that fails to load and shows only a
+   * red box has also thrown away the breadcrumb, which is the way back, and the
+   * rise then animates an empty sheet. The layout of a detail screen is known
+   * before its data is, so the wait shows that layout.
+   */
+  if (loading) {
+    return (
+      <>
+        <PageHeader icon={Building2} backTo="/admin/properties" backLabel="Listings" title="Listing" />
+        <EditorSkeleton />
+      </>
+    );
+  }
+  if (error) {
+    return (
+      <>
+        <PageHeader icon={Building2} backTo="/admin/properties" backLabel="Listings" title="Listing" />
+        <ErrorNote error={error} onRetry={reload} />
+      </>
+    );
+  }
   if (!data) return null;
 
   /*
@@ -120,6 +158,15 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  /*
+   * Dirty is derived, never tracked. A boolean set by every field handler drifts
+   * the first time somebody types a character and deletes it again, and then the
+   * save bar and the unload prompt start disagreeing with each other about
+   * whether anything is at stake. Comparing the draft against the listing it was
+   * seeded from cannot drift.
+   */
+  const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(property));
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -210,6 +257,16 @@ function PropertyEditor({ initial }: { initial: Property }) {
       {/* `backTo` draws the breadcrumb, which replaces the old "Back" link in
           the action row. The crumb says where you are AND takes you up, and it
           sits where a reader looks for that rather than beside Save. */}
+      <SaveBar
+        when={dirty}
+        saving={busy}
+        onDiscard={() => {
+          setDraft(toDraft(property));
+          setSaveError(null);
+        }}
+        onSave={() => void save()}
+      />
+
       <PageHeader
         icon={Building2}
         backTo="/admin/properties"
@@ -222,8 +279,8 @@ function PropertyEditor({ initial }: { initial: Property }) {
         }
         subtitle={property.slug ? `/listings/${property.slug}` : "No slug yet. It is derived when you publish."}
         actions={
-          <Button onClick={save} disabled={busy} size="lg">
-            {busy ? "Saving" : saved ? "Saved" : "Save"}
+          <Button onClick={save} disabled={busy || !dirty} size="lg">
+            {busy ? "Saving" : saved && !dirty ? "Saved" : "Save"}
           </Button>
         }
       />
@@ -358,11 +415,11 @@ function PropertyEditor({ initial }: { initial: Property }) {
 
           <Card className="space-y-2 text-sm">
             <Row label="Revision" value={String(property.revision)} />
-            <Row label="Created" value={new Date(property.createdAt).toLocaleDateString()} />
-            <Row label="Updated" value={new Date(property.updatedAt).toLocaleDateString()} />
+            <Row label="Created" value={new Date(property.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} />
+            <Row label="Updated" value={new Date(property.updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} />
             <Row
               label="Published"
-              value={property.publishedAt ? new Date(property.publishedAt).toLocaleDateString() : "Not yet"}
+              value={property.publishedAt ? new Date(property.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Not yet"}
             />
             <Row label="Agent" value={property.agent.name || "Unassigned"} />
           </Card>

@@ -12,7 +12,17 @@ import type { ReactNode } from "react";
  * cookie, which is a round trip and a cookie-forwarding path bought for a tab
  * label. "Editing a listing" is enough to tell two tabs apart.
  */
-export const metadata: Metadata = { title: "Editing a listing" };
+/*
+ * `absolute`, and spelled out in full, because the template does not reach this
+ * far. A `title.template` applies to a segment's children, but the Listings
+ * layout above sets a plain string, and a plain string carries no template of
+ * its own, so a bare title here rendered as "Editing a listing" with the
+ * console's name dropped. Absolute is the one form that cannot be affected by
+ * what any ancestor did.
+ */
+export const metadata: Metadata = {
+  title: { absolute: "Editing a listing | AVHomes console" },
+};
 
 export default function ListingEditorLayout({ children }: { children: ReactNode }) {
   return children;

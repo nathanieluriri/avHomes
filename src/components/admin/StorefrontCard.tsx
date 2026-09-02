@@ -42,8 +42,14 @@ import { Badge, Button, ErrorNote, Skeleton } from "./ui";
  * it is.
  */
 
-const FRAME_W = 1280;
-const FRAME_H = 820;
+/*
+ * Two frames, because scaling a 1280px page into a 340px card is not a preview,
+ * it is a smudge. On a phone the card renders the storefront at a PHONE
+ * viewport, which is both legible at that scale and the thing a phone visitor
+ * would actually be looking at.
+ */
+const DESKTOP = { w: 1280, h: 820 };
+const MOBILE = { w: 430, h: 700 };
 
 export function StorefrontCard({ user }: { user: AuthUser }) {
   /*
@@ -143,13 +149,19 @@ export function StorefrontCard({ user }: { user: AuthUser }) {
 function Preview({ nonce }: { nonce: number }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
+  const [frame, setFrame] = useState(DESKTOP);
 
   useEffect(() => {
     const box = boxRef.current;
     if (!box) return;
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? 0;
-      if (width > 0) setScale(width / FRAME_W);
+      if (width === 0) return;
+      // The card's own width picks the frame, not the window's: the rail
+      // collapsing changes this box without changing the viewport.
+      const next = width < 480 ? MOBILE : DESKTOP;
+      setFrame(next);
+      setScale(width / next.w);
     });
     observer.observe(box);
     return () => observer.disconnect();
@@ -159,7 +171,7 @@ function Preview({ nonce }: { nonce: number }) {
     <div
       ref={boxRef}
       className="relative w-full overflow-hidden bg-mist-50"
-      style={{ aspectRatio: `${FRAME_W} / ${FRAME_H}` }}
+      style={{ aspectRatio: `${frame.w} / ${frame.h}` }}
     >
       {/* `inert` rather than aria-hidden plus tabindex: the frame holds real
           links, and aria-hidden over focusable content is a violation on its
@@ -176,8 +188,8 @@ function Preview({ nonce }: { nonce: number }) {
           scrolling="no"
           className="border-0"
           style={{
-            width: FRAME_W,
-            height: FRAME_H,
+            width: frame.w,
+            height: frame.h,
             transform: `scale(${scale})`,
             transformOrigin: "top left",
             // Hidden until measured, so the first paint is not a full size page
