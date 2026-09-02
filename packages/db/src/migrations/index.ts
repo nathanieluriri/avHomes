@@ -1,0 +1,12 @@
+import type { Migration } from "../migrate";
+import { migration0001 } from "./0001_init";
+
+/**
+ * The ordered list. Append only, and never renumber a tag that has shipped:
+ * the ledger keys on the string, so a rename re-runs a migration that already
+ * applied.
+ *
+ * Read the folder, not this file, for the next number. A list in a document
+ * goes stale; `ls packages/db/src/migrations` cannot.
+ */
+export const MIGRATIONS: readonly Migration[] = [migration0001];
