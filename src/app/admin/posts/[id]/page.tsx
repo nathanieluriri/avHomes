@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { READING_TEMPLATES, type Post, type ReadingTemplate } from "@avhomes/contracts";
+import { READING_TEMPLATES, type DocNode, type Post, type ReadingTemplate } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
-import { canEditAsText, docToEditable, editableToDoc } from "@/lib/admin/doc-text";
+import "../../rte.css";
+import RichText from "@/components/admin/RichText";
 import {
   Badge,
   Button,
@@ -58,15 +59,16 @@ function PostEditor({ initial }: { initial: Post }) {
   const [template, setTemplate] = useState<ReadingTemplate | "">(initial.template ?? "");
   const [coverUrl, setCoverUrl] = useState(initial.coverImage?.url ?? "");
   const [coverAlt, setCoverAlt] = useState(initial.coverImage?.alt ?? "");
+  // The document itself. The editor hydrates it once and reports every edit
+  // back as ProseMirror JSON, so there is no text representation to convert.
+  const [body, setBody] = useState<DocNode>(initial.content);
   /*
-   * A document this editor cannot express is detected ONCE, from the value it
-   * was handed. A post carrying lists or tables renders read-only rather than
-   * being silently flattened to paragraphs on the next save.
+   * Set when the editor finds a node it cannot represent. While true the patch
+   * omits `content` entirely, so the server keeps the stored document: sending
+   * it back would be refused by validateDoc with a 422 about a body the writer
+   * never touched, and blocking a title fix on it would be worse still.
    */
-  const [richBody] = useState(() => !canEditAsText(initial.content));
-  const [body, setBody] = useState(() =>
-    canEditAsText(initial.content) ? docToEditable(initial.content) : "",
-  );
+  const [bodyLocked, setBodyLocked] = useState(false);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -89,9 +91,7 @@ function PostEditor({ initial }: { initial: Post }) {
           coverImage: coverUrl
             ? { url: coverUrl, alt: coverAlt, focalPoint: "50% 50%", width: 0, height: 0 }
             : null,
-          // A document this editor cannot express is left untouched rather than
-          // flattened. Omitting the key means the server keeps what it has.
-          ...(richBody ? {} : { content: editableToDoc(body) }),
+          ...(bodyLocked ? {} : { content: body }),
         },
         baseRevision: post.revision,
         kind,
@@ -183,30 +183,16 @@ function PostEditor({ initial }: { initial: Post }) {
           </Card>
 
           <Card>
-            {richBody ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                <p className="font-semibold">This post has rich formatting.</p>
-                <p className="mt-1">
-                  It contains lists, quotes, tables or inline formatting that a plain textarea cannot
-                  represent. The body is left untouched when you save, so nothing is lost. Editing it
-                  needs the rich editor.
-                </p>
-              </div>
-            ) : (
-              <Field
-                label="Body"
-                hint="Blank line between paragraphs. A line starting with ## becomes a heading."
-              >
-                <textarea
-                  className={`${inputClass} min-h-96 font-mono text-[13px] leading-relaxed`}
-                  value={body}
-                  onChange={(e) => {
-                    setBody(e.target.value);
-                    setSaved(false);
-                  }}
-                />
-              </Field>
-            )}
+            <Field label="Body">
+              <RichText
+                value={initial.content}
+                onChange={(doc) => {
+                  setBody(doc as DocNode);
+                  setSaved(false);
+                }}
+                onLockedChange={setBodyLocked}
+              />
+            </Field>
           </Card>
         </div>
 
