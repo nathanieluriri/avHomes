@@ -32,6 +32,9 @@ import type { DocNode, ImageRecord } from "@avhomes/contracts";
 import DocRenderer from "@/components/blog/DocRenderer";
 import { isAllowedHref } from "@/lib/blog/utils";
 import { ApiError, api } from "@/lib/admin/client";
+import { useIsPhone } from "@/lib/admin/hooks";
+import { BottomSheet } from "./BottomSheet";
+import { Button, inputClass } from "./ui";
 import { PasteRepair } from "./editor/paste";
 
 /**
@@ -94,6 +97,27 @@ function buildExtensions(placeholder: string) {
   ];
 }
 
+/**
+ * The captions drawn under the icons in the phone toolbar.
+ *
+ * Only six, because the strip scrolls and the first thing off the right edge
+ * should still be a rarity. A phone has no hover, so the `title` that carries
+ * every other tool's meaning renders nowhere, and H2 against H3 or the three
+ * list icons against each other is a few pixels of difference at 18px.
+ *
+ * KEYED ON THE ARIA-LABEL, and the caption is always a substring of it. A
+ * visible label that is not contained in the accessible name is a control voice
+ * control cannot be asked for by the words printed on it.
+ */
+const CAPTIONS: Record<string, string> = {
+  Bold: "Bold",
+  Italic: "Italic",
+  Heading: "Heading",
+  "Bulleted list": "List",
+  Link: "Link",
+  "Insert image": "Image",
+};
+
 export default function RichText({
   value,
   onChange,
@@ -116,6 +140,7 @@ export default function RichText({
   ariaLabel?: string;
 }) {
   const imageInputId = useId();
+  const isPhone = useIsPhone();
   const hydrated = useRef(false);
   const broken = useRef(false);
   const [locked, setLocked] = useState(false);
@@ -269,6 +294,11 @@ export default function RichText({
 
   const disabled = !editor || locked;
 
+  /* `c-tap` on every toolbar control at EVERY width, not only in the phone
+     strip below `sm`. The drawn button is 30px from `sm` up, and a tablet or a
+     landscape phone is still a thumb: the width decides the layout, the
+     pointer decides the target. rte.css widens the bar's gap on a coarse
+     pointer so that the 44px halos do not steal each other's edges. */
   const tool = (
     label: string,
     icon: React.ReactNode,
@@ -278,7 +308,7 @@ export default function RichText({
   ) => (
     <button
       type="button"
-      className="rte__btn"
+      className="rte__btn c-tap"
       aria-label={label}
       title={label}
       aria-pressed={active}
@@ -289,12 +319,21 @@ export default function RichText({
       onClick={run}
     >
       {icon}
+      {CAPTIONS[label] && <span className="rte__cap">{CAPTIONS[label]}</span>}
     </button>
   );
 
   return (
     <div className="rte">
-      <div className="rte__bar" role="toolbar" aria-label="Text formatting">
+      {/* `no-scrollbar` and `c-scroll-fade` are for the phone strip, where the
+          bar is one scrolling row: the fade is what says it scrolls once the
+          scrollbar is gone. rte.css takes the mask off again from `sm` up,
+          where the bar wraps instead. */}
+      <div
+        className="rte__bar no-scrollbar c-scroll-fade"
+        role="toolbar"
+        aria-label="Text formatting"
+      >
         {tool("Bold", <Bold aria-hidden="true" />, Boolean(state?.bold), () =>
           editor?.chain().focus().toggleBold().run(),
         )}
@@ -350,7 +389,7 @@ export default function RichText({
           that would have called .click() has not loaded yet.
         */}
         <label
-          className="rte__btn"
+          className="rte__btn c-tap"
           aria-label="Insert image"
           title="Insert image"
           data-disabled={disabled || uploading ? "true" : undefined}
@@ -361,6 +400,7 @@ export default function RichText({
           ) : (
             <ImagePlus aria-hidden="true" />
           )}
+          <span className="rte__cap">{CAPTIONS["Insert image"]}</span>
         </label>
         <input
           id={imageInputId}
@@ -393,14 +433,57 @@ export default function RichText({
         )}
       </div>
 
-      {linkOpen && (
-        <div className="rte__linkbar">
+      {/*
+        A SHEET ON A PHONE, THE BAR EVERYWHERE ELSE.
+
+        The bar is wedged at the top of the editor, which is the half of the
+        screen the keyboard is guaranteed to have taken, and it carried
+        `autoFocus`: tapping Link opened the keyboard over a row the writer had
+        not read yet, with no way to decline. The sheet comes up under the
+        thumb, pads itself clear of the keyboard and the home indicator, and
+        lets Radix land first focus on Close, so the writer decides when the
+        keyboard arrives.
+
+        BRANCHING IN JAVASCRIPT IS SAFE HERE in a way it is not for a layout.
+        Nothing renders until the writer taps Link, which is long after
+        hydration, so there is no first-frame flash to avoid and no reason to
+        mount both shapes.
+      */}
+      {isPhone ? (
+        <BottomSheet
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+          title="Link"
+          description="Leave the address empty to remove the link."
+          footer={
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="lg"
+                className="flex-1"
+                onClick={() => setLinkOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button size="lg" className="flex-1" onClick={applyLink}>
+                {linkDraft.trim() ? "Apply" : "Remove"}
+              </Button>
+            </div>
+          }
+        >
+          {/* `inputMode` rather than `type="url"`: it buys the keyboard with the
+              slash and the .com key and none of the validation semantics.
+              `applyLink` accepts a bare domain on purpose, and a url input would
+              call that malformed. */}
           <input
-            className="rte__linkinput"
+            className={inputClass}
             placeholder="example.com/page"
             value={linkDraft}
             aria-label="Link address"
-            autoFocus
+            inputMode="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             onChange={(e) => {
               setLinkDraft(e.target.value);
               setLinkError(null);
@@ -410,21 +493,48 @@ export default function RichText({
                 e.preventDefault();
                 applyLink();
               }
-              if (e.key === "Escape") setLinkOpen(false);
             }}
           />
-          <button type="button" className="rte__linkbtn" onClick={applyLink}>
-            {linkDraft.trim() ? "Apply" : "Remove"}
-          </button>
-          <button
-            type="button"
-            className="rte__linkbtn rte__linkbtn--plain"
-            onClick={() => setLinkOpen(false)}
-          >
-            Cancel
-          </button>
-          {linkError && <span className="rte__error">{linkError}</span>}
-        </div>
+          {linkError && <p className="mt-2 text-xs text-red-700">{linkError}</p>}
+        </BottomSheet>
+      ) : (
+        linkOpen && (
+          /* `useIsPhone` cuts at 40rem, so this inline bar is what a landscape
+             phone and every tablet get. Its two buttons keep their drawn size
+             and take a 44px hit area from `c-tap`; the row's own 8px gap is
+             already wide enough for the halos. */
+          <div className="rte__linkbar">
+            <input
+              className="rte__linkinput"
+              placeholder="example.com/page"
+              value={linkDraft}
+              aria-label="Link address"
+              autoFocus
+              onChange={(e) => {
+                setLinkDraft(e.target.value);
+                setLinkError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyLink();
+                }
+                if (e.key === "Escape") setLinkOpen(false);
+              }}
+            />
+            <button type="button" className="rte__linkbtn c-tap" onClick={applyLink}>
+              {linkDraft.trim() ? "Apply" : "Remove"}
+            </button>
+            <button
+              type="button"
+              className="rte__linkbtn rte__linkbtn--plain c-tap"
+              onClick={() => setLinkOpen(false)}
+            >
+              Cancel
+            </button>
+            {linkError && <span className="rte__error">{linkError}</span>}
+          </div>
+        )
       )}
 
       {uploadError && <p className="rte__error rte__error--row">{uploadError}</p>}

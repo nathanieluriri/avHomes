@@ -28,6 +28,12 @@
   --mist-100: #f1f5f9;
   --mist-200: #e2e8f0;
   --mist-300: #cbd5e1;
+  /* The disabled ink, and the only thing it is used for. Deliberately weak
+     against a --mist-100 plate, about 2.4:1, because a disabled label has to be
+     readable enough to say what the control would do and washed out enough that
+     nobody waits for it to respond. --mist-300 is too faint to read there and
+     --slate-500 is legible enough to look live. */
+  --mist-400: #94a3b8;
   --slate-500: #64748b;
 
   /*
@@ -53,6 +59,25 @@
   --slate-600: #55637a;
   --slate-550: #64718a;
 
+  /*
+   * The two bottom-edge insets, named once so nothing pinned to the bottom of
+   * the screen has to restate them.
+   *
+   * `--safe-b` is the static one: the iPhone home indicator's gesture strip,
+   * where a tap is swallowed by the system swipe rather than reaching the
+   * button drawn under it. It is only ever non-zero because the root layout
+   * sets `viewportFit: "cover"`.
+   *
+   * `--c-kb` is the moving one: the on-screen keyboard's height, written by
+   * `useKeyboardInset` from `visualViewport`. It exists because iOS does not
+   * shrink the layout viewport for the keyboard, so a `position: fixed` bar at
+   * `bottom: 0` is drawn underneath it and a save button disappears during the
+   * exact activity it exists to protect. 0 everywhere else, so a surface can
+   * read it unconditionally.
+   */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --c-kb: 0px;
+
   --background: #ffffff;
   --foreground: var(--ink);
   --card: #ffffff;
@@ -75,6 +100,11 @@
 }
 
 @theme inline {
+  /* One breakpoint below Tailwind's `sm`, for the band where a 360px Android
+     and a 430px iPhone genuinely want different layouts: two columns of photos
+     fit at 430 and are 148px wide at 360. Nothing else in the app needs it. */
+  --breakpoint-xs: 25rem;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -95,6 +125,7 @@
   --color-mist-100: var(--mist-100);
   --color-mist-200: var(--mist-200);
   --color-mist-300: var(--mist-300);
+  --color-mist-400: var(--mist-400);
   --color-slate-500: var(--slate-500);
   --color-chrome-900: var(--chrome-900);
   --color-chrome-800: var(--chrome-800);
@@ -282,15 +313,21 @@ html { scroll-behavior: smooth; }
  * is set on the body of the marketing document inside the iframe, which never
  * loads console.css. The outline follows the pointer so it is obvious that a
  * click is about to select words rather than follow a link.
+ *
+ * Gated on a real pointer. A crosshair cursor and a hover outline are the only
+ * things saying what copy mode does, and on a touch screen neither exists, so
+ * the mode reads as the site having stopped responding.
  */
-.studio-picking,
-.studio-picking * {
-  cursor: crosshair !important;
-}
+@media (hover: hover) and (pointer: fine) {
+  .studio-picking,
+  .studio-picking * {
+    cursor: crosshair !important;
+  }
 
-.studio-picking *:hover {
-  outline: 2px solid var(--wine-500);
-  outline-offset: 2px;
+  .studio-picking *:hover {
+    outline: 2px solid var(--wine-500);
+    outline-offset: 2px;
+  }
 }
 
 /* Marquee needs the track duplicated in markup for a seamless loop. */
@@ -304,9 +341,14 @@ html { scroll-behavior: smooth; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+/*
+ * `.line-clamp-2` used to be redefined here, and it had to go.
+ *
+ * Tailwind v4 ships `line-clamp-*` as a real utility inside its utilities
+ * layer. An unlayered copy of the same class name beats anything layered no
+ * matter the specificity, so this file's version won every cascade and, more
+ * to the point, there was no `line-clamp-none` alongside it to turn back off.
+ * That made `line-clamp-2 sm:line-clamp-none` silently do nothing, which is
+ * exactly the pattern the console now uses to let a card show its full text on
+ * a phone and clamp inside a table cell on a desktop.
+ */

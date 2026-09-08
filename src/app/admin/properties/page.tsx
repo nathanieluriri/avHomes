@@ -22,6 +22,7 @@ import {
   EmptyState,
   ErrorNote,
   PageHeader,
+  inputClass,
   type Tone,
 } from "@/components/admin/ui";
 import {
@@ -98,6 +99,10 @@ export default function PropertiesPage() {
         signal,
       ),
     [tab, sort, query, paging.cursor],
+    /* Hold the rows while the next filter loads. Blanking a list this long to
+       four skeleton rows clamps the console's scroller back to the top, so a
+       tap on a status pill silently relocates the reader. */
+    { keepPrevious: true },
   );
 
   async function create() {
@@ -136,17 +141,25 @@ export default function PropertiesPage() {
           title={p.title || "Untitled listing"}
           meta={[p.type, p.city].filter(Boolean).join(" · ") || "No location yet"}
           trailing={
-            <>
-              {p.featured && (
-                <Star
-                  className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500"
-                  aria-label="Featured on the homepage"
-                />
-              )}
-              {p.deletedAt !== null && (
-                <Trash2 className="h-3.5 w-3.5 shrink-0 text-red-500" aria-label="In the trash" />
-              )}
-            </>
+            /* Icons in the TABLE only. Below `md` these two are drawn as badges
+               on the card's chip line instead, because a 14px glyph pinned to
+               the ellipsis of a two-line title is the least readable place in
+               the row for the fact that decides whether the row is worth
+               opening. The wrapper is conditional rather than always present:
+               an empty flex item still spends the parent's 6px gap. */
+            p.featured || p.deletedAt !== null ? (
+              <span className="hidden items-center gap-1 md:flex">
+                {p.featured && (
+                  <Star
+                    className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500"
+                    aria-label="Featured on the homepage"
+                  />
+                )}
+                {p.deletedAt !== null && (
+                  <Trash2 className="h-3.5 w-3.5 shrink-0 text-red-500" aria-label="In the trash" />
+                )}
+              </span>
+            ) : null
           }
         />
       ),
@@ -156,7 +169,28 @@ export default function PropertiesPage() {
       header: "Status",
       tight: true,
       mobile: "keep",
-      render: (p) => <Badge tone={STATUS_TONE[p.status]}>{statusLabel(p.status)}</Badge>,
+      // The card's own slot, ahead of the meta run. Status is the value a scan
+      // down this list is looking for and it does not read as one mid-sentence.
+      badge: true,
+      /* Featured and In trash ride along in this cell rather than claiming two
+         columns of their own, because a column exists at every width and these
+         two are already said by the icons in the table. Both change what a row
+         MEANS, so neither may be what the collapse drops. */
+      render: (p) => (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <Badge tone={STATUS_TONE[p.status]}>{statusLabel(p.status)}</Badge>
+          {p.featured && (
+            <span className="md:hidden">
+              <Badge tone="amber">Featured</Badge>
+            </span>
+          )}
+          {p.deletedAt !== null && (
+            <span className="md:hidden">
+              <Badge tone="red">In trash</Badge>
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       key: "spec",
@@ -187,7 +221,12 @@ export default function PropertiesPage() {
       key: "updated",
       header: "Updated",
       numeric: true,
-      mobile: "keep",
+      /* The 640 to 1023 card only. Below 640 the run is already the spec and
+         the price, and a fourth value there is what turns a 328px meta line
+         into a run-on sentence. */
+      mobile: "tablet",
+      // A bare "12 Sep" on a card has no column header saying which date it is.
+      mobileLabel: "updated",
       render: (p) => <span className="text-slate-600">{shortDate(p.updatedAt)}</span>,
     },
   ];
@@ -242,12 +281,17 @@ export default function PropertiesPage() {
               onChange: setSearch,
             }}
             trailing={
-              <label className="shrink-0">
+              <label className="w-full sm:w-auto sm:shrink-0">
                 <span className="sr-only">Sort listings</span>
+                {/* `inputClass` rather than a hand-rolled height, so the phone
+                    inherits the console's one answer to field sizing and to the
+                    iOS focus zoom. Below `sm` this control lives in the filter
+                    sheet and wants the full width; the `sm:` overrides put the
+                    dense 32px toolbar box back exactly as it was. */}
                 <select
                   value={sort}
                   onChange={(event) => refilter(() => setSort(event.target.value as typeof sort))}
-                  className="h-8 rounded-lg border border-mist-200 bg-white px-2 text-[13px] font-medium text-plum-950 outline-none transition-colors focus:border-wine-500"
+                  className={`${inputClass} font-medium sm:h-8 sm:w-auto sm:px-2 sm:py-0`}
                 >
                   {SORTS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -269,6 +313,7 @@ export default function PropertiesPage() {
         empty={
           error ? undefined : filtered ? (
             <EmptyState
+              bare
               icon={Building2}
               title="Nothing matched"
               hint={
@@ -292,6 +337,7 @@ export default function PropertiesPage() {
             />
           ) : (
             <EmptyState
+              bare
               title="No listings yet"
               hint="A listing starts as a draft, so you can create one now and fill it in as the photos and the price arrive."
               action={

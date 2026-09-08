@@ -12,6 +12,7 @@ import {
   CardHead,
   ErrorNote,
   Field,
+  PageColumns,
   PageHeader,
   Skeleton,
   inputClass,
@@ -139,7 +140,29 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* `asideFirstOnMobile`, because the aside is a live preview of the team
+          name being typed two cards below it. Collapsed the old way it landed
+          last on a phone, which put it under the on-screen keyboard: the one
+          element that reflects what you are typing was the one element you
+          could not see while typing. */}
+      <PageColumns
+        asideFirstOnMobile
+        aside={
+          <aside>
+            <Card>
+              <CardHead title="How a reply appears" />
+              <div className="rounded-xl bg-mist-50 p-3">
+                <div className="rounded-2xl bg-wine-600 px-3.5 py-2.5 text-[13px] leading-relaxed text-white">
+                  Happy to arrange a viewing this week. Which day suits you?
+                </div>
+                <p className="mt-1 text-right text-[11px] text-slate-550">
+                  {isTeam ? draft.teamName || "Your team name" : "Whoever replied"}
+                </p>
+              </div>
+            </Card>
+          </aside>
+        }
+      >
         <div className="space-y-4">
           <Card>
             <CardHead title="Who answers an enquiry" />
@@ -196,7 +219,15 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   onChange={(event) => set("teamName", event.target.value)}
                 />
               </Field>
-              <Field label="Team photo" hint="Optional. Falls back to the first letter.">
+              {/* `as="group"`, not a label. ImagePicker owns a hidden file
+                  input, and a bare label forwards a tap on any of its own
+                  whitespace to the first labelable descendant, so tapping the
+                  hint line or the photo itself opened the camera roll. */}
+              <Field
+                label="Team photo"
+                hint="Optional. Falls back to the first letter."
+                as="group"
+              >
                 <ImagePicker
                   value={draft.teamAvatarUrl ? [draft.teamAvatarUrl] : []}
                   onChange={(urls) => set("teamAvatarUrl", urls[0] ?? "")}
@@ -207,21 +238,7 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
             </Card>
           )}
         </div>
-
-        <aside>
-          <Card>
-            <CardHead title="How a reply appears" />
-            <div className="rounded-xl bg-mist-50 p-3">
-              <div className="rounded-2xl bg-wine-600 px-3.5 py-2.5 text-[13px] leading-relaxed text-white">
-                Happy to arrange a viewing this week. Which day suits you?
-              </div>
-              <p className="mt-1 text-right text-[11px] text-slate-550">
-                {isTeam ? draft.teamName || "Your team name" : "Whoever replied"}
-              </p>
-            </div>
-          </Card>
-        </aside>
-      </div>
+      </PageColumns>
     </>
   );
 }

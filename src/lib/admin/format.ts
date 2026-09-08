@@ -48,6 +48,29 @@ export function dateTime(at: number): string {
 }
 
 /**
+ * The time on a chat bubble.
+ *
+ * The clock alone for a message sent today, the day and the clock for anything
+ * older. A thread on a phone shows a dozen of these in a column beside the
+ * text, and repeating "8 Sept 2026" on every bubble in a conversation that
+ * happened this afternoon is a line of noise per message.
+ */
+export function messageTime(at: number): string {
+  const date = new Date(at);
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  return date.toLocaleString(LOCALE, {
+    ...(sameDay ? {} : { day: "numeric", month: "short" }),
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
  * "2h ago", and a date once it stops being useful.
  *
  * Past a week, "9d ago" is arithmetic the reader has to do; a date is not.

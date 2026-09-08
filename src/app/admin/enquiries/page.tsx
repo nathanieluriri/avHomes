@@ -63,6 +63,10 @@ export default function EnquiriesPage() {
         signal,
       ),
     [tab, paging.cursor],
+    /* Hold the rows while the next status loads. Blanking an inbox several
+       viewports tall to four skeleton rows clamps the console's scroller back
+       to the top, so a tap on a status pill silently relocates the reader. */
+    { keepPrevious: true },
   );
 
   /*
@@ -114,6 +118,9 @@ export default function EnquiriesPage() {
       header: "Status",
       tight: true,
       mobile: "keep",
+      // Its own slot on the card, ahead of the message. Status is the value a
+      // scan down an inbox is looking for.
+      badge: true,
       render: (enquiry) => <Badge tone={TONE[enquiry.status]}>{humanise(enquiry.status)}</Badge>,
     },
     {
@@ -123,13 +130,31 @@ export default function EnquiriesPage() {
       // and times with no hint of what anybody actually asked, which is the one
       // thing this screen exists to show.
       mobile: "keep",
+      /*
+       * A FULL LINE OF ITS OWN BELOW `sm`, CLAMPED TO TWO.
+       *
+       * `max-w-[22rem]` is a desktop column cap, and flex wrapping is decided
+       * on an item's hypothetical size, so a 352px preview in 268px of card was
+       * forced onto its own line anyway and pushed everything after it onto a
+       * third. Saying so deliberately buys the second line back: two lines of
+       * what somebody asked is worth more than one line plus an orphan.
+       *
+       * `whitespace-normal` because the meta run wraps each value in
+       * `truncate`, and the `white-space: nowrap` that carries would collapse a
+       * line clamp to a single clipped line.
+       */
       render: (enquiry) => (
-        <span className="line-clamp-1 max-w-[22rem] text-slate-600">{enquiry.message}</span>
+        <span className="line-clamp-2 w-full whitespace-normal text-slate-600 sm:line-clamp-1 sm:w-auto sm:max-w-[22rem]">
+          {enquiry.message}
+        </span>
       ),
     },
     {
       key: "about",
       header: "About",
+      // The 640 to 1023 card only. It follows the preview there, where the
+      // preview is back to one capped line and there is room after it.
+      mobile: "tablet",
       render: (enquiry) => (
         <span className="text-slate-600">{enquiry.propertySlug ?? "General"}</span>
       ),
@@ -139,7 +164,16 @@ export default function EnquiriesPage() {
       header: "Received",
       numeric: true,
       mobile: "keep",
-      render: (enquiry) => <span className="text-slate-600">{relative(enquiry.createdAt)}</span>,
+      /* On the chip line beside the status rather than in the meta run, which
+         is what the preview above now owns outright. Sender, then state and
+         age, then what they said: the shape every mail client on the device
+         already uses. */
+      badge: true,
+      render: (enquiry) => (
+        <span className="text-[12px] text-slate-600 md:text-[13px]">
+          {relative(enquiry.createdAt)}
+        </span>
+      ),
     },
   ];
 
@@ -181,6 +215,7 @@ export default function EnquiriesPage() {
         empty={
           error ? undefined : filtered ? (
             <EmptyState
+              bare
               icon={Inbox}
               title="Nothing here"
               hint={
@@ -209,6 +244,7 @@ export default function EnquiriesPage() {
                bucket while sitting over an account with nothing in any of
                them. */
             <EmptyState
+              bare
               title="No enquiries yet"
               hint="The contact form on the site and the enquiry button on every listing both land here. Nothing has come in."
               art={<InboxArt />}

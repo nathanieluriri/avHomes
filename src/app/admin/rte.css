@@ -36,6 +36,23 @@
   border-radius: 0.75rem 0.75rem 0 0;
 }
 
+/* TARGET SIZE IS THE POINTER'S QUESTION; ONLY LAYOUT IS THE WIDTH'S.
+
+   The phone strip below is gated on width because it is a layout: one pinned
+   scrolling row, with captions, instead of three wrapped ones. Hit area is a
+   different question and gets a different query. Every button in this bar
+   carries `.c-tap` at every width, so on a tablet or a landscape phone (both
+   too wide for the strip, both driven by a thumb) a 30px control still answers
+   a 44px target. The halo is centred on the button and bleeds 7px past each
+   edge, so at the 2px gap the bar is drawn with for a mouse, neighbouring
+   buttons would eat each other's edges. 8px is the console-wide floor for two
+   adjacent `.c-tap` controls. */
+@media (pointer: coarse) {
+  .rte__bar {
+    gap: 0.5rem;
+  }
+}
+
 .rte__btn {
   display: grid;
   place-items: center;
@@ -68,6 +85,12 @@
   height: 15px;
 }
 
+/* Drawn only in the phone strip below. With a mouse the `title` tooltip is the
+   label and a caption would just widen a dense bar. */
+.rte__cap {
+  display: none;
+}
+
 .rte__sep {
   width: 1px;
   height: 1.125rem;
@@ -77,6 +100,103 @@
 
 .rte__spacer {
   flex: 1;
+}
+
+/* ═══ THE TOOLBAR ON A PHONE ══════════════════════════════════════════════
+   ONE SCROLLING ROW, PINNED TO THE BOTTOM OF THE EDITOR.
+
+   Wrapped, the fifteen controls take three rows at 360px, and `top: 0` pinned
+   that block to the top of the page scroller, which is the one part of the
+   screen the keyboard guarantees you cannot see. Bolding a word meant
+   dismissing the keyboard, scrolling up, tapping, and scrolling back. Sticky to
+   the BOTTOM puts the strip where the thumb already is, and the offset rides it
+   above the keyboard instead of under it.
+
+   `--c-kb` is the measured keyboard height: iOS overlays the keyboard rather
+   than shrinking the layout viewport, so `bottom: 0` on its own lands behind
+   it. `--safe-b` keeps the strip out of the home indicator's gesture strip when
+   there is no keyboard. Both are 0 everywhere else, so the sum is safe to read
+   unconditionally. */
+@media (max-width: 39.99rem) {
+  .rte {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Last, after the body and after the read-only notice, so the strip is the
+     nearest control to the thumb rather than the furthest. */
+  .rte__bar {
+    order: 3;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    top: auto;
+    bottom: calc(var(--safe-b) + var(--c-kb));
+    border-bottom: 0;
+    border-top: 1px solid var(--mist-200);
+    border-radius: 0 0 0.75rem 0.75rem;
+    /* It spends most of its life floating over the text it formats, so it needs
+       an edge that says it is on top of the document rather than in it. */
+    box-shadow: 0 -6px 12px -10px rgb(11 36 83 / 0.35);
+  }
+
+  /* The save bar is pinned to the same corner of the same viewport and it wins,
+     being portalled to the body. 4.75rem is its pill plus its own padding, so
+     the two stack instead of the strip hiding under Save at the exact moment
+     both are wanted. `.c-sheet` already reserves room for the bar the same way. */
+  body:has(.c-savebar) .rte__bar {
+    bottom: calc(var(--safe-b) + var(--c-kb) + 4.75rem);
+  }
+
+  /* In a nowrap row every item is shrinkable by default, which would squeeze
+     fifteen 44px targets into 290px rather than letting them scroll. */
+  .rte__btn,
+  .rte__sep {
+    flex: 0 0 auto;
+  }
+
+  .rte__btn {
+    width: auto;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0 0.5rem;
+    gap: 2px;
+    border-radius: 0.5rem;
+  }
+
+  .rte__btn > svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* `title` renders as a hover tooltip and a phone has no hover, so an icon-only
+     strip is fifteen unlabelled glyphs: H2 and H3 differ by a few pixels, and so
+     do the three list icons. The six a writer reaches for constantly say what
+     they are, which a scrolling row has the width to afford. */
+  .rte__cap {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  /* A flex spacer in a scrolling row has no free space to absorb. Wrapped it was
+     worse than useless: it ate the slack on whichever row it landed on, which is
+     how a 40px dead gap in the middle of row two orphaned Redo onto a third. */
+  .rte__spacer {
+    display: none;
+  }
+}
+
+/* `.c-scroll-fade` is the phone strip's affordance, paired with `.no-scrollbar`
+   because a hidden scrollbar has nothing left to say that it scrolls. The
+   classes sit on the element at every width, so the mask has to come off where
+   the bar wraps instead of scrolling: there it would fade Redo out of a row that
+   does not move. Two classes deep so import order cannot decide this. */
+@media (min-width: 40rem) {
+  .rte__bar.c-scroll-fade {
+    mask-image: none;
+  }
 }
 
 .rte__spinner {
@@ -165,6 +285,39 @@
   font-size: 0.9375rem;
   line-height: 1.7;
   color: var(--ink);
+}
+
+/* NO NESTED SCROLLER ON A PHONE.
+
+   At 360x780 the 40rem cap is 88 percent of what is left under the topbar, so
+   the writing surface was a scroller almost exactly as tall as the page
+   scroller around it: two scrollbars fighting for the same flick, and which one
+   won depended on where the thumb happened to land. The document flows into the
+   page instead, which is what a phone reader expects of a long text. The 12rem
+   floor is only there so an empty post is still worth tapping; the 20rem one
+   opened a new post with 320px of blank white before anything else on the page.
+
+   No font-size here. console.css raises this surface to 16px on a coarse
+   pointer for the whole console, in one place, and a second opinion would fight
+   it. */
+@media (max-width: 39.99rem) {
+  .rte__body {
+    min-height: 12rem;
+    max-height: none;
+    overflow-y: visible;
+    padding: 0.75rem 0.875rem;
+    /* `overflow-y: visible` takes `overflow-x` back to visible with it, so a
+       pasted link with no spaces in it now pushes the console sideways instead
+       of being clipped by a scroller that no longer exists. */
+    overflow-wrap: break-word;
+  }
+
+  /* The other node that can be wider than the column. `pre` carries its own
+     scroller already; a table never needed one while the body was clipping it. */
+  .rte__body table {
+    display: block;
+    overflow-x: auto;
+  }
 }
 
 .rte__body .tiptap {

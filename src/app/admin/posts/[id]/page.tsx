@@ -22,6 +22,9 @@ import {
   ButtonLink,
   Button,
   Card,
+  ConfirmButton,
+  DRow,
+  DefinitionList,
   ErrorNote,
   Field,
   PageHeader,
@@ -31,10 +34,17 @@ import {
 } from "@/components/admin/ui";
 
 /*
- * Every move except Restore requires the record to be OUT of the trash.
+ * Every move here requires the record to be OUT of the trash.
  * `transitionPost` has no `deletedAt` guard of its own, so offering Publish on a
  * trashed post would publish a trashed post: live on the site, still flagged
  * deleted, directly under a banner saying nothing here can be saved.
+ *
+ * Restore is the one move a trashed post can make, and while it is in the trash
+ * the banner at the top of the screen carries that button. Guarding it on
+ * `deletedAt === null` here is what stops the same control being drawn twice,
+ * once inside the sentence explaining the block and once in a card below it.
+ * Restoring an ARCHIVED post is a different move on the same op, and that one
+ * has nowhere else to live.
  */
 const LIFECYCLE: readonly { op: string; label: string; when: (p: Post) => boolean }[] = [
   { op: "publish", label: "Publish", when: (p) => p.deletedAt === null && p.status !== "published" },
@@ -44,7 +54,7 @@ const LIFECYCLE: readonly { op: string; label: string; when: (p: Post) => boolea
     when: (p) => p.deletedAt === null && p.status === "published",
   },
   { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
-  { op: "restore", label: "Restore", when: (p) => p.deletedAt !== null || p.status === "archived" },
+  { op: "restore", label: "Restore", when: (p) => p.deletedAt === null && p.status === "archived" },
 ];
 
 /** Status to tone, in one place, so the header chip and the sidebar chip
@@ -70,15 +80,21 @@ export default function PostEditorPage() {
     return (
       <>
         <PageHeader icon={Newspaper} backTo="/admin/posts" backLabel="Journal" title="Post" />
-        <div className="grid gap-4 lg:grid-cols-3" aria-busy="true">
+        {/* The same thirds grid and the same aside-first order as the editor, so
+            the wait does not stack one way and the post the other. The two
+            deepest placeholders are dropped below `lg`: stacked, they were a
+            thousand pixels of shimmer that no phone reader ever scrolled to. */}
+        <div aria-busy="true">
           <span className="sr-only">Loading this post</span>
-          <div className="space-y-4 lg:col-span-2">
-            <Skeleton className="h-56 rounded-2xl" />
-            <Skeleton className="h-96 rounded-2xl" />
-          </div>
-          <div className="space-y-4">
-            <Skeleton className="h-44 rounded-2xl" />
-            <Skeleton className="h-52 rounded-2xl" />
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="order-2 min-w-0 space-y-6 lg:order-none lg:col-span-2">
+              <Skeleton className="h-44 rounded-2xl sm:h-56" />
+              <Skeleton className="hidden h-96 rounded-2xl lg:block" />
+            </div>
+            <div className="order-1 min-w-0 space-y-6 lg:order-none">
+              <Skeleton className="h-32 rounded-2xl sm:h-44" />
+              <Skeleton className="hidden h-52 rounded-2xl lg:block" />
+            </div>
           </div>
         </div>
       </>
@@ -293,24 +309,44 @@ function PostEditor({ initial }: { initial: Post }) {
            once been pressable. */
         actions={
           /* The studio is the full-page writing surface. This screen stays for
-             quick metadata edits, which is what it is good at. */
-          <ButtonLink href={`/admin/posts/${post.id}/advanced`} variant="ghost" size="lg">
-            Advanced editor
-          </ButtonLink>
+             quick metadata edits, which is what it is good at.
+
+             THE DOOR IS ONLY DRAWN WHERE IT OPENS. The studio reorders blocks by
+             dragging and has no touch route for it, so below `lg` it answers
+             with a wide-screen interstitial. Offering the link on a phone would
+             cost a tap, a page load and a screen that only says no. This screen
+             is already the whole phone experience. */
+          <span className="hidden lg:inline-flex">
+            <ButtonLink href={`/admin/posts/${post.id}/advanced`} variant="ghost" size="lg">
+              Advanced editor
+            </ButtonLink>
+          </span>
         }
       />
 
       {trashed && (
         /* The server refuses a patch to a trashed record (`deletedAt: null` is
            in the update filter), so the form cannot be saved and the console
-           says so instead of offering a Save that comes back 409. Restore is
-           the one move that still works, and it is in the rail. */
+           says so instead of offering a Save that comes back 409.
+
+           RESTORE IS IN THE BANNER, not named by position. The copy used to send
+           the reader to "the panel on the right", which below `lg` is a panel
+           that does not exist: the status card is stacked with everything else.
+           The one control that unblocks this screen now sits inside the sentence
+           that says the screen is blocked. */
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-amber-900">
           <p className="font-semibold">This is in the trash</p>
           <p className="mt-1">
-            Nothing here can be saved while it is. Restore it first, from the panel on the
-            right, and the form comes back.
+            Nothing here can be saved while it is. Restore it and the form comes back.
           </p>
+          <Button
+            variant="ghost"
+            className="mt-3 w-full sm:w-auto"
+            disabled={busy}
+            onClick={() => transition("restore")}
+          >
+            Restore
+          </Button>
         </div>
       )}
 
@@ -326,12 +362,13 @@ function PostEditor({ initial }: { initial: Post }) {
              * still up at that moment. The listing editor has offered this since
              * it was written.
              */
-            <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
+            <div className="mt-2 flex flex-col items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <span className="text-amber-900">
                 Their version is revision {theirs.revision}, titled {theirs.title || "Untitled"}.
               </span>
               <Button
                 variant="ghost"
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setPost(theirs);
                   seed(theirs, { forceBody: true });
@@ -344,8 +381,14 @@ function PostEditor({ initial }: { initial: Post }) {
         </div>
       )}
 
+      {/* The aside comes FIRST on a phone and takes the right-hand third
+          from `lg` up. It is where this screen's whole job lives: the status
+          chip and the lifecycle moves, then category, tags, template and the
+          cover image. Stacked in source order every one of them landed after
+          a 320px-minimum writing surface, so the quick metadata edit this
+          screen exists for started with a full screen of body text. */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="order-2 min-w-0 space-y-6 lg:order-none lg:col-span-2">
           <Card className="space-y-4">
             <Field label="Title">
               <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -366,7 +409,11 @@ function PostEditor({ initial }: { initial: Post }) {
           </Card>
 
           <Card>
-            <Field label="Body">
+            {/* `as="group"`, not a label. RichText's first labelable descendant
+                is the Bold button, so a bare label turned a tap on the word
+                "Body", on the toolbar's padding, or on a short scroll that
+                started anywhere in the field into a formatting command. */}
+            <Field label="Body" as="group">
               {/* Keyed on `bodyVersion` and fed the live `body`, not the
                   document this component mounted with. RichText hydrates once
                   and names `key` as the way to reset it, so without the key a
@@ -384,7 +431,7 @@ function PostEditor({ initial }: { initial: Post }) {
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="order-1 min-w-0 space-y-6 lg:order-none">
           <Card className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
@@ -392,9 +439,19 @@ function PostEditor({ initial }: { initial: Post }) {
                 {post.deletedAt ? "In trash" : humanise(post.status)}
               </Badge>
             </div>
-            <div className="flex flex-wrap gap-2">
+            {/* A stacked full-width grid below `sm`, a wrapping chip row from
+                there up. Publish takes the post live and Archive takes it
+                down, and at 32px with 8px between them they are one thumb
+                apart on a surface the reader is also scrolling. */}
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
               {LIFECYCLE.filter((l) => l.when(post)).map((l) => (
-                <Button key={l.op} variant="ghost" disabled={busy} onClick={() => transition(l.op)}>
+                <Button
+                  key={l.op}
+                  variant="ghost"
+                  className="w-full sm:w-auto"
+                  disabled={busy}
+                  onClick={() => transition(l.op)}
+                >
                   {l.label}
                 </Button>
               ))}
@@ -425,7 +482,11 @@ function PostEditor({ initial }: { initial: Post }) {
           </Card>
 
           <Card className="space-y-4">
-            <Field label="Cover image">
+            {/* `as="group"`, not a label. ImagePicker owns a hidden file
+                input, and a bare label forwards a tap on any of its own
+                whitespace to the first labelable descendant, so tapping the
+                "0/1 · PNG, JPEG" helper line opened the camera roll. */}
+            <Field label="Cover image" as="group">
               <ImagePicker
                 value={coverUrl ? [coverUrl] : []}
                 onChange={(urls) => setCoverUrl(urls[0] ?? "")}
@@ -445,16 +506,17 @@ function PostEditor({ initial }: { initial: Post }) {
             </Field>
           </Card>
 
-          <Card className="space-y-2 text-sm">
-            <Row label="Revision" value={String(post.revision)} />
-            <Row label="Words" value={String(post.wordCount)} />
-            <Row label="Reading time" value={`${post.readingTime} min`} />
-            <Row label="Author" value={post.author.name} />
-            <Row label="Updated" value={fullDate(post.updatedAt)} />
-            <Row
-              label="Published"
-              value={post.publishedAt ? fullDate(post.publishedAt) : "Not yet"}
-            />
+          <Card>
+            <DefinitionList>
+              <DRow label="Revision">{post.revision}</DRow>
+              <DRow label="Words">{post.wordCount}</DRow>
+              <DRow label="Reading time">{post.readingTime} min</DRow>
+              <DRow label="Author">{post.author.name}</DRow>
+              <DRow label="Updated">{fullDate(post.updatedAt)}</DRow>
+              <DRow label="Published">
+                {post.publishedAt ? fullDate(post.publishedAt) : "Not yet"}
+              </DRow>
+            </DefinitionList>
           </Card>
 
           {post.deletedAt === null && (
@@ -465,22 +527,21 @@ function PostEditor({ initial }: { initial: Post }) {
                 Reversible. There is no permanent delete, and a trashed post keeps its
                 revisions, so it can be restored from this screen.
               </p>
-              <Button variant="danger" className="w-full" disabled={busy} onClick={trash}>
+              {/* Two taps. The aside comes FIRST on a phone now, so this
+                  full-bleed destructive control sits high on the screen and in
+                  the thumb arc rather than at the far bottom of the page. */}
+              <ConfirmButton
+                className="w-full"
+                confirmLabel="Yes, move to trash"
+                disabled={busy}
+                onConfirm={trash}
+              >
                 Move to trash
-              </Button>
+              </ConfirmButton>
             </Card>
           )}
         </div>
       </div>
     </>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-plum-950">{value}</span>
-    </div>
   );
 }

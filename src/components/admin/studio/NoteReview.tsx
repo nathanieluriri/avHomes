@@ -5,7 +5,8 @@ import { ArrowUpRight, Trash2, X } from "lucide-react";
 import { NOTE_STATUSES, type DesignNote, type NoteStatus } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { dateTime } from "@/lib/admin/format";
-import { Badge, Button, ErrorNote, type Tone } from "@/components/admin/ui";
+import { Badge, Button, ConfirmButton, ErrorNote, type Tone } from "@/components/admin/ui";
+import { BottomSheet } from "@/components/admin/BottomSheet";
 import { MarkLayer } from "./marks";
 
 /**
@@ -15,6 +16,21 @@ import { MarkLayer } from "./marks";
  * machine somebody moves through, and every move lands in the same trail as the
  * replies, so the panel reads top to bottom as a story rather than as a status
  * field with a comment box beside it.
+ *
+ * TWO MOUNTS, ONE SET OF CONTENT. At `lg` and up it is the studio's aside: a
+ * full-height column with its own header, scroller and pinned footer. Below
+ * `lg` the studio itself is gated and this panel is the whole reason a phone
+ * still has a route here, so it comes up as a sheet OVER the notes list rather
+ * than replacing it, which is what lets a reader close one note and land back
+ * on the row they tapped.
+ *
+ * The sheet is `BottomSheet` rather than a hand-rolled overlay, and the three
+ * regions map onto its three slots: the status becomes the sheet's title and
+ * the path its description, so the header the aside draws for itself is one the
+ * sheet already draws better (its Close is a 44px target, and it has the
+ * escape key, the scrim and the outside tap the aside has no need for). The
+ * footer keeps the same actions and the sheet pads them out of the home
+ * indicator and up over the keyboard.
  */
 
 const TONE: Record<NoteStatus, Tone> = {
@@ -44,16 +60,19 @@ export function NoteReview({
   onChange,
   onDeleted,
   onClose,
+  asSheet = false,
 }: {
   note: DesignNote;
   onChange: (next: DesignNote) => void;
   onDeleted: (id: string) => void;
   onClose: () => void;
+  /** True below `lg`, where this panel comes up over the notes list instead of
+   *  being the studio's aside. */
+  asSheet?: boolean;
 }) {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function patch(body: { status?: NoteStatus; reply?: string }) {
     setBusy(true);
@@ -89,165 +108,212 @@ export function NoteReview({
     }
   }
 
+  const body = (
+    <>
+      <a
+        href={note.shotUrl}
+        target="_blank"
+        rel="noreferrer"
+        title="Open the full picture"
+        className="relative block overflow-hidden rounded-xl border border-mist-200"
+        style={{ aspectRatio: `${note.shotWidth} / ${note.shotHeight}` }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={note.shotUrl} alt={`The page at ${note.path}`} className="block h-full w-full object-contain" />
+        <MarkLayer marks={note.marks} width={note.shotWidth} height={note.shotHeight} />
+      </a>
+
+      <div>
+        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-plum-950">
+          {note.comment}
+        </p>
+        {/* 12px is the floor for anything a reader has to act on, and who wrote
+            this and when is exactly that. 11px is legible in a 320px aside read
+            at desk distance and marginal on a handheld in daylight. */}
+        <p className="mt-1.5 text-[12px] text-slate-550 lg:text-[11px]">
+          {note.createdByName} · {dateTime(note.createdAt)}
+        </p>
+      </div>
+
+      {note.kind === "copy" && (
+        <div className="space-y-2 rounded-xl border border-mist-200 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+            Wording
+          </p>
+          <p className="rounded-lg bg-red-50 p-2 text-[13px] leading-relaxed text-red-900 line-through decoration-red-300">
+            {note.copyBefore || "(empty)"}
+          </p>
+          <p className="rounded-lg bg-emerald-50 p-2 text-[13px] leading-relaxed text-emerald-900">
+            {note.copyAfter || "(empty)"}
+          </p>
+        </div>
+      )}
+
+      {note.attachments.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+            Inspiration
+          </p>
+          {/* One up below `sm`. Two 152px thumbs in a 320px aside are already
+              small, and half of a phone sheet is smaller still, which is not a
+              size at which a reference picture references anything. */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {note.attachments.map((item, index) =>
+              item.kind === "image" ? (
+                <a key={index} href={item.url} target="_blank" rel="noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.url}
+                    alt={item.label}
+                    className="aspect-[4/3] w-full rounded-lg border border-mist-200 object-cover"
+                  />
+                </a>
+              ) : (
+                <a
+                  key={index}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="col-span-full flex items-center gap-1.5 rounded-lg bg-mist-50 px-2.5 py-2 text-[12px] font-medium text-wine-700 hover:bg-mist-100"
+                >
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                </a>
+              ),
+            )}
+          </div>
+        </div>
+      )}
+
+      {note.events.length > 0 && (
+        /* The trail is where "who moved this to Done, and when" lives, which on
+           a phone is the whole reason this panel exists. It is the last thing
+           in the console that should be set below the floor. */
+        <ol className="space-y-2 border-t border-mist-100 pt-3">
+          {note.events.map((event) => (
+            <li key={event.id} className="text-[13px] lg:text-[12px]">
+              <span className="font-semibold text-plum-950">{event.byName}</span>{" "}
+              <span className="text-slate-550">{dateTime(event.at)}</span>
+              <p className="mt-0.5 text-slate-600">
+                {event.kind === "status"
+                  ? `Moved to ${LABEL[event.text as NoteStatus] ?? event.text}`
+                  : event.text}
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {error && <ErrorNote error={error} />}
+    </>
+  );
+
+  const actions = (
+    <>
+      {/* A three-up grid of real targets in the sheet, the dense wrapping row in
+          the aside. There are always exactly three moves, because the status
+          the note already holds is not one of them.
+
+          `gap-2` rather than `gap-1.5` in both. These are `.c-tap` buttons, so
+          on a touch screen each one carries a 44px halo outside its 28px box,
+          and two of those at 6px apart steal each other's edges. */}
+      <div className={asSheet ? "grid grid-cols-3 gap-2" : "flex flex-wrap gap-2"}>
+        {NOTE_STATUSES.filter((status) => status !== note.status).map((status) => (
+          <Button
+            key={status}
+            variant="ghost"
+            size={asSheet ? "md" : "sm"}
+            className={asSheet ? "w-full" : ""}
+            disabled={busy}
+            title={MOVE_HINT[status]}
+            onClick={() => void patch({ status })}
+          >
+            {LABEL[status]}
+          </Button>
+        ))}
+      </div>
+
+      <div className="flex items-end gap-2">
+        <textarea
+          value={reply}
+          onChange={(event) => setReply(event.target.value)}
+          rows={2}
+          placeholder="Add to the thread"
+          className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-lg border border-mist-200 px-3 py-2 text-[13px] text-plum-950 outline-none placeholder:text-slate-550 focus:border-wine-500"
+        />
+        <Button
+          size="lg"
+          disabled={busy || reply.trim() === ""}
+          onClick={() => void patch({ reply: reply.trim() })}
+        >
+          Post
+        </Button>
+      </div>
+
+      {/* Two presses, because a note is the only record of what somebody asked
+          for and there is no trash to fish it back out of.
+
+          `ConfirmButton` rather than a third hand-rolled version of that: this
+          control reads as words at rest, which is the one thing that pushed
+          StorefrontCard's RemoveStat into rolling its own. Taking it also
+          settles the size question, since the shared size map gives the row a
+          real box at every width. The old `lg:h-auto` collapsed it to about
+          eighteen pixels in the aside, and the aside is the ONLY band this
+          branch renders in, where `lg` and up still includes a tablet in
+          landscape holding a thumb over the most destructive control here. */}
+      <ConfirmButton confirmLabel="Yes, delete this note" onConfirm={remove} disabled={busy}>
+        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+        Delete note
+      </ConfirmButton>
+    </>
+  );
+
+  if (asSheet) {
+    return (
+      <BottomSheet
+        open
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+        /* The status is the heading and the path is the subtitle, which is the
+           same two facts the aside's header carries as a badge and a truncated
+           line, in the shape a sheet already has. */
+        title={LABEL[note.status]}
+        description={note.path}
+        bodyClassName="space-y-4"
+        footer={<div className="space-y-2">{actions}</div>}
+      >
+        {body}
+      </BottomSheet>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col bg-white">
       <header className="flex shrink-0 items-center gap-2 border-b border-mist-200 px-4 py-3">
         <Badge tone={TONE[note.status]}>{LABEL[note.status]}</Badge>
         <span className="min-w-0 flex-1 truncate text-[12px] text-slate-600">{note.path}</span>
+        {/* Keeps its 32px box in a dense header row and gains a 44px hit area
+            from `.c-tap`, which matters here because `lg` and up includes a
+            tablet in landscape. */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Close note"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950"
+          className="c-tap grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <a
-          href={note.shotUrl}
-          target="_blank"
-          rel="noreferrer"
-          title="Open the full picture"
-          className="relative block overflow-hidden rounded-xl border border-mist-200"
-          style={{ aspectRatio: `${note.shotWidth} / ${note.shotHeight}` }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={note.shotUrl} alt={`The page at ${note.path}`} className="block h-full w-full object-contain" />
-          <MarkLayer marks={note.marks} width={note.shotWidth} height={note.shotHeight} />
-        </a>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">{body}</div>
 
-        <div>
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-plum-950">
-            {note.comment}
-          </p>
-          <p className="mt-1.5 text-[11px] text-slate-550">
-            {note.createdByName} · {dateTime(note.createdAt)}
-          </p>
-        </div>
-
-        {note.kind === "copy" && (
-          <div className="space-y-2 rounded-xl border border-mist-200 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-              Wording
-            </p>
-            <p className="rounded-lg bg-red-50 p-2 text-[13px] leading-relaxed text-red-900 line-through decoration-red-300">
-              {note.copyBefore || "(empty)"}
-            </p>
-            <p className="rounded-lg bg-emerald-50 p-2 text-[13px] leading-relaxed text-emerald-900">
-              {note.copyAfter || "(empty)"}
-            </p>
-          </div>
-        )}
-
-        {note.attachments.length > 0 && (
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-              Inspiration
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {note.attachments.map((item, index) =>
-                item.kind === "image" ? (
-                  <a key={index} href={item.url} target="_blank" rel="noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.url}
-                      alt={item.label}
-                      className="aspect-[4/3] w-full rounded-lg border border-mist-200 object-cover"
-                    />
-                  </a>
-                ) : (
-                  <a
-                    key={index}
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="col-span-2 flex items-center gap-1.5 rounded-lg bg-mist-50 px-2.5 py-2 text-[12px] font-medium text-wine-700 hover:bg-mist-100"
-                  >
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  </a>
-                ),
-              )}
-            </div>
-          </div>
-        )}
-
-        {note.events.length > 0 && (
-          <ol className="space-y-2 border-t border-mist-100 pt-3">
-            {note.events.map((event) => (
-              <li key={event.id} className="text-[12px]">
-                <span className="font-semibold text-plum-950">{event.byName}</span>{" "}
-                <span className="text-slate-550">{dateTime(event.at)}</span>
-                <p className="mt-0.5 text-slate-600">
-                  {event.kind === "status"
-                    ? `Moved to ${LABEL[event.text as NoteStatus] ?? event.text}`
-                    : event.text}
-                </p>
-              </li>
-            ))}
-          </ol>
-        )}
-
-        {error && <ErrorNote error={error} />}
-      </div>
-
-      <footer className="shrink-0 space-y-2 border-t border-mist-200 p-3">
-        <div className="flex flex-wrap gap-1.5">
-          {NOTE_STATUSES.filter((status) => status !== note.status).map((status) => (
-            <Button
-              key={status}
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              title={MOVE_HINT[status]}
-              onClick={() => void patch({ status })}
-            >
-              {LABEL[status]}
-            </Button>
-          ))}
-        </div>
-
-        <div className="flex items-end gap-2">
-          <textarea
-            value={reply}
-            onChange={(event) => setReply(event.target.value)}
-            rows={2}
-            placeholder="Add to the thread"
-            className="max-h-32 min-h-[3rem] flex-1 resize-none rounded-lg border border-mist-200 px-3 py-2 text-[13px] text-plum-950 outline-none placeholder:text-slate-550 focus:border-wine-500"
-          />
-          <Button
-            size="lg"
-            disabled={busy || reply.trim() === ""}
-            onClick={() => void patch({ reply: reply.trim() })}
-          >
-            Post
-          </Button>
-        </div>
-
-        {/* Two presses, because a note is the only record of what somebody asked
-            for and there is no trash to fish it back out of. */}
-        {confirmDelete ? (
-          <div className="flex items-center gap-2 rounded-lg bg-red-50 p-2">
-            <p className="flex-1 text-[12px] text-red-900">Delete this note for good?</p>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
-              Keep
-            </Button>
-            <Button variant="danger" size="sm" disabled={busy} onClick={() => void remove()}>
-              Delete
-            </Button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="flex items-center gap-1.5 px-1 text-[12px] text-slate-600 transition-colors hover:text-red-700"
-          >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-            Delete note
-          </button>
-        )}
+      {/* The pad carries both bottom insets even here. The studio is a fixed
+          `h-dvh` frame, so on a tablet this footer sits on the very edge of the
+          window: `--safe-b` keeps Post out of the home indicator's gesture
+          strip and `--c-kb` lifts it off the keyboard it just opened. */}
+      <footer className="shrink-0 space-y-2 border-t border-mist-200 p-3 pb-[calc(0.75rem+var(--safe-b)+var(--c-kb))]">
+        {actions}
       </footer>
     </div>
   );

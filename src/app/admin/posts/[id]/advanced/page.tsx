@@ -21,11 +21,14 @@ import {
   type DocNode,
   type ImageRecord,
   type Post,
+  type PostStatus,
   type ReadingTemplate,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { dateTime } from "@/lib/admin/format";
-import { useAsync } from "@/lib/admin/hooks";
+import { dateTime, humanise } from "@/lib/admin/format";
+import { useAsync, useIsNarrow, useIsTouch } from "@/lib/admin/hooks";
+import { Badge, Card, type Tone } from "@/components/admin/ui";
+import { WideScreenGate } from "@/components/admin/WideScreenGate";
 import { createEditorExtensions } from "@/components/admin/editor/extensions";
 import { AutoTextarea } from "@/components/admin/editor/AutoTextarea";
 import { BlockMenu } from "@/components/admin/editor/BlockMenu";
@@ -56,9 +59,19 @@ const AUTOSAVE_MS = 1500;
  */
 const DRAG_HANDLE_POSITION = { placement: "right-start" } as const;
 
+/** The same map the post editor's header chip uses, so the gate and the screen
+ *  it points at cannot disagree about what "draft" looks like. */
+const POST_TONE: Record<PostStatus, Tone> = {
+  published: "green",
+  draft: "amber",
+  archived: "neutral",
+};
+
 export default function AdvancedEditorPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const narrow = useIsNarrow();
+  const coarse = useIsTouch();
 
   const { data, error, loading, reload } = useAsync<{ post: Post }>(
     (signal) => api.get<{ post: Post }>(`/admin/posts/${id}`, signal),
@@ -85,6 +98,59 @@ export default function AdvancedEditorPage() {
     );
   }
   if (!data) return null;
+
+  /*
+   * THE GATE, and it is deliberately after the fetch rather than before it.
+   *
+   * The studio has no honest touch version, and the reason is one mechanic
+   * rather than a list of cramped controls: a document is arranged by dragging
+   * blocks by a handle that only exists while a pointer rests beside them.
+   * Half-gating (a bar that wraps, a palette in a sheet, and still no way to
+   * move a paragraph) would be worse than either answer, because it would look
+   * like the studio works.
+   *
+   * WIDTH ALONE IS THE WRONG QUESTION HERE. The handle is hidden on any coarse
+   * pointer, and Alt+Arrow, the keyboard route past it, needs an Alt key. A
+   * tablet in landscape clears lg comfortably and has neither, so gating on
+   * width alone handed exactly that device the full studio with no way to
+   * reorder anything in it.
+   *
+   * Fetching first is what lets the interstitial name the post and show its
+   * status. An interstitial that cannot say which post it is about is a wall,
+   * and the writer arriving from a list needs to know they are about to open
+   * the right one in the simple editor.
+   */
+  if (narrow || coarse) {
+    return (
+      <WideScreenGate
+        feature="the advanced writing studio"
+        why="The studio arranges a post by dragging blocks up and down by a handle that appears beside whichever block the pointer is resting on, and a touch screen has no resting pointer to reveal it with."
+        backHref={`/admin/posts/${data.post.id}`}
+        backLabel="Back to the simple editor"
+      >
+        <Card>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                This post
+              </p>
+              <p className="mt-1 text-sm font-semibold text-plum-950 [overflow-wrap:anywhere]">
+                {data.post.title || "Untitled"}
+              </p>
+            </div>
+            <Badge tone={POST_TONE[data.post.status]}>{humanise(data.post.status)}</Badge>
+          </div>
+          <p className="mt-3 text-[13px] leading-relaxed text-slate-600">
+            The simple editor is not a cut down one. It carries the title, subtitle, excerpt,
+            body, category, tags, reading template, cover image and its alt text, the whole
+            draft to published lifecycle and the save bar. What a phone gives up here is the
+            block canvas and the slash menu, not the ability to write, format, illustrate or
+            publish.
+          </p>
+        </Card>
+      </WideScreenGate>
+    );
+  }
 
   // Remounted by key, so opening another post builds fresh state rather than
   // syncing ten fields through an effect.
@@ -804,7 +870,7 @@ function HistoryPanel({
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.title || "Untitled"}</p>
             <button
               type="button"
-              className="mt-1.5 text-xs font-semibold text-wine-600 underline underline-offset-2 disabled:text-mist-300"
+              className="mt-1.5 text-xs font-semibold text-wine-600 underline underline-offset-2 disabled:text-mist-400"
               disabled={restoring !== null}
               onClick={() => void restore(r.id)}
             >

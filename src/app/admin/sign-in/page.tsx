@@ -28,7 +28,15 @@ export default function SignInPage() {
   );
 
   return (
-    <div className="grid min-h-screen place-items-center px-6">
+    /* `svh`, not `vh`, and the vertical pad is part of the same fix. `100vh` is
+       the LARGE viewport, which includes the space a mobile browser's URL bar is
+       currently occupying, so the card centres against a box taller than the
+       screen and sits low. On a 360x640 Android with the chrome showing that put
+       the submit button of the claim variant, which draws a third field, below
+       the fold on a page that looks like it fits. `svh` measures what is
+       actually visible, and the padding gives the taller form somewhere to
+       scroll instead of clipping the centring. */
+    <div className="grid min-h-[100svh] place-items-center px-6 py-8">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <p className="text-xl font-bold tracking-tight text-plum-950">AVHomes</p>
@@ -98,6 +106,7 @@ function PasswordDoor({ reason }: { reason: string }) {
           <Field label="Your name" hint="Shown on the listings and posts you publish.">
             <input
               className={inputClass}
+              autoComplete="name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
@@ -125,9 +134,16 @@ function PasswordDoor({ reason }: { reason: string }) {
           {busy ? "Working" : mode === "login" ? "Sign in" : "Accept invite"}
         </Button>
 
+        {/* A real box, not an underlined run of text. This is the only route to
+            the invite-acceptance flow, which is how every new colleague first
+            reaches the console, and as a bare 12px line its hit box was about
+            16px tall on the sparsest screen in the product. It keeps the
+            underline, because with no border at rest that is the only thing
+            saying it is a control, and it keeps its quieter 12px size from `sm`
+            up where a mouse is already accurate. */}
         <button
           type="button"
-          className="w-full text-center text-xs text-muted-foreground underline underline-offset-2"
+          className="flex min-h-11 w-full items-center justify-center rounded-lg text-center text-[13px] text-muted-foreground underline underline-offset-2 transition-colors hover:bg-mist-50 sm:min-h-0 sm:py-1 sm:text-xs"
           onClick={() => {
             setMode(mode === "login" ? "claim" : "login");
             setError(null);

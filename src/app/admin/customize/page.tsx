@@ -5,11 +5,12 @@ import Link from "next/link";
 import { Loader2, MousePointerClick, Pencil, RefreshCw, Type, X } from "lucide-react";
 import type { DesignNote, NoteStatus } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
-import { useAsync } from "@/lib/admin/hooks";
-import { Badge, ErrorNote, type Tone } from "@/components/admin/ui";
-import { MarkLayer } from "@/components/admin/studio/marks";
+import { useAsync, useIsNarrow } from "@/lib/admin/hooks";
+import { Card } from "@/components/admin/ui";
+import { WideScreenGate } from "@/components/admin/WideScreenGate";
 import { Markup, type Capture } from "@/components/admin/studio/Markup";
 import { NoteReview } from "@/components/admin/studio/NoteReview";
+import { NotesPanel } from "@/components/admin/studio/NotesPanel";
 
 /**
  * The customize studio.
@@ -37,23 +38,35 @@ import { NoteReview } from "@/components/admin/studio/NoteReview";
  * rail and 66rem sheet would leave the site rendered as a postcard inside a
  * column. `ConsoleShell` steps aside for this path and the bar below carries the
  * way out.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * BELOW `lg` THE AUTHORING HALF IS GATED AND THE READING HALF IS NEW.
+ *
+ * Three facts, all of them visible in this file, and not one of them a layout
+ * problem that a breakpoint could solve. `takeShot` sizes the picture from
+ * `win.innerWidth`, so a note taken on a phone permanently stores a 390px
+ * picture of the MOBILE site while the reviewer reading it later believes they
+ * marked up "the site": that is wrong data, not a wrong layout. The capture
+ * clones the whole document and inlines every stylesheet and every image as a
+ * data URI, which the comment on `takeShot` measures at 23 seconds and then 11
+ * on a desktop dev server, and which is exactly the workload that gets a mobile
+ * Safari tab killed at its memory ceiling. And the drawing surface is
+ * `touch-none` across nearly its full width, so a finger that lands on the
+ * picture cannot reach the comment box under it.
+ *
+ * So the narrow branch renders the gate with the notes panel under it, and it
+ * ships MORE than this screen had before rather than less: reading a note, its
+ * picture, its comment and its event trail, replying to it, moving it between
+ * statuses and deleting it are all new on a phone.
+ *
+ * THE BRANCH IS `useIsNarrow`, NEVER A CSS `hidden`. A hidden subtree still
+ * mounts, and a mounted iframe pulls the entire marketing site and its
+ * photography onto the phone, which is the precise cost the gate exists to
+ * avoid.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 type Mode = "browse" | "markup" | "copy";
-
-const TONE: Record<NoteStatus, Tone> = {
-  open: "wine",
-  "in-progress": "amber",
-  done: "green",
-  declined: "neutral",
-};
-
-const LABEL: Record<NoteStatus, string> = {
-  open: "Open",
-  "in-progress": "In progress",
-  done: "Done",
-  declined: "Not doing",
-};
 
 /** The pages worth starting from. The frame can navigate anywhere from here. */
 const START_PAGES = [
@@ -73,6 +86,7 @@ export default function CustomizePage() {
   const [selected, setSelected] = useState<DesignNote | null>(null);
   const [filter, setFilter] = useState<NoteStatus | "all">("open");
 
+  const isNarrow = useIsNarrow();
   const frame = useRef<HTMLIFrameElement>(null);
 
   const { data, error, loading, reload } = useAsync<{ items: DesignNote[] }>(
@@ -98,8 +112,8 @@ export default function CustomizePage() {
     return () => URL.revokeObjectURL(url);
   }, [capture]);
 
-  const visible = notes.filter((note) => filter === "all" || note.status === filter);
   const onThisPage = notes.filter((note) => note.path === path && note.status !== "done").length;
+  const openCount = notes.filter((note) => note.status === "open").length;
 
   /**
    * Freezes the frame's current view as a PNG.
@@ -119,6 +133,14 @@ export default function CustomizePage() {
     setCaptureError(null);
     try {
       const { domToBlob } = await import("modern-screenshot");
+      /*
+       * The picture is the size of the FRAME'S OWN WINDOW, which is why this
+       * screen is gated below `lg`. The width taken here is stored on the note
+       * forever and is what every later reader is shown, so a capture made in a
+       * 390px frame is a permanent record of the mobile site filed under a
+       * comment about "the site". A breakpoint cannot fix that; only not
+       * offering the button can.
+       */
       const width = win.innerWidth;
       const height = win.innerHeight;
       /*
@@ -136,7 +158,9 @@ export default function CustomizePage() {
        * crops to the slice above. Production images are optimised and cached, so
        * it is faster there, but this is never instant. The button says
        * "Freezing" and the banner warns, because a spinner with no explanation
-       * at eleven seconds reads as a hang.
+       * at eleven seconds reads as a hang. It is also the second reason this
+       * screen is gated: base64-inlining a page full of photography is what
+       * takes a phone browser to its memory ceiling.
        *
        * `timeout` is the one figure worth tuning: it bounds how long a single
        * unreachable font or image can stall the whole capture. Measured, it
@@ -216,14 +240,83 @@ export default function CustomizePage() {
     };
   }, [mode, path, takeShot]);
 
+  /* One set of props, two mounts: the aside at `lg` and up, the gate's body
+     below it. Only the second gets no height of its own, so the document
+     scrolls rather than a panel inside it. */
+  const panelProps = { notes, filter, setFilter, selected, setSelected, loading, error, reload };
+
+  const review = selected && (
+    <NoteReview
+      note={selected}
+      asSheet={isNarrow}
+      onChange={(next) => {
+        setSelected(next);
+        setNotes((all) => all.map((n) => (n.id === next.id ? next : n)));
+      }}
+      onDeleted={(id) => {
+        setNotes((all) => all.filter((n) => n.id !== id));
+        setSelected(null);
+      }}
+      onClose={() => setSelected(null)}
+    />
+  );
+
+  if (isNarrow) {
+    return (
+      <>
+        <WideScreenGate
+          feature="the customize studio"
+          why="Marking up the site means photographing a whole desktop page inside the browser and drawing on the picture, and a phone can only show you the phone version of that page and cannot hold the photograph."
+          backHref="/admin"
+          backLabel="Back to the console"
+        >
+          <section>
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+              Notes so far
+            </h2>
+            {/* The count lives HERE below `lg`, beside the notes it counts,
+                rather than in the studio header where it used to sit over a
+                panel a phone could not open. Say plainly what half of the
+                screen this is: a number with no route to it is worse than no
+                number. */}
+            <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
+              {loading
+                ? "Loading the notes."
+                : `${openCount === 1 ? "1 note is" : `${openCount} notes are`} open across the site.`}{" "}
+              You can read them here, reply, move one along and delete it. Taking a
+              new one needs the wider screen.
+            </p>
+            {/* `padded={false}`: the panel owns its own padding, and the card's
+                would put a second gutter around a list that already has one. */}
+            <Card padded={false} className="mt-3 overflow-hidden">
+              <NotesPanel {...panelProps} />
+            </Card>
+          </section>
+        </WideScreenGate>
+
+        {/* Over the list, not instead of it, so closing a note lands back on the
+            row it was opened from. */}
+        {review}
+      </>
+    );
+  }
+
   return (
-    <div className="flex h-screen flex-col bg-mist-100">
+    /* `h-dvh`, not `h-screen`. `vh` is the LARGE viewport, measured with the
+       browser's URL bar retracted, so a fixed non-scrolling column sized against
+       it is taller than what is visible and runs its own bottom edge under the
+       toolbar with no scroller left to recover it. */
+    <div className="flex h-dvh flex-col bg-mist-100">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-mist-200 bg-white px-3 py-2">
         {/* An EXIT, not a back arrow. The studio covers the whole window, so the
-            rail and breadcrumb that would say where you are are both gone. */}
+            rail and breadcrumb that would say where you are are both gone.
+
+            The `.c-tap` on this row's 32px controls is not dead weight above
+            `lg`: a tablet in landscape is a coarse pointer at 1024px, and it is
+            inert with a mouse. */}
         <Link
           href="/admin"
-          className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-plum-950 transition-colors hover:bg-mist-100"
+          className="c-tap flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-plum-950 transition-colors hover:bg-mist-100"
         >
           <X className="h-4 w-4" aria-hidden="true" />
           Exit customize
@@ -256,7 +349,7 @@ export default function CustomizePage() {
             if (win) win.location.reload();
           }}
           aria-label="Reload the page"
-          className="grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950"
+          className="c-tap grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950"
         >
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -290,13 +383,17 @@ export default function CustomizePage() {
             type="button"
             onClick={() => void takeShot()}
             disabled={capturing}
-            className="c-bevel-primary inline-flex h-8 items-center gap-1.5 rounded-lg bg-wine-600 px-3 text-[13px] font-semibold text-white transition-colors hover:bg-wine-700 disabled:bg-wine-600/50"
+            className="c-tap c-bevel-primary inline-flex h-8 items-center gap-1.5 rounded-lg bg-wine-600 px-3 text-[13px] font-semibold text-white transition-colors hover:bg-wine-700"
           >
             {capturing && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
             {capturing ? "Freezing, a few seconds" : "Freeze this screen"}
           </button>
         )}
 
+        {/* The count is only drawn in this branch, and that is the honest
+            version of it: the panel holding those notes is on the same screen,
+            one Close away at worst. Below `lg` the same fact is restated inside
+            the gate, over the list a phone can actually open. */}
         <span className="ml-auto text-[12px] text-slate-600">
           {onThisPage > 0 ? `${onThisPage} open on this page` : "Nothing open here"}
         </span>
@@ -335,92 +432,10 @@ export default function CustomizePage() {
         </div>
 
         <aside className="hidden w-80 shrink-0 flex-col border-l border-mist-200 bg-white lg:flex">
-          {selected ? (
-            <NoteReview
-              note={selected}
-              onChange={(next) => {
-                setSelected(next);
-                setNotes((all) => all.map((n) => (n.id === next.id ? next : n)));
-              }}
-              onDeleted={(id) => {
-                setNotes((all) => all.filter((n) => n.id !== id));
-                setSelected(null);
-              }}
-              onClose={() => setSelected(null)}
-            />
-          ) : (
-            <>
-              <div className="shrink-0 border-b border-mist-200 p-3">
-                <div className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1">
-                  {(["open", "in-progress", "done", "all"] as const).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-pressed={filter === value}
-                      onClick={() => setFilter(value)}
-                      className={`h-7 shrink-0 rounded-lg px-2.5 text-[13px] font-medium transition-colors ${
-                        filter === value
-                          ? "bg-plum-950 text-white"
-                          : "text-slate-600 hover:bg-mist-100 hover:text-plum-950"
-                      }`}
-                    >
-                      {value === "all" ? "All" : LABEL[value]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                {loading && <p className="py-8 text-center text-[13px] text-slate-600">Loading</p>}
-                {error && <ErrorNote error={error} onRetry={reload} />}
-                {!loading && visible.length === 0 && (
-                  <div className="px-2 py-10 text-center">
-                    <p className="text-[13px] font-semibold text-plum-950">Nothing here yet</p>
-                    <p className="mx-auto mt-1 max-w-[15rem] text-[12px] leading-relaxed text-slate-600">
-                      Switch to Mark up, scroll to something that bothers you, and
-                      freeze the screen.
-                    </p>
-                  </div>
-                )}
-                <ul className="space-y-2">
-                  {visible.map((note) => (
-                    <li key={note.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelected(note)}
-                        className="w-full rounded-xl border border-mist-200 p-2 text-left transition-colors hover:border-wine-500 hover:bg-wine-50/40"
-                      >
-                        <div
-                          className="relative mb-2 overflow-hidden rounded-lg bg-mist-100"
-                          style={{ aspectRatio: `${note.shotWidth} / ${note.shotHeight}` }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={note.shotUrl}
-                            alt=""
-                            loading="lazy"
-                            className="block h-full w-full object-cover object-top"
-                          />
-                          <MarkLayer
-                            marks={note.marks}
-                            width={note.shotWidth}
-                            height={note.shotHeight}
-                          />
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Badge tone={TONE[note.status]}>{LABEL[note.status]}</Badge>
-                          <span className="truncate text-[11px] text-slate-550">{note.path}</span>
-                        </div>
-                        <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-plum-950">
-                          {note.comment}
-                        </p>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </>
-          )}
+          {/* The aside SWAPS between the list and the review, because at 320px
+              there is no room for both. Below `lg` they stack instead: the
+              review comes up as a sheet over the list. */}
+          {selected ? review : <NotesPanel {...panelProps} className="flex-1" />}
         </aside>
       </div>
 
@@ -459,7 +474,10 @@ function ModeButton({
       aria-pressed={active}
       title={hint}
       onClick={onClick}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors ${
+      /* `.c-tap` despite the `gap-1` beside its neighbours: the halo is
+         `max(100%, 44px)` per axis, and these are drawn wider than 44px, so it
+         only grows downwards and upwards where nothing sits. */
+      className={`c-tap flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors ${
         active ? "bg-plum-950 text-white" : "text-slate-600 hover:bg-mist-100 hover:text-plum-950"
       }`}
     >

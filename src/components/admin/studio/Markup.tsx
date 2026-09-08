@@ -35,7 +35,9 @@ export interface Capture {
   copyBefore?: string;
 }
 
-type Draft = NoteMark & { done: boolean };
+/** `coarse` is recorded on the way down, because the stray-mark guard in `onUp`
+ *  has no pointer event of its own to ask. */
+type Draft = NoteMark & { coarse: boolean };
 
 export function Markup({
   capture,
@@ -57,6 +59,9 @@ export function Markup({
   const [attachments, setAttachments] = useState<NoteAttachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkDraft, setLinkDraft] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const surface = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -80,7 +85,12 @@ export function Markup({
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const [x, y] = pointAt(event);
-    setDrawing({ kind: tool, color, points: [x, y, x, y], done: false });
+    setDrawing({
+      kind: tool,
+      color,
+      points: [x, y, x, y],
+      coarse: event.pointerType !== "mouse",
+    });
   }
 
   function onMove(event: React.PointerEvent) {
@@ -103,15 +113,24 @@ export function Markup({
      * A click with no drag is discarded rather than stored as a zero-size shape.
      * Somebody tapping the image to focus it should not leave an invisible mark
      * that later renders as a dot nobody can select or explain.
+     *
+     * THE SLOP IS A FRACTION OF THE SURFACE, SO IT HAS TO SCALE WITH THE
+     * POINTER. A mouse press moves under a pixel, and 0.005 of a 1100px picture
+     * is five and a half of them, which is the right figure for one. A finger
+     * moves three to six pixels on what its owner thinks was a tap, and on a
+     * narrower surface that is one to two per cent, so the mouse figure passes
+     * every accidental touch straight through as a real mark. The only recovery
+     * is Undo, two rows up in the header.
      */
     const [x1, y1, x2, y2] = drawing.points;
+    const slop = drawing.coarse ? 0.02 : 0.005;
     const tiny =
       drawing.kind !== "pen" &&
-      Math.abs((x2 ?? 0) - (x1 ?? 0)) < 0.005 &&
-      Math.abs((y2 ?? 0) - (y1 ?? 0)) < 0.005;
+      Math.abs((x2 ?? 0) - (x1 ?? 0)) < slop &&
+      Math.abs((y2 ?? 0) - (y1 ?? 0)) < slop;
     if (!tiny && drawing.points.length >= 4) {
-      const { done: _done, ...mark } = drawing;
-      void _done;
+      const { coarse: _coarse, ...mark } = drawing;
+      void _coarse;
       setMarks((all) => [...all, mark]);
     }
     setDrawing(null);
@@ -136,14 +155,30 @@ export function Markup({
     }
   }
 
+  function closeLink() {
+    setLinkOpen(false);
+    setLinkDraft("");
+    setLinkError(null);
+  }
+
+  /**
+   * Reads the inline link field.
+   *
+   * IT USED TO BE A `window.prompt`, and replacing it is a desktop fix as much
+   * as a touch one. A prompt is an unstyled system dialog with no room to say
+   * what a valid link is; both of its refusals below could only surface after it
+   * had already closed, as a shared error box further down the pane; and a
+   * handful of in-app browsers suppress `prompt()` outright, which leaves the
+   * button silently doing nothing at all.
+   */
   function attachLink() {
-    const raw = window.prompt(
-      "Paste a link. A Loom, a YouTube video, a page you like the look of.",
-    );
-    const url = raw?.trim();
-    if (!url) return;
+    const url = linkDraft.trim();
+    if (url === "") {
+      setLinkError("Paste a link first.");
+      return;
+    }
     /*
-     * `http` and `https` only. A prompt that accepts whatever is typed accepts
+     * `http` and `https` only. A field that accepts whatever is typed accepts
      * `javascript:` too, and this URL is later rendered as an anchor somebody on
      * the team clicks.
      */
@@ -151,15 +186,16 @@ export function Markup({
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        setError(new ApiError(400, { error: "bad_request", detail: "Links must start with http or https." }));
+        setLinkError("Links must start with http or https.");
         return;
       }
       label = parsed.hostname.replace(/^www\./, "");
     } catch {
-      setError(new ApiError(400, { error: "bad_request", detail: "That is not a link." }));
+      setLinkError("That is not a link. It needs to start with https://");
       return;
     }
     setAttachments((all) => [...all, { kind: "link", url, label }]);
+    closeLink();
   }
 
   async function save() {
@@ -205,7 +241,11 @@ export function Markup({
 
         {!isCopy && (
           <>
-            <div role="group" aria-label="Tool" className="flex items-center gap-1">
+            {/* `.c-tap` on every 32px control in this row, and `gap-2` to hold
+                the halos apart. The studio only renders at `lg` and up, which
+                is not the same as "a mouse": an iPad in landscape is a coarse
+                pointer at 1024px, and this is the surface it draws on. */}
+            <div role="group" aria-label="Tool" className="flex items-center gap-2">
               {TOOLS.map((entry) => (
                 <button
                   key={entry.kind}
@@ -213,7 +253,7 @@ export function Markup({
                   aria-pressed={tool === entry.kind}
                   title={entry.hint}
                   onClick={() => setTool(entry.kind)}
-                  className={`h-8 rounded-lg px-2.5 text-[13px] font-medium transition-colors ${
+                  className={`c-tap h-8 rounded-lg px-2.5 text-[13px] font-medium transition-colors ${
                     tool === entry.kind
                       ? "bg-plum-950 text-white"
                       : "text-slate-600 hover:bg-mist-100 hover:text-plum-950"
@@ -224,7 +264,16 @@ export function Markup({
               ))}
             </div>
 
-            <div role="group" aria-label="Colour" className="flex items-center gap-1.5 pl-1">
+            {/* A REAL BOX ON A FINGER, not a `.c-tap` halo.
+                Five 24px dots were the smallest targets in the console, on the
+                one screen somebody drives with a fingertip. A 44px halo cannot
+                fix that here: it bleeds ten pixels past each dot into a
+                six pixel gap, so the five swatches end up trading edges and the
+                colour you get is not the one you aimed at. The button grows to
+                a genuine 44px square on a coarse pointer instead and the dot
+                rides inside it, so with a mouse this draws the same 24px row it
+                always did. */}
+            <div role="group" aria-label="Colour" className="flex items-center gap-2 pl-1">
               {MARK_COLORS.map((entry) => (
                 <button
                   key={entry.value}
@@ -232,13 +281,17 @@ export function Markup({
                   aria-label={entry.label}
                   aria-pressed={color === entry.value}
                   onClick={() => setColor(entry.value)}
-                  style={{ background: entry.value }}
-                  className={`h-6 w-6 rounded-full transition-transform ${
-                    color === entry.value
-                      ? "scale-110 ring-2 ring-plum-950 ring-offset-2"
-                      : "hover:scale-110"
-                  }`}
-                />
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-lg pointer-coarse:h-11 pointer-coarse:w-11"
+                >
+                  <span
+                    style={{ background: entry.value }}
+                    className={`block h-6 w-6 rounded-full transition-transform ${
+                      color === entry.value
+                        ? "scale-110 ring-2 ring-plum-950 ring-offset-2"
+                        : "hover:scale-110"
+                    }`}
+                  />
+                </button>
               ))}
             </div>
 
@@ -246,7 +299,7 @@ export function Markup({
               type="button"
               onClick={() => setMarks((all) => all.slice(0, -1))}
               disabled={marks.length === 0}
-              className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:cursor-not-allowed disabled:text-mist-300"
+              className="c-tap flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:cursor-not-allowed disabled:text-mist-400"
             >
               <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
               Undo
@@ -255,7 +308,7 @@ export function Markup({
               type="button"
               onClick={() => setMarks([])}
               disabled={marks.length === 0}
-              className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:cursor-not-allowed disabled:text-mist-300"
+              className="c-tap flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:cursor-not-allowed disabled:text-mist-400"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
               Clear
@@ -267,7 +320,7 @@ export function Markup({
           type="button"
           onClick={onCancel}
           aria-label="Cancel"
-          className="ml-auto grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950"
+          className="c-tap ml-auto grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -351,7 +404,9 @@ export function Markup({
               className="hidden"
               onChange={(event) => void attachImage(event.target.files)}
             />
-            <div className="flex flex-wrap gap-1.5">
+            {/* `gap-2`, because `BUTTON_BASE` carries `.c-tap`: two of these at
+                six pixels apart would steal each other's halo edges. */}
+            <div className="flex flex-wrap gap-2">
               <Button variant="ghost" size="sm" onClick={() => fileInput.current?.click()} disabled={busy}>
                 <Paperclip className="h-3.5 w-3.5" aria-hidden="true" />
                 Add a picture
@@ -359,11 +414,52 @@ export function Markup({
               {/* A link, not an upload, for video. A video store is a different
                   problem from an image store, and a Loom URL is what people
                   actually have to hand. */}
-              <Button variant="ghost" size="sm" onClick={attachLink} disabled={busy}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => (linkOpen ? closeLink() : setLinkOpen(true))}
+                disabled={busy}
+              >
                 <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
                 Add a link
               </Button>
             </div>
+
+            {linkOpen && (
+              <div className="mt-2 space-y-1.5">
+                <input
+                  type="url"
+                  inputMode="url"
+                  value={linkDraft}
+                  autoFocus
+                  onChange={(event) => {
+                    setLinkDraft(event.target.value);
+                    setLinkError(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      attachLink();
+                    }
+                    if (event.key === "Escape") closeLink();
+                  }}
+                  placeholder="https://a-page-you-like-the-look-of.com"
+                  aria-label="Link to attach"
+                  className="w-full rounded-lg border border-mist-200 px-3 py-2 text-[13px] text-plum-950 outline-none placeholder:text-slate-550 focus:border-wine-500"
+                />
+                {/* Under the field it belongs to, not in the shared error box at
+                    the bottom of the pane. */}
+                {linkError && <p className="text-[12px] text-red-700">{linkError}</p>}
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={attachLink} disabled={busy}>
+                    Add
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={closeLink}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
             {attachments.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {attachments.map((item, index) => (

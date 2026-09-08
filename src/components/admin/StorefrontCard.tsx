@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Building2,
   Check,
+  Eye,
   Plus,
   RotateCw,
   Settings2,
@@ -23,7 +24,7 @@ import {
   type SiteStat,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { useAsync } from "@/lib/admin/hooks";
+import { useAsync, useIsPhone } from "@/lib/admin/hooks";
 import { Badge, Button, ErrorNote, Skeleton } from "./ui";
 
 /**
@@ -40,6 +41,15 @@ import { Badge, Button, ErrorNote, Skeleton } from "./ui";
  * listings that fill its grid. The hero's copy lives in
  * `src/components/Hero.tsx` and is not editable, so this panel does not pretend
  * it is.
+ *
+ * BELOW `sm` THE FRAME IS NOT MOUNTED, and that is a mount decision rather than
+ * a visibility one on purpose: `hidden` still boots a second Next app, its
+ * fonts, its hero imagery and its client JavaScript, over cellular, to draw a
+ * 534px picture nobody can touch. The rest of this card, the domain, the status
+ * and the two actions, is exactly as useful on a phone as on a desk, so the
+ * card stays and only the picture becomes opt in. `useIsPhone` reads `false`
+ * from the server snapshot, so the phone branch is what hydrates and the
+ * download never starts on the way to being torn down.
  */
 
 /*
@@ -65,6 +75,13 @@ export function StorefrontCard({ user }: { user: AuthUser }) {
   /* Bumped after a save so the frame re-fetches and the operator sees the edit
      land on the page, rather than being told it did. */
   const [previewNonce, setPreviewNonce] = useState(0);
+
+  /* Asked for by a phone, never withheld from one. The state only ever turns
+     the frame ON, so a desktop is unaffected and a phone that wants the picture
+     gets it for the rest of the visit. */
+  const isPhone = useIsPhone();
+  const [askedForPreview, setAskedForPreview] = useState(false);
+  const showPreview = !isPhone || askedForPreview;
 
   /*
    * The badge reports what is actually known rather than always saying Live.
@@ -101,7 +118,15 @@ export function StorefrontCard({ user }: { user: AuthUser }) {
           )}
         </p>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {/*
+          These two keep their 28px drawn size at every width and take a 44px
+          hit area from `.c-tap` instead, which is exactly what that utility is
+          for: growing them would break the address bar this header is drawn as,
+          and the bar is what says storefront before any copy does. `gap-2`
+          rather than `gap-1.5` because the two hit areas bleed outside their
+          buttons, and at 6px apart they steal each other's edges.
+        */}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {mayCustomize && (
             <Button
               variant="ghost"
@@ -117,7 +142,7 @@ export function StorefrontCard({ user }: { user: AuthUser }) {
             href="/"
             target="_blank"
             rel="noreferrer"
-            className="c-bevel inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-white px-2.5 text-[12px] font-semibold text-plum-950 transition-colors hover:bg-mist-50"
+            className="c-tap c-bevel inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-white px-2.5 text-[12px] font-semibold text-plum-950 transition-colors hover:bg-mist-50"
           >
             Open
             <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -125,11 +150,25 @@ export function StorefrontCard({ user }: { user: AuthUser }) {
         </div>
       </header>
 
-      <Preview nonce={previewNonce} />
+      {showPreview ? (
+        <Preview nonce={previewNonce} />
+      ) : (
+        /* The offer, not the picture. The header above already draws the
+           divider, so this row carries no border of its own. */
+        <button
+          type="button"
+          onClick={() => setAskedForPreview(true)}
+          className="flex h-11 w-full items-center justify-center gap-1.5 text-[13px] font-semibold text-wine-600 transition-colors hover:bg-mist-50 active:bg-mist-100"
+        >
+          <Eye className="h-4 w-4" aria-hidden="true" />
+          Show the page preview
+        </button>
+      )}
 
       {mayCustomize && customizing && (
         <CustomizePanel
           user={user}
+          previewShowing={showPreview}
           onSaved={() => setPreviewNonce((n) => n + 1)}
           onClose={() => setCustomizing(false)}
         />
@@ -219,10 +258,13 @@ interface Draft {
 
 function CustomizePanel({
   user,
+  previewShowing,
   onSaved,
   onClose,
 }: {
   user: AuthUser;
+  /** Whether the frame is mounted, so the save note only claims what happened. */
+  previewShowing: boolean;
   onSaved: () => void;
   onClose: () => void;
 }) {
@@ -254,11 +296,18 @@ function CustomizePanel({
    * preview that is most of the card's height, so on a 1440 by 900 screen it
    * arrived entirely below the fold and the button read as dead: the only
    * feedback was a card silently growing taller off screen.
+   *
+   * `nearest` is right on a desktop, where the panel is shorter than what is
+   * left of the viewport and the minimum scroll puts all of it on screen. On a
+   * phone the panel is taller than the viewport, so `nearest` lands its top
+   * edge near the bottom of the screen and the visible result of tapping
+   * Customize is the card twitching. There it scrolls to `start`.
    */
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const phone = !window.matchMedia("(min-width: 40rem)").matches;
     panelRef.current?.scrollIntoView({
-      block: "nearest",
+      block: phone ? "start" : "nearest",
       behavior: reduced ? "auto" : "smooth",
     });
   }, []);
@@ -363,14 +412,21 @@ function CustomizePanel({
   }
 
   return (
-    <div ref={panelRef} className="scroll-mt-4 border-t border-mist-200 bg-mist-50/70 p-4 sm:p-5">
+    <div
+      ref={panelRef}
+      className="scroll-mt-2 border-t border-mist-200 bg-mist-50/70 p-4 sm:scroll-mt-4 sm:p-5"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold text-plum-950">Homepage</h2>
         <p className="text-[12px] text-slate-600">What the site reads from the database.</p>
+        {/* A real box below sm, pulled right by its own padding so it still
+            lines up with the panel edge. Done is the only close control near
+            the panel: the Customize toggle that also closes it is above a
+            preview and off screen by the time this is read. */}
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto text-[12px] font-semibold text-wine-600 hover:text-wine-700"
+          className="-mr-2 ml-auto inline-flex h-11 items-center rounded-lg px-2 text-[13px] font-semibold text-wine-600 hover:text-wine-700 sm:mr-0 sm:h-auto sm:px-0 sm:text-[12px]"
         >
           Done
         </button>
@@ -382,8 +438,18 @@ function CustomizePanel({
         </div>
       )}
 
-      <div className="mt-4 grid gap-5 lg:grid-cols-2">
-        <section>
+      {/*
+        `min-w-0` on the grid AND on both sections, and it is the single fix
+        that keeps this panel from breaking the console. A grid item's default
+        `min-width: auto` refuses to shrink below its content's min-content
+        width, so any wide child in here, a long counter label or the action
+        row, widened its track instead of wrapping. That widened the card, and
+        because the console is a `fixed inset-0` frame with an overflow-y
+        scroller, a card wider than the frame means the whole console scrolls
+        sideways with nothing to scroll it back.
+      */}
+      <div className="mt-4 grid min-w-0 gap-5 lg:grid-cols-2">
+        <section className="min-w-0">
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-slate-600">
             The number strip
           </h3>
@@ -392,9 +458,12 @@ function CustomizePanel({
           </p>
 
           {stats.loading && (
+            /* The edit row is two lines below sm and one from sm up, so the
+               placeholder is too. A skeleton drawn at the desktop height here
+               would shuffle the whole panel on arrival. */
             <div className="mt-3 space-y-2">
-              <Skeleton className="h-9" />
-              <Skeleton className="h-9" />
+              <Skeleton className="h-24 sm:h-9" />
+              <Skeleton className="h-24 sm:h-9" />
             </div>
           )}
           {stats.error && (
@@ -439,42 +508,56 @@ function CustomizePanel({
                   );
                 }
                 return (
-                  <li key={stat.id} className="flex items-center gap-2">
-                    <label className="w-20 shrink-0">
-                      <span className="sr-only">Value for {stat.label}</span>
-                      <input
-                        inputMode="numeric"
-                        value={draft.value}
-                        onChange={(event) => edit(stat, { value: event.target.value })}
-                        className="c-num h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-right text-[13px] font-semibold text-plum-950 outline-none focus:border-wine-500"
-                      />
-                    </label>
-                    <label className="w-14 shrink-0">
-                      <span className="sr-only">Suffix for {stat.label}</span>
-                      <input
-                        value={draft.suffix}
-                        placeholder="+"
-                        onChange={(event) => edit(stat, { suffix: event.target.value })}
-                        className="h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-plum-950 outline-none placeholder:text-slate-550 focus:border-wine-500"
-                      />
-                    </label>
-                    <label className="min-w-0 flex-1">
+                  /*
+                    Two rows below sm, one row from sm up. As a single flex line
+                    the fixed pieces and gaps took 192px of the 296px a 360px
+                    phone has here, leaving 104px for the label: the field most
+                    likely to actually be edited was the one edited through a
+                    peephole. The label gets a full row of its own instead.
+
+                    `sm:contents` on the value/suffix pair is what keeps the
+                    desktop row byte for byte what it was: below sm the pair is
+                    one grid cell, from sm up the wrapper stops generating a box
+                    and its two labels become flex children of the row directly,
+                    in the same order they are written.
+                  */
+                  <li
+                    key={stat.id}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:items-center"
+                  >
+                    <div className="col-start-1 row-start-1 flex items-center gap-2 sm:contents">
+                      <label className="w-20 sm:shrink-0">
+                        <span className="sr-only">Value for {stat.label}</span>
+                        <input
+                          inputMode="numeric"
+                          value={draft.value}
+                          onChange={(event) => edit(stat, { value: event.target.value })}
+                          className="c-num h-11 w-full rounded-lg border border-mist-200 bg-white px-2 text-right text-[13px] font-semibold text-plum-950 outline-none focus:border-wine-500 sm:h-8"
+                        />
+                      </label>
+                      <label className="w-14 sm:shrink-0">
+                        <span className="sr-only">Suffix for {stat.label}</span>
+                        <input
+                          value={draft.suffix}
+                          placeholder="+"
+                          onChange={(event) => edit(stat, { suffix: event.target.value })}
+                          className="h-11 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-plum-950 outline-none placeholder:text-slate-550 focus:border-wine-500 sm:h-8"
+                        />
+                      </label>
+                    </div>
+                    <label className="col-span-2 row-start-2 min-w-0 sm:flex-1">
                       <span className="sr-only">Label for this counter</span>
                       <input
                         value={draft.label}
                         onChange={(event) => edit(stat, { label: event.target.value })}
-                        className="h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-plum-950 outline-none focus:border-wine-500"
+                        className="h-11 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-plum-950 outline-none focus:border-wine-500 sm:h-8"
                       />
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => void removeStat(stat.id)}
+                    <RemoveStat
+                      label={stat.label}
                       disabled={saving}
-                      aria-label={`Remove the ${stat.label} counter`}
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-550 transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-40"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
+                      onConfirm={() => void removeStat(stat.id)}
+                    />
                   </li>
                 );
               })}
@@ -482,7 +565,12 @@ function CustomizePanel({
           )}
 
           {mayEdit && items.length > 0 && (
-            <div className="mt-3 flex items-center gap-2">
+            /* Wrapping, because `BUTTON_BASE` carries `shrink-0` and nothing in
+               this row could compress: two buttons plus a status sentence came
+               to roughly 380px inside a 296px panel. The two messages take a
+               line of their own below sm rather than being squeezed beside the
+               buttons. */
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button onClick={save} disabled={dirty.length === 0 || saving}>
                 {saving ? (
                   <>
@@ -498,12 +586,18 @@ function CustomizePanel({
                 Add
               </Button>
               {full && (
-                <span className="text-[12px] text-slate-600">Six is what the strip fits.</span>
+                <span className="basis-full text-[12px] text-slate-600 sm:basis-auto">
+                  Six is what the strip fits.
+                </span>
               )}
               {saved && dirty.length === 0 && (
-                <span className="flex items-center gap-1 text-[12px] font-medium text-emerald-700">
+                /* The note only claims the reload when there is a frame to
+                   reload. On a phone the preview is not mounted, and telling
+                   somebody a picture they cannot see has refreshed is the same
+                   class of lie as a Live badge over localhost. */
+                <span className="flex basis-full items-center gap-1 text-[12px] font-medium text-emerald-700 sm:basis-auto">
                   <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  Saved, and the preview reloaded
+                  {previewShowing ? "Saved, and the preview reloaded" : "Saved, and the site updated"}
                 </span>
               )}
             </div>
@@ -516,7 +610,7 @@ function CustomizePanel({
           )}
         </section>
 
-        <section>
+        <section className="min-w-0">
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-slate-600">
             Featured listings
           </h3>
@@ -526,8 +620,8 @@ function CustomizePanel({
 
           {featured.loading && (
             <div className="mt-3 space-y-2">
-              <Skeleton className="h-11" />
-              <Skeleton className="h-11" />
+              <Skeleton className="h-13 sm:h-11" />
+              <Skeleton className="h-13 sm:h-11" />
             </div>
           )}
 
@@ -543,7 +637,10 @@ function CustomizePanel({
                 <li key={property.id}>
                   <Link
                     href={`/admin/properties/${property.id}`}
-                    className="flex items-center gap-2.5 rounded-lg bg-white px-2 py-1.5 shadow-card transition-colors hover:bg-wine-50/60"
+                    /* `py-2` below sm takes the row from exactly 44px to 52px.
+                       Meeting the floor with zero margin is a row that fails
+                       the moment the thumbnail changes size. */
+                    className="flex items-center gap-2.5 rounded-lg bg-white px-2 py-2 shadow-card transition-colors hover:bg-wine-50/60 active:bg-wine-50 sm:py-1.5"
                   >
                     <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-mist-100 text-slate-550">
                       {property.images[0] ? (
@@ -567,12 +664,72 @@ function CustomizePanel({
 
           <Link
             href="/admin/properties"
-            className="mt-3 inline-block text-[12px] font-semibold text-wine-600 hover:text-wine-700"
+            className="-ml-2 mt-1 inline-flex h-11 items-center rounded-lg px-2 text-[13px] font-semibold text-wine-600 hover:text-wine-700 sm:ml-0 sm:mt-3 sm:h-auto sm:px-0 sm:text-[12px]"
           >
             Manage listings
           </Link>
         </section>
       </div>
     </div>
+  );
+}
+
+/**
+ * Remove a counter, asked twice, in place.
+ *
+ * The console's own two tap confirm shape, hand rolled rather than taken from
+ * `ConfirmButton` for one reason: at rest this has to stay a glyph. It sits in
+ * a dense edit row where a button reading "Remove" at every width would rewrite
+ * what the desktop row is, and `ConfirmButton` has no way to give an icon-only
+ * resting state an accessible name. Armed it becomes words, because the second
+ * tap is the one that has to be readable and a red icon is not an outcome.
+ *
+ * It matters most on a phone. This is an irreversible write with no undo, it
+ * used to be a 32px target eight pixels from a text field, and a thumb that
+ * misses the field hits it.
+ */
+function RemoveStat({
+  label,
+  disabled,
+  onConfirm,
+}: {
+  label: string;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const timer = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(timer);
+  }, [armed]);
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      /* The armed state is announced as well as drawn, because a colour change
+         is not available to a screen reader and this is the control where the
+         reader has to know which of two things the next press does. */
+      aria-live="polite"
+      aria-label={armed ? undefined : `Remove the ${label} counter`}
+      onBlur={() => setArmed(false)}
+      onClick={() => {
+        if (!armed) {
+          setArmed(true);
+          return;
+        }
+        setArmed(false);
+        onConfirm();
+      }}
+      className={`col-start-2 row-start-1 inline-flex h-11 shrink-0 items-center justify-center rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-40 sm:h-8 ${
+        armed
+          ? "c-bevel-danger bg-red-600 px-2.5 text-white hover:bg-red-700"
+          : "w-11 text-slate-550 hover:bg-red-50 hover:text-red-700 sm:w-8"
+      }`}
+    >
+      {armed ? "Yes, remove" : <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />}
+    </button>
   );
 }

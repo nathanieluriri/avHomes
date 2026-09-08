@@ -57,8 +57,16 @@ function sentenceFor(status: number, b: ApiErrorBody): string {
     case "gone":
       return "That no longer exists.";
     case "bad_request":
+      // Capped at three, because this sentence is the headline of `ErrorNote`
+      // and a field path has no spaces in it. Eight of them joined by commas is
+      // one unbreakable token wider than a 288px card, which pushes the whole
+      // console into horizontal scroll on a phone. The full list is still drawn
+      // as a bulleted breakdown underneath.
       return b.issues?.length
-        ? `Check ${b.issues.map((i) => i.path).join(", ")}.`
+        ? `Check ${b.issues
+            .slice(0, 3)
+            .map((i) => i.path)
+            .join(", ")}${b.issues.length > 3 ? ` and ${b.issues.length - 3} more` : ""}.`
         : "That request was not accepted.";
     case "invalid_document":
       return `The document is not valid at ${b.path ?? "an unknown position"}.`;
@@ -107,10 +115,81 @@ interface RequestOptions {
   signal?: AbortSignal;
   /** For multipart uploads, which must not be JSON-encoded. */
   form?: FormData;
+  /** Milliseconds before the request is abandoned. 0 disables it. */
+  timeoutMs?: number;
+}
+
+/**
+ * A request that gives up.
+ *
+ * Written for the mobile radio that ATTACHES BUT CARRIES NOTHING: a lift, a
+ * basement, a handover between masts. `fetch` has no timeout of its own, so
+ * that state does not fail, it hangs, and a screen sits on its skeleton
+ * forever with no error and no retry. Twenty seconds is long enough that a slow
+ * but working connection is never cut off and short enough that a dead one is
+ * reported while the operator is still looking at the screen.
+ *
+ * Uploads opt out by passing 0. A photo taken on the phone is several megabytes
+ * over cellular, and a timeout there would cancel work that is progressing
+ * perfectly well.
+ */
+const DEFAULT_TIMEOUT_MS = 20_000;
+
+/**
+ * The timeout signal, and the caller's, as one signal.
+ *
+ * HAND-ROLLED RATHER THAN `AbortSignal.any`, and the reason is the entire point
+ * of this file's mobile pass. `AbortSignal.any` shipped in Safari 17.4 and
+ * `AbortSignal.timeout` in Safari 16.0, both well after the iPhones an estate
+ * agent is actually carrying. Calling either unguarded throws a synchronous
+ * TypeError before the try/catch around `fetch`, and since every `useAsync`
+ * read passes a signal, that would mean the console failing to load ANY screen
+ * on iOS 16 through 17.3 while working perfectly on the desktop it was tested
+ * on. A twenty second timeout is not worth a blank app on a two year old phone.
+ *
+ * The manual controller aborts with a `TimeoutError`, the same name the native
+ * signal uses, so the branch that turns it into a sentence does not care which
+ * path produced it.
+ */
+function composeSignal(signal: AbortSignal | undefined, timeoutMs: number) {
+  if (timeoutMs <= 0) return { signal: signal ?? null, done: () => {} };
+
+  if (typeof AbortSignal.timeout === "function" && typeof AbortSignal.any === "function") {
+    const timeout = AbortSignal.timeout(timeoutMs);
+    return {
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      done: () => {},
+    };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("The request timed out.", "TimeoutError")),
+    timeoutMs,
+  );
+  // The caller's abort has to reach the controller by hand, or unmounting a
+  // component would leave the request running until the timer fires.
+  const forward = () => controller.abort(signal?.reason);
+  if (signal) {
+    if (signal.aborted) forward();
+    else signal.addEventListener("abort", forward, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    // Called whatever the outcome, so a resolved request does not hold a timer
+    // and a listener on the caller's signal for the rest of its life.
+    done: () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", forward);
+    },
+  };
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, signal, form } = options;
+  const { method = "GET", body, signal, form, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+
+  const composed = composeSignal(signal, timeoutMs);
 
   const init: RequestInit = {
     method,
@@ -118,7 +197,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     // because "it worked until someone moved the admin to another host" is a
     // failure mode worth one word of insurance.
     credentials: "same-origin",
-    signal: signal ?? null,
+    signal: composed.signal,
     headers: {},
   };
 
@@ -132,7 +211,23 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`/api${path}`, init);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, init);
+  } catch (err) {
+    composed.done();
+    // Told apart from a component unmounting, which aborts the caller's signal
+    // and is not a failure to report. A timeout is, and it needs a sentence
+    // that names the connection rather than blaming the server.
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new ApiError(0, {
+        error: "upstream_failed",
+        detail: "The connection is not answering. Check your signal and try again.",
+      });
+    }
+    throw err;
+  }
+  composed.done();
 
   if (res.status === 204) return undefined as T;
 
@@ -160,5 +255,9 @@ export const api = {
   patch: <T>(path: string, body: unknown) => apiFetch<T>(path, { method: "PATCH", body }),
   put: <T>(path: string, body: unknown) => apiFetch<T>(path, { method: "PUT", body }),
   del: <T>(path: string) => apiFetch<T>(path, { method: "DELETE" }),
-  upload: <T>(path: string, form: FormData) => apiFetch<T>(path, { method: "POST", form }),
+  // No timeout. A photo straight off a phone camera is several megabytes over
+  // cellular, and cutting that off at twenty seconds would cancel an upload
+  // that is progressing perfectly well.
+  upload: <T>(path: string, form: FormData) =>
+    apiFetch<T>(path, { method: "POST", form, timeoutMs: 0 }),
 };

@@ -10,8 +10,11 @@ import { SaveBar } from "@/components/admin/SaveBar";
 import {
   Card,
   CardHead,
+  DRow,
+  DefinitionList,
   ErrorNote,
   Field,
+  PageColumns,
   PageHeader,
   Skeleton,
   inputClass,
@@ -129,10 +132,73 @@ function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () =>
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* `asideFirstOnMobile`, because the aside opens with a live preview of
+          the name and title being typed below it. Collapsed the old way it
+          landed last on a phone, under the keyboard, which is the one place a
+          live preview cannot do its job. The Account card rides above the
+          fields with it rather than being split out: it is two read-only lines
+          that answer the preview's own closing sentence about what a buyer
+          never sees, and separating it would cost either duplicated markup or a
+          change to the desktop rail. */}
+      <PageColumns
+        asideFirstOnMobile
+        aside={
+          <aside className="space-y-4">
+            {/* A live preview, because the fields above are abstract and this is
+                the concrete thing they add up to. */}
+            <Card>
+              <CardHead title="How you appear" />
+              {/* `items-start`, so the avatar stays level with the first line
+                  once a long job title wraps to two. */}
+              <div className="flex items-start gap-3 rounded-xl bg-mist-50 p-3">
+                <Avatar name={draft.displayName} url={draft.avatarUrl} />
+                <div className="min-w-0">
+                  {/* Wrapped on a phone, truncated in the 20rem desktop rail.
+                      This card's whole job is to show what a buyer will read,
+                      and an ellipsis shows them something they will not. */}
+                  <p className="text-[13px] font-semibold text-plum-950 [overflow-wrap:anywhere] sm:truncate">
+                    {draft.displayName || "Your name"}
+                  </p>
+                  <p className="text-[12px] text-slate-600 [overflow-wrap:anywhere] sm:truncate">
+                    {draft.title || "No job title yet"}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-[12px] leading-relaxed text-slate-600">
+                Your email address and access role are never shown to a buyer.
+              </p>
+            </Card>
+
+            <Card>
+              <CardHead title="Account" />
+              {/* `DRow` rather than a hand-rolled label-beside-value flex. The
+                  old one truncated the address, and a work email is exactly the
+                  kind of value that has no shorter form: at 360px the row had
+                  about 236px for it, so the one fact this card exists to show
+                  was the part that got cut. */}
+              <DefinitionList>
+                <DRow label="Email">{user.email}</DRow>
+                <DRow label="Role">{user.role}</DRow>
+              </DefinitionList>
+              <p className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600">
+                Only an owner or developer can change these, from Team.
+              </p>
+            </Card>
+          </aside>
+        }
+      >
         <div className="space-y-4">
           <Card className="space-y-4">
-            <Field label="Photo" hint="A clear headshot. Buyers reply more often to a face.">
+            {/* `as="group"`, not a label. ImagePicker owns a hidden file
+                input, and a bare label forwards a tap on any of its own
+                whitespace to the first labelable descendant, so tapping the
+                hint line, the headshot, or the counter under it opened the
+                camera roll. */}
+            <Field
+              label="Photo"
+              hint="A clear headshot. Buyers reply more often to a face."
+              as="group"
+            >
               <ImagePicker
                 value={draft.avatarUrl ? [draft.avatarUrl] : []}
                 onChange={(urls) => set("avatarUrl", urls[0] ?? "")}
@@ -146,6 +212,7 @@ function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () =>
             <Field label="Display name">
               <input
                 className={inputClass}
+                autoComplete="name"
                 value={draft.displayName}
                 onChange={(event) => set("displayName", event.target.value)}
               />
@@ -153,60 +220,29 @@ function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () =>
             <Field label="Job title" hint="The line under your name. Not your access role.">
               <input
                 className={inputClass}
+                autoComplete="organization-title"
                 value={draft.title}
                 placeholder="Senior Property Consultant"
                 onChange={(event) => set("title", event.target.value)}
               />
             </Field>
             <Field label="Phone" hint="Shown on listings you own. Never shown in a chat.">
+              {/* `tel` on both counts. The value is digits, a plus and spaces,
+                  so the alphabetic keyboard is slower and a source of typos in a
+                  number that goes out on public listings, and the autofill token
+                  lets a phone offer the one the account already knows. */}
               <input
                 className={inputClass}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={draft.phone}
                 onChange={(event) => set("phone", event.target.value)}
               />
             </Field>
           </Card>
         </div>
-
-        <aside className="space-y-4">
-          {/* A live preview, because the fields above are abstract and this is
-              the concrete thing they add up to. */}
-          <Card>
-            <CardHead title="How you appear" />
-            <div className="flex items-center gap-3 rounded-xl bg-mist-50 p-3">
-              <Avatar name={draft.displayName} url={draft.avatarUrl} />
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold text-plum-950">
-                  {draft.displayName || "Your name"}
-                </p>
-                <p className="truncate text-[12px] text-slate-600">
-                  {draft.title || "No job title yet"}
-                </p>
-              </div>
-            </div>
-            <p className="mt-3 text-[12px] leading-relaxed text-slate-600">
-              Your email address and access role are never shown to a buyer.
-            </p>
-          </Card>
-
-          <Card>
-            <CardHead title="Account" />
-            <dl className="space-y-1.5 text-[13px]">
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-slate-600">Email</dt>
-                <dd className="truncate font-medium text-plum-950">{user.email}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-slate-600">Role</dt>
-                <dd className="font-medium text-plum-950">{user.role}</dd>
-              </div>
-            </dl>
-            <p className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600">
-              Only an owner or developer can change these, from Team.
-            </p>
-          </Card>
-        </aside>
-      </div>
+      </PageColumns>
     </>
   );
 }

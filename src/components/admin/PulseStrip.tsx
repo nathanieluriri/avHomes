@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { SitePulse } from "@avhomes/contracts";
 
@@ -21,6 +21,11 @@ import type { SitePulse } from "@avhomes/contracts";
  *  3. **No trend is invented.** With nothing in the previous window there is no
  *     percentage to state, so it says "first traffic in this window" instead of
  *     dividing by zero and printing an arrow.
+ *
+ * Rule 1 is also why BOTH tiles open the panel and why the scope now lives in
+ * the panel's footnote rather than in a `title`. A tooltip does not exist on a
+ * touch screen, so on a phone the number labelled "Live visitors" had its
+ * definition nowhere on the device.
  */
 
 const OPEN_KEY = "avhomes.console.sessions-open";
@@ -55,20 +60,31 @@ export function PulseStrip({ pulse }: { pulse: SitePulse }) {
   }
 
   const trend = trendOf(pulse.sessions, pulse.previousSessions);
+  const panelId = useId();
 
   return (
     <div className="flex flex-col items-center">
-      <div className="flex items-stretch gap-1 rounded-xl bg-white p-1 shadow-card">
+      {/*
+        The strip is full width and WRAPPING below sm, and its two tiles share
+        the row rather than sitting at their content widths. As a non-shrinking
+        pill it measured about 320px inside a 328px content column: it fit at
+        360px by eight pixels, and a five figure session count or a longer label
+        pushed it past the column. On a `fixed inset-0` frame that is not a
+        clipped pill, it is the whole console scrolling sideways with no way to
+        scroll back.
+      */}
+      <div className="flex w-full flex-wrap items-stretch gap-1 rounded-xl bg-white p-1 shadow-card sm:w-auto sm:flex-nowrap">
         <button
           type="button"
           onClick={toggle}
           aria-expanded={open}
+          aria-controls={panelId}
           title="Visitors who accepted analytics cookies, over the last 30 days"
-          className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-left transition-colors ${
+          className={`flex min-w-0 grow basis-36 items-center gap-3 rounded-lg px-3 py-1.5 text-left transition-colors sm:grow-0 sm:basis-auto ${
             open ? "bg-mist-100" : "hover:bg-mist-50"
           }`}
         >
-          <span>
+          <span className="min-w-0">
             {/* The window is on the label, not only inside the panel. A bare
                 "Sessions" is a claim about all traffic for all time, and this
                 figure is neither. */}
@@ -80,18 +96,29 @@ export function PulseStrip({ pulse }: { pulse: SitePulse }) {
             </span>
           </span>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 text-slate-550 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`ml-auto h-4 w-4 shrink-0 text-slate-550 transition-transform sm:ml-0 ${open ? "rotate-180" : ""}`}
             aria-hidden="true"
           />
         </button>
 
-        <span className="my-1.5 w-px bg-mist-200" aria-hidden="true" />
+        {/* A vertical rule between two tiles that have wrapped onto separate
+            rows is drawing a column that is not there. */}
+        <span className="my-1.5 hidden w-px bg-mist-200 sm:block" aria-hidden="true" />
 
-        <div
-          className="flex items-center gap-2.5 px-3 py-1.5"
+        {/* The live tile opens the same panel, because the panel's footnote is
+            now the only place either number is defined and the sessions toggle
+            was the only way in. */}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className={`flex min-w-0 grow basis-36 items-center gap-2.5 rounded-lg px-3 py-1.5 text-left transition-colors sm:grow-0 sm:basis-auto ${
+            open ? "bg-mist-100" : "hover:bg-mist-50"
+          }`}
           title="Browser tabs that beaconed in the last five minutes"
         >
-          <span>
+          <span className="min-w-0">
             <span className="block text-[11px] font-medium text-slate-600">
               Live visitors <span className="text-slate-550">· now</span>
             </span>
@@ -99,12 +126,14 @@ export function PulseStrip({ pulse }: { pulse: SitePulse }) {
               {pulse.live}
             </span>
           </span>
-          <LiveDot count={pulse.live} />
-        </div>
+          <span className="ml-auto flex items-center sm:ml-0">
+            <LiveDot count={pulse.live} />
+          </span>
+        </button>
       </div>
 
       {open && (
-        <div className="mt-2 w-full max-w-2xl rounded-2xl bg-white p-4 shadow-card sm:p-5">
+        <div id={panelId} className="mt-2 w-full max-w-2xl rounded-2xl bg-white p-4 shadow-card sm:p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <div>
               <h2 className="text-sm font-semibold text-plum-950">Sessions over time</h2>
@@ -125,9 +154,13 @@ export function PulseStrip({ pulse }: { pulse: SitePulse }) {
 
           <Sparkline series={pulse.series} />
 
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-550">
+          {/* Both tiles are defined here, in copy. The live figure used to be
+              explained only by a `title` tooltip, which is nothing at all on a
+              phone. */}
+          <p className="mt-2 text-[12px] leading-relaxed text-slate-550 sm:text-[11px]">
             The last 30 days, counted from visitors who accepted analytics cookies. A session is
-            one browser tab, and it stops counting as live five minutes after its last page view.
+            one browser tab. Live is the tabs that beaconed in the last five minutes, and a tab
+            stops counting five minutes after its last page view.
           </p>
         </div>
       )}
@@ -184,10 +217,11 @@ function yFor(value: number, scale: number): number {
  * auto-scales to its own peak, so without a labelled maximum a single session
  * draws exactly the same full-height cliff as a thousand: the shape says surge
  * and the number says one, and nothing on screen reconciles them. Three
- * gridlines and three labels cost one row of 10px text and make the shape
+ * gridlines and three labels cost one row of small text and make the shape
  * readable.
  *
- * Reading a single day is a hover or an arrow key, not a guess from the line.
+ * Reading a single day is a hover, a drag or an arrow key, not a guess from the
+ * line.
  */
 function Sparkline({ series }: { series: SitePulse["series"] }) {
   const W = 300;
@@ -247,6 +281,12 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
     setCursor(Math.max(0, Math.min(series.length - 1, index)));
   }
 
+  /** Where along the chart box an x coordinate falls, as a day. */
+  function readAt(clientX: number, box: DOMRect) {
+    if (box.width === 0) return;
+    moveTo(Math.round(((clientX - box.left) / box.width) * (series.length - 1)));
+  }
+
   return (
     <figure className="mt-3">
       <figcaption className="sr-only">
@@ -258,7 +298,7 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
       {/* The readout sits above the chart rather than floating over it: a
           tooltip that follows the pointer cannot be reached by a keyboard, and
           this line is the same object for both. */}
-      <p className="mb-1 h-4 text-[11px] text-slate-600" aria-live="polite">
+      <p className="mb-1 h-5 text-[12px] text-slate-600 sm:h-4 sm:text-[11px]" aria-live="polite">
         {active ? (
           <>
             <span className="font-semibold text-plum-950">{dayLabel(active.day)}</span>
@@ -267,18 +307,21 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
             {active.sessions === 1 ? " session" : " sessions"}
           </>
         ) : (
-          <span className="text-slate-550">Hover or arrow along the line for a day.</span>
+          <span className="text-slate-550">
+            <span className="sm:hidden">Drag along the line for a day.</span>
+            <span className="hidden sm:inline">Hover or arrow along the line for a day.</span>
+          </span>
         )}
       </p>
 
       <div className="flex items-stretch gap-2">
         {/* The axis. Without it the line's height means nothing: it always
             reaches the top, whatever the peak is. */}
-        <div className="relative w-9 shrink-0" aria-hidden="true">
+        <div className="relative w-10 shrink-0 sm:w-9" aria-hidden="true">
           {rules.map((rule) => (
             <span
               key={rule.value}
-              className="c-num absolute right-0 -translate-y-1/2 text-[10px] tabular-nums text-slate-550"
+              className="c-num absolute right-0 -translate-y-1/2 text-[11px] tabular-nums text-slate-550 sm:text-[10px]"
               style={{ top: `${rule.top}%` }}
             >
               {rule.value.toLocaleString("en-GB")}
@@ -286,14 +329,28 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
           ))}
         </div>
 
+        {/*
+          Three ways in, one readout. `touch-pan-y` is what makes the touch pair
+          safe: a drag ACROSS the chart reads days, a drag DOWN it still scrolls
+          the console. It has to be declared rather than handled, because React
+          registers touchmove passively and `preventDefault` there does nothing.
+
+          Unlike the mouse, a lift does NOT clear the reading. A finger covers
+          the day it is asking about, and a pointer leaving the box means "done
+          reading" where lifting a thumb means "let me look". The value that
+          stays carries its own date, so it cannot be misread as today.
+        */}
         <div
-          className="relative min-w-0 flex-1"
+          className="relative min-w-0 flex-1 touch-pan-y"
           onMouseLeave={() => setCursor(null)}
-          onMouseMove={(event) => {
-            const box = event.currentTarget.getBoundingClientRect();
-            if (box.width === 0) return;
-            const ratio = (event.clientX - box.left) / box.width;
-            moveTo(Math.round(ratio * (series.length - 1)));
+          onMouseMove={(event) => readAt(event.clientX, event.currentTarget.getBoundingClientRect())}
+          onTouchStart={(event: React.TouchEvent<HTMLDivElement>) => {
+            const touch = event.touches[0];
+            if (touch) readAt(touch.clientX, event.currentTarget.getBoundingClientRect());
+          }}
+          onTouchMove={(event: React.TouchEvent<HTMLDivElement>) => {
+            const touch = event.touches[0];
+            if (touch) readAt(touch.clientX, event.currentTarget.getBoundingClientRect());
           }}
         >
           {rules.map((rule) => (
@@ -384,7 +441,9 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
         </div>
       </div>
 
-      <div className="ml-11 mt-1 flex justify-between text-[11px] text-slate-550">
+      {/* Indented past the axis gutter plus its gap, so the first date sits
+          under the start of the line rather than under the numbers. */}
+      <div className="ml-12 mt-1 flex justify-between text-[11px] text-slate-550 sm:ml-11">
         <span>{dayLabel(first)}</span>
         <span>{dayLabel(last)}</span>
       </div>

@@ -27,6 +27,14 @@ import { StorefrontCard } from "@/components/admin/StorefrontCard";
  * the site, what does the site look like right now, and what is worth doing
  * next.
  *
+ * BELOW `sm` IT ANSWERS THEM IN THE OPPOSITE ORDER, and the word launcher is
+ * why. On a desk the pulse and the storefront are a glance on the way past. On
+ * a 360px screen they are a strip, then a picture of the homepage, and the
+ * first thing a finger can actually go somewhere with started 700px down: two
+ * screens of scroll past two things nobody can touch, to reach the thing the
+ * page exists for. So the destinations come first there and the briefing
+ * follows them, by `order` on the flex column rather than by two markups.
+ *
  * The destination cards carry live counts in their kicker, which is what turns
  * a menu into a briefing. "Enquiries" reads "Enquiries" on a quiet day and
  * "3 new" when there is something to answer, without adding a badge, a bell, or
@@ -115,7 +123,10 @@ export default function DashboardPage() {
   const firstName = user?.displayName.trim().split(/\s+/)[0] ?? "";
 
   return (
-    <div className="space-y-8">
+    /* A flex column rather than `space-y-8`, so the loaded branch below can put
+       the destinations first on a phone with `order` and leave the desktop
+       sequence exactly as it is. The two produce the same 32px rhythm. */
+    <div className="flex flex-col gap-8">
       {/*
         A greeting above the banner, even when nothing loaded. A screen whose
         whole body is a red box has thrown away every landmark on it, and the
@@ -125,7 +136,9 @@ export default function DashboardPage() {
       {error && (
         <div className="space-y-4">
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-plum-950">
+            {/* 20px on a phone. Centred at 24px this ran to three lines and
+                read as a banner rather than a title. */}
+            <h1 className="text-xl font-bold tracking-tight text-plum-950 sm:text-2xl">
               {firstName ? `${firstName}, something is not answering` : "Something is not answering"}
             </h1>
             <p className="mt-1 text-[13px] text-slate-600">
@@ -153,13 +166,17 @@ export default function DashboardPage() {
 
       {data && user && (
         <>
-          <PulseStrip pulse={data.pulse} />
+          <div className="order-2 sm:order-1">
+            <PulseStrip pulse={data.pulse} />
+          </div>
 
-          <StorefrontCard user={user} />
+          <div className="order-3 sm:order-2">
+            <StorefrontCard user={user} />
+          </div>
 
-          <section>
+          <section className="order-1 sm:order-3">
             <div className="mb-4 text-center">
-              <h1 className="text-2xl font-bold tracking-tight text-plum-950">
+              <h1 className="text-xl font-bold tracking-tight text-plum-950 sm:text-2xl">
                 {firstName ? `${firstName}, what` : "What"} do you want to work on next?
               </h1>
               <p className="mt-1 text-[13px] text-slate-600">
@@ -174,14 +191,20 @@ export default function DashboardPage() {
             </div>
           </section>
 
+          {/* `order-4` explicitly: the three above it carry orders 1 to 3, and
+              an unordered item defaults to 0, which would have put the inbox
+              card at the top of the phone layout. */}
           {hasDomain(user.role, "enquiries") && (
-            <Card>
+            <Card className="order-4">
               <div className="mb-3 flex items-center gap-2">
                 <Inbox className="h-4 w-4 shrink-0 text-slate-550" aria-hidden="true" />
                 <h2 className="text-sm font-semibold text-plum-950">Latest enquiries</h2>
                 <Link
                   href="/admin/enquiries"
-                  className="ml-auto text-[12px] font-semibold text-wine-600 hover:text-wine-700"
+                  /* A real box below sm, pulled right by its own padding so it
+                     still sits flush with the card edge. This is the card's
+                     only navigation and it was an 84 by 16px run of text. */
+                  className="-mr-2 ml-auto inline-flex h-11 items-center rounded-lg px-2 text-[13px] font-semibold text-wine-600 hover:text-wine-700 sm:mr-0 sm:h-auto sm:px-0 sm:text-[12px]"
                 >
                   Open the inbox
                 </Link>
@@ -192,18 +215,33 @@ export default function DashboardPage() {
                   Nothing yet. The contact form on the site feeds this.
                 </p>
               ) : (
+                /*
+                  The row is a LINK, and below sm the meta drops to a second
+                  line. As a static row it showed who wrote in, truncated the
+                  name to about 160px once the timestamp and the badge had taken
+                  their share, and then refused the tap: the only way into any of
+                  these was the link in the card head. A full name on its own
+                  line and a 44px row fixes both at once.
+                */
                 <ul className="divide-y divide-mist-100">
                   {data.recentEnquiries.map((enquiry) => (
-                    <li key={enquiry.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-plum-950">
-                        {enquiry.name}
-                      </span>
-                      <span className="c-num shrink-0 text-[12px] text-slate-600">
-                        {relative(enquiry.createdAt)}
-                      </span>
-                      <Badge tone={enquiry.status === "new" ? "wine" : "neutral"}>
-                        {enquiry.status}
-                      </Badge>
+                    <li key={enquiry.id} className="first:[&>a]:pt-0 last:[&>a]:pb-0">
+                      <Link
+                        href={`/admin/enquiries/${enquiry.id}`}
+                        className="flex min-h-11 flex-col items-start justify-center gap-0.5 py-2 transition-colors active:bg-mist-50 sm:min-h-0 sm:flex-row sm:items-center sm:gap-3"
+                      >
+                        <span className="w-full text-[13px] font-medium text-plum-950 sm:w-auto sm:min-w-0 sm:flex-1 sm:truncate">
+                          {enquiry.name}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="c-num text-[12px] text-slate-600">
+                            {relative(enquiry.createdAt)}
+                          </span>
+                          <Badge tone={enquiry.status === "new" ? "wine" : "neutral"}>
+                            {enquiry.status}
+                          </Badge>
+                        </span>
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -226,28 +264,50 @@ function DestinationCard({ item, data }: { item: Destination; data: Dashboard | 
   // state to advertise, and an invented kicker would be worse than none.
   const kicker = data ? item.kicker(data) : null;
   return (
+    /*
+      Two shapes. Stacked and roomy from sm up, where five of these are a grid
+      and the body copy is what turns a menu into a briefing. Horizontal and
+      tighter below it, where the same five are a single column: at `p-5` around
+      a 36px tile with three lines under it they came to 780px of scroll, which
+      is the launcher costing more to read than the screens it launches.
+
+      The pressed states are not decoration either. Every affordance here was a
+      hover, and a hover never fires on a thumb, so a tap produced no feedback at
+      all until the next route painted and the operator tapped again. The lift is
+      the one thing kept behind a real hover query, because a sticky :hover after
+      a tap strands the card half a step off the grid.
+    */
     <Link
       href={item.href}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-card transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-wine-50/40 ${
+      className={`group relative flex flex-row items-start gap-3 overflow-hidden rounded-2xl bg-white p-4 shadow-card transition-[transform,background-color] duration-200 hover:bg-wine-50/40 active:bg-wine-50/70 sm:flex-col sm:items-stretch sm:gap-0 sm:p-5 [@media(hover:hover)]:hover:-translate-y-0.5 ${
         item.wide ? "sm:col-span-2" : ""
       }`}
     >
-      <span className="mb-3 grid h-9 w-9 place-items-center rounded-xl bg-wine-50 text-wine-600 transition-colors group-hover:bg-wine-600 group-hover:text-white">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-wine-50 text-wine-600 transition-colors group-hover:bg-wine-600 group-hover:text-white group-active:bg-wine-600 group-active:text-white sm:mb-3">
         <item.icon className="h-[18px] w-[18px]" aria-hidden="true" />
       </span>
 
-      <span className="flex items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-550">
-          {item.label}
+      {/* The arrow is absolutely positioned at the top right, so the text column
+          keeps clear of it on the horizontal shape. */}
+      <span className="flex min-w-0 flex-1 flex-col pr-6 sm:contents sm:pr-0">
+        <span className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-550">
+            {item.label}
+          </span>
+          {kicker && <Badge tone="wine">{kicker}</Badge>}
         </span>
-        {kicker && <Badge tone="wine">{kicker}</Badge>}
+
+        <span className="mt-1 text-sm font-semibold text-plum-950">{item.title}</span>
+        {/* Orientation copy earns its space in a three column grid and costs a
+            screen of scroll in a single column one, so a phone gets two lines
+            of it rather than none. */}
+        <span className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-slate-600 sm:line-clamp-none">
+          {item.body}
+        </span>
       </span>
 
-      <span className="mt-1 text-sm font-semibold text-plum-950">{item.title}</span>
-      <span className="mt-1 text-[13px] leading-relaxed text-slate-600">{item.body}</span>
-
       <ArrowRight
-        className="absolute right-4 top-5 h-4 w-4 text-mist-300 transition-[color,transform] duration-200 group-hover:translate-x-0.5 group-hover:text-wine-600"
+        className="absolute right-4 top-4 h-4 w-4 text-mist-300 transition-[color,transform] duration-200 group-hover:translate-x-0.5 group-hover:text-wine-600 group-active:text-wine-600 sm:top-5"
         aria-hidden="true"
       />
     </Link>
@@ -273,25 +333,46 @@ function summarise(data: Dashboard): string {
  */
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8" aria-live="polite" aria-busy="true">
+    /* The same flex column and the same `order` as the loaded screen, or the
+       arrival would reshuffle the page as well as fill it. */
+    <div className="flex flex-col gap-8" aria-live="polite" aria-busy="true">
       <span className="sr-only">Loading the dashboard</span>
-      <Skeleton className="mx-auto h-14 w-64 rounded-xl" />
-      {/* The same aspect ratio the preview uses, plus its header row, so the
-          card does not double in height the moment the data lands. A skeleton
-          that lies about its size turns the rise into a reflow. */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-card">
-        <Skeleton className="h-12 w-full rounded-none" />
-        <Skeleton className="w-full rounded-none" style={{ aspectRatio: "1280 / 820" }} />
+      {/* `max-w-64` rather than `w-64`. A fixed 256px block sits 32px from the
+          content column at 360px and overflows it outright at 320px, so the
+          loading state briefly gave the console a horizontal scrollbar. */}
+      <Skeleton className="order-2 mx-auto h-14 w-full max-w-64 rounded-xl sm:order-1" />
+
+      {/*
+        The shape the storefront card will land in, at both widths, because a
+        skeleton that lies about its size turns the rise into a reflow. The
+        header is two stacked rows on a phone and one from sm up. Under it the
+        phone reserves the 44px button that offers the preview, and sm up
+        reserves the frame itself: from 640px the card is at least 592px wide,
+        which is always the 1280 by 820 desktop frame rather than the phone one.
+      */}
+      <div className="order-3 overflow-hidden rounded-2xl bg-white shadow-card sm:order-2">
+        <Skeleton className="h-[5.25rem] w-full rounded-none sm:h-12" />
+        <Skeleton className="h-11 w-full rounded-none sm:aspect-[1280/820] sm:h-auto" />
       </div>
-      <div>
-        <Skeleton className="mx-auto mb-4 h-8 w-80 rounded-lg" />
+
+      <div className="order-1 sm:order-3">
+        <Skeleton className="mx-auto mb-4 h-8 w-full max-w-80 rounded-lg" />
+        {/* Three below sm, five from sm up. Five phone-shaped cards is still
+            two screens of shimmer for a page whose data is a handful of
+            counts, and the two that never paint are the two nobody waits for. */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 5 }, (_, index) => (
-            <Skeleton key={index} className={`h-44 rounded-2xl ${index === 0 ? "sm:col-span-2" : ""}`} />
+            <Skeleton
+              key={index}
+              className={`h-28 rounded-2xl sm:h-44 ${index > 2 ? "hidden sm:block" : ""} ${
+                index === 0 ? "sm:col-span-2" : ""
+              }`}
+            />
           ))}
         </div>
       </div>
-      <Skeleton className="h-28 w-full rounded-2xl" />
+
+      <Skeleton className="order-4 h-28 w-full rounded-2xl" />
     </div>
   );
 }

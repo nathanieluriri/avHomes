@@ -19,8 +19,10 @@ import {
   Card,
   CardHead,
   ErrorNote,
+  PageColumns,
   PageHeader,
   Skeleton,
+  inputClass,
   type Tone,
 } from "@/components/admin/ui";
 
@@ -63,13 +65,23 @@ export default function EnquiryDetailPage() {
     return (
       <>
         <PageHeader icon={Inbox} backTo="/admin/enquiries" backLabel="Enquiries" title="Enquiry" />
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]" aria-busy="true">
+        {/* The same columns and the same `asideFirstOnMobile` as the screen it
+            is waiting for, so contact and status do not swap places with the
+            thread the moment the data lands. */}
+        <div aria-busy="true">
           <span className="sr-only">Loading this enquiry</span>
-          <Skeleton className="h-64 rounded-2xl" />
-          <div className="space-y-4">
-            <Skeleton className="h-40 rounded-2xl" />
-            <Skeleton className="h-32 rounded-2xl" />
-          </div>
+          <PageColumns
+            asideFirstOnMobile
+            asideWidth="18rem"
+            aside={
+              <div className="space-y-4">
+                <Skeleton className="h-40 rounded-2xl" />
+                <Skeleton className="h-32 rounded-2xl" />
+              </div>
+            }
+          >
+            <Skeleton className="h-64 rounded-2xl" />
+          </PageColumns>
         </div>
       </>
     );
@@ -165,7 +177,121 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      {/* `asideFirstOnMobile`. The aside holds the two things anybody opens an
+          enquiry to do: ring the buyer, and say what happened to it. Below `lg`
+          the old grid put both of them after the whole thread and a four-row
+          note box, so the phone number was the last thing on the screen. */}
+      <PageColumns
+        asideFirstOnMobile
+        asideWidth="18rem"
+        aside={
+          <aside className="space-y-4">
+            <Card>
+              <CardHead title="Contact" />
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-wine-50 text-[11px] font-bold text-wine-700">
+                  {initials(enquiry.name)}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-semibold text-plum-950">
+                    {enquiry.name}
+                  </span>
+                </span>
+              </div>
+
+              {/* Real rows below `sm`. The `tel:` link dials the buyer, which is
+                  the single most valuable control in the console on a phone, and
+                  it was a 32px strip with a 14px glyph in it. */}
+              <div className="mt-3 space-y-1.5">
+                <a
+                  href={`mailto:${enquiry.email}`}
+                  className="flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-wine-700 transition-colors hover:bg-wine-50 sm:min-h-0 sm:gap-2 sm:py-1.5"
+                >
+                  <Mail className="h-4 w-4 shrink-0 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                  <span className="truncate">{enquiry.email}</span>
+                </a>
+                {enquiry.phone && (
+                  <a
+                    href={`tel:${enquiry.phone}`}
+                    className="flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-wine-700 transition-colors hover:bg-wine-50 sm:min-h-0 sm:gap-2 sm:py-1.5"
+                  >
+                    <Phone className="h-4 w-4 shrink-0 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                    <span className="truncate">{enquiry.phone}</span>
+                  </a>
+                )}
+              </div>
+            </Card>
+
+            {enquiry.propertySlug && (
+              <Card>
+                <CardHead title="About" />
+                {/* A navigation control, so it is drawn as one below `sm` rather
+                    than as a run of body text. The negative margin keeps it
+                    optically flush with the heading above it. */}
+                <a
+                  href={`/listings/${enquiry.propertySlug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="-mx-2 flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-wine-600 hover:bg-wine-50 hover:text-wine-700 sm:mx-0 sm:min-h-0 sm:px-0 sm:hover:bg-transparent"
+                >
+                  <span className="truncate">{enquiry.propertySlug}</span>
+                  <ArrowUpRight className="h-4 w-4 shrink-0 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                </a>
+                <p className="mt-1 text-[12px] text-slate-600">
+                  They were reading this listing when they wrote in.
+                </p>
+              </Card>
+            )}
+
+            <Card>
+              <CardHead title="Status" />
+              {/* Only the moves that are not where it already is. A button that
+                  sets the status it already has is a click that does nothing. */}
+              {/* Ghost buttons, the same control the listing and post editors use
+                  for the same class of action, with the sentence underneath
+                  rather than beside so the pill keeps its shape.
+
+                  A stacked full-width grid below `sm`. Three 32px pills 8px
+                  apart is where a tap meant for Closed lands on Spam, and Spam
+                  is the move nobody wants to make by accident. */}
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                {ENQUIRY_STATUSES.filter((status) => status !== enquiry.status).map((status) => (
+                  <Button
+                    key={status}
+                    variant="ghost"
+                    className="w-full sm:w-auto"
+                    disabled={busy}
+                    onClick={() => void patch({ status })}
+                    title={MOVES[status]}
+                  >
+                    {humanise(status)}
+                  </Button>
+                ))}
+              </div>
+              {/* Each button carries its own meaning, so the sentence under them
+                  does not try to gloss a subset. Assembling one from two picked
+                  statuses produced copy that named Spam after Spam had been
+                  chosen and never mentioned Closed at all. */}
+              <dl className="mt-3 space-y-1 border-t border-mist-100 pt-3">
+                {ENQUIRY_STATUSES.filter((status) => status !== enquiry.status).map((status) => (
+                  <div key={status} className="flex gap-2 text-[12px]">
+                    <dt className="w-14 shrink-0 font-semibold text-slate-600">
+                      {humanise(status)}
+                    </dt>
+                    <dd className="min-w-0 flex-1 text-slate-600">{MOVES[status]}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              {enquiry.handledByName && (
+                <p className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600">
+                  Last moved by {enquiry.handledByName}
+                </p>
+              )}
+            </Card>
+          </aside>
+        }
+      >
         <div className="space-y-4">
           {/* The thread replaces the old single-message card. A chat renders as
               a conversation with a reply box; a form enquiry still renders as
@@ -177,111 +303,19 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
             <p className="mb-2 text-[12px] text-slate-600">
               Only the team sees this. It is never sent to the person who wrote in.
             </p>
+            {/* The drag-to-resize corner does not answer to a finger, so below
+                `sm` the box is simply the size it is and the save bar is the
+                workflow. */}
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
               rows={4}
               placeholder="What was agreed, what is outstanding, who is picking it up."
-              className="w-full resize-y rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-550 focus:border-wine-500"
+              className={`${inputClass} resize-none sm:resize-y`}
             />
           </Card>
         </div>
-
-        <aside className="space-y-4">
-          <Card>
-            <CardHead title="Contact" />
-            <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-wine-50 text-[11px] font-bold text-wine-700">
-                {initials(enquiry.name)}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-[13px] font-semibold text-plum-950">
-                  {enquiry.name}
-                </span>
-              </span>
-            </div>
-
-            <div className="mt-3 space-y-1.5">
-              <a
-                href={`mailto:${enquiry.email}`}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-wine-700 transition-colors hover:bg-wine-50"
-              >
-                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{enquiry.email}</span>
-              </a>
-              {enquiry.phone && (
-                <a
-                  href={`tel:${enquiry.phone}`}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-wine-700 transition-colors hover:bg-wine-50"
-                >
-                  <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{enquiry.phone}</span>
-                </a>
-              )}
-            </div>
-          </Card>
-
-          {enquiry.propertySlug && (
-            <Card>
-              <CardHead title="About" />
-              <a
-                href={`/listings/${enquiry.propertySlug}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 text-[13px] font-medium text-wine-600 hover:text-wine-700"
-              >
-                <span className="truncate">{enquiry.propertySlug}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              </a>
-              <p className="mt-1 text-[12px] text-slate-600">
-                They were reading this listing when they wrote in.
-              </p>
-            </Card>
-          )}
-
-          <Card>
-            <CardHead title="Status" />
-            {/* Only the moves that are not where it already is. A button that
-                sets the status it already has is a click that does nothing. */}
-            {/* Ghost buttons, the same control the listing and post editors use
-                for the same class of action, with the sentence underneath
-                rather than beside so the pill keeps its shape. */}
-            <div className="flex flex-wrap gap-2">
-              {ENQUIRY_STATUSES.filter((status) => status !== enquiry.status).map((status) => (
-                <Button
-                  key={status}
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => void patch({ status })}
-                  title={MOVES[status]}
-                >
-                  {humanise(status)}
-                </Button>
-              ))}
-            </div>
-            {/* Each button carries its own meaning, so the sentence under them
-                does not try to gloss a subset. Assembling one from two picked
-                statuses produced copy that named Spam after Spam had been
-                chosen and never mentioned Closed at all. */}
-            <dl className="mt-3 space-y-1 border-t border-mist-100 pt-3">
-              {ENQUIRY_STATUSES.filter((status) => status !== enquiry.status).map((status) => (
-                <div key={status} className="flex gap-2 text-[12px]">
-                  <dt className="w-14 shrink-0 font-semibold text-slate-600">
-                    {humanise(status)}
-                  </dt>
-                  <dd className="min-w-0 flex-1 text-slate-600">{MOVES[status]}</dd>
-                </div>
-              ))}
-            </dl>
-
-            {enquiry.handledByName && (
-              <p className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600">
-                Last moved by {enquiry.handledByName}
-              </p>
-            )}
-          </Card>
-        </aside>
-      </div>
+      </PageColumns>
     </>
   );
 }

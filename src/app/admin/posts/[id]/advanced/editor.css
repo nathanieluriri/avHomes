@@ -706,11 +706,20 @@
 }
 
 /*
- * A coarse pointer cannot hover, so the grip would be permanently invisible and
- * permanently in the way. Alt+Up and Alt+Down still move a block, which is what
- * makes removing this safe rather than a regression.
+ * Two reasons to take the grip away, and the second one has nothing to do with
+ * touch. A coarse pointer cannot hover, so the grip would be permanently
+ * invisible and permanently in the way. A narrow WINDOW cannot hold it at all:
+ * it is placed into `.adv__page`'s side gutter, which is 20px, and a 24px
+ * control in a 20px gutter is drawn over the first characters of the paragraph
+ * it belongs to. The old rule asked only the pointer question, so a 400px
+ * desktop window kept a handle in a gutter with no room for it.
+ *
+ * What answers the missing grip is the gate, not a keystroke: dragging is the
+ * reason this studio asks for a wider window AND a fine pointer before it opens
+ * at all, so neither branch of this rule can strand a reader who got in. The
+ * simple editor it sends everyone else to does every other part of the job.
  */
-@media (pointer: coarse) {
+@media (pointer: coarse), (max-width: 47.99rem) {
   .draghandle {
     display: none;
   }
@@ -730,6 +739,11 @@
   border-left: 1px solid var(--mist-200);
   box-shadow: -12px 0 32px rgba(11, 26, 51, 0.1);
   padding: 1.25rem;
+  /* The panel is pinned to `bottom: 0`, so on any device with a home indicator
+     the last row of the details list and the last revision in the history sit
+     under the gesture strip, where a tap is swallowed by the system swipe. An
+     iPad in landscape clears the studio's own lg gate and still has one. */
+  padding-bottom: calc(1.25rem + var(--safe-b));
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 

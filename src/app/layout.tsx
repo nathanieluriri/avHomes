@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Spectral, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -31,6 +31,33 @@ export const metadata: Metadata = {
   title: "AVHomes | Buy. Sell. Rent.",
   description:
     "AVHomes lists vetted homes across Lagos and Abuja, backed by the build quality of AV Constructions.",
+};
+
+/**
+ * The viewport, and two of these four values do real work on a phone.
+ *
+ * `viewportFit: "cover"` is the one everything else waits on. Without it every
+ * `env(safe-area-inset-*)` in the tree resolves to 0, so a padding written
+ * against the home indicator is not a weak fix, it is no fix at all. The
+ * console's save bar and its bottom sheets both read those insets, so this line
+ * has to exist before any of them mean anything.
+ *
+ * `interactiveWidget: "resizes-content"` makes Chromium shrink the layout
+ * viewport when the on-screen keyboard opens, which by itself puts the save bar
+ * back above the keyboard on Android. iOS does not honour it and is handled
+ * separately, by `useKeyboardInset` publishing a measured `--c-kb`.
+ *
+ * No `maximumScale` and no `userScalable: false`. Locking zoom is the usual way
+ * to dodge iOS's focus-zoom on a sub-16px input, and it pays for that by taking
+ * pinch-zoom away from everybody, permanently, on a console whose meta lines
+ * are 12px. The zoom is solved where it belongs instead, by raising input text
+ * to 16px on coarse pointers only.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 /**

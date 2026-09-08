@@ -19,8 +19,11 @@ import { lowlight } from "@/lib/blog/highlight";
 /**
  * Alt+Up and Alt+Down move the block containing the caret.
  *
- * This is the ONLY way to reorder without a pointer, which is what makes the
- * drag handle safe to hide on touch and on narrow screens.
+ * A keyboard route for someone whose hands are already on the keys, not a
+ * substitute for the grip. A touch device has no Alt key, so hiding the handle
+ * there leaves a document with no reorder path at all, which is why the studio
+ * is gated on a coarse pointer as well as on a narrow window rather than
+ * leaning on this shortcut to cover touch.
  */
 const BlockMove = Extension.create({
   name: "blockMove",
