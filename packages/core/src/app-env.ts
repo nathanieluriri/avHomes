@@ -7,9 +7,9 @@ import { UnauthenticatedError } from "./errors";
  * The Hono context typing every router in the application shares.
  *
  * `dbFactory` rather than `db`, and the difference is measurable: a request that
- * never touches the database (an unrouted path, an anonymous 401, a forged
- * origin 403) never builds a client, so its answer cannot be turned into a 500
- * by an environment it did not need.
+ * never touches the database (an unrouted path, an anonymous 401) never builds
+ * a client, so its answer cannot be turned into a 500 by an environment it did
+ * not need.
  */
 export interface AppVariables {
   requestId: string;
@@ -18,7 +18,6 @@ export interface AppVariables {
   user: AuthUser | null;
   /** The session id, so a caller can see which of its own sessions is current. */
   sessionId: string | null;
-  origins: readonly string[];
 }
 
 export type AppEnv = { Variables: AppVariables };

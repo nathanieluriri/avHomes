@@ -4,7 +4,6 @@ import { hasDomain, isAdminRole, type Domain } from "@avhomes/contracts";
 import {
   ForbiddenError,
   UnauthenticatedError,
-  configuredOrigins,
   currentDb,
   currentUser,
   isProduction,
@@ -32,9 +31,13 @@ export function setSessionCookie(
     httpOnly: true,
     secure: isProduction(),
     // Lax, not Strict. Strict means a link from an email lands the operator on a
-    // logged-out app, which is how people conclude that login is broken. Lax
-    // still withholds the cookie on every cross-site POST, and originGuard
-    // covers the top-level navigation Lax allows.
+    // logged-out app, which is how people conclude that login is broken.
+    //
+    // SINCE THE ORIGIN ALLOW-LIST WAS REMOVED THIS IS THE WHOLE CSRF STORY, so
+    // it is worth stating what it does: a browser withholds a Lax cookie on
+    // every cross-site request that is not a top-level GET navigation, which
+    // covers form posts, fetch and XHR from another site. What it does not
+    // cover is a browser that ignores SameSite entirely.
     sameSite: "Lax",
     path: "/",
     // Derived from the session's own expiry, not fixed at 30 days, so a session
@@ -46,44 +49,6 @@ export function setSessionCookie(
 
 export function clearSessionCookie(c: Context<AppEnv>): void {
   deleteCookie(c, sessionCookieName(), { path: "/" });
-}
-
-/* ────────────────────────────── origin guard ──────────────────────────── */
-
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-
-/**
- * CSRF, as an exact-match allow-list on unsafe methods.
- *
- * Three properties worth stating:
- *
- *  - **Matching is equality against a fixed list, never `endsWith`.** Anyone can
- *    deploy to `*.vercel.app`, and `https://evil-avhomes.vercel.app` ends with
- *    `avhomes.vercel.app`. Previews get their own APP_ORIGINS entry.
- *  - **An absent Origin is refused on unsafe methods.** Treating absence as
- *    permission is the hole a SameSite=Lax cookie plus a top-level form POST
- *    walks straight through. The one exemption in this app (the blob upload
- *    callback) is mounted ABOVE this guard and carries its own signed token.
- *  - **GET is allowed from anywhere.** A cross-origin GET cannot read the
- *    response without CORS headers this app does not send.
- */
-export function originGuard(origins?: readonly string[]): MiddlewareHandler<AppEnv> {
-  return async (c, next) => {
-    const allowed = origins ?? configuredOrigins();
-    c.set("origins", allowed);
-    if (SAFE_METHODS.has(c.req.method)) return next();
-
-    const origin = c.req.header("Origin");
-    if (!origin) {
-      throw new ForbiddenError("no Origin header on an unsafe method");
-    }
-    if (!allowed.includes(origin)) {
-      // The reason names the caller's own value, which is theirs already, and
-      // never the allow-list, which is ours.
-      throw new ForbiddenError(`origin ${origin} is not allowed`);
-    }
-    await next();
-  };
 }
 
 /* ──────────────────────────── session resolve ─────────────────────────── */

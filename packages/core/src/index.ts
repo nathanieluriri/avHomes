@@ -56,8 +56,7 @@ export {
   resetEnv,
   databaseConfig,
   sessionSecret,
-  configuredOrigins,
-  siteOrigin,
+  requestOrigin,
   isProduction,
   type Env,
 } from "./env";

@@ -1,4 +1,4 @@
-import { getEnv, siteOrigin } from "@avhomes/core";
+import { getEnv, requestOrigin } from "@avhomes/core";
 
 export type AuthDoor = "clerk" | "password";
 
@@ -30,9 +30,9 @@ export interface DoorStatus {
  *    need a redeploy to notice a dashboard change. Asking the server instead
  *    means the answer is always current.
  */
-export function doorStatus(): DoorStatus {
+export function doorStatus(req: { url: string }): DoorStatus {
   const env = getEnv();
-  const origin = siteOrigin();
+  const origin = requestOrigin(req);
 
   if (env.CLERK_SECRET_KEY === "") {
     return closed("CLERK_SECRET_KEY is not set");
@@ -42,7 +42,7 @@ export function doorStatus(): DoorStatus {
   }
   if (isDeployAlias(origin)) {
     return closed(
-      `Clerk keys refuse to load on a deploy alias (${origin}). Set SITE_ORIGIN to the custom domain.`,
+      `Clerk keys refuse to load on a deploy alias (${origin}). Reach the app on the custom domain the keys were issued for.`,
     );
   }
   return {
@@ -57,20 +57,22 @@ function closed(reason: string): DoorStatus {
 }
 
 /**
- * A production Clerk key is bound to a configured domain. `*.vercel.app` and
- * localhost are never that domain.
+ * A production Clerk key is bound to a configured domain, and `*.vercel.app` is
+ * never that domain. Judged from the host the request actually arrived on,
+ * which is also the host the browser would hand to Clerk, so the two cannot
+ * disagree the way a configured value could.
  */
 function isDeployAlias(origin: string): boolean {
   try {
     const host = new URL(origin).hostname;
     return host.endsWith(".vercel.app");
   } catch {
-    // An unparseable SITE_ORIGIN is a misconfiguration, and falling back to the
+    // An origin we cannot parse is a misconfiguration, and falling back to the
     // password door keeps somebody able to sign in and fix it.
     return true;
   }
 }
 
-export function activeDoor(): AuthDoor {
-  return doorStatus().door;
+export function activeDoor(req: { url: string }): AuthDoor {
+  return doorStatus(req).door;
 }

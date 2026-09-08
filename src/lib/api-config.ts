@@ -22,8 +22,6 @@
  * environment variable per environment.
  */
 export function apiBase(): string {
-  const explicit = process.env.SITE_ORIGIN ?? process.env.NEXT_PUBLIC_SITE_ORIGIN;
-  if (explicit) return explicit.replace(/\/+$/, "");
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
@@ -32,7 +30,25 @@ export function apiBase(): string {
 export const LIST_REVALIDATE = 300;
 export const DETAIL_REVALIDATE = 600;
 
-/** The canonical public origin for metadata, sitemaps and og:url. */
-export const SITE_DOMAIN =
-  process.env.NEXT_PUBLIC_SITE_ORIGIN ?? process.env.SITE_ORIGIN ?? "https://avhomes.example.com";
+/**
+ * The canonical public origin, taken from the deployment itself.
+ *
+ * NOTHING IS CONFIGURED HERE ANY MORE. Vercel publishes two hosts and the order
+ * below matters: `VERCEL_PROJECT_PRODUCTION_URL` is the STABLE production
+ * domain and is what a canonical URL, an og:url or a sitemap entry has to name,
+ * while `VERCEL_URL` is this particular deployment's own immutable host, which
+ * is right for a preview and wrong as a canonical link because it changes on
+ * every push.
+ *
+ * Synchronous on purpose. `ShareLinks` uses this as the server snapshot of a
+ * `useSyncExternalStore` whose client snapshot is `window.location.origin`, so
+ * a promise here would have to be resolved before render and the two halves
+ * would stop agreeing.
+ */
+export const SITE_DOMAIN = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : `http://localhost:${process.env.PORT ?? 3000}`;
+
 export const SITE_NAME = "AVHomes";

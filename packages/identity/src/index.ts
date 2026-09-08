@@ -26,7 +26,6 @@ export {
 } from "./schema";
 
 export {
-  originGuard,
   sessionMiddleware,
   rolePermissions,
   requireAuth,

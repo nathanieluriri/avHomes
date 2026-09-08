@@ -84,14 +84,18 @@ export function StorefrontCard({ user }: { user: AuthUser }) {
   const showPreview = !isPhone || askedForPreview;
 
   /*
-   * The badge reports what is actually known rather than always saying Live.
-   * A published origin means the storefront is reachable; without one this is a
-   * developer's machine, and a green "Live" chip over localhost is a status
-   * light wired to nothing.
+   * The storefront is wherever this console is. Nothing is configured any more,
+   * so the card reads the host out of the browser's own location rather than an
+   * environment variable that used to say "storefront not configured" on every
+   * deployment where somebody had not set it.
+   *
+   * The badge still reports what is actually known rather than always saying
+   * Live: an https origin means a real deployment, and a green "Live" chip over
+   * localhost is a status light wired to nothing.
    */
-  const origin = (process.env.NEXT_PUBLIC_SITE_ORIGIN ?? "").replace(/\/+$/, "");
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
   const published = /^https:\/\//.test(origin);
-  const domain = origin.replace(/^https?:\/\//, "") || "storefront not configured";
+  const domain = origin.replace(/^https?:\/\//, "") || "this deployment";
 
   return (
     <section className="overflow-hidden rounded-2xl bg-white shadow-card">

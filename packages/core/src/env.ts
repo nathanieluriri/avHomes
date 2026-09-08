@@ -17,16 +17,16 @@ export interface Env {
   MONGODB_URI: string;
   MONGODB_DB: string;
   SESSION_SECRET: string;
-  /** Comma-separated EXACT origins. Never a suffix match. */
-  APP_ORIGINS: string;
-  /** The canonical public origin, used for canonical URLs and invite links. */
-  SITE_ORIGIN: string;
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
-  /** "local" writes to IMAGE_LOCAL_DIR; anything else uses Vercel Blob. */
+  /** "local" writes to IMAGE_LOCAL_DIR, "blob" uses Vercel Blob, anything else
+   *  (and the default) uses Cloudinary. */
   IMAGE_STORAGE: string;
   IMAGE_LOCAL_DIR: string;
   BLOB_READ_WRITE_TOKEN: string;
+  /** cloudinary://<api_key>:<api_secret>@<cloud_name>, one string from the
+   *  Cloudinary dashboard. */
+  CLOUDINARY_URL: string;
   RESEND_API_KEY: string;
   MAIL_FROM: string;
   /** Where a new enquiry is announced. Empty means "do not send". */
@@ -47,13 +47,12 @@ export function getEnv(): Env {
     MONGODB_URI: read("MONGODB_URI"),
     MONGODB_DB: read("MONGODB_DB", "avhomes"),
     SESSION_SECRET: read("SESSION_SECRET"),
-    APP_ORIGINS: read("APP_ORIGINS"),
-    SITE_ORIGIN: read("SITE_ORIGIN", read("NEXT_PUBLIC_SITE_ORIGIN", "http://localhost:3000")),
     CLERK_SECRET_KEY: read("CLERK_SECRET_KEY"),
     CLERK_PUBLISHABLE_KEY: read("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"),
-    IMAGE_STORAGE: read("IMAGE_STORAGE", "blob").toLowerCase(),
+    IMAGE_STORAGE: read("IMAGE_STORAGE", "cloudinary").toLowerCase(),
     IMAGE_LOCAL_DIR: read("IMAGE_LOCAL_DIR", ".uploads"),
     BLOB_READ_WRITE_TOKEN: read("BLOB_READ_WRITE_TOKEN"),
+    CLOUDINARY_URL: read("CLOUDINARY_URL"),
     RESEND_API_KEY: read("RESEND_API_KEY"),
     MAIL_FROM: read("MAIL_FROM"),
     ENQUIRY_NOTIFY_TO: read("ENQUIRY_NOTIFY_TO"),
@@ -100,29 +99,30 @@ export function sessionSecret(): string {
 }
 
 /**
- * The exact-match origin allow-list.
+ * The origin THIS REQUEST arrived on.
  *
- * SITE_ORIGIN is appended unconditionally whether or not anyone remembered to
- * put it in APP_ORIGINS, because leaving it out is not a policy decision, it is
- * a value somebody forgot to update, and the failure is silent.
+ * There is no configured origin any more, and no allow-list. The app answers on
+ * whatever host it is reached at, and every absolute URL it writes into an
+ * email or a page is built from that same host, so a preview deployment, a
+ * `*.vercel.app` alias and a custom domain each hand out links back to
+ * themselves with nothing to configure and nothing to keep in sync.
+ *
+ * The trade is stated plainly because it is real: this value comes from the
+ * request, so a caller that reaches the app on a host it does not own can make
+ * the app print that host into an invite link. The mitigation is not a
+ * configured origin, it is that the link only ever grants what the recipient
+ * could already ask for, and that the session cookie is `SameSite=Lax` and
+ * `__Host-` prefixed in production, so it is not sent to another site at all.
  */
-export function configuredOrigins(): readonly string[] {
-  const env = getEnv();
-  const listed = env.APP_ORIGINS.split(",")
-    .map((o) => o.trim())
-    .filter((o) => o !== "");
-  const all = new Set(listed);
-  if (env.SITE_ORIGIN !== "") all.add(env.SITE_ORIGIN.replace(/\/+$/, ""));
-  if (env.NODE_ENV !== "production") {
-    all.add("http://localhost:3000");
-    all.add("http://127.0.0.1:3000");
+export function requestOrigin(req: { url: string }): string {
+  try {
+    return new URL(req.url).origin;
+  } catch {
+    // A relative or malformed URL cannot happen through Hono, which always
+    // hands over an absolute one, but a caller constructing a Request by hand
+    // can, and a thrown TypeError here would surface as a 500 on a send.
+    return "";
   }
-  return [...all];
-}
-
-/** The origin invite links and canonical URLs are built from. Never the Host header. */
-export function siteOrigin(): string {
-  return getEnv().SITE_ORIGIN.replace(/\/+$/, "");
 }
 
 export function isProduction(): boolean {

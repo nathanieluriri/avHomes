@@ -63,11 +63,12 @@ Package                       Holds
                               ids, environment, the mail port.
 ``@avhomes/db``               The cached MongoDB client, collection names, the
                               migration runner.
-``@avhomes/identity``         Users, sessions, invites, the two auth doors, the
-                              origin guard and the domain gate.
+``@avhomes/identity``         Users, sessions, invites, the two auth doors and
+                              the domain gate.
 ``@avhomes/listings``         Properties, testimonials, site counters.
 ``@avhomes/content``          Posts, revisions, categories.
-``@avhomes/media``            The image library and its storage port.
+``@avhomes/media``            The image library and its storage port
+                              (Cloudinary, Vercel Blob, or a local folder).
 ``@avhomes/enquiries``        Contact intake and the inbox.
 ``@avhomes/api``              ``createApp()``: the composition root.
 ============================  ================================================
@@ -104,12 +105,11 @@ the session" is a convention.
     6. GET /api/public/*     ABOVE sessionMiddleware. Cache-Control: public,
                              and cookieless BY CONSTRUCTION
    ------------------------------------------------------------------
-    7. originGuard           exact match on unsafe methods, never a suffix
-    8. POST /api/enquiries   a public MUTATION, deliberately not cacheable
-    9. sessionMiddleware     resolves the cookie to a user or null
-   10. rolePermissions       the domain gate over URL prefixes
+    7. POST /api/enquiries   a public MUTATION, deliberately not cacheable
+    8. sessionMiddleware     resolves the cookie to a user or null
+    9. rolePermissions       the domain gate over URL prefixes
    ------------------------------------------------------------------
-   11. auth, team, listings, content, media, enquiries, dashboard
+   10. auth, team, listings, content, media, enquiries, dashboard
 
 Authentication
 ==============
@@ -120,8 +120,9 @@ provider enforces.
 
 ``GET /api/auth/door`` answers which one, at runtime. The Clerk door opens only
 when ``CLERK_SECRET_KEY`` **and** ``NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`` are set
-**and** ``SITE_ORIGIN`` is not a ``*.vercel.app`` alias, because a production
-Clerk key refuses to load on a deploy alias and the symptom is a blank screen.
+**and** the request did not arrive on a ``*.vercel.app`` alias, because a
+production Clerk key refuses to load on a deploy alias and the symptom is a
+blank screen.
 Otherwise the password door is live. Either way, membership is invite only and
 one ``admit()`` decides it.
 
@@ -146,15 +147,14 @@ Variable                            Needed for  Notes
 ``MONGODB_DB``                      storage     Defaults to ``avhomes``.
 ``SESSION_SECRET``                  sessions    At least 32 characters, refused rather than
                                                 padded. ``openssl rand -base64 32``
-``SITE_ORIGIN``                     always      Canonical origin. Invite links and canonical
-``NEXT_PUBLIC_SITE_ORIGIN``                     URLs are built from it, never from the Host
-                                                header, which is attacker controlled.
-``APP_ORIGINS``                     previews    Extra EXACT origins allowed on unsafe methods,
-                                                comma separated. Never a suffix match: anyone
-                                                can deploy to ``*.vercel.app``.
 ``CLERK_SECRET_KEY``                SSO         Both, on a custom domain, switch the admin to
 ``NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY``           Clerk. Otherwise the password door is live.
-``BLOB_READ_WRITE_TOKEN``           uploads     Vercel dashboard, Storage, Blob.
+``CLOUDINARY_URL``                  uploads     cloudinary://<key>:<secret>@<cloud_name>, one
+                                                string from the Cloudinary dashboard.
+``IMAGE_STORAGE``                   uploads     Defaults to ``cloudinary``. ``local`` writes to
+                                                a folder for development; ``blob`` is kept so
+                                                images uploaded before the switch resolve.
+``BLOB_READ_WRITE_TOKEN``           legacy      Only when ``IMAGE_STORAGE=blob``.
 ``RESEND_API_KEY``                  mail        Invites still work without mail: the URL is
 ``MAIL_FROM``                                   returned so it can be sent by hand.
 ``ENQUIRY_NOTIFY_TO``               mail        Where a new enquiry is announced. Empty means

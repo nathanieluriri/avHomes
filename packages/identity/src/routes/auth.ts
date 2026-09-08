@@ -45,7 +45,7 @@ export function authRoutes(): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.get("/auth/door", (c) => {
-    const status = doorStatus();
+    const status = doorStatus(c.req);
     return c.json({
       door: status.door,
       clerkPublishableKey: status.clerkPublishableKey,

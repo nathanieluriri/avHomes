@@ -13,7 +13,6 @@ import { getDb, type Db } from "@avhomes/db";
 import {
   authRoutes,
   clerkRoutes,
-  originGuard,
   passwordRoutes,
   rolePermissions,
   sessionMiddleware,
@@ -22,6 +21,7 @@ import {
 import { listingsAdminRoutes, listingsPublicRoutes } from "@avhomes/listings";
 import { contentAdminRoutes, contentPublicRoutes } from "@avhomes/content";
 import {
+  cloudinaryStorage,
   localFileStorage,
   mediaPublicRoutes,
   mediaRoutes,
@@ -64,8 +64,6 @@ export interface AppDeps {
    * reason to touch the database never builds a client.
    */
   db?: Db | (() => Promise<Db>);
-  /** Exact-match allow-list. Defaults to APP_ORIGINS plus SITE_ORIGIN. */
-  origins?: readonly string[];
   /**
    * One transport for the whole deployment, so a suite injecting a recorder for
    * invites gets enquiry mail through the same recorder rather than a second,
@@ -104,7 +102,9 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    *
    * `local` writes to a directory and serves it back through the public route
    * below. It is a DEVELOPMENT store: a serverless filesystem is read only
-   * apart from a per-instance /tmp, so anything deployed needs `blob`.
+   * apart from a per-instance /tmp, so anything deployed needs a real store.
+   * `cloudinary` is the default and the one every deployment uses; `blob` is
+   * kept because images uploaded to it before the switch still resolve.
    *
    * Resolved once at construction, not per request, so the whole application
    * cannot disagree with itself about where an image went.
@@ -114,7 +114,9 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     deps.storage ??
     (env.IMAGE_STORAGE === "local"
       ? localFileStorage(env.IMAGE_LOCAL_DIR, `${API_PREFIX}/public/images`)
-      : vercelBlobStorage());
+      : env.IMAGE_STORAGE === "blob"
+        ? vercelBlobStorage()
+        : cloudinaryStorage());
 
   /* ═════════════════ 1. request id, before everything ═════════════════ */
 
@@ -171,21 +173,19 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     await next();
   });
 
-  /* ═════════════════ 5. machine callbacks, ABOVE originGuard ══════════ */
+  /* ═════════════════ 5. machine callbacks ════════════════════════════ */
 
   /*
    * THE SLOT IS EMPTY, AND THAT IS THE CURRENT DESIGN.
    *
-   * A route belongs here only if it is a server-to-server POST with no Origin
-   * header AND carries its own cryptographic authority AND reads no cookie. The
-   * one candidate is a client-side blob upload completion callback, which the
-   * media package deliberately does not use: uploads go through the server, so
-   * no origin-guard exemption has to be bought.
+   * A route belongs here only if it is a server-to-server POST that carries its
+   * own cryptographic authority AND reads no cookie. The one candidate is a
+   * client-side upload completion callback, which the media package
+   * deliberately does not use: uploads go through the server.
    *
-   * If a route is ever added here, all three properties are the price of
-   * admission. Reading a cookie is the single thing that would make the
-   * exemption unsafe, because CSRF borrows a victim's AMBIENT authority and a
-   * route that reads no cookie has none to borrow.
+   * Reading a cookie is the single thing that would make such a route unsafe,
+   * because CSRF borrows a victim's AMBIENT authority and a route that reads no
+   * cookie has none to borrow.
    */
 
   /* ═════════════════ 6. public reads, ABOVE sessionMiddleware ═════════ */
@@ -199,10 +199,6 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * Mounted here, `c.get('user')` is undefined on every request that reaches
    * them: the middleware that would resolve a session has not run and cannot be
    * reached from inside. Cookieless BY CONSTRUCTION.
-   *
-   * They are also above originGuard, which is irrelevant either way: every route
-   * in them is a GET, and the guard returns for safe methods before it looks at
-   * anything.
    */
   app.route(API_PREFIX, listingsPublicRoutes());
   app.route(API_PREFIX, contentPublicRoutes());
@@ -219,37 +215,44 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    */
   app.route(API_PREFIX, mediaPublicRoutes({ storage }));
 
-  /* ═════════════════ 7. the origin guard ══════════════════════════════ */
+  /* ═════════════════ 7. the public mutations ═════════════════════════ */
 
-  app.use(`${API_PREFIX}/*`, originGuard(deps.origins));
-
-  /* ═════════════════ 8. the public mutations, BELOW the guard ═════════ */
+  /*
+   * THERE IS NO ORIGIN ALLOW-LIST. The app answers on whatever host it is
+   * reached at, by choice, so there is nothing here refusing a request for the
+   * Origin header it carried.
+   *
+   * What still protects the admin's authenticated writes is the session cookie
+   * itself: `SameSite=Lax` means a browser does not attach it to a cross-site
+   * form post, fetch or XHR, and in production the cookie also carries the
+   * `__Host-` prefix, so it is bound to this exact host over HTTPS. The three
+   * routers below read no session at all, so they have no ambient authority to
+   * borrow in the first place.
+   */
 
   /*
    * The contact form. A public write, so it is NOT in the cacheable router
    * above: putting a mutation there would put "may be stored by a shared cache"
    * and "creates a document" in one file.
    *
-   * Below originGuard, so a cross-origin form post cannot drive it, and above
-   * sessionMiddleware is not needed because it reads no session either way.
+   * It reads no session, so being driven from another page buys a caller
+   * nothing they could not do by posting the form themselves.
    */
   app.route(API_PREFIX, enquiriesPublicRoutes({ mailer }));
 
   /*
    * The visit beacon, in the same slot and for the same two reasons. It is a
-   * public mutation, so it must be BELOW originGuard or any page on the web
-   * could drive the site's own numbers; and it reads no cookie, so it must stay
-   * ABOVE sessionMiddleware, where being cookieless is structural rather than a
-   * thing the handler remembered.
+   * public mutation that reads no cookie, so it stays ABOVE sessionMiddleware,
+   * where being cookieless is structural rather than a thing the handler
+   * remembered. Its numbers are rate limited rather than origin gated.
    */
   app.route(API_PREFIX, analyticsPublicRoutes());
 
   /*
    * The subscribe intake, in the same slot and for the same two reasons as its
-   * neighbours. It is a public write, so it must be BELOW originGuard or any
-   * page on the web could add addresses to this site's list; and it reads no
-   * cookie, so it stays ABOVE sessionMiddleware, where being cookieless is
-   * structural rather than a thing the handler remembered.
+   * neighbours. It is a public write that reads no cookie, so it stays ABOVE
+   * sessionMiddleware, where being cookieless is structural rather than a thing
+   * the handler remembered.
    */
   app.route(API_PREFIX, audiencePublicRoutes());
 

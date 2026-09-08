@@ -13,4 +13,5 @@ export {
   type StoredFile,
 } from "./storage";
 export { localFileStorage } from "./storage-local";
+export { cloudinaryStorage } from "./storage-cloudinary";
 export { sniffImage, type SniffedImage } from "./sniff";

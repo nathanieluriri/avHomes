@@ -17,7 +17,7 @@ import {
   pathParam,
   readJson,
   readQuery,
-  siteOrigin,
+  requestOrigin,
   str,
   takePage,
   trySend,
@@ -255,9 +255,15 @@ function transcript(doc: EnquiryDoc): string {
     .join("\n\n");
 }
 
-function propertyLine(doc: EnquiryDoc): string {
+/**
+ * `origin` is threaded in from the request rather than read from configuration,
+ * because there is no configured origin any more. A mail sent from a preview
+ * deployment therefore links back to that preview instead of to production,
+ * which is what somebody testing there actually wants.
+ */
+function propertyLine(doc: EnquiryDoc, origin: string): string {
   if (!doc.propertySlug) return "";
-  return `About: ${doc.propertyTitle ?? doc.propertySlug} (${siteOrigin()}/listings/${doc.propertySlug})`;
+  return `About: ${doc.propertyTitle ?? doc.propertySlug} (${origin}/listings/${doc.propertySlug})`;
 }
 
 /**
@@ -271,7 +277,7 @@ function propertyLine(doc: EnquiryDoc): string {
 async function mailTranscript(
   mailer: Mailer,
   doc: EnquiryDoc,
-  ctx: { requestId: string; route: string },
+  ctx: { requestId: string; route: string; origin: string },
 ): Promise<void> {
   const subject = doc.propertyTitle
     ? `Your conversation about ${doc.propertyTitle}`
@@ -285,7 +291,7 @@ async function mailTranscript(
         `Hello ${doc.name || "there"},`,
         "",
         "Here is your conversation with our team so far.",
-        propertyLine(doc),
+        propertyLine(doc, ctx.origin),
         "",
         "------------------------",
         transcript(doc),
@@ -310,7 +316,7 @@ async function notifyTeam(
   mailer: Mailer,
   doc: EnquiryDoc,
   subject: string,
-  ctx: { requestId: string; route: string },
+  ctx: { requestId: string; route: string; origin: string },
 ): Promise<void> {
   const notifyTo = getEnv().ENQUIRY_NOTIFY_TO;
   if (notifyTo === "") return;
@@ -322,11 +328,11 @@ async function notifyTeam(
       subject,
       text: [
         `${doc.name} <${doc.email}>${doc.phone ? ` / ${doc.phone}` : ""}`,
-        propertyLine(doc),
+        propertyLine(doc, ctx.origin),
         "",
         last?.body ?? doc.message,
         "",
-        `Open the thread: ${siteOrigin()}/admin/enquiries/${doc._id}`,
+        `Open the thread: ${ctx.origin}/admin/enquiries/${doc._id}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -476,6 +482,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     await notifyTeam(deps.mailer, doc, `New enquiry from ${doc.name}`, {
       requestId: c.get("requestId"),
       route: "POST /enquiries",
+      origin: requestOrigin(c.req),
     });
 
     // The id is returned so a client can reference it in a support conversation.
@@ -529,7 +536,11 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const doc = openingDoc(body, "chat", ip, tokenId(token));
     await enquiries(db).insertOne(doc);
 
-    const ctx = { requestId: c.get("requestId"), route: "POST /enquiries/chat" };
+    const ctx = {
+      requestId: c.get("requestId"),
+      route: "POST /enquiries/chat",
+      origin: requestOrigin(c.req),
+    };
     await notifyTeam(deps.mailer, doc, `New chat from ${doc.name}`, ctx);
     // The buyer's own copy, from the first message: it is the receipt that says
     // the thread exists and how to get back to it if the tab is gone.
@@ -587,6 +598,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     await notifyTeam(deps.mailer, after, `Reply from ${after.name}`, {
       requestId: c.get("requestId"),
       route: "POST /enquiries/chat/:id/messages",
+      origin: requestOrigin(c.req),
     });
 
     return c.json({ thread: await toThread(db, after) });
@@ -747,6 +759,7 @@ export function enquiriesAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     await mailTranscript(deps.mailer, after, {
       requestId: c.get("requestId"),
       route: "POST /admin/enquiries/:id/reply",
+      origin: requestOrigin(c.req),
     });
 
     const names = await handlerNames(db, [after.handledBy]);

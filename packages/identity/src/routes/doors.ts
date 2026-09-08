@@ -103,7 +103,7 @@ export function clerkRoutes(deps: { verifier?: ClerkVerifier } = {}): Hono<AppEn
   const routes = new Hono<AppEnv>();
 
   routes.post("/auth/clerk/exchange", async (c) => {
-    if (activeDoor() !== "clerk") {
+    if (activeDoor(c.req) !== "clerk") {
       throw new NotImplementedError(
         "clerk-door",
         "the password door is active; set CLERK_SECRET_KEY and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY on a custom domain",
@@ -138,8 +138,8 @@ export function clerkRoutes(deps: { verifier?: ClerkVerifier } = {}): Hono<AppEn
 export function passwordRoutes(): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
-  function assertActive(): void {
-    if (activeDoor() !== "password") {
+  function assertActive(req: { url: string }): void {
+    if (activeDoor(req) !== "password") {
       throw new NotImplementedError(
         "password-door",
         "the Clerk door is active; unset CLERK_SECRET_KEY to use email and password",
@@ -148,7 +148,7 @@ export function passwordRoutes(): Hono<AppEnv> {
   }
 
   routes.post("/auth/password/login", async (c) => {
-    assertActive();
+    assertActive(c.req);
     // Parsed before the limiter: validation is free, the limiter is a write.
     const body = await readJson(c, LoginBody);
 
@@ -184,7 +184,7 @@ export function passwordRoutes(): Hono<AppEnv> {
    * ever get in.
    */
   routes.post("/auth/password/claim", async (c) => {
-    assertActive();
+    assertActive(c.req);
     const body = await readJson(c, ClaimBody);
 
     const db = await currentDb(c);
@@ -226,7 +226,7 @@ export function passwordRoutes(): Hono<AppEnv> {
 
   /** Changing your own password. Requires the current one, even with a session. */
   routes.post("/auth/password/change", async (c) => {
-    assertActive();
+    assertActive(c.req);
     const user = c.get("user");
     if (!user) throw new UnauthenticatedError("route requires a session");
 

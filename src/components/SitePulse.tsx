@@ -112,9 +112,7 @@ function pulse({ arrived }: { arrived: boolean }): void {
   try {
     /*
      * sendBeacon survives the page being torn down mid-navigation, which a
-     * plain fetch does not. It also sends an Origin header on a same-origin
-     * POST, which is what keeps it legal under originGuard: the guard refuses
-     * an unsafe method with no Origin.
+     * plain fetch does not.
      */
     if (typeof navigator.sendBeacon === "function") {
       // A Blob, because the queued content type is taken from it and the route

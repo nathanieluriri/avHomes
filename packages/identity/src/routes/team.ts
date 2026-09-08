@@ -18,7 +18,7 @@ import {
   pathParam,
   readJson,
   readQuery,
-  siteOrigin,
+  requestOrigin,
   str,
   trySend,
   type AppEnv,
@@ -258,11 +258,14 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
      * account; now it is a forwarded URL to a screen that refuses the wrong
      * person.
      *
-     * Built from siteOrigin(), never from the Host header (attacker-controlled)
-     * and never from origins[0] (the allow-list holds every alias and its order
-     * is nobody's decision).
+     * Built from the origin this request arrived on, so an invite sent from a
+     * preview deployment points back at that preview and one sent from the live
+     * host points at the live host, with nothing to configure. That is only
+     * safe because the link carries no credential: the worst a caller reaching
+     * the app on a host they control can do is mail somebody a URL to a
+     * sign-in screen that will refuse them.
      */
-    const url = `${siteOrigin()}/admin/sign-in`;
+    const url = `${requestOrigin(c.req)}/admin/sign-in`;
 
     const emailed = await trySend(
       deps.mailer,

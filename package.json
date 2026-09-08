@@ -30,6 +30,7 @@
     "@tiptap/starter-kit": "^3.31.0",
     "@vercel/blob": "^2.0.0",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "hono": "^4.13.1",
     "lowlight": "^3.3.0",
