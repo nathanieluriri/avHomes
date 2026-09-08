@@ -125,6 +125,36 @@ export function requestOrigin(req: { url: string }): string {
   }
 }
 
+/**
+ * The DEPLOYMENT's own origin, for a link that will be mailed to a colleague.
+ *
+ * The difference from `requestOrigin` is who chose the value, and it matters on
+ * exactly one class of link. `POST /enquiries` is public and unauthenticated,
+ * and it mails ENQUIRY_NOTIFY_TO, which is the team's own inbox. Built from the
+ * request, a stranger submitting the contact form with a poisoned Host would
+ * have the app mail our own staff `Open the thread: https://evil.example/admin/...`,
+ * and the recipient clicks it expecting their admin and types a password into
+ * whatever is there. The link's contents are harmless; the trust the recipient
+ * places in it is not.
+ *
+ * So anything pointing at `/admin` uses this, and only buyer-facing links keep
+ * the request's origin. It reads Vercel's own variables rather than a
+ * configured one, so it stays true to "nothing to set":
+ * `VERCEL_PROJECT_PRODUCTION_URL` is the project's stable production host and
+ * `VERCEL_URL` is this deployment's immutable one. Neither comes from a header,
+ * so neither can be chosen by a caller.
+ *
+ * Falls back to the request off Vercel, where the only host available is the
+ * one the request arrived on and a local developer is not being phished.
+ */
+export function deploymentOrigin(req: { url: string }): string {
+  const production = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (production) return `https://${production}`;
+  const deployment = process.env.VERCEL_URL;
+  if (deployment) return `https://${deployment}`;
+  return requestOrigin(req);
+}
+
 export function isProduction(): boolean {
   return getEnv().NODE_ENV === "production";
 }

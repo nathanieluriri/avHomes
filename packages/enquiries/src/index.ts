@@ -17,6 +17,7 @@ import {
   pathParam,
   readJson,
   readQuery,
+  deploymentOrigin,
   requestOrigin,
   str,
   takePage,
@@ -277,7 +278,7 @@ function propertyLine(doc: EnquiryDoc, origin: string): string {
 async function mailTranscript(
   mailer: Mailer,
   doc: EnquiryDoc,
-  ctx: { requestId: string; route: string; origin: string },
+  ctx: { requestId: string; route: string; origin: string; adminOrigin: string },
 ): Promise<void> {
   const subject = doc.propertyTitle
     ? `Your conversation about ${doc.propertyTitle}`
@@ -316,7 +317,7 @@ async function notifyTeam(
   mailer: Mailer,
   doc: EnquiryDoc,
   subject: string,
-  ctx: { requestId: string; route: string; origin: string },
+  ctx: { requestId: string; route: string; origin: string; adminOrigin: string },
 ): Promise<void> {
   const notifyTo = getEnv().ENQUIRY_NOTIFY_TO;
   if (notifyTo === "") return;
@@ -332,7 +333,7 @@ async function notifyTeam(
         "",
         last?.body ?? doc.message,
         "",
-        `Open the thread: ${ctx.origin}/admin/enquiries/${doc._id}`,
+        `Open the thread: ${ctx.adminOrigin}/admin/enquiries/${doc._id}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -483,6 +484,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       requestId: c.get("requestId"),
       route: "POST /enquiries",
       origin: requestOrigin(c.req),
+      adminOrigin: deploymentOrigin(c.req),
     });
 
     // The id is returned so a client can reference it in a support conversation.
@@ -540,6 +542,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       requestId: c.get("requestId"),
       route: "POST /enquiries/chat",
       origin: requestOrigin(c.req),
+      adminOrigin: deploymentOrigin(c.req),
     };
     await notifyTeam(deps.mailer, doc, `New chat from ${doc.name}`, ctx);
     // The buyer's own copy, from the first message: it is the receipt that says
@@ -599,6 +602,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       requestId: c.get("requestId"),
       route: "POST /enquiries/chat/:id/messages",
       origin: requestOrigin(c.req),
+      adminOrigin: deploymentOrigin(c.req),
     });
 
     return c.json({ thread: await toThread(db, after) });
@@ -760,6 +764,7 @@ export function enquiriesAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       requestId: c.get("requestId"),
       route: "POST /admin/enquiries/:id/reply",
       origin: requestOrigin(c.req),
+      adminOrigin: deploymentOrigin(c.req),
     });
 
     const names = await handlerNames(db, [after.handledBy]);

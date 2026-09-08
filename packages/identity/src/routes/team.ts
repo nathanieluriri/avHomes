@@ -18,7 +18,7 @@ import {
   pathParam,
   readJson,
   readQuery,
-  requestOrigin,
+  deploymentOrigin,
   str,
   trySend,
   type AppEnv,
@@ -258,14 +258,13 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
      * account; now it is a forwarded URL to a screen that refuses the wrong
      * person.
      *
-     * Built from the origin this request arrived on, so an invite sent from a
-     * preview deployment points back at that preview and one sent from the live
-     * host points at the live host, with nothing to configure. That is only
-     * safe because the link carries no credential: the worst a caller reaching
-     * the app on a host they control can do is mail somebody a URL to a
-     * sign-in screen that will refuse them.
+     * Built from the DEPLOYMENT's own host, not from the request. It points at
+     * a sign-in screen, so a recipient trusts it the way they trust any mail
+     * from us, and a host chosen by whoever made the request is a credential
+     * phishing page wearing our return address. Still nothing to configure:
+     * `deploymentOrigin` reads Vercel's own variables.
      */
-    const url = `${requestOrigin(c.req)}/admin/sign-in`;
+    const url = `${deploymentOrigin(c.req)}/admin/sign-in`;
 
     const emailed = await trySend(
       deps.mailer,
