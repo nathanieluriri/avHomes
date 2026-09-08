@@ -5,16 +5,25 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* AVHomes palette: AV Constructions deep blue on a light, airy base */
-  --navy-950: #0b1a33;
-  --navy-900: #12294a;
-  --navy-800: #1a3a63;
-  --ink: #0f172a;
-  --blue-700: #1d4ed8;
-  --blue-600: #2563eb;
-  --blue-500: #3b82f6;
-  --blue-100: #dbeafe;
-  --blue-50: #eff6ff;
+  /*
+   * AVHomes palette: the AV Homes wine red on a light, airy base.
+   *
+   * --wine-600 is the mark's own red, sampled from the logo. The neutrals stay
+   * cool and untinted because the logo's second colour is a neutral charcoal
+   * grey, so warming them would fight the mark rather than support it.
+   * --wine-300 exists for one job: an accent word on a dark ground, where the
+   * 600 is too dark to separate from the plum behind it.
+   */
+  --plum-950: #1c1214;
+  --plum-900: #2c1b1f;
+  --plum-800: #3f272d;
+  --ink: #1a1215;
+  --wine-700: #762d3f;
+  --wine-600: #983c53;
+  --wine-500: #b45069;
+  --wine-300: #e6a8b7;
+  --wine-100: #f2dee3;
+  --wine-50: #fbf4f6;
   --mist-50: #f8fafc;
   --mist-100: #f1f5f9;
   --mist-200: #e2e8f0;
@@ -24,20 +33,20 @@
   /*
    * Admin console chrome.
    *
-   * A deep brand blue, not the marketing navy. `--navy-950` is so far towards
+   * A deep brand wine, not the marketing plum. `--plum-950` is so far towards
    * black that a bar painted with it reads as black, which is what the owner
    * asked us to stop doing. These three climb from the bar's foot to its head,
    * because a flat fill at this darkness looks like a stripe of nothing and a
    * two-stop gradient is what gives it a surface.
    */
-  --chrome-900: #0a2350;
-  --chrome-800: #10306c;
-  --chrome-700: #1b4193;
-  --chrome-line: #2c4d8f;
+  --chrome-900: #321119;
+  --chrome-800: #4d1a26;
+  --chrome-700: #7d2c40;
+  --chrome-line: #6d3b48;
 
-  /* The console's page ground. Cooler than --mist-50, so the working area
-     reads as belonging to the blue chrome rather than sitting on top of it. */
-  --haze: #f4f7fc;
+  /* The console's page ground. Warmer than --mist-50, so the working area
+     reads as belonging to the wine chrome rather than sitting on top of it. */
+  --haze: #faf4f6;
 
   /* Console ink. Both are measured against white: 5.9:1 and 4.8:1, so either
      is legal for real text at 13px. --slate-500 is 4.6:1 and stays decorative. */
@@ -50,18 +59,18 @@
   --card-foreground: var(--ink);
   --popover: #ffffff;
   --popover-foreground: var(--ink);
-  --primary: var(--navy-950);
+  --primary: var(--plum-950);
   --primary-foreground: #ffffff;
   --secondary: var(--mist-100);
   --secondary-foreground: var(--ink);
   --muted: var(--mist-100);
   --muted-foreground: var(--slate-500);
-  --accent: var(--blue-50);
-  --accent-foreground: var(--blue-700);
+  --accent: var(--wine-50);
+  --accent-foreground: var(--wine-700);
   --destructive: #dc2626;
   --border: var(--mist-200);
   --input: var(--mist-200);
-  --ring: var(--blue-600);
+  --ring: var(--wine-600);
   --radius: 1rem;
 }
 
@@ -72,15 +81,16 @@
   --font-serif: var(--font-instrument-serif);
   --font-mono: var(--font-geist-mono);
 
-  --color-navy-950: var(--navy-950);
-  --color-navy-900: var(--navy-900);
-  --color-navy-800: var(--navy-800);
+  --color-plum-950: var(--plum-950);
+  --color-plum-900: var(--plum-900);
+  --color-plum-800: var(--plum-800);
   --color-ink: var(--ink);
-  --color-blue-700: var(--blue-700);
-  --color-blue-600: var(--blue-600);
-  --color-blue-500: var(--blue-500);
-  --color-blue-100: var(--blue-100);
-  --color-blue-50: var(--blue-50);
+  --color-wine-700: var(--wine-700);
+  --color-wine-600: var(--wine-600);
+  --color-wine-500: var(--wine-500);
+  --color-wine-300: var(--wine-300);
+  --color-wine-100: var(--wine-100);
+  --color-wine-50: var(--wine-50);
   --color-mist-50: var(--mist-50);
   --color-mist-100: var(--mist-100);
   --color-mist-200: var(--mist-200);
@@ -125,9 +135,9 @@
    * Reachable as `shadow-card` and `shadow-pop`; both are inert outside the
    * console, where the base layer strips box-shadow.
    */
-  --shadow-card: 0 0 0 1px rgb(11 36 83 / 0.05), 0 1px 2px 0 rgb(11 36 83 / 0.06);
-  --shadow-pop: 0 0 0 1px rgb(11 36 83 / 0.07), 0 10px 28px -8px rgb(11 36 83 / 0.22),
-    0 2px 6px 0 rgb(11 36 83 / 0.08);
+  --shadow-card: 0 0 0 1px rgb(44 27 31 / 0.05), 0 1px 2px 0 rgb(44 27 31 / 0.06);
+  --shadow-pop: 0 0 0 1px rgb(44 27 31 / 0.07), 0 10px 28px -8px rgb(44 27 31 / 0.22),
+    0 2px 6px 0 rgb(44 27 31 / 0.08);
 
   --animate-marquee: marquee 40s linear infinite;
   @keyframes marquee {
@@ -169,7 +179,7 @@
   font-family: var(--font-instrument-serif), Georgia, serif;
   font-style: italic;
   font-weight: 400;
-  color: var(--blue-600);
+  color: var(--wine-600);
   letter-spacing: -0.01em;
 }
 
@@ -181,7 +191,7 @@
   transition: border-color 0.25s ease, transform 0.25s ease;
 }
 .card-soft:hover {
-  border-color: var(--blue-500);
+  border-color: var(--wine-500);
   transform: translateY(-4px);
 }
 
@@ -211,8 +221,31 @@
 
 html { scroll-behavior: smooth; }
 
+/*
+ * The customize studio's copy picker, applied INSIDE the framed site.
+ *
+ * It lives in globals.css and not in the console's stylesheet because the class
+ * is set on the body of the marketing document inside the iframe, which never
+ * loads console.css. The outline follows the pointer so it is obvious that a
+ * click is about to select words rather than follow a link.
+ */
+.studio-picking,
+.studio-picking * {
+  cursor: crosshair !important;
+}
+
+.studio-picking *:hover {
+  outline: 2px solid var(--wine-500);
+  outline-offset: 2px;
+}
+
 /* Marquee needs the track duplicated in markup for a seamless loop. */
 .marquee-track { display: flex; width: max-content; }
+
+/* The strip stops while it is hovered. A mark somebody is pointing at has to
+   hold still long enough to be read, and colouring the thing under the pointer
+   is no use if the pointer's target keeps sliding out from under it. */
+.marquee-track:hover { animation-play-state: paused; }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
