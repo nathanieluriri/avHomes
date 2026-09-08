@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 const fieldClass =
-  "mt-2 w-full rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm text-navy-950 outline-none transition-colors placeholder:text-slate-500 focus:border-blue-600";
-const labelClass = "block text-sm font-semibold text-navy-950";
+  "mt-2 w-full rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm text-plum-950 outline-none transition-colors placeholder:text-slate-500 focus:border-wine-600";
+const labelClass = "block text-sm font-semibold text-plum-950";
 
 const SUBJECTS = [
   { value: "general", label: "General enquiry" },
@@ -106,7 +106,7 @@ export default function ContactForm({
   if (state === "sent") {
     return (
       <div className="rounded-2xl border border-mist-200 bg-white p-6 sm:p-8 lg:p-10">
-        <h2 className="text-lg font-bold tracking-tight text-navy-950">Message received</h2>
+        <h2 className="text-lg font-bold tracking-tight text-plum-950">Message received</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Thank you. A member of the team will respond within one business day. If it is urgent, call
           the Lagos office on the number in the panel beside this form.
@@ -202,7 +202,7 @@ export default function ContactForm({
       <button
         type="submit"
         disabled={state === "sending"}
-        className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-blue-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-mist-300 sm:w-auto"
+        className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-wine-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 disabled:bg-mist-300 sm:w-auto"
       >
         {state === "sending" ? "Sending" : "Send message"}
       </button>
@@ -211,7 +211,7 @@ export default function ContactForm({
         We reply within one business day. You can also email{" "}
         <a
           href="mailto:hello@avhomes.com"
-          className="font-semibold text-blue-600 transition-colors hover:text-blue-700"
+          className="font-semibold text-wine-600 transition-colors hover:text-wine-700"
         >
           hello@avhomes.com
         </a>

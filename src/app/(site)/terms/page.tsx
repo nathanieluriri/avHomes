@@ -20,7 +20,7 @@ const sections: LegalSection[] = [
   { id: "changes", label: "Changes to These Terms" },
 ];
 
-const heading = "text-xl font-bold tracking-tight text-navy-950 sm:text-2xl";
+const heading = "text-xl font-bold tracking-tight text-plum-950 sm:text-2xl";
 const body = "mt-4 space-y-4 text-base leading-relaxed text-ink/80";
 
 export default function TermsPage() {

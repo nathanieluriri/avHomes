@@ -38,9 +38,31 @@ export function str(): z.ZodString {
   return z.string().regex(NO_CONTROL, "control-character");
 }
 
-/** A trimmed, lowercased address. Format is checked; deliverability is not. */
+/**
+ * One `@`, something either side, and a dotted domain ending in a label.
+ *
+ * Deliberately NOT an RFC 5322 parser. That grammar admits quoted local
+ * parts and bracketed address literals that no mail provider in front of
+ * this application accepts, and the regexes people write to implement it are
+ * the classic catastrophic-backtracking bug. This is the shape a browser's
+ * `type="email"` already enforces, so the server refuses exactly what the
+ * form in front of it refuses, and no more.
+ *
+ * The bound matters as much as the pattern: `.max(320)` runs first, so the
+ * expression is never handed an unbounded string.
+ */
+const EMAIL = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/u;
+
+/**
+ * A trimmed, lowercased address. Format is checked; deliverability is not.
+ *
+ * The format check is the half that was missing, while this comment claimed
+ * it anyway. `not-an-address` satisfied every caller: the subscriber list,
+ * the enquiry inbox, a login attempt and an invite could each carry a string
+ * nobody can ever send mail to.
+ */
 export function email(): z.ZodString {
-  return str().trim().toLowerCase().min(3).max(320);
+  return str().trim().toLowerCase().min(3).max(320).regex(EMAIL, "email");
 }
 
 /** Lowercase, digits, single hyphens. Never derived from user input blindly. */

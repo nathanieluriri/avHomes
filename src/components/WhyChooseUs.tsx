@@ -33,7 +33,7 @@ export default function WhyChooseUs({ stats }: { stats: SiteStat[] }) {
           <div className="mt-6 grid gap-px overflow-hidden rounded-2xl border border-mist-200 bg-mist-200 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((s) => (
               <div key={s.label} className="bg-white px-6 py-8 text-center">
-                <p className="text-3xl font-bold tracking-tight text-navy-950 lg:text-4xl">
+                <p className="text-3xl font-bold tracking-tight text-plum-950 lg:text-4xl">
                   <Counter value={s.value} prefix={s.prefix} suffix={s.suffix} />
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">{s.label}</p>

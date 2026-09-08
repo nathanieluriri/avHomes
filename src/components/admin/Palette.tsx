@@ -140,7 +140,7 @@ export function Palette({
   return (
     <Dialog.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="console-float fixed inset-0 z-[70] bg-navy-950/45 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="console-float fixed inset-0 z-[70] bg-plum-950/45 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <Dialog.Content
           aria-describedby={undefined}
           onOpenAutoFocus={(event) => {
@@ -173,7 +173,7 @@ export function Palette({
                 maySearchListings ? "Search screens and listings" : "Search screens"
               }
               aria-label="Search the console"
-              className="h-13 w-full bg-transparent py-4 text-sm text-navy-950 outline-none placeholder:text-slate-550"
+              className="h-13 w-full bg-transparent py-4 text-sm text-plum-950 outline-none placeholder:text-slate-550"
             />
             <kbd className="hidden shrink-0 rounded border border-mist-200 bg-mist-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 sm:block">
               Esc
@@ -204,11 +204,11 @@ export function Palette({
                       aria-current={index === cursor}
                       data-cursor={index === cursor}
                       className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
-                        index === cursor ? "bg-blue-50 text-blue-700" : "text-navy-950"
+                        index === cursor ? "bg-wine-50 text-wine-700" : "text-plum-950"
                       }`}
                     >
                       <span
-                        className={index === cursor ? "text-blue-600" : "text-slate-550"}
+                        className={index === cursor ? "text-wine-600" : "text-slate-550"}
                       >
                         {row.icon}
                       </span>
@@ -217,7 +217,7 @@ export function Palette({
                         <span className="block truncate text-xs text-slate-600">{row.meta}</span>
                       </span>
                       {index === cursor && (
-                        <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-blue-600" aria-hidden="true" />
+                        <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-wine-600" aria-hidden="true" />
                       )}
                     </button>
                   </div>

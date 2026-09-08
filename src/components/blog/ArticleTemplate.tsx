@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 import CoverImg from "@/components/blog/CoverImg";
 import DocRenderer from "@/components/blog/DocRenderer";
@@ -53,12 +54,30 @@ function TagChips({ tags }: { tags: string[] }) {
   );
 }
 
-function Tags({ tags }: { tags: string[] }) {
+/**
+ * Tags sit ABOVE the body, not in a footer under it.
+ *
+ * They are the way out of an article and into everything else on the subject,
+ * and a reader who has decided this is not their piece has already left before
+ * a footer would have offered them the alternative.
+ */
+function TagRow({ tags }: { tags: string[] }) {
   if (tags.length === 0) return null;
   return (
-    <footer className="tpl__tags">
+    <div className="tpl__tags tpl__tags--top">
       <TagChips tags={tags} />
-    </footer>
+    </div>
+  );
+}
+
+/** Always the index, never history.back(): an article reached from a search
+ *  result or a shared link has no history to go back to. */
+function BackLink() {
+  return (
+    <Link href="/posts" className="tpl__back">
+      <ArrowLeft className="tpl__back-icon" aria-hidden="true" />
+      All insights
+    </Link>
   );
 }
 
@@ -67,10 +86,12 @@ function Magazine({ post }: { post: PublicPostDetail }) {
   const cover = post.coverImage;
   return (
     <article className="tpl tpl--magazine">
+      <BackLink />
       <header className="tpl__head">
         {post.category && <p className="tpl__kicker">{post.category}</p>}
         <h1 className="tpl__title">{title}</h1>
         {post.subtitle && <p className="tpl__subtitle">{post.subtitle}</p>}
+        <TagRow tags={post.tags} />
         <Byline post={post} />
       </header>
       {cover && (
@@ -80,15 +101,16 @@ function Magazine({ post }: { post: PublicPostDetail }) {
         </figure>
       )}
       <Body post={post} />
-      <Tags tags={post.tags} />
     </article>
   );
 }
 
 function Minimal({ post }: { post: PublicPostDetail }) {
   const title = titleOf(post);
+  const cover = post.coverImage;
   return (
     <article className="tpl tpl--minimal">
+      <BackLink />
       <header className="tpl__head">
         <h1 className="tpl__title">{title}</h1>
         {post.subtitle && <p className="tpl__subtitle">{post.subtitle}</p>}
@@ -96,9 +118,14 @@ function Minimal({ post }: { post: PublicPostDetail }) {
           {post.author.name} · {formatShortDate(post.publishedAt)}
           {SHOW_READING_TIME && post.wordCount > 0 && ` · ${post.readingTime} min`}
         </p>
+        <TagRow tags={post.tags} />
       </header>
+      {cover && (
+        <figure className="tpl__cover">
+          <CoverImg image={cover} fallbackAlt={title} className="tpl__cover-img" priority />
+        </figure>
+      )}
       <Body post={post} />
-      <Tags tags={post.tags} />
     </article>
   );
 }
@@ -108,6 +135,7 @@ function Editorial({ post }: { post: PublicPostDetail }) {
   const cover = post.coverImage;
   return (
     <article className="tpl tpl--editorial">
+      <BackLink />
       {cover && (
         <figure className="tpl__cover tpl__cover--bleed">
           <CoverImg image={cover} fallbackAlt={title} className="tpl__cover-img" priority />
@@ -117,11 +145,11 @@ function Editorial({ post }: { post: PublicPostDetail }) {
         {post.category && <p className="tpl__kicker">{post.category}</p>}
         <h1 className="tpl__title">{title}</h1>
         {post.subtitle && <p className="tpl__subtitle">{post.subtitle}</p>}
+        <TagRow tags={post.tags} />
         <div className="tpl__rule" aria-hidden="true" />
         <Byline post={post} />
       </header>
       <Body post={post} />
-      <Tags tags={post.tags} />
     </article>
   );
 }
@@ -131,6 +159,9 @@ function Technical({ post }: { post: PublicPostDetail }) {
   const cover = post.coverImage;
   return (
     <article className="tpl tpl--technical">
+      <div className="tpl__back-row">
+        <BackLink />
+      </div>
       <div className="tpl__rail">
         <dl className="tpl__facts">
           <dt>Author</dt>

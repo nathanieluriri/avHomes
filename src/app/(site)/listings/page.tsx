@@ -66,10 +66,10 @@ export default async function ListingsPage({
     <>
       <section className="border-b border-mist-200 bg-mist-50">
         <div className="mx-auto max-w-7xl px-6 py-14 text-center lg:px-10 lg:py-20">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-wine-600">
             {header.eyebrow}
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-navy-950 sm:text-4xl lg:text-5xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-plum-950 sm:text-4xl lg:text-5xl">
             {header.lead} <span className="accent">{header.accent}</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">
@@ -91,14 +91,14 @@ export default async function ListingsPage({
 
         {filtered.length === 0 ? (
           <div className="mt-12 rounded-2xl border border-mist-200 bg-white px-8 py-16 text-center">
-            <p className="text-lg font-semibold text-navy-950">No matches yet</p>
+            <p className="text-lg font-semibold text-plum-950">No matches yet</p>
             <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
               Nothing fits those filters right now. Try widening the search or clearing
               a filter or two.
             </p>
             <Link
               href="/listings"
-              className="mt-6 inline-flex rounded-full bg-blue-600 px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              className="mt-6 inline-flex rounded-full bg-wine-600 px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-wine-700"
             >
               Clear filters
             </Link>

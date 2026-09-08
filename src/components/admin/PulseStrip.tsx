@@ -75,7 +75,7 @@ export function PulseStrip({ pulse }: { pulse: SitePulse }) {
             <span className="block text-[11px] font-medium text-slate-600">
               Sessions <span className="text-slate-550">· 30 days</span>
             </span>
-            <span className="c-num block text-lg font-bold leading-tight text-navy-950">
+            <span className="c-num block text-lg font-bold leading-tight text-plum-950">
               {pulse.sessions.toLocaleString("en-GB")}
             </span>
           </span>
@@ -95,7 +95,7 @@ export function PulseStrip({ pulse }: { pulse: SitePulse }) {
             <span className="block text-[11px] font-medium text-slate-600">
               Live visitors <span className="text-slate-550">· now</span>
             </span>
-            <span className="c-num block text-lg font-bold leading-tight text-navy-950">
+            <span className="c-num block text-lg font-bold leading-tight text-plum-950">
               {pulse.live}
             </span>
           </span>
@@ -107,8 +107,8 @@ export function PulseStrip({ pulse }: { pulse: SitePulse }) {
         <div className="mt-2 w-full max-w-2xl rounded-2xl bg-white p-4 shadow-card sm:p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <div>
-              <h2 className="text-sm font-semibold text-navy-950">Sessions over time</h2>
-              <p className="c-num mt-0.5 text-2xl font-bold tracking-tight text-navy-950">
+              <h2 className="text-sm font-semibold text-plum-950">Sessions over time</h2>
+              <p className="c-num mt-0.5 text-2xl font-bold tracking-tight text-plum-950">
                 {pulse.sessions.toLocaleString("en-GB")}
               </p>
             </div>
@@ -261,7 +261,7 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
       <p className="mb-1 h-4 text-[11px] text-slate-600" aria-live="polite">
         {active ? (
           <>
-            <span className="font-semibold text-navy-950">{dayLabel(active.day)}</span>
+            <span className="font-semibold text-plum-950">{dayLabel(active.day)}</span>
             {": "}
             <span className="c-num">{active.sessions}</span>
             {active.sessions === 1 ? " session" : " sessions"}
@@ -336,8 +336,8 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
           >
             <defs>
               <linearGradient id="c-spark-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--blue-500)" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="var(--blue-500)" stopOpacity="0" />
+                <stop offset="0%" stopColor="var(--wine-500)" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="var(--wine-500)" stopOpacity="0" />
               </linearGradient>
             </defs>
             <path d={area} fill="url(#c-spark-fill)" />
@@ -346,7 +346,7 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
               style={{ "--c-len": length } as React.CSSProperties}
               d={line}
               fill="none"
-              stroke="var(--blue-600)"
+              stroke="var(--wine-600)"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -360,7 +360,7 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
                   x2={(cursor / (series.length - 1)) * W}
                   y1={PAD_T}
                   y2={H - PAD_B}
-                  stroke="var(--blue-500)"
+                  stroke="var(--wine-500)"
                   strokeWidth="1"
                   strokeDasharray="3 3"
                   vectorEffect="non-scaling-stroke"
@@ -373,7 +373,7 @@ function Sparkline({ series }: { series: SitePulse["series"] }) {
                   x2={(cursor / (series.length - 1)) * W}
                   y1={yFor(active.sessions, scale)}
                   y2={yFor(active.sessions, scale)}
-                  stroke="var(--blue-600)"
+                  stroke="var(--wine-600)"
                   strokeWidth="7"
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"

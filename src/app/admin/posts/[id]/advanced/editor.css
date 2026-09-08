@@ -37,7 +37,7 @@
   background: none;
   padding: 0.35rem 0.5rem;
   border-radius: 0.5rem;
-  color: var(--navy-950);
+  color: var(--plum-950);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -63,7 +63,7 @@
   background: none;
   padding: 0.4rem 0.6rem;
   border-radius: 0.5rem;
-  color: var(--navy-950);
+  color: var(--plum-950);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -82,7 +82,7 @@
   background: #fff;
   padding: 0.4rem 0.85rem;
   border-radius: 0.5rem;
-  color: var(--navy-950);
+  color: var(--plum-950);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -95,7 +95,7 @@
 
 .adv__primary {
   border: 0;
-  background: var(--navy-950);
+  background: var(--plum-950);
   color: #fff;
   padding: 0.45rem 1rem;
   border-radius: 0.5rem;
@@ -106,7 +106,7 @@
 }
 
 .adv__primary:hover {
-  background: var(--navy-900);
+  background: var(--plum-900);
 }
 
 .adv__primary[disabled] {
@@ -160,7 +160,7 @@
 }
 
 .adv__cover:hover {
-  color: var(--navy-950);
+  color: var(--plum-950);
   border-color: var(--mist-300);
 }
 
@@ -214,7 +214,7 @@
   overflow: hidden;
   padding: 0;
   font-family: var(--font-spectral), Georgia, serif;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .adv__title:focus,
@@ -268,7 +268,7 @@
 .adv__surface h2,
 .adv__surface h3 {
   font-weight: 700;
-  color: var(--navy-950);
+  color: var(--plum-950);
   letter-spacing: -0.02em;
   line-height: 1.2;
   margin: 1.8em 0 0.5em;
@@ -283,7 +283,7 @@
 }
 
 .adv__surface a {
-  color: var(--blue-600);
+  color: var(--wine-600);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -313,7 +313,7 @@
 .adv__surface blockquote {
   margin: 0 0 1.1em;
   padding-left: 1.25rem;
-  border-left: 3px solid var(--blue-500);
+  border-left: 3px solid var(--wine-500);
   color: var(--slate-500);
   font-style: italic;
 }
@@ -322,7 +322,7 @@
   margin: 0 0 1.1em;
   padding: 1rem 1.15rem;
   border-radius: 0.625rem;
-  background: var(--navy-950);
+  background: var(--plum-950);
   color: #e2e8f0;
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-size: 0.875rem;
@@ -336,7 +336,7 @@
   padding: 0.12em 0.36em;
   border-radius: 0.25rem;
   background: var(--mist-100);
-  color: var(--navy-900);
+  color: var(--plum-900);
 }
 
 .adv__surface hr {
@@ -354,7 +354,7 @@
 }
 
 .adv__surface img.ProseMirror-selectednode {
-  outline: 3px solid var(--blue-500);
+  outline: 3px solid var(--wine-500);
   outline-offset: 3px;
 }
 
@@ -384,7 +384,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--blue-100);
+  background: var(--wine-100);
   opacity: 0.45;
   pointer-events: none;
 }
@@ -435,7 +435,7 @@
 }
 
 .blockmenu__plus:hover {
-  color: var(--navy-950);
+  color: var(--plum-950);
   border-color: var(--mist-300);
 }
 
@@ -503,7 +503,7 @@
 }
 
 .blockpop__item:focus-visible {
-  outline: 2px solid var(--blue-500);
+  outline: 2px solid var(--wine-500);
   outline-offset: -2px;
 }
 
@@ -515,7 +515,7 @@
   flex: none;
   border-radius: 0.375rem;
   background: var(--mist-100);
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .blockpop__icon > svg {
@@ -533,7 +533,7 @@
 .blockpop__label {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .blockpop__hint {
@@ -560,7 +560,7 @@
   gap: 1px;
   padding: 0.25rem;
   border-radius: 0.625rem;
-  background: var(--navy-950);
+  background: var(--plum-950);
   box-shadow: 0 10px 26px rgba(11, 26, 51, 0.28);
 }
 
@@ -583,7 +583,7 @@
 
 .bubble__btn.is-active {
   background: #fff;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .bubble__btn > svg {
@@ -635,12 +635,12 @@
   border-radius: 0.5rem;
   padding: 0.55rem 0.75rem;
   font-size: 0.9375rem;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .linkdialog__input:focus {
   outline: none;
-  border-color: var(--blue-500);
+  border-color: var(--wine-500);
 }
 
 .linkdialog__error {
@@ -661,14 +661,14 @@
   padding: 0.45rem 0.9rem;
   font-size: 0.875rem;
   font-weight: 600;
-  background: var(--navy-950);
+  background: var(--plum-950);
   color: #fff;
   cursor: pointer;
 }
 
 .linkdialog__btn--plain {
   background: #fff;
-  color: var(--navy-950);
+  color: var(--plum-950);
   border-color: var(--mist-200);
 }
 
@@ -744,7 +744,7 @@
   margin: 0;
   font-size: 0.9375rem;
   font-weight: 700;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .adv__scrim {
@@ -818,12 +818,12 @@
   border-radius: 0.5rem;
   padding: 0.35rem 0.6rem;
   font-size: 0.8125rem;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .findbar__field:focus {
   outline: none;
-  border-color: var(--blue-500);
+  border-color: var(--wine-500);
 }
 
 .findbar__count {
@@ -850,7 +850,7 @@
 
 .findbar__icon:hover:not([disabled]) {
   background: var(--mist-100);
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .findbar__icon[disabled] {
@@ -869,7 +869,7 @@
   border-radius: 0.5rem;
   padding: 0.35rem 0.65rem;
   background: #fff;
-  color: var(--navy-950);
+  color: var(--plum-950);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
@@ -929,7 +929,7 @@
 
 /* The listbox itself is drawn by the OS, which does not inherit the dark chip. */
 .codelang__select option {
-  color: var(--navy-950);
+  color: var(--plum-950);
   background: #fff;
 }
 
@@ -954,7 +954,7 @@
   margin: 0 0 0.35rem;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .adv__checknote {
@@ -969,7 +969,7 @@
   list-style: disc;
   font-size: 0.875rem;
   line-height: 1.5;
-  color: var(--navy-950);
+  color: var(--plum-950);
   max-height: 40vh;
   overflow-y: auto;
 }

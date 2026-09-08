@@ -17,8 +17,8 @@
 }
 
 .rte:focus-within {
-  border-color: var(--blue-500);
-  box-shadow: 0 0 0 3px var(--blue-100);
+  border-color: var(--wine-500);
+  box-shadow: 0 0 0 3px var(--wine-100);
 }
 
 .rte__bar {
@@ -50,11 +50,11 @@
 
 .rte__btn:hover:not([disabled]) {
   background: var(--mist-100);
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .rte__btn[aria-pressed="true"] {
-  background: var(--navy-950);
+  background: var(--plum-950);
   color: #fff;
 }
 
@@ -83,7 +83,7 @@
   width: 13px;
   height: 13px;
   border: 2px solid var(--mist-300);
-  border-top-color: var(--navy-950);
+  border-top-color: var(--plum-950);
   border-radius: 50%;
   animation: rte-spin 0.7s linear infinite;
 }
@@ -111,13 +111,13 @@
   border-radius: 0.5rem;
   padding: 0.375rem 0.625rem;
   font-size: 0.8125rem;
-  color: var(--navy-950);
+  color: var(--plum-950);
   background: #fff;
 }
 
 .rte__linkinput:focus {
   outline: none;
-  border-color: var(--blue-500);
+  border-color: var(--wine-500);
 }
 
 .rte__linkbtn {
@@ -126,14 +126,14 @@
   padding: 0.375rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  background: var(--navy-950);
+  background: var(--plum-950);
   color: #fff;
   cursor: pointer;
 }
 
 .rte__linkbtn--plain {
   background: #fff;
-  color: var(--navy-950);
+  color: var(--plum-950);
 }
 
 .rte__error {
@@ -183,7 +183,7 @@
 
 .rte__body h2,
 .rte__body h3 {
-  color: var(--navy-950);
+  color: var(--plum-950);
   font-weight: 700;
   letter-spacing: -0.01em;
   margin: 1.4em 0 0.5em;
@@ -204,7 +204,7 @@
 }
 
 .rte__body a {
-  color: var(--blue-600);
+  color: var(--wine-600);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -230,7 +230,7 @@
 .rte__body blockquote {
   margin: 0 0 0.85em;
   padding-left: 1rem;
-  border-left: 3px solid var(--blue-500);
+  border-left: 3px solid var(--wine-500);
   color: var(--slate-500);
   font-style: italic;
 }
@@ -239,7 +239,7 @@
   margin: 0 0 0.85em;
   padding: 0.875rem 1rem;
   border-radius: 0.5rem;
-  background: var(--navy-950);
+  background: var(--plum-950);
   color: #e2e8f0;
   font-size: 0.8125rem;
   line-height: 1.55;
@@ -255,7 +255,7 @@
   padding: 0.1em 0.35em;
   border-radius: 0.25rem;
   background: var(--mist-100);
-  color: var(--navy-900);
+  color: var(--plum-900);
 }
 
 .rte__body hr {
@@ -273,7 +273,7 @@
 
 /* The selected image gets a ring, so it is obvious what Delete will remove. */
 .rte__body img.ProseMirror-selectednode {
-  outline: 3px solid var(--blue-500);
+  outline: 3px solid var(--wine-500);
   outline-offset: 2px;
 }
 
@@ -301,7 +301,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--blue-100);
+  background: var(--wine-100);
   opacity: 0.5;
   pointer-events: none;
 }

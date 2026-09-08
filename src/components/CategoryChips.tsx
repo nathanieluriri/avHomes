@@ -47,10 +47,10 @@ export default function CategoryChips({ scrollOnSelect = false }: { scrollOnSele
               type="button"
               onClick={() => select(t)}
               aria-pressed={isActive}
-              className={`shrink-0 rounded-full px-5 py-2.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+              className={`shrink-0 rounded-full px-5 py-2.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600 ${
                 isActive
-                  ? "bg-navy-950 text-white"
-                  : "bg-mist-100 text-slate-500 hover:bg-mist-200 hover:text-navy-950"
+                  ? "bg-plum-950 text-white"
+                  : "bg-mist-100 text-slate-500 hover:bg-mist-200 hover:text-plum-950"
               }`}
             >
               {label(t)}

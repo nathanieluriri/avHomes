@@ -12,10 +12,10 @@ export default function ContactPage() {
     <>
       <section className="border-b border-mist-200 bg-mist-50">
         <div className="mx-auto max-w-7xl px-6 py-14 text-center lg:px-10 lg:py-20">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-wine-600">
             Contact
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-navy-950 sm:text-4xl lg:text-5xl">
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-plum-950 sm:text-4xl lg:text-5xl">
             Talk To Us About Your <span className="accent">Next Move</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">
@@ -34,7 +34,7 @@ export default function ContactPage() {
 
           <Reveal delay={80} className="lg:col-span-2">
             <div className="rounded-2xl border border-mist-200 bg-white p-6 sm:p-8">
-              <h2 className="text-lg font-bold tracking-tight text-navy-950">
+              <h2 className="text-lg font-bold tracking-tight text-plum-950">
                 Visit Or Reach Us Directly
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -44,11 +44,11 @@ export default function ContactPage() {
 
               <div className="mt-6 space-y-5">
                 <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
-                    <MapPin className="h-4 w-4 text-blue-600" strokeWidth={1.8} />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                    <MapPin className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-navy-950">Lagos Office</p>
+                    <p className="text-sm font-semibold text-plum-950">Lagos Office</p>
                     <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
                       12 Admiralty Way, Lekki Phase 1, Lagos
                     </p>
@@ -56,11 +56,11 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
-                    <MapPin className="h-4 w-4 text-blue-600" strokeWidth={1.8} />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                    <MapPin className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-navy-950">Abuja Office</p>
+                    <p className="text-sm font-semibold text-plum-950">Abuja Office</p>
                     <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
                       9 Gana Street, Maitama, Abuja
                     </p>
@@ -68,14 +68,14 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
-                    <Phone className="h-4 w-4 text-blue-600" strokeWidth={1.8} />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                    <Phone className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-navy-950">Phone</p>
+                    <p className="text-sm font-semibold text-plum-950">Phone</p>
                     <a
                       href="tel:+2348000000000"
-                      className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-blue-600"
+                      className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
                     >
                       +234 800 000 0000
                     </a>
@@ -83,14 +83,14 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
-                    <Mail className="h-4 w-4 text-blue-600" strokeWidth={1.8} />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                    <Mail className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-navy-950">Email</p>
+                    <p className="text-sm font-semibold text-plum-950">Email</p>
                     <a
                       href="mailto:hello@avhomes.com"
-                      className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-blue-600"
+                      className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
                     >
                       hello@avhomes.com
                     </a>
@@ -98,11 +98,11 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
-                    <Clock className="h-4 w-4 text-blue-600" strokeWidth={1.8} />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                    <Clock className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-navy-950">Office Hours</p>
+                    <p className="text-sm font-semibold text-plum-950">Office Hours</p>
                     <div className="mt-0.5 space-y-0.5 text-sm leading-relaxed text-muted-foreground">
                       <p>Monday to Friday: 9am to 6pm</p>
                       <p>Saturday: 10am to 4pm</p>

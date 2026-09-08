@@ -54,15 +54,15 @@ export default async function PropertyPage({
         className="border-b border-mist-200 bg-white pb-3 pt-24"
       >
         <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto whitespace-nowrap px-6 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:px-10">
-          <Link href="/" className="shrink-0 transition-colors hover:text-blue-600">
+          <Link href="/" className="shrink-0 transition-colors hover:text-wine-600">
             Home
           </Link>
           <ChevronRight className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-          <Link href="/listings" className="shrink-0 transition-colors hover:text-blue-600">
+          <Link href="/listings" className="shrink-0 transition-colors hover:text-wine-600">
             Listings
           </Link>
           <ChevronRight className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-          <span className="truncate text-navy-950">{property.title}</span>
+          <span className="truncate text-plum-950">{property.title}</span>
         </div>
       </nav>
 
@@ -70,15 +70,15 @@ export default async function PropertyPage({
         <div className="mx-auto max-w-7xl px-6 py-10 sm:py-14 lg:flex lg:items-end lg:justify-between lg:gap-10 lg:px-10">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-700">
+              <span className="inline-flex items-center rounded-full bg-wine-50 px-3.5 py-1.5 text-xs font-semibold text-wine-700">
                 {property.status}
               </span>
-              <span className="inline-flex items-center rounded-full bg-mist-100 px-3.5 py-1.5 text-xs font-semibold text-navy-950">
+              <span className="inline-flex items-center rounded-full bg-mist-100 px-3.5 py-1.5 text-xs font-semibold text-plum-950">
                 {property.type}
               </span>
             </div>
 
-            <h1 className="mt-5 text-4xl font-bold leading-[0.98] tracking-tight text-navy-950 sm:text-5xl lg:text-6xl">
+            <h1 className="mt-5 text-4xl font-bold leading-[0.98] tracking-tight text-plum-950 sm:text-5xl lg:text-6xl">
               {property.title}
             </h1>
             <p className="mt-4 max-w-2xl text-lg font-medium text-muted-foreground sm:text-xl">
@@ -88,7 +88,7 @@ export default async function PropertyPage({
           </div>
 
           <div className="mt-8 shrink-0 border-t border-mist-200 pt-6 lg:mt-0 lg:border-t-0 lg:pt-0 lg:text-right">
-            <p className="break-words text-3xl font-bold leading-none tracking-tight text-navy-950 sm:text-4xl">
+            <p className="break-words text-3xl font-bold leading-none tracking-tight text-plum-950 sm:text-4xl">
               {formatPrice(property.priceMinor, property.status, property.currency)}
             </p>
           </div>
@@ -106,10 +106,10 @@ export default async function PropertyPage({
           <div className="min-w-0">
             <Reveal>
               <div>
-                <h2 className="text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">
+                <h2 className="text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl">
                   Overview
                 </h2>
-                <p className="mt-4 max-w-[65ch] text-base leading-relaxed text-navy-950/80 sm:text-lg sm:leading-[1.75]">
+                <p className="mt-4 max-w-[65ch] text-base leading-relaxed text-plum-950/80 sm:text-lg sm:leading-[1.75]">
                   {property.description}
                 </p>
               </div>
@@ -123,17 +123,17 @@ export default async function PropertyPage({
 
             <Reveal delay={120}>
               <div className="mt-12">
-                <h2 className="text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">
+                <h2 className="text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl">
                   Amenities
                 </h2>
                 <div className="mt-5 flex flex-wrap gap-3">
                   {property.amenities.map((amenity) => (
                     <span
                       key={amenity}
-                      className="inline-flex items-center gap-2 rounded-full bg-mist-100 px-4 py-2 text-sm font-medium text-navy-950"
+                      className="inline-flex items-center gap-2 rounded-full bg-mist-100 px-4 py-2 text-sm font-medium text-plum-950"
                     >
                       <Check
-                        className="h-3.5 w-3.5 shrink-0 text-blue-600"
+                        className="h-3.5 w-3.5 shrink-0 text-wine-600"
                         strokeWidth={2.5}
                         aria-hidden="true"
                       />
@@ -146,7 +146,7 @@ export default async function PropertyPage({
 
             <Reveal delay={160}>
               <div className="mt-12 rounded-2xl border border-mist-200 bg-white p-6 sm:p-8">
-                <h2 className="text-xl font-bold tracking-tight text-navy-950 sm:text-2xl">
+                <h2 className="text-xl font-bold tracking-tight text-plum-950 sm:text-2xl">
                   Location
                 </h2>
                 <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -170,7 +170,7 @@ export default async function PropertyPage({
                   href={mapsHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-mist-200 px-7 py-3.5 text-sm font-semibold text-navy-950 transition-colors duration-200 hover:border-blue-600 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-mist-200 px-7 py-3.5 text-sm font-semibold text-plum-950 transition-colors duration-200 hover:border-wine-600 hover:text-wine-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600"
                 >
                   Get directions
                   <ArrowUpRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
@@ -189,7 +189,7 @@ export default async function PropertyPage({
         <section className="border-t border-mist-200 bg-white">
           <div className="mx-auto max-w-7xl px-6 py-16 lg:px-10 lg:py-20">
             <Reveal>
-              <h2 className="text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">
+              <h2 className="text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl">
                 Similar properties
               </h2>
             </Reveal>

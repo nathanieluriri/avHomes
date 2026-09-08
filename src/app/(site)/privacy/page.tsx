@@ -20,10 +20,10 @@ const sections: LegalSection[] = [
   { id: "contact-dpo", label: "Contact Our Data Protection Officer" },
 ];
 
-const heading = "text-xl font-bold tracking-tight text-navy-950 sm:text-2xl";
+const heading = "text-xl font-bold tracking-tight text-plum-950 sm:text-2xl";
 const body = "mt-4 space-y-4 text-base leading-relaxed text-ink/80";
 const list = "mt-4 space-y-3 text-base leading-relaxed text-ink/80";
-const dot = "mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600";
+const dot = "mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-wine-600";
 
 export default function PrivacyPage() {
   return (
@@ -109,7 +109,7 @@ export default function PrivacyPage() {
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Strictly necessary cookies</strong>{" "}
+              <strong className="font-semibold text-plum-950">Strictly necessary cookies</strong>{" "}
               are required for core functionality, such as remembering your filter selections
               during a session and keeping the Service secure. These cannot be switched off.
             </span>
@@ -117,7 +117,7 @@ export default function PrivacyPage() {
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Analytics cookies</strong> help us
+              <strong className="font-semibold text-plum-950">Analytics cookies</strong> help us
               understand aggregate visitor behaviour, such as which listings and pages are
               viewed most often, so that we can improve the Service. These are only set with
               your consent.
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Marketing cookies</strong> may be
+              <strong className="font-semibold text-plum-950">Marketing cookies</strong> may be
               used to show more relevant AVHomes messaging on other platforms and to measure the
               effectiveness of our campaigns. These are only set with your consent and can be
               withdrawn at any time through your cookie preferences.
@@ -193,35 +193,35 @@ export default function PrivacyPage() {
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Access.</strong> Request a copy of
+              <strong className="font-semibold text-plum-950">Access.</strong> Request a copy of
               the personal data we hold about you.
             </span>
           </li>
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Correction.</strong> Ask us to
+              <strong className="font-semibold text-plum-950">Correction.</strong> Ask us to
               correct inaccurate or incomplete data.
             </span>
           </li>
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Deletion.</strong> Ask us to
+              <strong className="font-semibold text-plum-950">Deletion.</strong> Ask us to
               delete data we no longer have a valid reason to keep.
             </span>
           </li>
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Objection.</strong> Object to or
+              <strong className="font-semibold text-plum-950">Objection.</strong> Object to or
               request that we restrict certain processing of your data.
             </span>
           </li>
           <li className="flex gap-3">
             <span className={dot} aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-navy-950">Portability.</strong> Request your
+              <strong className="font-semibold text-plum-950">Portability.</strong> Request your
               data in a structured, commonly used, machine readable format.
             </span>
           </li>

@@ -117,7 +117,7 @@ export function StorefrontCard({ user }: { user: AuthUser }) {
             href="/"
             target="_blank"
             rel="noreferrer"
-            className="c-bevel inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-white px-2.5 text-[12px] font-semibold text-navy-950 transition-colors hover:bg-mist-50"
+            className="c-bevel inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg bg-white px-2.5 text-[12px] font-semibold text-plum-950 transition-colors hover:bg-mist-50"
           >
             Open
             <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -365,12 +365,12 @@ function CustomizePanel({
   return (
     <div ref={panelRef} className="scroll-mt-4 border-t border-mist-200 bg-mist-50/70 p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold text-navy-950">Homepage</h2>
+        <h2 className="text-sm font-semibold text-plum-950">Homepage</h2>
         <p className="text-[12px] text-slate-600">What the site reads from the database.</p>
         <button
           type="button"
           onClick={onClose}
-          className="ml-auto text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+          className="ml-auto text-[12px] font-semibold text-wine-600 hover:text-wine-700"
         >
           Done
         </button>
@@ -405,7 +405,7 @@ function CustomizePanel({
 
           {stats.data && items.length === 0 && (
             <div className="mt-3 rounded-xl bg-white p-4 shadow-card">
-              <p className="text-[13px] font-medium text-navy-950">No counters yet</p>
+              <p className="text-[13px] font-medium text-plum-950">No counters yet</p>
               <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
                 The homepage renders that section without them. Add one here and it appears on
                 the site as soon as you save.
@@ -429,7 +429,7 @@ function CustomizePanel({
                       key={stat.id}
                       className="flex items-baseline gap-2 rounded-lg bg-white px-3 py-2 shadow-card"
                     >
-                      <span className="c-num text-sm font-bold text-navy-950">
+                      <span className="c-num text-sm font-bold text-plum-950">
                         {stat.prefix}
                         {stat.value}
                         {stat.suffix}
@@ -446,7 +446,7 @@ function CustomizePanel({
                         inputMode="numeric"
                         value={draft.value}
                         onChange={(event) => edit(stat, { value: event.target.value })}
-                        className="c-num h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-right text-[13px] font-semibold text-navy-950 outline-none focus:border-blue-500"
+                        className="c-num h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-right text-[13px] font-semibold text-plum-950 outline-none focus:border-wine-500"
                       />
                     </label>
                     <label className="w-14 shrink-0">
@@ -455,7 +455,7 @@ function CustomizePanel({
                         value={draft.suffix}
                         placeholder="+"
                         onChange={(event) => edit(stat, { suffix: event.target.value })}
-                        className="h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-navy-950 outline-none placeholder:text-slate-550 focus:border-blue-500"
+                        className="h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-plum-950 outline-none placeholder:text-slate-550 focus:border-wine-500"
                       />
                     </label>
                     <label className="min-w-0 flex-1">
@@ -463,7 +463,7 @@ function CustomizePanel({
                       <input
                         value={draft.label}
                         onChange={(event) => edit(stat, { label: event.target.value })}
-                        className="h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-navy-950 outline-none focus:border-blue-500"
+                        className="h-8 w-full rounded-lg border border-mist-200 bg-white px-2 text-[13px] text-plum-950 outline-none focus:border-wine-500"
                       />
                     </label>
                     <button
@@ -543,7 +543,7 @@ function CustomizePanel({
                 <li key={property.id}>
                   <Link
                     href={`/admin/properties/${property.id}`}
-                    className="flex items-center gap-2.5 rounded-lg bg-white px-2 py-1.5 shadow-card transition-colors hover:bg-blue-50/60"
+                    className="flex items-center gap-2.5 rounded-lg bg-white px-2 py-1.5 shadow-card transition-colors hover:bg-wine-50/60"
                   >
                     <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-mist-100 text-slate-550">
                       {property.images[0] ? (
@@ -552,7 +552,7 @@ function CustomizePanel({
                         <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
                       )}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-navy-950">
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-plum-950">
                       {property.title || "Untitled listing"}
                     </span>
                     <Star
@@ -567,7 +567,7 @@ function CustomizePanel({
 
           <Link
             href="/admin/properties"
-            className="mt-3 inline-block text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+            className="mt-3 inline-block text-[12px] font-semibold text-wine-600 hover:text-wine-700"
           >
             Manage listings
           </Link>

@@ -72,7 +72,7 @@ export default function Gallery({ images, title }: GalleryProps) {
           }}
           onClick={() => openAt(0)}
           aria-label={`Open photo 1 of ${count}`}
-          className="group relative block h-[300px] w-full overflow-hidden rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 md:h-[560px]"
+          className="group relative block h-[300px] w-full overflow-hidden rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600 md:h-[560px]"
         >
           <Image
             src={images[0]}
@@ -82,7 +82,7 @@ export default function Gallery({ images, title }: GalleryProps) {
             sizes="(min-width: 1024px) 66vw, 100vw"
             className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"
           />
-          <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-navy-950 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100">
+          <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-plum-950 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100">
             <Maximize2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
           </span>
         </button>
@@ -100,7 +100,7 @@ export default function Gallery({ images, title }: GalleryProps) {
               }}
               onClick={() => openAt(i + 1)}
               aria-label={`Open photo ${i + 2} of ${count}`}
-              className="group relative block h-[220px] w-full overflow-hidden rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 md:h-auto"
+              className="group relative block h-[220px] w-full overflow-hidden rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600 md:h-auto"
             >
               <Image
                 src={src}
@@ -109,7 +109,7 @@ export default function Gallery({ images, title }: GalleryProps) {
                 sizes="(min-width: 1024px) 34vw, 100vw"
                 className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"
               />
-              <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-navy-950 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100">
+              <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-plum-950 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100">
                 <Maximize2 className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
               </span>
             </button>
@@ -122,7 +122,7 @@ export default function Gallery({ images, title }: GalleryProps) {
           role="dialog"
           aria-modal="true"
           aria-label={`${title} gallery`}
-          className="fixed inset-0 z-[100] bg-navy-950/95"
+          className="fixed inset-0 z-[100] bg-plum-950/95"
           onClick={close}
         >
           <button
@@ -130,7 +130,7 @@ export default function Gallery({ images, title }: GalleryProps) {
             type="button"
             onClick={close}
             aria-label="Close gallery"
-            className="absolute right-4 top-4 z-10 grid h-12 w-12 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition-colors duration-200 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            className="absolute right-4 top-4 z-10 grid h-12 w-12 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition-colors duration-200 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-500"
           >
             <X className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
           </button>
@@ -144,7 +144,7 @@ export default function Gallery({ images, title }: GalleryProps) {
                   step(-1);
                 }}
                 aria-label="Previous photo"
-                className="absolute left-4 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition-colors duration-200 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                className="absolute left-4 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition-colors duration-200 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-500"
               >
                 <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
               </button>
@@ -155,7 +155,7 @@ export default function Gallery({ images, title }: GalleryProps) {
                   step(1);
                 }}
                 aria-label="Next photo"
-                className="absolute right-4 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition-colors duration-200 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                className="absolute right-4 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition-colors duration-200 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-500"
               >
                 <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
               </button>

@@ -153,7 +153,7 @@ const CategoryBody = z
     slug: slugString(),
     name: str().min(1).max(120),
     blurb: str().max(500).default(""),
-    accent: str().max(20).default("#2563eb"),
+    accent: str().max(20).default("#983c53"),
     position: z.number().int().min(0).max(999).default(0),
   })
   .strict();

@@ -128,7 +128,7 @@ export function CardHead({
   return (
     <div className="mb-3 flex items-center gap-2">
       {Icon && <Icon className="h-4 w-4 shrink-0 text-slate-550" aria-hidden />}
-      <h2 className="text-sm font-semibold text-navy-950">{title}</h2>
+      <h2 className="text-sm font-semibold text-plum-950">{title}</h2>
       {action && <div className="ml-auto flex items-center gap-1.5">{action}</div>}
     </div>
   );
@@ -173,7 +173,7 @@ export function PageHeader({
           <nav aria-label="Breadcrumb" className="mb-1.5 flex items-center gap-1">
             <Link
               href={backTo}
-              className="flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-mist-200/70 hover:text-navy-950"
+              className="flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-mist-200/70 hover:text-plum-950"
             >
               {Icon && <Icon className="h-3.5 w-3.5" aria-hidden />}
               {backLabel ?? "Back"}
@@ -189,7 +189,7 @@ export function PageHeader({
           {Icon && !backTo && (
             <Icon className="h-5 w-5 shrink-0 text-slate-550" aria-hidden />
           )}
-          <h1 className="truncate text-xl font-bold tracking-tight text-navy-950">{title}</h1>
+          <h1 className="truncate text-xl font-bold tracking-tight text-plum-950">{title}</h1>
           {badge}
         </div>
 
@@ -215,8 +215,8 @@ type ButtonSize = "sm" | "md" | "lg";
  * hairline under a light one.
  */
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: "c-bevel-primary bg-blue-600 text-white hover:bg-blue-700 disabled:bg-mist-300",
-  ghost: "c-bevel bg-white text-navy-950 hover:bg-mist-50 disabled:text-mist-300",
+  primary: "c-bevel-primary bg-wine-600 text-white hover:bg-wine-700 disabled:bg-mist-300",
+  ghost: "c-bevel bg-white text-plum-950 hover:bg-mist-50 disabled:text-mist-300",
   danger: "c-bevel bg-white text-red-700 hover:bg-red-50 disabled:text-red-300",
 };
 
@@ -312,23 +312,29 @@ export function Field({
  * focus state at all.
  */
 export const inputClass =
-  "w-full rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-navy-950 outline-none transition-colors placeholder:text-slate-550 focus:border-blue-500";
+  "w-full rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-550 focus:border-wine-500";
 
 /* ════════════════════════════════════════════════════════════════ STATUS ══ */
 
-export type Tone = "neutral" | "green" | "amber" | "blue" | "red";
+export type Tone = "neutral" | "green" | "amber" | "wine" | "red";
 
 /*
  * A fill plus the ink that is legal ON that fill, never ink chosen against
  * white. Badges are the only saturated surfaces in the console, which is
  * exactly what makes a scan down a status column work.
+ *
+ * `red` sits one step darker than the other tints. The brand tone used to be
+ * blue, so danger was the only red in the column and a 50 ground was enough to
+ * name it. Now the brand is a wine red, and a wine tint beside a red tint is
+ * two pale pinks: "For rent" and "Deleted" stop being one glance apart. The
+ * 100/800 pair keeps danger the louder of the two.
  */
 const TONES: Record<Tone, string> = {
   neutral: "bg-mist-100 text-slate-600",
   green: "bg-emerald-50 text-emerald-700",
   amber: "bg-amber-50 text-amber-700",
-  blue: "bg-blue-50 text-blue-700",
-  red: "bg-red-50 text-red-700",
+  wine: "bg-wine-50 text-wine-700",
+  red: "bg-red-100 text-red-800",
 };
 
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
@@ -367,7 +373,7 @@ export function EmptyState({
     return (
       <div className="grid items-center gap-6 rounded-2xl bg-white p-8 shadow-card sm:grid-cols-[minmax(0,1fr)_auto] sm:p-10">
         <div>
-          <p className="text-base font-semibold text-navy-950">{title}</p>
+          <p className="text-base font-semibold text-plum-950">{title}</p>
           {hint && <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-slate-600">{hint}</p>}
           {action && <div className="mt-4 flex flex-wrap gap-2">{action}</div>}
         </div>
@@ -385,7 +391,7 @@ export function EmptyState({
           <Icon className="h-5 w-5" aria-hidden />
         </span>
       )}
-      <p className="font-semibold text-navy-950">{title}</p>
+      <p className="font-semibold text-plum-950">{title}</p>
       {hint && <p className="mx-auto mt-1 max-w-sm text-[13px] text-slate-600">{hint}</p>}
       {action && <div className="mt-4 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
@@ -414,7 +420,7 @@ export function Skeleton({
 export function Spinner() {
   return (
     <div className="flex items-center gap-2 py-10 text-[13px] text-slate-600">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-mist-300 border-t-blue-600" />
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-mist-300 border-t-wine-600" />
       Loading
     </div>
   );

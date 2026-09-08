@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin } from "lucide-react";
+import { Search } from "lucide-react";
+import LocationInput from "@/components/LocationInput";
 import {
   Select,
   SelectContent,
@@ -49,16 +50,7 @@ export default function SearchStrip() {
         onSubmit={submit}
         className="mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl border border-mist-200 bg-white p-3 lg:flex-row lg:items-center lg:gap-0 lg:rounded-full lg:p-2.5"
       >
-        <div className="flex flex-1 items-center gap-2.5 px-4 py-2">
-          <MapPin className="h-4 w-4 shrink-0 text-blue-600" strokeWidth={1.8} />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search in location..."
-            aria-label="Search by location"
-            className="w-full bg-transparent text-sm text-navy-950 outline-none placeholder:text-slate-500"
-          />
-        </div>
+        <LocationInput value={q} onChange={setQ} placeholder="Search in location..." />
 
         <div className="hidden h-8 w-px bg-mist-200 lg:block" />
 
@@ -99,7 +91,7 @@ export default function SearchStrip() {
 
         <button
           type="submit"
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 lg:py-3"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-wine-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 lg:py-3"
         >
           <Search className="h-4 w-4" strokeWidth={2.2} />
           Find Property

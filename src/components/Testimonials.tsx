@@ -28,16 +28,16 @@ export default function Testimonials({ testimonials }: { testimonials: Testimoni
           {testimonials.map((t, i) => (
             <Reveal key={t.id} delay={(i % 2) * 90}>
               <figure className="card-soft flex h-full flex-col overflow-hidden p-6 sm:p-7">
-                <div className="flex items-center gap-1 text-blue-600">
+                <div className="flex items-center gap-1 text-wine-600">
                   {Array.from({ length: t.rating }).map((_, s) => (
                     <Star key={s} className="h-4 w-4 fill-current" strokeWidth={0} />
                   ))}
-                  <span className="ml-2 text-sm font-semibold text-navy-950">
+                  <span className="ml-2 text-sm font-semibold text-plum-950">
                     {t.rating.toFixed(1)}
                   </span>
                 </div>
 
-                <blockquote className="mt-4 flex-1 text-base leading-relaxed text-navy-950/80">
+                <blockquote className="mt-4 flex-1 text-base leading-relaxed text-plum-950/80">
                   {t.quote}
                 </blockquote>
 
@@ -50,7 +50,7 @@ export default function Testimonials({ testimonials }: { testimonials: Testimoni
                     className="h-12 w-12 rounded-full object-cover"
                   />
                   <div>
-                    <p className="text-sm font-semibold text-navy-950">{t.name}</p>
+                    <p className="text-sm font-semibold text-plum-950">{t.name}</p>
                     <p className="text-xs text-muted-foreground">{t.role}</p>
                   </div>
                 </figcaption>

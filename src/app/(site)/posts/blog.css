@@ -1,5 +1,5 @@
 /*
- * Blog reading surface. White paper, neutral ink, the site blue as the one
+ * Blog reading surface. White paper, neutral ink, the site wine as the one
  * accent, generous type scale.
  *
  * Three rules govern this file:
@@ -39,11 +39,11 @@
   --card-line: #0f172a;
   --card-lift: 3px;
 
-  /* accent: the AVHomes blue, so the reader matches the rest of the site */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: #eff6ff;
-  --accent-line: #bfdbfe;
+  /* accent: the AVHomes wine, so the reader matches the rest of the site */
+  --accent: #983c53;
+  --accent-hover: #762d3f;
+  --accent-soft: #fbf4f6;
+  --accent-line: #f2dee3;
   --accent-ink: #ffffff;
 
   /* state */
@@ -275,6 +275,38 @@
   border-top: 1px solid var(--rule);
 }
 
+/* Tags above the body lead into the subject rather than closing it off, so this
+   variant drops the rule the footer version needed to separate itself. */
+.blog .tpl__tags--top {
+  padding-top: 0;
+  border-top: 0;
+  margin: var(--s4) 0 var(--s5);
+}
+
+.blog .tpl__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-bottom: var(--s5);
+  font-family: var(--font-ui);
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--ink-3);
+  text-decoration: none;
+}
+.blog .tpl__back:hover {
+  color: var(--accent);
+}
+.blog .tpl__back-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+/* The technical template is a two column grid, so the link has to span both or
+   it lands in the rail column and pushes the facts across. */
+.blog .tpl--technical .tpl__back-row {
+  grid-column: 1 / -1;
+}
+
 /* chips: tags that navigate */
 .blog .chip {
   display: inline-flex;
@@ -476,7 +508,7 @@
   gap: var(--s4);
   flex-wrap: wrap;
   padding-top: var(--s5);
-  border-top: 1px solid var(--rule, #e2ded2);
+  border-top: 1px solid var(--rule);
 }
 .blog .share__label {
   font-size: var(--step--1);
@@ -495,17 +527,55 @@
   place-items: center;
   width: var(--tap-min);
   height: var(--tap-min);
+  border: 0;
   border-radius: var(--radius-full);
-  color: var(--ink-3);
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  background: var(--paper-sunken);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease),
+    color var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
 }
-.blog .share__link svg {
-  width: 1.15rem;
-  height: 1.15rem;
+/*
+ * The fill is the brand colour and the glyph goes white on it, so the pair is a
+ * graphical object at better than 3:1. Two of the hexes in ShareLinks are the
+ * brands own deep variants rather than their published ones, because WhatsApp
+ * green and Reddit orange both land near 2:1 against white.
+ */
+.blog .share__link:hover,
+.blog .share__link:focus-visible {
+  background: var(--brand, var(--accent));
+  color: #ffffff;
+  transform: translateY(-2px);
 }
-.blog .share__link:hover {
-  background: var(--accent-soft);
-  color: var(--accent-hover);
+/* Copy has no brand of its own, so it borrows the page accent, and turns to the
+   success colour for as long as the confirmation is showing. */
+.blog .share__link--copy {
+  --brand: var(--accent-hover);
+}
+.blog .share__link--copy[data-copy="copied"] {
+  --brand: #15803d;
+  background: var(--brand);
+  color: #ffffff;
+}
+/* Both paths refused. The button says so rather than looking untouched. */
+.blog .share__link--copy[data-copy="failed"] {
+  --brand: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+/* The confirmation is announced, never drawn: the button already shows a tick. */
+.blog .share__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---------- prose ---------- */
@@ -974,5 +1044,257 @@
 @media (max-width: 640px) {
   .blog .idx {
     padding: var(--s6) var(--s4) var(--s8);
+  }
+}
+
+/* ---------- reading progress ---------- */
+
+/*
+ * A full-viewport fixed layer holding both readouts, so `--read` is written
+ * once and the marks and the hairline both follow it. `pointer-events: none` is
+ * load bearing: without it this layer would swallow every click on the page.
+ */
+.blog .rail {
+  --read: 0;
+  /* Must equal TICKS in ReadingProgress.tsx. The marks arithmetic is over it. */
+  --ticks: 32;
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+}
+/* Set by the component when the article fits on one screen. A rail that only
+   ever reads empty or full is furniture that reports nothing. */
+.blog .rail[data-idle] {
+  display: none;
+}
+
+/* The hairline, for viewports with no gutter to put the column in. The z-index
+   above puts it over the site header, which is sticky at 80. */
+.blog .rail__bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--accent-line);
+}
+.blog .rail__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(var(--read));
+  transform-origin: left center;
+}
+
+.blog .rail__ticks {
+  position: absolute;
+  left: clamp(0.75rem, 2.2vw, 2.5rem);
+  top: 50%;
+  translate: 0 -50%;
+  display: none;
+  flex-direction: column;
+  gap: 9px;
+}
+.blog .rail__tick {
+  width: 15px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ink);
+  transform-origin: left center;
+  /*
+   * `--read * --ticks - --i` is how many marks past this one the reader has
+   * gone: above 1 for a mark already behind them, below 0 for one not reached,
+   * and a fraction for the mark being read right now. Clamping that one number
+   * into both the fade and the width is what lets thirty-two marks animate off
+   * a single style write per frame, with no per-mark work in JavaScript.
+   */
+  opacity: clamp(0.13, calc(var(--read) * var(--ticks) - var(--i)), 0.85);
+  scale: clamp(0.5, calc(var(--read) * var(--ticks) - var(--i)), 1) 1;
+}
+
+/* Wide enough for a gutter beside the measure. Below this the column would sit
+   on the text, so the hairline does the job instead. */
+@media (min-width: 1180px) {
+  .blog .rail__ticks {
+    display: flex;
+  }
+  .blog .rail__bar {
+    display: none;
+  }
+}
+
+@media print {
+  .blog .rail {
+    display: none;
+  }
+}
+
+/* ---------- subscribe ---------- */
+
+/* Same measure as the share row above it, so the page keeps one left edge. */
+.blog .blog-subscribe {
+  max-width: calc(var(--measure) + 2 * var(--s5));
+  margin: 0 auto;
+  padding: 0 var(--s5) var(--s8);
+}
+@media (max-width: 640px) {
+  .blog .blog-subscribe {
+    padding: 0 var(--s4) var(--s7);
+  }
+}
+
+.blog .sub {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: start;
+  gap: var(--s4);
+  padding: var(--s5);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-l);
+  background: var(--accent-soft);
+}
+.blog .sub__mark {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.blog .sub__title {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink);
+}
+.blog .sub__body {
+  margin: var(--s2) 0 0;
+  font-size: var(--step--1);
+  line-height: 1.55;
+  color: var(--ink-3);
+  max-width: 46ch;
+}
+
+.blog .sub__form {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+/* On a wide card the field lines up under the copy, not under the mark. */
+@media (min-width: 720px) {
+  .blog .sub__form {
+    grid-column: 2;
+  }
+}
+
+/* The field is labelled for assistive technology and captioned by the heading
+   for everyone else, so drawing the label as well would only add clutter. */
+.blog .sub__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.blog .sub__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.blog .sub__input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  height: var(--tap-min);
+  padding: 0 var(--ctl-pad-x-lg);
+  font: inherit;
+  font-size: var(--step-0);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-m);
+}
+.blog .sub__input::placeholder {
+  color: var(--ink-5);
+}
+.blog .sub__input:focus-visible {
+  border-color: var(--accent);
+}
+.blog .sub__input[aria-invalid] {
+  border-color: var(--danger);
+}
+.blog .sub__input:disabled {
+  color: var(--ink-4);
+  background: var(--paper-sunken);
+}
+.blog .sub__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  height: var(--tap-min);
+  padding: 0 var(--s5);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease);
+}
+.blog .sub__submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.blog .sub__submit:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+.blog .sub__spin {
+  animation: sub-spin 900ms linear infinite;
+}
+@keyframes sub-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/*
+ * Off screen rather than `display: none`. A form filler that reads the
+ * stylesheet skips a field it can see is hidden, and one that does not read it
+ * fills this in either way.
+ */
+.blog .sub__trap {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* Empty until there is something to say, so the card does not jump when there
+   is. `role="alert"` announces it the moment it fills. */
+.blog .sub__problem:empty {
+  display: none;
+}
+.blog .sub__problem {
+  margin: var(--s2) 0 0;
+  font-size: var(--step--1);
+  color: var(--danger);
+}
+
+@media (max-width: 520px) {
+  .blog .sub {
+    padding: var(--s4);
+  }
+  .blog .sub__submit {
+    flex: 1 1 auto;
   }
 }

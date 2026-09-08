@@ -59,8 +59,8 @@ export function SaveBar({
       role="status"
       className="c-savebar console-float fixed inset-x-0 bottom-0 z-[60] flex justify-center p-3 sm:p-4"
     >
-      <div className="pointer-events-auto flex w-full max-w-lg items-center gap-3 rounded-2xl bg-navy-950 py-2 pl-4 pr-2 shadow-pop">
-        <AlertCircle className="hidden h-4 w-4 shrink-0 text-blue-100 sm:block" aria-hidden="true" />
+      <div className="pointer-events-auto flex w-full max-w-lg items-center gap-3 rounded-2xl bg-plum-950 py-2 pl-4 pr-2 shadow-pop">
+        <AlertCircle className="hidden h-4 w-4 shrink-0 text-wine-100 sm:block" aria-hidden="true" />
         <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-white">
           Unsaved changes
         </p>
@@ -68,7 +68,7 @@ export function SaveBar({
           type="button"
           onClick={onDiscard}
           disabled={saving}
-          className="h-8 shrink-0 rounded-lg px-3 text-[13px] font-semibold text-blue-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+          className="h-8 shrink-0 rounded-lg px-3 text-[13px] font-semibold text-wine-100 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
         >
           Discard
         </button>
@@ -76,7 +76,7 @@ export function SaveBar({
           type="button"
           onClick={onSave}
           disabled={saving || disabled}
-          className="c-bevel-primary inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-600/50"
+          className="c-bevel-primary inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-wine-600 px-3.5 text-[13px] font-semibold text-white transition-colors hover:bg-wine-700 disabled:cursor-not-allowed disabled:bg-wine-600/50"
         >
           {saving && <RotateCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
           {saving ? "Saving" : "Save"}

@@ -125,7 +125,7 @@ export default function DashboardPage() {
       {error && (
         <div className="space-y-4">
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-navy-950">
+            <h1 className="text-2xl font-bold tracking-tight text-plum-950">
               {firstName ? `${firstName}, something is not answering` : "Something is not answering"}
             </h1>
             <p className="mt-1 text-[13px] text-slate-600">
@@ -159,7 +159,7 @@ export default function DashboardPage() {
 
           <section>
             <div className="mb-4 text-center">
-              <h1 className="text-2xl font-bold tracking-tight text-navy-950">
+              <h1 className="text-2xl font-bold tracking-tight text-plum-950">
                 {firstName ? `${firstName}, what` : "What"} do you want to work on next?
               </h1>
               <p className="mt-1 text-[13px] text-slate-600">
@@ -178,10 +178,10 @@ export default function DashboardPage() {
             <Card>
               <div className="mb-3 flex items-center gap-2">
                 <Inbox className="h-4 w-4 shrink-0 text-slate-550" aria-hidden="true" />
-                <h2 className="text-sm font-semibold text-navy-950">Latest enquiries</h2>
+                <h2 className="text-sm font-semibold text-plum-950">Latest enquiries</h2>
                 <Link
                   href="/admin/enquiries"
-                  className="ml-auto text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+                  className="ml-auto text-[12px] font-semibold text-wine-600 hover:text-wine-700"
                 >
                   Open the inbox
                 </Link>
@@ -195,13 +195,13 @@ export default function DashboardPage() {
                 <ul className="divide-y divide-mist-100">
                   {data.recentEnquiries.map((enquiry) => (
                     <li key={enquiry.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-navy-950">
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-plum-950">
                         {enquiry.name}
                       </span>
                       <span className="c-num shrink-0 text-[12px] text-slate-600">
                         {relative(enquiry.createdAt)}
                       </span>
-                      <Badge tone={enquiry.status === "new" ? "blue" : "neutral"}>
+                      <Badge tone={enquiry.status === "new" ? "wine" : "neutral"}>
                         {enquiry.status}
                       </Badge>
                     </li>
@@ -228,11 +228,11 @@ function DestinationCard({ item, data }: { item: Destination; data: Dashboard | 
   return (
     <Link
       href={item.href}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-card transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-blue-50/40 ${
+      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-card transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-wine-50/40 ${
         item.wide ? "sm:col-span-2" : ""
       }`}
     >
-      <span className="mb-3 grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+      <span className="mb-3 grid h-9 w-9 place-items-center rounded-xl bg-wine-50 text-wine-600 transition-colors group-hover:bg-wine-600 group-hover:text-white">
         <item.icon className="h-[18px] w-[18px]" aria-hidden="true" />
       </span>
 
@@ -240,14 +240,14 @@ function DestinationCard({ item, data }: { item: Destination; data: Dashboard | 
         <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-550">
           {item.label}
         </span>
-        {kicker && <Badge tone="blue">{kicker}</Badge>}
+        {kicker && <Badge tone="wine">{kicker}</Badge>}
       </span>
 
-      <span className="mt-1 text-sm font-semibold text-navy-950">{item.title}</span>
+      <span className="mt-1 text-sm font-semibold text-plum-950">{item.title}</span>
       <span className="mt-1 text-[13px] leading-relaxed text-slate-600">{item.body}</span>
 
       <ArrowRight
-        className="absolute right-4 top-5 h-4 w-4 text-mist-300 transition-[color,transform] duration-200 group-hover:translate-x-0.5 group-hover:text-blue-600"
+        className="absolute right-4 top-5 h-4 w-4 text-mist-300 transition-[color,transform] duration-200 group-hover:translate-x-0.5 group-hover:text-wine-600"
         aria-hidden="true"
       />
     </Link>

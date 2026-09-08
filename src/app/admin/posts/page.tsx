@@ -216,7 +216,7 @@ export default function PostsPage() {
                 <select
                   value={sort}
                   onChange={(event) => refilter(() => setSort(event.target.value as typeof sort))}
-                  className="h-8 rounded-lg border border-mist-200 bg-white px-2 text-[13px] font-medium text-navy-950 outline-none transition-colors focus:border-blue-500"
+                  className="h-8 rounded-lg border border-mist-200 bg-white px-2 text-[13px] font-medium text-plum-950 outline-none transition-colors focus:border-wine-500"
                 >
                   {SORTS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -284,16 +284,16 @@ function JournalArt() {
   return (
     <svg width="168" height="112" viewBox="0 0 168 112" fill="none" aria-hidden="true">
       <rect x="16" y="20" width="98" height="80" rx="9" fill="var(--mist-100)" />
-      <rect x="34" y="12" width="104" height="88" rx="10" fill="var(--blue-50)" />
-      <rect x="34.5" y="12.5" width="103" height="87" rx="9.5" stroke="var(--blue-100)" />
-      <rect x="48" y="26" width="52" height="9" rx="4.5" fill="var(--blue-500)" />
+      <rect x="34" y="12" width="104" height="88" rx="10" fill="var(--wine-50)" />
+      <rect x="34.5" y="12.5" width="103" height="87" rx="9.5" stroke="var(--wine-100)" />
+      <rect x="48" y="26" width="52" height="9" rx="4.5" fill="var(--wine-500)" />
       <rect x="48" y="44" width="76" height="5" rx="2.5" fill="var(--mist-200)" />
       <rect x="48" y="56" width="76" height="5" rx="2.5" fill="var(--mist-200)" />
       <rect x="48" y="68" width="48" height="5" rx="2.5" fill="var(--mist-200)" />
-      <circle cx="112" cy="30" r="5" fill="var(--blue-100)" />
+      <circle cx="112" cy="30" r="5" fill="var(--wine-100)" />
       <path
         d="M110 30l1.6 1.6 3.4-3.4"
-        stroke="var(--blue-600)"
+        stroke="var(--wine-600)"
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"

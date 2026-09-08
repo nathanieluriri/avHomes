@@ -31,7 +31,7 @@ export default function SignInPage() {
     <div className="grid min-h-screen place-items-center px-6">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <p className="text-xl font-bold tracking-tight text-navy-950">AVHomes</p>
+          <p className="text-xl font-bold tracking-tight text-plum-950">AVHomes</p>
           <p className="mt-1 text-sm text-muted-foreground">Sign in to the admin</p>
         </div>
 
@@ -160,7 +160,7 @@ function PasswordDoor({ reason }: { reason: string }) {
 function ClerkDoor() {
   return (
     <Card>
-      <p className="text-sm font-semibold text-navy-950">Single sign-on is configured</p>
+      <p className="text-sm font-semibold text-plum-950">Single sign-on is configured</p>
       <p className="mt-2 text-sm text-muted-foreground">
         The server is ready to exchange a Clerk token for a session. The sign-in widget is not part of
         this build yet, so install <code className="font-mono text-xs">@clerk/nextjs</code>, mount its

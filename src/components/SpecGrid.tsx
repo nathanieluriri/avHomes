@@ -19,8 +19,8 @@ export default function SpecGrid({ property }: { property: Property }) {
           key={spec.label}
           className="flex flex-col items-center justify-center gap-2 bg-white px-4 py-7 text-center"
         >
-          <spec.icon className="h-5 w-5 text-blue-600" strokeWidth={1.8} aria-hidden="true" />
-          <div className="text-2xl font-bold leading-none tracking-tight text-navy-950 sm:text-3xl">
+          <spec.icon className="h-5 w-5 text-wine-600" strokeWidth={1.8} aria-hidden="true" />
+          <div className="text-2xl font-bold leading-none tracking-tight text-plum-950 sm:text-3xl">
             {spec.value}
           </div>
           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">

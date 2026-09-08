@@ -34,7 +34,7 @@ export default function FeaturedListings({ properties }: { properties: Property[
       <div className="mt-12 text-center">
         <Link
           href="/listings"
-          className="group inline-flex items-center gap-2 rounded-full border border-mist-200 px-8 py-3.5 text-sm font-semibold text-navy-950 transition-colors hover:border-blue-600 hover:text-blue-600"
+          className="group inline-flex items-center gap-2 rounded-full border border-mist-200 px-8 py-3.5 text-sm font-semibold text-plum-950 transition-colors hover:border-wine-600 hover:text-wine-600"
         >
           Explore More
           <ArrowRight

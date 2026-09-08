@@ -1,6 +1,8 @@
 import { COLLECTIONS, collection, getDb } from "@avhomes/db";
 import { databaseConfig } from "@avhomes/core";
+import { docToText, readingMinutes, wordCount } from "@avhomes/contracts";
 import { demoProperties, demoStats, demoTestimonials } from "../src/lib/demo-data";
+import { demoPostSeeds } from "../src/lib/blog/demo-posts";
 
 /**
  * Fills an empty database with the fixtures the app already ships.
@@ -53,16 +55,22 @@ async function main(): Promise<void> {
   const properties = collection<SeedDoc>(db, COLLECTIONS.properties);
   const stats = collection<SeedDoc>(db, COLLECTIONS.siteStats);
   const testimonials = collection<SeedDoc>(db, COLLECTIONS.testimonials);
+  const posts = collection<SeedDoc>(db, COLLECTIONS.posts);
+  const categories = collection<SeedDoc>(db, COLLECTIONS.categories);
 
   if (RESET) {
     const removed = await Promise.all([
       properties.deleteMany({ _id: { $regex: `^${PREFIX}` } }),
       stats.deleteMany({ _id: { $regex: `^${PREFIX}` } }),
       testimonials.deleteMany({ _id: { $regex: `^${PREFIX}` } }),
+      posts.deleteMany({ _id: { $regex: `^${PREFIX}` } }),
+      categories.deleteMany({ _id: { $regex: `^${PREFIX}` } }),
     ]);
     console.log(`removed  ${removed[0].deletedCount} properties`);
     console.log(`removed  ${removed[1].deletedCount} counters`);
     console.log(`removed  ${removed[2].deletedCount} testimonials`);
+    console.log(`removed  ${removed[3].deletedCount} posts`);
+    console.log(`removed  ${removed[4].deletedCount} categories`);
     console.log("\nOnly documents this script wrote were touched.");
     process.exit(0);
   }
@@ -72,10 +80,19 @@ async function main(): Promise<void> {
    * either typed into the console or seeded before this script existed, and
    * either way it is not ours to bury under fixtures.
    */
-  const foreign = await properties.countDocuments({ _id: { $not: { $regex: `^${PREFIX}` } } });
+  const notOurs = { _id: { $not: { $regex: `^${PREFIX}` } } };
+  const [foreignListings, foreignPosts] = await Promise.all([
+    properties.countDocuments(notOurs),
+    posts.countDocuments(notOurs),
+  ]);
+  const foreign = foreignListings + foreignPosts;
   if (foreign > 0 && !FORCE) {
+    const parts = [
+      foreignListings > 0 ? `${foreignListings} listing${foreignListings === 1 ? "" : "s"}` : null,
+      foreignPosts > 0 ? `${foreignPosts} post${foreignPosts === 1 ? "" : "s"}` : null,
+    ].filter(Boolean);
     console.error(
-      `Refusing to seed: ${foreign} listing${foreign === 1 ? "" : "s"} in this database ` +
+      `Refusing to seed: ${parts.join(" and ")} in this database ` +
         `${foreign === 1 ? "was" : "were"} not written by this script.\n` +
         `Pass --force to seed anyway, or --reset to remove only what this script wrote.`,
     );
@@ -141,6 +158,83 @@ async function main(): Promise<void> {
     quoteCount += 1;
   }
   console.log(`testimonials  ${quoteCount}`);
+
+  /*
+   * Posts are attributed to the OWNER, never to invented authors.
+   *
+   * The fixtures name three writers, and reproducing that faithfully would mean
+   * three rows in `users`. This script does not write to `users`, for the same
+   * reason it does not write enquiries: a fabricated colleague is a person
+   * somebody eventually tries to email, and they show up in the team screen
+   * looking exactly like a real account. Where no owner exists yet the join
+   * simply misses and the reader renders the site name instead, which is the
+   * behaviour the repo already defines for an unknown author.
+   */
+  const owner = await collection<{ _id: string; role: string; disabledAt: number | null }>(
+    db,
+    COLLECTIONS.users,
+  ).findOne({ role: "owner", disabledAt: null }, { projection: { _id: 1 } });
+  const authorId = owner?._id ?? `${PREFIX}unknown-author`;
+
+  let postCount = 0;
+  for (const seed of demoPostSeeds) {
+    const text = docToText(seed.body);
+    const words = wordCount(text);
+    const publishedAt = Date.parse(`${seed.published}T09:00:00Z`);
+    await posts.updateOne(
+      { _id: idFor(seed.slug) },
+      {
+        $set: {
+          slug: seed.slug,
+          title: seed.title,
+          subtitle: seed.subtitle,
+          excerpt: seed.excerpt,
+          excerptSource: "author",
+          content: seed.body,
+          contentText: text,
+          coverImage: {
+            url: seed.cover,
+            alt: seed.coverAlt,
+            focalPoint: "50% 50%",
+            width: 1600,
+            height: 900,
+          },
+          category: seed.category,
+          tags: seed.tags,
+          template: seed.template,
+          status: "published",
+          wordCount: words,
+          readingTime: readingMinutes(words),
+          authorId,
+          publishedAt,
+          deletedAt: null,
+          updatedAt: Date.parse(`${seed.updated}T09:00:00Z`),
+        },
+        // The publish date is the document's own history, so a re-run must not
+        // move it, and the CAS token must not reset under an open editor.
+        $setOnInsert: { createdAt: publishedAt, revision: 1 },
+      },
+      { upsert: true },
+    );
+    postCount += 1;
+  }
+  console.log(`posts         ${postCount}`);
+
+  const categoryNames = [...new Set(demoPostSeeds.map((s) => s.category))];
+  let categoryCount = 0;
+  for (const [position, name] of categoryNames.entries()) {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    await categories.updateOne(
+      { _id: idFor(`category-${slug}`) },
+      {
+        $set: { slug, name, blurb: "", accent: "#983c53", position, updatedAt: now },
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true },
+    );
+    categoryCount += 1;
+  }
+  console.log(`categories    ${categoryCount}`);
 
   const featured = demoProperties.filter((p) => p.featured).length;
   console.log(`\n${featured} listings are featured, and the homepage shows six of them.`);

@@ -15,11 +15,11 @@ export default function CTABanner() {
             sizes="100vw"
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-navy-950/90 via-navy-950/75 to-navy-950/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-plum-950/90 via-plum-950/75 to-plum-950/40" />
 
           <div className="relative px-8 py-16 sm:px-12 lg:px-16 lg:py-24">
             <h2 className="max-w-xl text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
-              Start Your Property <span className="accent text-blue-300">Journey Today</span>
+              Start Your Property <span className="accent text-wine-300">Journey Today</span>
             </h2>
             <p className="mt-5 max-w-md text-base leading-relaxed text-white/75">
               Tell us what you are looking for and a dedicated agent will reach
@@ -29,7 +29,7 @@ export default function CTABanner() {
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
                 href="/listings"
-                className="group inline-flex items-center gap-2 rounded-full bg-blue-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                className="group inline-flex items-center gap-2 rounded-full bg-wine-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700"
               >
                 Get Started
                 <ArrowRight

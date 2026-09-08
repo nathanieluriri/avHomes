@@ -80,18 +80,19 @@ export default function Navbar() {
           reachable. The background never changes. */}
       <header className="sticky top-0 z-[80] w-full border-b border-mist-200 bg-white">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
-          <Link href="/" className="flex items-center gap-3">
+          {/* The horizontal lockup, not the stacked one. Stacked, the tagline is
+              a tenth of the file's height, so a navbar had to run ~96px tall to
+              keep that line readable. Set beside the mark instead, the same
+              artwork gives a larger wordmark in a shorter bar. */}
+          <Link href="/" className="flex items-center" aria-label="AVHomes, home">
             <Image
-              src="/brand/logo-mark.png"
-              alt="AVHomes"
-              width={1199}
-              height={844}
+              src="/brand/logo-h.png"
+              alt="AVHomes Ltd"
+              width={830}
+              height={178}
               priority
-              className="h-9 w-auto sm:h-11"
+              className="h-10 w-auto sm:h-12"
             />
-            <span className="text-xl font-extrabold tracking-tight text-navy-950 sm:text-2xl">
-              AVHomes
-            </span>
           </Link>
 
           <div className="hidden items-center gap-8 lg:flex">
@@ -99,7 +100,7 @@ export default function Navbar() {
               <Link
                 key={l.label}
                 href={l.href}
-                className="text-sm font-medium text-slate-500 transition-colors hover:text-navy-950"
+                className="text-sm font-medium text-slate-500 transition-colors hover:text-plum-950"
               >
                 {l.label}
               </Link>
@@ -109,7 +110,7 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             <Link
               href="/listings"
-              className="hidden rounded-full bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 lg:inline-flex"
+              className="hidden rounded-full bg-wine-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 lg:inline-flex"
             >
               Find Property
             </Link>
@@ -126,17 +127,17 @@ export default function Navbar() {
               {/* Every bar is the same 2px stroke, so the hamburger and the X match. */}
               <span className="relative block h-4 w-5">
                 <span
-                  className={`absolute left-0 block h-[2px] w-5 rounded-full bg-navy-950 transition-all duration-300 ease-out ${
+                  className={`absolute left-0 block h-[2px] w-5 rounded-full bg-plum-950 transition-all duration-300 ease-out ${
                     shown ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0"
                   }`}
                 />
                 <span
-                  className={`absolute left-0 top-1/2 block h-[2px] w-5 -translate-y-1/2 rounded-full bg-navy-950 transition-opacity duration-200 ${
+                  className={`absolute left-0 top-1/2 block h-[2px] w-5 -translate-y-1/2 rounded-full bg-plum-950 transition-opacity duration-200 ${
                     shown ? "opacity-0" : "opacity-100"
                   }`}
                 />
                 <span
-                  className={`absolute left-0 block h-[2px] w-5 rounded-full bg-navy-950 transition-all duration-300 ease-out ${
+                  className={`absolute left-0 block h-[2px] w-5 rounded-full bg-plum-950 transition-all duration-300 ease-out ${
                     shown ? "bottom-1/2 translate-y-1/2 -rotate-45" : "bottom-0"
                   }`}
                 />
@@ -157,7 +158,7 @@ export default function Navbar() {
         >
           {/* Navy sheet wipes up from the bottom, then the links stagger in over it. */}
           <div
-            className={`absolute inset-0 bg-navy-950 transition-transform duration-[520ms] [transition-timing-function:cubic-bezier(0.76,0,0.24,1)] ${
+            className={`absolute inset-0 bg-plum-950 transition-transform duration-[520ms] [transition-timing-function:cubic-bezier(0.76,0,0.24,1)] ${
               shown ? "translate-y-0" : "translate-y-full"
             }`}
           />
@@ -179,7 +180,7 @@ export default function Navbar() {
                         {l.label}
                       </span>
                       <ArrowUpRight
-                        className="ml-auto h-5 w-5 text-white/30 transition-colors group-hover:text-blue-400"
+                        className="ml-auto h-5 w-5 text-white/30 transition-colors group-hover:text-wine-300"
                         strokeWidth={1.8}
                         aria-hidden="true"
                       />
@@ -198,7 +199,7 @@ export default function Navbar() {
               <Link
                 href="/listings"
                 onClick={closeMenu}
-                className="flex items-center justify-center rounded-full bg-blue-600 px-6 py-4 text-sm font-semibold text-white"
+                className="flex items-center justify-center rounded-full bg-wine-600 px-6 py-4 text-sm font-semibold text-white"
               >
                 Find Property
               </Link>
@@ -211,7 +212,7 @@ export default function Navbar() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={label}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white/70 transition-colors hover:border-blue-500 hover:text-blue-500"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white/70 transition-colors hover:border-wine-500 hover:text-wine-500"
                   >
                     <Icon className="h-4 w-4" />
                   </a>

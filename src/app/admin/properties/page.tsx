@@ -53,7 +53,7 @@ const SORTS = [
 
 const STATUS_TONE: Record<PropertyStatus, Tone> = {
   "for-sale": "green",
-  "for-rent": "blue",
+  "for-rent": "wine",
   sold: "neutral",
   draft: "amber",
   archived: "neutral",
@@ -178,7 +178,7 @@ export default function PropertiesPage() {
       numeric: true,
       mobile: "keep",
       render: (p) => (
-        <span className="font-semibold text-navy-950">
+        <span className="font-semibold text-plum-950">
           {formatPriceShort(p.priceMinor, p.status, p.currency)}
         </span>
       ),
@@ -247,7 +247,7 @@ export default function PropertiesPage() {
                 <select
                   value={sort}
                   onChange={(event) => refilter(() => setSort(event.target.value as typeof sort))}
-                  className="h-8 rounded-lg border border-mist-200 bg-white px-2 text-[13px] font-medium text-navy-950 outline-none transition-colors focus:border-blue-500"
+                  className="h-8 rounded-lg border border-mist-200 bg-white px-2 text-[13px] font-medium text-plum-950 outline-none transition-colors focus:border-wine-500"
                 >
                   {SORTS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -337,27 +337,27 @@ function ListingsArt() {
   return (
     <svg width="168" height="112" viewBox="0 0 168 112" fill="none" aria-hidden="true">
       <rect x="12" y="26" width="96" height="70" rx="10" fill="var(--mist-100)" />
-      <rect x="28" y="16" width="112" height="82" rx="11" fill="var(--blue-50)" />
+      <rect x="28" y="16" width="112" height="82" rx="11" fill="var(--wine-50)" />
       <rect
         x="28.5"
         y="16.5"
         width="111"
         height="81"
         rx="10.5"
-        stroke="var(--blue-100)"
+        stroke="var(--wine-100)"
       />
-      <rect x="40" y="28" width="88" height="34" rx="7" fill="var(--blue-100)" />
+      <rect x="40" y="28" width="88" height="34" rx="7" fill="var(--wine-100)" />
       <path
         d="M56 54l12-13 10 11 7-7 11 12"
-        stroke="var(--blue-500)"
+        stroke="var(--wine-500)"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="102" cy="40" r="4.5" fill="var(--blue-500)" />
+      <circle cx="102" cy="40" r="4.5" fill="var(--wine-500)" />
       <rect x="40" y="70" width="52" height="7" rx="3.5" fill="var(--mist-200)" />
       <rect x="40" y="82" width="32" height="6" rx="3" fill="var(--mist-200)" />
-      <rect x="104" y="80" width="24" height="9" rx="4.5" fill="var(--blue-500)" />
+      <rect x="104" y="80" width="24" height="9" rx="4.5" fill="var(--wine-500)" />
     </svg>
   );
 }

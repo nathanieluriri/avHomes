@@ -68,12 +68,12 @@ export default function CookieBanner() {
       className="fixed inset-x-0 bottom-0 z-[60] px-4 pb-4 sm:px-6 sm:pb-6"
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-4 rounded-2xl border border-mist-200 bg-white p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50 text-wine-600">
           <Cookie className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
         </span>
 
         <div className="min-w-0 flex-1">
-          <p id="cookie-title" className="text-sm font-semibold text-navy-950">
+          <p id="cookie-title" className="text-sm font-semibold text-plum-950">
             We use cookies
           </p>
           <p id="cookie-body" className="mt-1 text-sm leading-relaxed text-muted-foreground">
@@ -82,7 +82,7 @@ export default function CookieBanner() {
             Read the{" "}
             <Link
               href="/privacy#cookies"
-              className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700"
+              className="font-medium text-wine-600 underline underline-offset-2 hover:text-wine-700"
             >
               cookie policy
             </Link>
@@ -94,14 +94,14 @@ export default function CookieBanner() {
           <button
             type="button"
             onClick={() => choose("rejected")}
-            className="flex-1 rounded-full border border-mist-200 px-5 py-2.5 text-sm font-semibold text-navy-950 transition-colors hover:border-blue-600 hover:text-blue-600 sm:flex-none"
+            className="flex-1 rounded-full border border-mist-200 px-5 py-2.5 text-sm font-semibold text-plum-950 transition-colors hover:border-wine-600 hover:text-wine-600 sm:flex-none"
           >
             Reject
           </button>
           <button
             type="button"
             onClick={() => choose("accepted")}
-            className="flex-1 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 sm:flex-none"
+            className="flex-1 rounded-full bg-wine-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 sm:flex-none"
           >
             Accept
           </button>
@@ -109,7 +109,7 @@ export default function CookieBanner() {
             type="button"
             onClick={() => choose("rejected")}
             aria-label="Dismiss and reject non essential cookies"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 transition-colors hover:bg-mist-100 hover:text-navy-950"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 transition-colors hover:bg-mist-100 hover:text-plum-950"
           >
             <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
           </button>

@@ -33,7 +33,7 @@ const TABS = [
 ] as const;
 
 const TONE: Record<EnquiryStatus, Tone> = {
-  new: "blue",
+  new: "wine",
   open: "amber",
   closed: "neutral",
   spam: "red",
@@ -246,11 +246,11 @@ function capitalise(value: string): string {
 function InboxArt() {
   return (
     <svg width="168" height="112" viewBox="0 0 168 112" fill="none" aria-hidden="true">
-      <rect x="26" y="34" width="116" height="62" rx="11" fill="var(--blue-50)" />
-      <rect x="26.5" y="34.5" width="115" height="61" rx="10.5" stroke="var(--blue-100)" />
+      <rect x="26" y="34" width="116" height="62" rx="11" fill="var(--wine-50)" />
+      <rect x="26.5" y="34.5" width="115" height="61" rx="10.5" stroke="var(--wine-100)" />
       <path
         d="M26 62h32l6 11h36l6-11h36"
-        stroke="var(--blue-500)"
+        stroke="var(--wine-500)"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"

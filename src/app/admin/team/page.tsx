@@ -75,7 +75,7 @@ export default function TeamPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card className="p-0">
-            <h2 className="border-b border-mist-200 px-5 py-4 text-sm font-semibold text-navy-950">
+            <h2 className="border-b border-mist-200 px-5 py-4 text-sm font-semibold text-plum-950">
               People
             </h2>
             {users.loading && (
@@ -97,7 +97,7 @@ export default function TeamPage() {
                     className="flex flex-wrap items-center justify-between gap-3 border-b border-mist-100 px-5 py-4 last:border-0"
                   >
                     <div className="min-w-0">
-                      <p className="font-semibold text-navy-950">
+                      <p className="font-semibold text-plum-950">
                         {user.displayName}
                         {user.id === actor?.id && (
                           <span className="ml-2 text-xs font-normal text-muted-foreground">you</span>
@@ -154,7 +154,7 @@ export default function TeamPage() {
           </Card>
 
           <Card className="p-0">
-            <h2 className="border-b border-mist-200 px-5 py-4 text-sm font-semibold text-navy-950">
+            <h2 className="border-b border-mist-200 px-5 py-4 text-sm font-semibold text-plum-950">
               Open invites
             </h2>
             {invites.error && (
@@ -172,7 +172,7 @@ export default function TeamPage() {
                   className="flex flex-wrap items-center justify-between gap-3 border-b border-mist-100 px-5 py-4 last:border-0"
                 >
                   <div>
-                    <p className="font-semibold text-navy-950">{invite.email}</p>
+                    <p className="font-semibold text-plum-950">{invite.email}</p>
                     <p className="text-xs text-muted-foreground">
                       {ROLE_INFO[invite.role].label} · invited by {invite.invitedByName} ·{" "}
                       {/* The SERVER's verdict, never re-derived from the clock here:
@@ -234,7 +234,7 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
 
   return (
     <Card>
-      <h2 className="text-sm font-semibold text-navy-950">Invite someone</h2>
+      <h2 className="text-sm font-semibold text-plum-950">Invite someone</h2>
       <form onSubmit={submit} className="mt-4 space-y-4">
         <Field label="Email">
           <input
@@ -267,7 +267,7 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
       </form>
 
       {result && (
-        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+        <div className="mt-4 rounded-xl border border-wine-100 bg-wine-50 p-3 text-sm text-wine-700">
           {/* The URL is returned whether or not the mail went, because an invite
               is the only way a second person reaches an invite-only instance and
               a mail outage must not lock the team out of growing. */}

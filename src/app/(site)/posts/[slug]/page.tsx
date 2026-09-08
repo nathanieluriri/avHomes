@@ -6,6 +6,8 @@ import { SITE_DOMAIN, SITE_NAME } from "@/lib/blog/config";
 import { docToText, imageUrl, toIso, truncate } from "@/lib/blog/utils";
 import ArticleTemplate from "@/components/blog/ArticleTemplate";
 import ShareLinks from "@/components/blog/ShareLinks";
+import ReadingProgress from "@/components/blog/ReadingProgress";
+import SubscribeBanner from "@/components/blog/SubscribeBanner";
 import JsonLd from "@/components/blog/JsonLd";
 
 /** Absolute, because structured data and og:url consumers resolve nothing. */
@@ -78,7 +80,7 @@ export default async function PostPage({
     publisher: {
       "@type": "Organization",
       name: SITE_NAME,
-      logo: { "@type": "ImageObject", url: absolute("/brand/logo-mark.png") },
+      logo: { "@type": "ImageObject", url: absolute("/brand/logo.png") },
     },
     mainEntityOfPage: absolute(`/posts/${post.slug}`),
     ...(cover ? { image: cover } : {}),
@@ -87,9 +89,16 @@ export default async function PostPage({
   return (
     <>
       <JsonLd data={jsonLd} />
+      {/* Renders a fixed overlay, so it does not matter where in the tree it
+          sits. It is here rather than in the layout because the index page has
+          no article to measure. */}
+      <ReadingProgress />
       <ArticleTemplate post={post} />
       <div className="blog-share">
         <ShareLinks title={post.title} slug={post.slug} />
+      </div>
+      <div className="blog-subscribe">
+        <SubscribeBanner source={post.slug} />
       </div>
     </>
   );
