@@ -30,8 +30,16 @@ jobs:
       # Deliberately run with NO environment. Every read falls back to bundled
       # fixtures and every optional capability answers 501, so a green build here
       # proves the code compiles and renders rather than proving a secret exists.
+      # `npm run typecheck`, not a bare `tsc`, and the difference is the reason
+      # this step used to fail on a clean checkout. `LayoutProps`, `PageProps`
+      # and `RouteContext` are GLOBALS that Next generates into `.next/types`,
+      # which tsconfig includes. A fresh clone has no `.next`, so the root
+      # layout's `LayoutProps<"/">` resolved to nothing and tsc stopped at
+      # TS2304 before checking anything else. The script runs `next typegen`
+      # first, which writes those types in a couple of seconds without a full
+      # build, so this step no longer depends on Build having run before it.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Lint
         run: npm run lint

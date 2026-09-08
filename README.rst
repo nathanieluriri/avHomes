@@ -256,8 +256,16 @@ Verifying
 .. code-block:: bash
 
    npm run build       # the gate
-   npx tsc --noEmit
+   npm run typecheck
    npm run lint
+
+``npm run typecheck`` rather than a bare ``tsc --noEmit``, because ``LayoutProps``,
+``PageProps`` and ``RouteContext`` are globals Next generates into ``.next/types``
+and tsconfig includes from there. On a clean checkout that directory does not
+exist, so the root layout's ``LayoutProps<"/">`` resolves to nothing and the
+compiler stops at TS2304 before it checks anything real. The script runs
+``next typegen`` first, which writes those types in a couple of seconds without a
+full build, so the three commands above pass in any order.
 
 There is no test suite yet. The plan for one, in the order that matters and with
 the reasoning attached, is in ``packages/api/src/TESTS.todo.ts``. Three items in
