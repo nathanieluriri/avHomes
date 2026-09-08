@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { ImageRecord } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
+import { absoluteUrl } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import {
   Button,
@@ -20,11 +21,47 @@ import {
  * the declared content type entirely. That is why an HTML file renamed to .png
  * is a 400 here rather than a stored XSS served from our own origin.
  */
+/**
+ * The pre-Clipboard-API copy, kept as a fallback rather than as history.
+ *
+ * `navigator.clipboard` is undefined on plain http and its write can be refused
+ * outright; `execCommand` has neither condition and is still implemented
+ * everywhere despite the deprecation, so the pair covers cases neither covers
+ * alone. The field is readonly and off screen, because selecting a visible
+ * editable one shows a flash of highlighted text in a box the reader could type
+ * into.
+ */
+function copyByExecCommand(text: string): boolean {
+  const restore = document.activeElement;
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
+  document.body.append(field);
+  field.select();
+
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+
+  field.remove();
+  // select() took focus off the button. Without this the next Tab starts from
+  // the top of the document.
+  if (restore instanceof HTMLElement) restore.focus();
+  return ok;
+}
+
 export default function ImagesPage() {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [uploadError, setUploadError] = useState<ApiError | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  /* The id of the row whose copy just happened, and whether it worked. A copy
+     that silently fails is a button the reader presses twice and then gives up
+     on, with no way to learn that the clipboard is the thing refusing. */
+  const [copied, setCopied] = useState<{ id: string; ok: boolean } | null>(null);
 
   const { data, error, loading, reload } = useAsync<{ items: ImageRecord[]; nextCursor: string | null }>(
     (signal) => api.get<{ items: ImageRecord[]; nextCursor: string | null }>("/admin/images?limit=60", signal),
@@ -52,6 +89,28 @@ export default function ImagesPage() {
       setBusy(false);
       if (input.current) input.current.value = "";
     }
+  }
+
+  /*
+   * The ABSOLUTE url, always. These are stored as origin-relative paths, and
+   * "Copy URL" that yields `/api/public/images/img_...png` produces a Google
+   * search when it is pasted into an address bar and a dead link when it is
+   * pasted anywhere else. `absoluteUrl` resolves against the origin the
+   * operator is actually on, so a preview deploy copies preview links.
+   */
+  async function copy(image: ImageRecord) {
+    const url = absoluteUrl(image.url);
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      ok = true;
+    } catch {
+      // Absent on plain http, and refusable everywhere. `execCommand` has
+      // neither condition and is still implemented in every browser.
+      ok = copyByExecCommand(url);
+    }
+    setCopied({ id: image.id, ok });
+    setTimeout(() => setCopied(null), 2000);
   }
 
   async function remove(image: ImageRecord) {
@@ -118,14 +177,12 @@ export default function ImagesPage() {
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
-                  className="text-xs font-semibold text-blue-600 underline underline-offset-2"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(image.url);
-                    setCopied(image.id);
-                    setTimeout(() => setCopied(null), 1500);
-                  }}
+                  className={`text-xs font-semibold underline underline-offset-2 ${
+                    copied?.id === image.id && !copied.ok ? "text-red-700" : "text-wine-600"
+                  }`}
+                  onClick={() => void copy(image)}
                 >
-                  {copied === image.id ? "Copied" : "Copy URL"}
+                  {copied?.id !== image.id ? "Copy URL" : copied.ok ? "Copied" : "Copy blocked"}
                 </button>
                 <button
                   type="button"

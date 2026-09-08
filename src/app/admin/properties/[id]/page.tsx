@@ -167,7 +167,6 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   /*
    * Dirty is derived, never tracked. A boolean set by every field handler drifts
@@ -184,7 +183,6 @@ function PropertyEditor({ initial }: { initial: Property }) {
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
-    setSaved(false);
   }
 
   async function save() {
@@ -229,7 +227,6 @@ function PropertyEditor({ initial }: { initial: Property }) {
       });
       setProperty(res.property);
       setDraft(toDraft(res.property));
-      setSaved(true);
     } catch (err) {
       setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
     } finally {
@@ -301,24 +298,16 @@ function PropertyEditor({ initial }: { initial: Property }) {
         backLabel="Listings"
         title={property.title || "Untitled listing"}
         badge={
-          <Badge tone={property.deletedAt ? "red" : "blue"}>
+          <Badge tone={property.deletedAt ? "red" : "wine"}>
             {property.deletedAt ? "In trash" : statusLabel(property.status)}
           </Badge>
         }
         subtitle={property.slug ? `/listings/${property.slug}` : "No slug yet. It is derived when you publish."}
-        /*
-         * One Save at a time. While the bar is up it owns the act, and a second
-         * live Save in the header is two controls competing for the same click.
-         * Clean, the header keeps a disabled Save so the affordance does not
-         * disappear from the place a reader looks for it first.
-         */
-        actions={
-          dirty || trashed ? undefined : (
-            <Button onClick={save} disabled size="lg">
-              {saved ? "Saved" : "Save"}
-            </Button>
-          )
-        }
+        /* NO SAVE IN THE HEADER. Saving belongs to the bar, which appears the
+           moment there is anything to save and follows the work down the page.
+           A permanently greyed-out Save up here is a control that has never
+           once been pressable: it teaches the reader to look in the wrong
+           place, and then does nothing when they do. */
       />
 
       {trashed && (
@@ -442,7 +431,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
           <Card className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
-              <Badge tone={property.deletedAt ? "red" : "blue"}>
+              <Badge tone={property.deletedAt ? "red" : "wine"}>
                 {property.deletedAt ? "In trash" : statusLabel(property.status)}
               </Badge>
             </div>
@@ -453,7 +442,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 </Button>
               ))}
             </div>
-            <label className="flex items-center gap-2 pt-2 text-sm text-navy-950">
+            <label className="flex items-center gap-2 pt-2 text-sm text-plum-950">
               <input
                 type="checkbox"
                 checked={draft.featured}
@@ -523,7 +512,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-navy-950">{value}</span>
+      <span className="font-medium text-plum-950">{value}</span>
     </div>
   );
 }

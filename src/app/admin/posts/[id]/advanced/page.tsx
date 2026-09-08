@@ -6,10 +6,10 @@ import Link from "next/link";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import {
-  ChevronLeft,
   GripVertical,
   ImagePlus,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   READING_TEMPLATES,
@@ -305,9 +305,13 @@ function Studio({ initial }: { initial: Post }) {
   return (
     <div className="adv">
       <header className="adv__bar">
+        {/* An EXIT, not a back arrow. The studio covers the whole window, so
+            the rail and the breadcrumb that would otherwise say where you are
+            are both gone, and a lone chevron in that context reads as "undo"
+            rather than "leave". This is the only way out of the takeover. */}
         <Link href="/admin/posts" className="adv__back">
-          <ChevronLeft aria-hidden="true" />
-          Posts
+          <X aria-hidden="true" />
+          Exit editor
         </Link>
 
         <span className="adv__spacer" />
@@ -714,7 +718,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <dt>{label}</dt>
-      <dd className="font-medium text-navy-950">{value}</dd>
+      <dd className="font-medium text-plum-950">{value}</dd>
     </div>
   );
 }
@@ -787,7 +791,7 @@ function HistoryPanel({
           <li key={r.id} className="border-b border-mist-100 pb-3 last:border-0">
             <div className="flex items-baseline justify-between gap-3">
               <span>
-                <span className="font-semibold text-navy-950">r{r.revision}</span>{" "}
+                <span className="font-semibold text-plum-950">r{r.revision}</span>{" "}
                 <span className="text-muted-foreground">{r.kind}</span>
                 {r.note && <span className="text-muted-foreground"> · {r.note}</span>}
               </span>
@@ -800,7 +804,7 @@ function HistoryPanel({
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.title || "Untitled"}</p>
             <button
               type="button"
-              className="mt-1.5 text-xs font-semibold text-blue-600 underline underline-offset-2 disabled:text-mist-300"
+              className="mt-1.5 text-xs font-semibold text-wine-600 underline underline-offset-2 disabled:text-mist-300"
               disabled={restoring !== null}
               onClick={() => void restore(r.id)}
             >

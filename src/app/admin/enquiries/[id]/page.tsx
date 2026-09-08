@@ -12,6 +12,7 @@ import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { dateTime, humanise, initials } from "@/lib/admin/format";
 import { SaveBar } from "@/components/admin/SaveBar";
+import { Conversation } from "@/components/admin/Conversation";
 import {
   Badge,
   Button,
@@ -33,7 +34,7 @@ import {
  */
 
 const TONE: Record<EnquiryStatus, Tone> = {
-  new: "blue",
+  new: "wine",
   open: "amber",
   closed: "neutral",
   spam: "red",
@@ -94,7 +95,6 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
   const [enquiry, setEnquiry] = useState<Enquiry>(initial);
   const [note, setNote] = useState(enquiry.note ?? "");
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
 
   const dirty = note !== (enquiry.note ?? "");
@@ -124,7 +124,6 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
        */
       if (body.note !== undefined) {
         setNote(res.enquiry.note ?? "");
-        setSaved(true);
       }
     } catch (err) {
       setSaveError(
@@ -156,16 +155,8 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
         title={enquiry.name}
         badge={<Badge tone={TONE[enquiry.status]}>{humanise(enquiry.status)}</Badge>}
         subtitle={`Received ${dateTime(enquiry.createdAt)}`}
-        /* Its two siblings keep a disabled Save here when the form is clean, so
-           the affordance does not vanish from the first place a reader looks.
-           This screen was the only editor in the console without one. */
-        actions={
-          dirty ? undefined : (
-            <Button onClick={() => {}} disabled size="lg">
-              {saved ? "Saved" : "Save"}
-            </Button>
-          )
-        }
+        /* No Save here, the same as its two siblings. Saving belongs to the
+           bar, which appears the moment there is anything to save. */
       />
 
       {saveError && (
@@ -176,12 +167,10 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="space-y-4">
-          <Card>
-            <CardHead title="Message" />
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-navy-950">
-              {enquiry.message}
-            </p>
-          </Card>
+          {/* The thread replaces the old single-message card. A chat renders as
+              a conversation with a reply box; a form enquiry still renders as
+              one quoted message, because that is all it is. */}
+          <Conversation enquiry={enquiry} onChange={setEnquiry} />
 
           <Card>
             <CardHead title="Internal note" />
@@ -190,13 +179,10 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
             </p>
             <textarea
               value={note}
-              onChange={(event) => {
-                setNote(event.target.value);
-                setSaved(false);
-              }}
+              onChange={(event) => setNote(event.target.value)}
               rows={4}
               placeholder="What was agreed, what is outstanding, who is picking it up."
-              className="w-full resize-y rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-navy-950 outline-none transition-colors placeholder:text-slate-550 focus:border-blue-500"
+              className="w-full resize-y rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-550 focus:border-wine-500"
             />
           </Card>
         </div>
@@ -205,11 +191,11 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
           <Card>
             <CardHead title="Contact" />
             <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-50 text-[11px] font-bold text-blue-700">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-wine-50 text-[11px] font-bold text-wine-700">
                 {initials(enquiry.name)}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[13px] font-semibold text-navy-950">
+                <span className="block truncate text-[13px] font-semibold text-plum-950">
                   {enquiry.name}
                 </span>
               </span>
@@ -218,7 +204,7 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
             <div className="mt-3 space-y-1.5">
               <a
                 href={`mailto:${enquiry.email}`}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-blue-700 transition-colors hover:bg-blue-50"
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-wine-700 transition-colors hover:bg-wine-50"
               >
                 <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{enquiry.email}</span>
@@ -226,7 +212,7 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
               {enquiry.phone && (
                 <a
                   href={`tel:${enquiry.phone}`}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-blue-700 transition-colors hover:bg-blue-50"
+                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-wine-700 transition-colors hover:bg-wine-50"
                 >
                   <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span className="truncate">{enquiry.phone}</span>
@@ -242,7 +228,7 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
                 href={`/listings/${enquiry.propertySlug}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 text-[13px] font-medium text-blue-700 hover:text-blue-800"
+                className="flex items-center gap-1.5 text-[13px] font-medium text-wine-600 hover:text-wine-700"
               >
                 <span className="truncate">{enquiry.propertySlug}</span>
                 <ArrowUpRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

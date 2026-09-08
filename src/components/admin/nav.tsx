@@ -4,6 +4,8 @@ import {
   Images,
   Inbox,
   Newspaper,
+  PencilRuler,
+  SlidersHorizontal,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -79,6 +81,16 @@ export const NAV: readonly NavGroup[] = [
         icon: Images,
         domain: "media",
       },
+      {
+        href: "/admin/customize",
+        label: "Customize",
+        /* `content` rather than a domain of its own. The studio is where
+           somebody says what the site should say and look like, which is the
+           same authority as writing the words on it. */
+        hint: "Circle anything on the site and leave a note",
+        icon: PencilRuler,
+        domain: "content",
+      },
     ],
   },
   {
@@ -89,6 +101,16 @@ export const NAV: readonly NavGroup[] = [
         label: "Team",
         hint: "Who can sign in, and what they may touch",
         icon: Users,
+        domain: "team",
+      },
+      {
+        href: "/admin/settings",
+        label: "Settings",
+        /* `team` rather than a domain of its own. The only setting here decides
+           what a buyer is told about who works here, which is the same authority
+           as deciding who works here. */
+        hint: "Whose name answers an enquiry",
+        icon: SlidersHorizontal,
         domain: "team",
       },
     ],

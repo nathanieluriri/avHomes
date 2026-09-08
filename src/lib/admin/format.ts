@@ -83,3 +83,25 @@ export function humanise(value: string): string {
   const spaced = value.replace(/[-_]/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+/**
+ * A stored path, turned into a URL somebody can actually paste.
+ *
+ * Uploads come back as origin-relative paths (`/api/public/images/img_...png`),
+ * which is right for storing and for an `<img src>` and useless in a clipboard:
+ * pasted into an address bar it is a search query, pasted into an email it is a
+ * dead link. Resolved against the origin the operator is on, so a preview
+ * deploy hands out preview links rather than production ones.
+ *
+ * A value that is already absolute, which is what every blob store returns, is
+ * handed back untouched.
+ */
+export function absoluteUrl(url: string): string {
+  if (typeof window === "undefined") return url;
+  try {
+    return new URL(url, window.location.origin).href;
+  } catch {
+    // A path the URL parser refuses is not worth failing a copy over.
+    return url;
+  }
+}

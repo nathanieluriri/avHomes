@@ -9,7 +9,15 @@ import type { UserDoc } from "../schema";
  * `passwordHash` lives here. An enumerated projection means a column added later
  * cannot arrive in a response by default, which is the whole rule.
  */
-const AUTH_PROJECTION = { _id: 1, email: 1, displayName: 1, role: 1, disabledAt: 1 } as const;
+const PROFILE_FIELDS = { avatarUrl: 1, title: 1, phone: 1 } as const;
+const AUTH_PROJECTION = {
+  _id: 1,
+  email: 1,
+  displayName: 1,
+  role: 1,
+  disabledAt: 1,
+  ...PROFILE_FIELDS,
+} as const;
 const TEAM_PROJECTION = {
   _id: 1,
   email: 1,
@@ -17,14 +25,61 @@ const TEAM_PROJECTION = {
   role: 1,
   createdAt: 1,
   disabledAt: 1,
+  ...PROFILE_FIELDS,
 } as const;
 
 function users(db: Db) {
   return collection<UserDoc>(db, COLLECTIONS.users);
 }
 
-export function toAuthUser(doc: Pick<UserDoc, "_id" | "email" | "displayName" | "role">): AuthUser {
-  return { id: doc._id, email: doc.email, displayName: doc.displayName, role: doc.role };
+/**
+ * Coalesced to "", never left undefined.
+ *
+ * These three arrived after the collection did, so every account older than the
+ * migration has no key at all for them. A wire type of `string` and a stored
+ * value of `undefined` is how `avatarUrl` reaches `next/image` as undefined and
+ * throws, so the absence is resolved once, here, rather than at each of the
+ * five places that render a face.
+ */
+export function toAuthUser(
+  doc: Pick<UserDoc, "_id" | "email" | "displayName" | "role"> &
+    Partial<Pick<UserDoc, "avatarUrl" | "title" | "phone">>,
+): AuthUser {
+  return {
+    id: doc._id,
+    email: doc.email,
+    displayName: doc.displayName,
+    role: doc.role,
+    avatarUrl: doc.avatarUrl ?? "",
+    title: doc.title ?? "",
+    phone: doc.phone ?? "",
+  };
+}
+
+export interface ProfilePatch {
+  displayName?: string;
+  avatarUrl?: string;
+  title?: string;
+  phone?: string;
+}
+
+/** The signed-in person editing their own card. Never another account's. */
+export async function updateProfile(
+  db: Db,
+  userId: string,
+  patch: ProfilePatch,
+): Promise<AuthUser | null> {
+  const set: Record<string, unknown> = { updatedAt: Date.now() };
+  if (patch.displayName !== undefined) set.displayName = patch.displayName;
+  if (patch.avatarUrl !== undefined) set.avatarUrl = patch.avatarUrl;
+  if (patch.title !== undefined) set.title = patch.title;
+  if (patch.phone !== undefined) set.phone = patch.phone;
+  const after = await users(db).findOneAndUpdate(
+    { _id: userId },
+    { $set: set },
+    { returnDocument: "after", projection: AUTH_PROJECTION },
+  );
+  return after ? toAuthUser(after) : null;
 }
 
 export interface FoundUser {
@@ -84,6 +139,9 @@ export async function createUser(db: Db, args: CreateUserArgs): Promise<AuthUser
     displayName,
     role: args.role,
     passwordHash: args.passwordHash ?? null,
+    avatarUrl: null,
+    title: null,
+    phone: null,
     createdAt: now,
     updatedAt: now,
     disabledAt: null,
@@ -139,6 +197,43 @@ export async function disableUser(db: Db, userId: string): Promise<void> {
     { _id: userId, disabledAt: null },
     { $set: { disabledAt: now, updatedAt: now } },
   );
+}
+
+/**
+ * The listings an account held become the owner's.
+ *
+ * A listing is a live page with a phone number and a face on it. When the agent
+ * behind it leaves, `agentUserId` is a dangling reference: nobody can edit the
+ * record, and the per-record authorization in @avhomes/listings has no one to
+ * say yes to, so the page keeps selling a house that no one on the team can
+ * correct. Handing it to the owner keeps it EDITABLE rather than unpublishing
+ * it, because a listing quietly disappearing is worse than one with a stale
+ * byline that somebody can now fix.
+ *
+ * The agent CARD on the record is deliberately left alone. It is a snapshot of
+ * who was selling, the transfer is about who may edit, and rewriting the card
+ * here would silently put the owner's phone number on every listing the moment
+ * a colleague was disabled.
+ *
+ * Returns how many moved, so the route can say so rather than claiming a number
+ * it did not measure.
+ */
+export async function reassignListingsToOwner(db: Db, fromUserId: string): Promise<number> {
+  const owner = await users(db).findOne(
+    { role: "owner", disabledAt: null },
+    { projection: { _id: 1 } },
+  );
+  // No active owner is a broken instance, not a reason to throw here: the caller
+  // is a disable route and failing it would leave a compromised account live.
+  if (!owner || owner._id === fromUserId) return 0;
+  const res = await collection<{ _id: string; agentUserId: string | null }>(
+    db,
+    COLLECTIONS.properties,
+  ).updateMany(
+    { agentUserId: fromUserId },
+    { $set: { agentUserId: owner._id, updatedAt: Date.now() } },
+  );
+  return res.modifiedCount;
 }
 
 export async function enableUser(db: Db, userId: string): Promise<void> {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ImageRecord } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
@@ -120,7 +121,7 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
           void upload(e.dataTransfer.files);
         }}
         className={`rounded-xl border-2 border-dashed p-3 transition-colors ${
-          dragOver ? "border-blue-500 bg-blue-50" : "border-mist-200 bg-mist-50"
+          dragOver ? "border-wine-500 bg-wine-50" : "border-mist-200 bg-mist-50"
         }`}
       >
         {value.length === 0 ? (
@@ -129,7 +130,7 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
             onClick={() => input.current?.click()}
             className="flex w-full flex-col items-center justify-center gap-1 py-8 text-sm text-muted-foreground"
           >
-            <span className="font-semibold text-navy-950">Drop images here</span>
+            <span className="font-semibold text-plum-950">Drop images here</span>
             <span>or click to choose a file</span>
           </button>
         ) : (
@@ -146,13 +147,13 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
                   setDragIndex(null);
                 }}
                 className={`overflow-hidden rounded-lg border bg-white ${
-                  dragIndex === i ? "border-blue-500 opacity-50" : "border-mist-200"
+                  dragIndex === i ? "border-wine-500 opacity-50" : "border-mist-200"
                 }`}
               >
                 <div className="relative">
                   <Thumb url={url} />
                   {i === 0 && !single && (
-                    <span className="absolute left-2 top-2 rounded-full bg-navy-950/85 px-2 py-0.5 text-[11px] font-semibold text-white">
+                    <span className="absolute left-2 top-2 rounded-full bg-plum-950/85 px-2 py-0.5 text-[11px] font-semibold text-white">
                       {coverLabel}
                     </span>
                   )}
@@ -258,14 +259,29 @@ function IconButton({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="rounded border border-mist-200 px-1.5 py-0.5 text-xs text-navy-950 hover:bg-mist-100 disabled:opacity-30"
+      className="rounded border border-mist-200 px-1.5 py-0.5 text-xs text-plum-950 hover:bg-mist-100 disabled:opacity-30"
     >
       {children}
     </button>
   );
 }
 
-/** Picks from images already uploaded, so one photo is not stored twice. */
+/**
+ * Picks from images already uploaded, so one photo is not stored twice.
+ *
+ * PORTALLED TO `document.body`, and that is what makes it appear at all.
+ * `.c-sheet` animates a transform on every navigation, and a transformed
+ * ancestor becomes the containing block for a fixed child: `inset: 0` then
+ * resolved against the 66rem page column instead of the viewport, so the
+ * backdrop covered the column and the panel centred itself somewhere down the
+ * middle of a page far taller than the window. The dimming was visible and the
+ * dialog was not, which reads exactly like a button that does nothing.
+ * `SaveBar` is portalled for the same reason.
+ *
+ * Both console classes, because the panel has now left that subtree: the
+ * marketing site strips box-shadow from everything outside it, and the focus
+ * ring every control in here relies on is declared as `.console :focus-visible`.
+ */
 function LibraryModal({
   onClose,
   onPick,
@@ -280,9 +296,21 @@ function LibraryModal({
     [],
   );
 
-  return (
+  /* Escape closes it. A dialog over a long form with its Close button scrolled
+     out of the panel is otherwise a trap for anyone not using a mouse. */
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-navy-950/40 p-4"
+      className="console console-float fixed inset-0 z-[80] grid place-items-center bg-plum-950/40 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Choose from the image library"
@@ -294,7 +322,7 @@ function LibraryModal({
       >
         <div onClick={(e) => e.stopPropagation()}>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-navy-950">Image library</h2>
+            <h2 className="text-sm font-semibold text-plum-950">Image library</h2>
             <Button variant="ghost" onClick={onClose}>
               Close
             </Button>
@@ -318,7 +346,7 @@ function LibraryModal({
                   onClick={() => onPick(image.url)}
                   disabled={already}
                   className={`overflow-hidden rounded-lg border text-left transition-colors ${
-                    already ? "border-blue-500 opacity-50" : "border-mist-200 hover:border-blue-500"
+                    already ? "border-wine-500 opacity-50" : "border-mist-200 hover:border-wine-500"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -337,6 +365,7 @@ function LibraryModal({
           </div>
         </div>
       </Card>
-    </div>
+    </div>,
+    document.body,
   );
 }

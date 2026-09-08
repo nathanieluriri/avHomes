@@ -23,6 +23,9 @@ export const COLLECTIONS = {
   images: "images",
   enquiries: "enquiries",
   visits: "visits",
+  subscribers: "subscribers",
+  settings: "settings",
+  designNotes: "design_notes",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

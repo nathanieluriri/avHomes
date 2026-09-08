@@ -128,7 +128,6 @@ function PostEditor({ initial }: { initial: Post }) {
   const [bodyVersion, setBodyVersion] = useState(0);
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   /*
    * Dirty is derived from the fields against the post they were seeded from,
@@ -218,7 +217,6 @@ function PostEditor({ initial }: { initial: Post }) {
       });
       setPost(res.post);
       seed(res.post);
-      setSaved(true);
     } catch (err) {
       setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
     } finally {
@@ -289,20 +287,16 @@ function PostEditor({ initial }: { initial: Post }) {
           </Badge>
         }
         subtitle={post.slug ? `/posts/${post.slug}` : "No slug yet. It is derived when you publish."}
+        /* NO SAVE HERE. Saving belongs to the bar, which appears the moment
+           there is anything to save and follows the work down the page. A
+           permanently greyed-out Save in the header is a control that has never
+           once been pressable. */
         actions={
-          <>
-            {/* The studio is the full-page writing surface. This screen stays
-                for quick metadata edits, which is what it is good at. */}
-            <ButtonLink href={`/admin/posts/${post.id}/advanced`} variant="ghost" size="lg">
-              Advanced editor
-            </ButtonLink>
-            {/* One live Save at a time: while the bar is up it owns the act. */}
-            {!dirty && !trashed && (
-              <Button onClick={() => save()} disabled size="lg">
-                {saved ? "Saved" : "Save"}
-              </Button>
-            )}
-          </>
+          /* The studio is the full-page writing surface. This screen stays for
+             quick metadata edits, which is what it is good at. */
+          <ButtonLink href={`/admin/posts/${post.id}/advanced`} variant="ghost" size="lg">
+            Advanced editor
+          </ButtonLink>
         }
       />
 
@@ -383,10 +377,7 @@ function PostEditor({ initial }: { initial: Post }) {
               <RichText
                 key={bodyVersion}
                 value={body}
-                onChange={(doc) => {
-                  setBody(doc as DocNode);
-                  setSaved(false);
-                }}
+                onChange={(doc) => setBody(doc as DocNode)}
                 onLockedChange={setBodyLocked}
               />
             </Field>
@@ -437,10 +428,7 @@ function PostEditor({ initial }: { initial: Post }) {
             <Field label="Cover image">
               <ImagePicker
                 value={coverUrl ? [coverUrl] : []}
-                onChange={(urls) => {
-                  setCoverUrl(urls[0] ?? "");
-                  setSaved(false);
-                }}
+                onChange={(urls) => setCoverUrl(urls[0] ?? "")}
                 max={1}
               />
             </Field>
@@ -492,7 +480,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-navy-950">{value}</span>
+      <span className="font-medium text-plum-950">{value}</span>
     </div>
   );
 }

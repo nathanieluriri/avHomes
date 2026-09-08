@@ -8,6 +8,16 @@ export interface AuthUser {
   email: string;
   displayName: string;
   role: Role;
+  /**
+   * The face a buyer sees in a chat. Empty until somebody uploads one, which is
+   * exactly the state the console nags about: an enquiry answered by a blank
+   * circle reads as an autoresponder, and the whole point of the thread is that
+   * a person is on the other end.
+   */
+  avatarUrl: string;
+  /** The line under the name. "Senior Property Consultant", not the role slug. */
+  title: string;
+  phone: string;
 }
 
 export interface TeamUser extends AuthUser {
@@ -215,21 +225,163 @@ export interface ImageRecord {
 export const ENQUIRY_STATUSES = ["new", "open", "closed", "spam"] as const;
 export type EnquiryStatus = (typeof ENQUIRY_STATUSES)[number];
 
+/**
+ * How the enquiry arrived.
+ *
+ * `form` is the one-shot contact form: a message with no expectation of a reply
+ * in the page. `chat` is a live thread the visitor can come back to. They share
+ * a collection because they are the same object to whoever works the inbox, and
+ * splitting them would mean two unread counts and two places to miss one.
+ */
+export const ENQUIRY_CHANNELS = ["form", "chat"] as const;
+export type EnquiryChannel = (typeof ENQUIRY_CHANNELS)[number];
+
+export interface EnquiryMessage {
+  id: string;
+  /** Never an account id. A thread has exactly two sides. */
+  from: "visitor" | "agent";
+  body: string;
+  createdAt: number;
+  /**
+   * SNAPSHOT, not a join. What the visitor was told at the time this was sent.
+   * Flipping the site to a team identity must not silently rewrite the name on
+   * messages a buyer has already read, or on the transcript already in their
+   * inbox.
+   */
+  authorName: string;
+}
+
 export interface Enquiry {
   id: string;
   name: string;
   email: string;
   phone: string | null;
+  /** The opening message. Also `messages[0]`, kept flat for the inbox preview. */
   message: string;
+  channel: EnquiryChannel;
+  messages: EnquiryMessage[];
   /** Set when the enquiry came from a property page. */
   propertyId: string | null;
   propertySlug: string | null;
+  propertyTitle: string | null;
   status: EnquiryStatus;
   createdAt: number;
   updatedAt: number;
+  /** When the visitor last wrote. Null on a thread nobody has answered yet. */
+  lastVisitorAt: number | null;
+  lastAgentAt: number | null;
   handledBy: string | null;
   handledByName: string | null;
   note: string | null;
+  revision: number;
+}
+
+/** What the VISITOR is allowed to see of their own thread. No inbox metadata. */
+export interface EnquiryThread {
+  id: string;
+  status: EnquiryStatus;
+  propertyTitle: string | null;
+  messages: EnquiryMessage[];
+  /** Who is answering, as the visitor should be told. Null before a first reply. */
+  agentName: string | null;
+  agentAvatarUrl: string | null;
+  updatedAt: number;
+}
+
+/* ─────────────────────────────── settings ─────────────────────────────── */
+
+/**
+ * Whose name goes on a reply.
+ *
+ * `individual` signs with the person who typed it. `team` signs everything with
+ * one name, which is what an agency wants when staff turn over and a buyer
+ * should not be able to tell that the person they spoke to last month has left.
+ */
+export const REPLY_IDENTITIES = ["individual", "team"] as const;
+export type ReplyIdentity = (typeof REPLY_IDENTITIES)[number];
+
+export interface SiteSettings {
+  replyIdentity: ReplyIdentity;
+  /** The name used when `replyIdentity` is `team`. */
+  teamName: string;
+  /** The avatar shown beside that name. Empty falls back to an initial. */
+  teamAvatarUrl: string;
+  updatedAt: number;
+  revision: number;
+}
+
+/* ──────────────────────────── design notes ───────────────────────────── */
+
+/**
+ * The customize studio's unit of work.
+ *
+ * A note is a FROZEN PICTURE plus something said about it. The picture is the
+ * anchor, deliberately: the alternative was pinning a note to a CSS selector and
+ * a scroll offset, which survives an edit to the copy and then silently points
+ * at nothing the day the section is rebuilt. A screenshot can go stale, but it
+ * always renders, and "here is exactly what I was looking at" is the thing a
+ * developer actually needs six weeks later.
+ */
+export const NOTE_STATUSES = ["open", "in-progress", "done", "declined"] as const;
+export type NoteStatus = (typeof NOTE_STATUSES)[number];
+
+export const NOTE_KINDS = ["markup", "copy"] as const;
+export type NoteKind = (typeof NOTE_KINDS)[number];
+
+export const MARK_KINDS = ["pen", "ellipse", "rect", "arrow"] as const;
+export type MarkKind = (typeof MARK_KINDS)[number];
+
+export interface NoteMark {
+  kind: MarkKind;
+  color: string;
+  /**
+   * Flat [x, y, x, y, ...] NORMALISED to 0..1 against the shot.
+   *
+   * Normalised rather than pixels because the same note is drawn at three sizes:
+   * a sidebar thumbnail, the review pane, and full screen. Pixel coordinates
+   * would need the render scale threaded through every one of them, and the
+   * first place that forgot would draw a circle a hundred pixels off the thing
+   * it was circling.
+   */
+  points: number[];
+}
+
+export interface NoteAttachment {
+  /** Uploaded stills go through the image pipeline; video is a link. */
+  kind: "image" | "link";
+  url: string;
+  label: string;
+}
+
+/** The trail. Every status move and every reply, in the order they happened. */
+export interface NoteEvent {
+  id: string;
+  at: number;
+  byName: string;
+  kind: "comment" | "status";
+  text: string;
+}
+
+export interface DesignNote {
+  id: string;
+  /** The pathname the shot was taken on, so notes group by page. */
+  path: string;
+  kind: NoteKind;
+  comment: string;
+  /** For a `copy` note: the words as they were, and as they should be. */
+  copyBefore: string | null;
+  copyAfter: string | null;
+  shotUrl: string;
+  shotWidth: number;
+  shotHeight: number;
+  marks: NoteMark[];
+  attachments: NoteAttachment[];
+  status: NoteStatus;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: string;
+  createdByName: string;
+  events: NoteEvent[];
   revision: number;
 }
 

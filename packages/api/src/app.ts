@@ -28,8 +28,10 @@ import {
   vercelBlobStorage,
   type StoragePort,
 } from "@avhomes/media";
-import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
+import { enquiriesAdminRoutes, enquiriesPublicRoutes, settingsRoutes } from "@avhomes/enquiries";
+import { feedbackRoutes } from "@avhomes/feedback";
 import { analyticsPublicRoutes } from "@avhomes/analytics";
+import { audiencePublicRoutes } from "@avhomes/audience";
 import { dashboardRoutes } from "./dashboard";
 
 /**
@@ -242,6 +244,15 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    */
   app.route(API_PREFIX, analyticsPublicRoutes());
 
+  /*
+   * The subscribe intake, in the same slot and for the same two reasons as its
+   * neighbours. It is a public write, so it must be BELOW originGuard or any
+   * page on the web could add addresses to this site's list; and it reads no
+   * cookie, so it stays ABOVE sessionMiddleware, where being cookieless is
+   * structural rather than a thing the handler remembered.
+   */
+  app.route(API_PREFIX, audiencePublicRoutes());
+
   /* ═════════════════ 9. session, then the domain gate ═════════════════ */
 
   app.use(`${API_PREFIX}/*`, sessionMiddleware());
@@ -264,7 +275,14 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, listingsAdminRoutes());
   app.route(API_PREFIX, contentAdminRoutes());
   app.route(API_PREFIX, mediaRoutes({ storage }));
-  app.route(API_PREFIX, enquiriesAdminRoutes());
+  /*
+   * The inbox takes the mailer because a reply is not only a row: it mails the
+   * buyer the transcript, which is the only durable copy of a conversation that
+   * otherwise lives in one browser's storage.
+   */
+  app.route(API_PREFIX, enquiriesAdminRoutes({ mailer }));
+  app.route(API_PREFIX, settingsRoutes());
+  app.route(API_PREFIX, feedbackRoutes());
 
   /*
    * LAST, and the position is not arbitrary. Hono resolves two routers claiming

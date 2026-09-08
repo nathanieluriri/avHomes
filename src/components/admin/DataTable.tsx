@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "./ui";
 
 /**
  * The console's one table.
+ *
+ * THE TOOLBAR AND THE HEADER ROW BOTH STICK to the top of the scroller. Past
+ * about twenty rows the column titles and the status filter had both scrolled
+ * away, which leaves a wall of dates and money with nothing naming the columns,
+ * and no way back to the filter that produced them short of scrolling to the
+ * top and down again.
  *
  * Declarative columns rather than hand-written `<tr>`s, and the reason is the
  * phone. Below `sm` the table stops being a table and becomes a list of
@@ -69,9 +75,54 @@ export function DataTable<T>({
   const rest = columns.filter((column) => column !== primary);
   const mobileMeta = rest.filter((column) => column.mobile === "keep");
 
+  /*
+   * The header row parks under the toolbar, so it has to know how tall the
+   * toolbar is. Measured, not a constant: the toolbar reflows from one row to
+   * two below `xl`, and its height moves again when the status pills wrap. Any
+   * fixed number is wrong at some width, and wrong here means either a strip of
+   * rows showing through the gap or the column titles hidden behind the
+   * filters.
+   */
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [headTop, setHeadTop] = useState(0);
+  const hasToolbar = Boolean(toolbar);
+
+  /* Keyed on WHETHER there is a toolbar, never on the node itself. `toolbar` is
+     JSX built inline by the caller, so it is a new object on every render, and
+     depending on it would tear the observer down and rebuild it on every
+     keystroke in the search box it contains. */
+  useEffect(() => {
+    const node = toolbarRef.current;
+    if (!node) {
+      setHeadTop(0);
+      return;
+    }
+    // `offsetHeight`, not `getBoundingClientRect`. The sheet animates a scale on
+    // arrival and a rect is measured through that transform, which would read a
+    // height a couple of pixels short and then never correct itself: the
+    // observer watches the border box, which a transform does not touch, so it
+    // has no second firing to correct with.
+    const observer = new ResizeObserver(() => setHeadTop(node.offsetHeight));
+    observer.observe(node);
+    setHeadTop(node.offsetHeight);
+    return () => observer.disconnect();
+  }, [hasToolbar]);
+
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-card">
-      {toolbar && <div className="border-b border-mist-200 p-3">{toolbar}</div>}
+    /*
+     * `overflow-clip`, NOT `overflow-hidden`, and that is the whole reason the
+     * sticking works. `hidden` makes this element a scroll container, so a
+     * sticky descendant sticks to a box that never scrolls, which is a silent
+     * no-op rather than an error. `clip` still trims the table to the radius
+     * but creates no scrollport, so the sticky cells resolve against `.c-main`,
+     * which is the thing actually moving.
+     */
+    <div className="overflow-clip rounded-2xl bg-white shadow-card">
+      {toolbar && (
+        <div ref={toolbarRef} className="sticky top-0 z-30 border-b border-mist-200 bg-white p-3">
+          {toolbar}
+        </div>
+      )}
 
       {/* Loading is a skeleton in the exact shape the rows will land in, never
           a spinner. The columns are known before the data is, so the wait can
@@ -88,12 +139,26 @@ export function DataTable<T>({
           <table className="hidden w-full text-[13px] sm:table">
             <caption className="sr-only">{caption}</caption>
             <thead>
-              <tr className="border-b border-mist-200 bg-mist-50/60">
+              {/*
+                The CELLS stick, not the row. `position: sticky` on a `<tr>` is
+                ignored under `border-collapse: collapse`, which is the default
+                Tailwind sets, so each `<th>` carries it.
+
+                Each also carries its own OPAQUE fill and draws its own bottom
+                rule. The tint was `bg-mist-50/60` on the row and the rule was a
+                `border-b`: at 60% the rows underneath read straight through a
+                stuck header, and a collapsed border belongs to the table grid
+                rather than to the cell, so it stays behind while the cell
+                travels. An inset shadow is painted by the cell and goes where
+                the cell goes.
+              */}
+              <tr>
                 {columns.map((column) => (
                   <th
                     key={column.key}
                     scope="col"
-                    className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 ${
+                    style={{ top: headTop }}
+                    className={`sticky z-20 bg-mist-50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-[inset_0_-1px_0_0_var(--mist-200)] ${
                       column.numeric ? "text-right" : "text-left"
                     } ${column.tight ? "w-px whitespace-nowrap" : ""}`}
                   >
@@ -106,7 +171,7 @@ export function DataTable<T>({
               {rows.map((row) => (
                 /*
                  * The whole row navigates, not just the title cell. The row
-                 * already hover-highlights and turns its title blue, so a click
+                 * already hover-highlights and turns its title wine, so a click
                  * on the price or the date has to do what that appearance
                  * promises. The primary cell keeps a real `<a>` underneath, so
                  * middle-click, open-in-new-tab and the status bar preview all
@@ -133,7 +198,7 @@ export function DataTable<T>({
                   /* `focus-within` as well as `hover`: the whole row responds
                      to a pointer, so it has to respond the same way when a
                      keyboard reaches the link inside it. */
-                  className={`group border-b border-mist-100 last:border-0 hover:bg-blue-50/40 focus-within:bg-blue-50/40 ${
+                  className={`group border-b border-mist-100 last:border-0 hover:bg-wine-50/40 focus-within:bg-wine-50/40 ${
                     hrefFor ? "cursor-pointer" : ""
                   }`}
                 >
@@ -167,7 +232,7 @@ export function DataTable<T>({
               const body = (
                 <>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold text-navy-950">
+                    <div className="text-[13px] font-semibold text-plum-950">
                       {primary.render(row)}
                     </div>
                     {mobileMeta.length > 0 && (
@@ -190,7 +255,7 @@ export function DataTable<T>({
                   {hrefFor ? (
                     <Link
                       href={hrefFor(row)}
-                      className="flex items-center gap-3 px-4 py-3 active:bg-blue-50/60"
+                      className="flex items-center gap-3 px-4 py-3 active:bg-wine-50/60"
                     >
                       {body}
                     </Link>
@@ -228,12 +293,14 @@ function TableSkeleton<T>({ columns }: { columns: readonly Column<T>[] }) {
 
       <table className="hidden w-full text-[13px] sm:table">
         <thead>
-          <tr className="border-b border-mist-200 bg-mist-50/60">
+          {/* Same opaque fill and same drawn rule as the real header, so the
+              swap from skeleton to rows changes nothing but the rows. */}
+          <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
                 scope="col"
-                className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 ${
+                className={`bg-mist-50 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-[inset_0_-1px_0_0_var(--mist-200)] ${
                   column.numeric ? "text-right" : "text-left"
                 }`}
               >
@@ -304,7 +371,7 @@ export function IdCell({
       )}
       <span className="min-w-0">
         <span className="flex items-center gap-1.5">
-          <span className="truncate font-semibold text-navy-950 group-hover:text-blue-700">
+          <span className="truncate font-semibold text-plum-950 group-hover:text-wine-700">
             {title}
           </span>
           {trailing}
@@ -343,7 +410,7 @@ export function TablePager({
           onClick={onPrev}
           disabled={!canPrev}
           aria-label="Previous page"
-          className="c-bevel grid h-9 w-9 place-items-center rounded-lg bg-white text-navy-950 transition-colors hover:bg-mist-50 disabled:cursor-not-allowed disabled:text-mist-300 sm:h-7 sm:w-7"
+          className="c-bevel grid h-9 w-9 place-items-center rounded-lg bg-white text-plum-950 transition-colors hover:bg-mist-50 disabled:cursor-not-allowed disabled:text-mist-300 sm:h-7 sm:w-7"
         >
           <ChevronLeft className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -352,7 +419,7 @@ export function TablePager({
           onClick={onNext}
           disabled={!canNext}
           aria-label="Next page"
-          className="c-bevel grid h-9 w-9 place-items-center rounded-lg bg-white text-navy-950 transition-colors hover:bg-mist-50 disabled:cursor-not-allowed disabled:text-mist-300 sm:h-7 sm:w-7"
+          className="c-bevel grid h-9 w-9 place-items-center rounded-lg bg-white text-plum-950 transition-colors hover:bg-mist-50 disabled:cursor-not-allowed disabled:text-mist-300 sm:h-7 sm:w-7"
         >
           <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -414,8 +481,8 @@ export function TableToolbar({
               onClick={() => tabs.onChange(option.value)}
               className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-colors sm:h-7 sm:px-2.5 ${
                 active
-                  ? "bg-navy-950 text-white"
-                  : "text-slate-600 hover:bg-mist-100 hover:text-navy-950"
+                  ? "bg-plum-950 text-white"
+                  : "text-slate-600 hover:bg-mist-100 hover:text-plum-950"
               }`}
             >
               {option.label}
@@ -440,7 +507,7 @@ export function TableToolbar({
           onChange={(event) => search.onChange(event.target.value)}
           placeholder={search.placeholder}
           aria-label={search.placeholder}
-          className="h-8 w-full min-w-0 rounded-lg border border-mist-200 bg-white px-2.5 text-[13px] text-navy-950 outline-none transition-colors placeholder:text-slate-550 focus:border-blue-500 xl:w-56"
+          className="h-8 w-full min-w-0 rounded-lg border border-mist-200 bg-white px-2.5 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-550 focus:border-wine-500 xl:w-56"
         />
         {trailing}
       </div>

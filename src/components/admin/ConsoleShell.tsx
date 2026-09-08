@@ -1,10 +1,20 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DropdownMenu } from "radix-ui";
-import { ExternalLink, LogOut, Menu as MenuIcon, Search, Store, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ExternalLink,
+  LogOut,
+  Menu as MenuIcon,
+  Search,
+  Store,
+  UserRound,
+  X,
+} from "lucide-react";
 import { hasDomain, type AuthUser } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useSession } from "@/lib/admin/hooks";
@@ -15,7 +25,7 @@ import { Spinner } from "./ui";
 import "@/app/admin/console.css";
 
 /**
- * The console shell: a blue bar over a light working panel with a rail.
+ * The console shell: a wine bar over a light working panel with a rail.
  *
  * A FIXED FRAME, `inset: 0`, and that is the load-bearing decision in this
  * file. The document itself never scrolls here, so there is no second outer
@@ -41,6 +51,21 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const mainRef = useRef<HTMLElement>(null);
 
   const isSignIn = pathname === "/admin/sign-in";
+
+  /*
+   * The studios take the whole window.
+   *
+   * Two screens qualify, for the same reason. The writing studio is a DOCUMENT
+   * rather than a record in a frame; the customize studio is the whole site in a
+   * frame. The console chrome was actively costing both: the rail ate 15rem, the
+   * sheet capped them at 66rem and padded them again inside that, so a full-page
+   * editor was drawn as a card in a column and the site was drawn as a postcard.
+   * Nothing in the chrome serves a writer mid-paragraph or a reviewer mid-page
+   * either. So the shell steps out of the way entirely and each studio's own bar
+   * carries the way back, the same deal `/admin/sign-in` already gets below.
+   */
+  const isStudio =
+    /^\/admin\/posts\/[^/]+\/advanced\/?$/.test(pathname) || pathname === "/admin/customize";
 
   /*
    * Two redirects, and the second one has to compute a destination rather than
@@ -131,6 +156,12 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   if (isSignIn) return <div className="console min-h-screen bg-haze">{children}</div>;
   if (session.status !== "signed-in") return null;
 
+  /* AFTER the auth gate, unlike sign-in: the studio is a signed-in screen and
+     has to stay behind the same redirect every other one is behind. The
+     document scrolls here rather than an inner pane, so the studio's sticky bar
+     and its slide-over panels anchor to the viewport with nothing in between. */
+  if (isStudio) return <div className="console min-h-screen bg-mist-50">{children}</div>;
+
   const { user } = session;
 
   return (
@@ -143,7 +174,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           event.preventDefault();
           mainRef.current?.focus();
         }}
-        className="sr-only rounded-lg bg-white px-4 py-2 text-[13px] font-semibold text-navy-950 focus:not-sr-only focus:absolute focus:left-3 focus:top-2.5 focus:z-[60]"
+        className="sr-only rounded-lg bg-white px-4 py-2 text-[13px] font-semibold text-plum-950 focus:not-sr-only focus:absolute focus:left-3 focus:top-2.5 focus:z-[60]"
       >
         Skip to content
       </a>
@@ -155,7 +186,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             aria-label="Toggle navigation"
             aria-expanded={railOpen}
             onClick={() => setRailOpen((open) => !open)}
-            className="grid h-9 w-9 place-items-center rounded-lg text-blue-100 transition-colors hover:bg-white/12 hover:text-white lg:hidden"
+            className="grid h-9 w-9 place-items-center rounded-lg text-wine-100 transition-colors hover:bg-white/12 hover:text-white lg:hidden"
           >
             {railOpen ? (
               <X className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -164,7 +195,12 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             )}
           </button>
 
-          {/* The mark stays at every width and the words drop, rather than the
+          {/* The real mark, not an "AV" square. This bar is the one place the
+              product names itself, and a two letter chip is a placeholder for a
+              brand rather than the brand. The reversed lockup, because the
+              standard one's charcoal V all but disappears on this ground.
+
+              The mark stays at every width and the word drops, rather than the
               whole thing vanishing below sm. A phone had no product name in the
               chrome at all and no route home outside the drawer. */}
           <Link
@@ -172,11 +208,16 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             aria-label="AVHomes console home"
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10"
           >
-            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/15 text-[11px] font-bold text-white">
-              AV
-            </span>
-            <span className="hidden text-sm font-bold tracking-tight text-white sm:block">
-              AVHomes <span className="font-normal text-blue-100">console</span>
+            <Image
+              src="/brand/logo-mark-reversed.png"
+              alt="AVHomes"
+              width={279}
+              height={178}
+              priority
+              className="h-7 w-auto shrink-0"
+            />
+            <span className="hidden text-sm font-medium tracking-tight text-wine-100 sm:block">
+              console
             </span>
           </Link>
         </div>
@@ -189,13 +230,13 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           aria-haspopup="dialog"
           className="flex h-9 w-full max-w-lg items-center gap-2.5 justify-self-center rounded-lg border border-white/15 bg-white/10 px-3 text-left transition-colors hover:border-white/25 hover:bg-white/15"
         >
-          <Search className="h-4 w-4 shrink-0 text-blue-100" aria-hidden="true" />
-          <span className="flex-1 truncate text-sm text-blue-100">Search</span>
+          <Search className="h-4 w-4 shrink-0 text-wine-100" aria-hidden="true" />
+          <span className="flex-1 truncate text-sm text-wine-100">Search</span>
           <span className="hidden shrink-0 items-center gap-1 sm:flex" aria-hidden="true">
-            <kbd className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-100">
+            <kbd className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-wine-100">
               Ctrl
             </kbd>
-            <kbd className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-100">
+            <kbd className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-wine-100">
               K
             </kbd>
           </span>
@@ -207,7 +248,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             target="_blank"
             rel="noreferrer"
             title="Open the storefront in a new tab"
-            className="grid h-9 w-9 place-items-center rounded-lg text-blue-100 transition-colors hover:bg-white/12 hover:text-white"
+            className="grid h-9 w-9 place-items-center rounded-lg text-wine-100 transition-colors hover:bg-white/12 hover:text-white"
           >
             <Store className="h-[18px] w-[18px]" aria-hidden="true" />
             <span className="sr-only">Open the storefront in a new tab</span>
@@ -222,7 +263,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             type="button"
             aria-label="Close navigation"
             onClick={() => setRailOpen(false)}
-            className="c-scrim fixed inset-x-0 bottom-0 top-(--c-topbar-h) z-[54] bg-navy-950/45 lg:hidden"
+            className="c-scrim fixed inset-x-0 bottom-0 top-(--c-topbar-h) z-[54] bg-plum-950/45 lg:hidden"
           />
         )}
 
@@ -255,13 +296,13 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                       aria-current={active ? "page" : undefined}
                       className={`flex h-9 items-center gap-3 rounded-lg px-2 text-sm transition-colors ${
                         active
-                          ? "bg-white font-semibold text-navy-950 shadow-card"
-                          : "font-medium text-slate-600 hover:bg-mist-200/60 hover:text-navy-950"
+                          ? "bg-white font-semibold text-plum-950 shadow-card"
+                          : "font-medium text-slate-600 hover:bg-mist-200/60 hover:text-plum-950"
                       }`}
                     >
                       <item.icon
                         className={`h-[18px] w-[18px] shrink-0 ${
-                          active ? "text-blue-600" : "text-slate-550"
+                          active ? "text-wine-600" : "text-slate-550"
                         }`}
                         aria-hidden="true"
                       />
@@ -278,7 +319,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
               href="/"
               target="_blank"
               rel="noreferrer"
-              className="flex h-9 items-center gap-3 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-mist-200/60 hover:text-navy-950"
+              className="flex h-9 items-center gap-3 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-mist-200/60 hover:text-plum-950"
             >
               <ExternalLink className="h-[18px] w-[18px] shrink-0 text-slate-550" aria-hidden="true" />
               <span className="truncate">View storefront</span>
@@ -297,12 +338,55 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           {/* Keyed on the pathname so React remounts it per navigation and the
               rise replays without any JavaScript timing. */}
           <div key={pathname} className="c-sheet mx-auto w-full max-w-[66rem] px-4 py-6 sm:px-6 sm:py-8">
+            <AvatarNag user={user} pathname={pathname} />
             {children}
           </div>
         </main>
       </div>
 
       <Palette open={paletteOpen} onClose={() => setPaletteOpen(false)} user={user} />
+    </div>
+  );
+}
+
+/**
+ * The missing-photo warning.
+ *
+ * Not decoration and not a growth nudge. Since "Contact agent" became a live
+ * conversation, a reply from an account with no photo reaches a buyer as a grey
+ * circle with a letter in it, which reads as an autoresponder at the exact
+ * moment the site is trying to prove a person is there. That is a real cost to
+ * the business, so it is stated rather than left to be noticed.
+ *
+ * NOT DISMISSIBLE, and that is deliberate: a dismiss button turns a two minute
+ * fix into a thing somebody clears every morning forever. It is instead SHOWN
+ * ONLY TO ROLES WHO ACTUALLY ANSWER BUYERS, and it takes itself down the moment
+ * a photo exists. An editor writing blog posts is never met by a buyer and is
+ * not nagged about a headshot they have no use for.
+ *
+ * It also hides itself ON the profile screen. A banner telling you to go
+ * somewhere you are already standing is noise.
+ */
+function AvatarNag({ user, pathname }: { user: AuthUser; pathname: string }) {
+  const facesBuyers = hasDomain(user.role, "enquiries") || hasDomain(user.role, "listings");
+  if (!facesBuyers) return null;
+  if (user.avatarUrl !== "") return null;
+  if (pathname === "/admin/profile") return null;
+
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+      <p className="min-w-0 flex-1 text-[13px] text-amber-900">
+        <span className="font-semibold">Add a profile photo.</span> Buyers see your
+        face when you answer an enquiry. Without one your replies arrive from a
+        blank circle.
+      </p>
+      <Link
+        href="/admin/profile"
+        className="c-bevel shrink-0 rounded-lg bg-white px-3 py-1.5 text-[13px] font-semibold text-plum-950 transition-colors hover:bg-mist-50"
+      >
+        Add one
+      </Link>
     </div>
   );
 }
@@ -315,7 +399,7 @@ function UserMenu({ user }: { user: AuthUser }) {
           type="button"
           className="flex h-9 items-center gap-2 rounded-lg pl-1 pr-1.5 transition-colors hover:bg-white/12 sm:pr-2.5"
         >
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-blue-500/25 text-[11px] font-bold text-white">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-wine-500/25 text-[11px] font-bold text-white">
             {initials(user.displayName, "AV")}
           </span>
           <span className="hidden max-w-[9rem] truncate text-sm font-medium text-white sm:block">
@@ -331,14 +415,28 @@ function UserMenu({ user }: { user: AuthUser }) {
           className="console-float z-[72] w-60 overflow-hidden rounded-xl border border-mist-200 bg-white p-1.5 shadow-pop"
         >
           <div className="px-2.5 py-2">
-            <p className="truncate text-sm font-semibold text-navy-950">{user.displayName}</p>
+            <p className="truncate text-sm font-semibold text-plum-950">{user.displayName}</p>
             <p className="truncate text-xs text-slate-600">{user.email}</p>
-            <span className="mt-2 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+            <span className="mt-2 inline-flex rounded-full bg-wine-50 px-2 py-0.5 text-[11px] font-semibold text-wine-700">
               {user.role}
             </span>
           </div>
 
           <DropdownMenu.Separator className="my-1.5 h-px bg-mist-200" />
+
+          {/* Not a rail row. Every role has a profile, so gating it by a domain
+              would be a lie, and an ungated row in a rail whose whole contract
+              is "these are your permissions" is worse. The account menu is where
+              a reader already looks for their own things. */}
+          <DropdownMenu.Item asChild>
+            <Link
+              href="/admin/profile"
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-plum-950 outline-none data-[highlighted]:bg-mist-100"
+            >
+              <UserRound className="h-4 w-4 text-slate-550" aria-hidden="true" />
+              Your profile
+            </Link>
+          </DropdownMenu.Item>
 
           <DropdownMenu.Item
             onSelect={() => {
@@ -353,7 +451,7 @@ function UserMenu({ user }: { user: AuthUser }) {
                 window.location.href = "/admin/sign-in";
               });
             }}
-            className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-navy-950 outline-none data-[highlighted]:bg-mist-100"
+            className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-plum-950 outline-none data-[highlighted]:bg-mist-100"
           >
             <LogOut className="h-4 w-4 text-slate-550" aria-hidden="true" />
             Sign out

@@ -34,6 +34,7 @@ import {
   findUserById,
   findUserByEmail,
   listUsers,
+  reassignListingsToOwner,
   setUserRole,
 } from "../repo/users";
 import { endAllSessions } from "../repo/sessions";
@@ -154,9 +155,19 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
 
     await disableUser(db, id);
     const sessionsEnded = await endAllSessions(db, id);
+    /*
+     * The listings follow the account out.
+     *
+     * AFTER the disable and the session sweep, never before: those two are what
+     * make the account safe, and a slow bulk update in front of them is a window
+     * where a revoked laptop is still signed in. If this line throws, the
+     * account is already locked out and the listings are merely still pointing
+     * at it, which is the recoverable half of the failure.
+     */
+    const listingsReassigned = await reassignListingsToOwner(db, id);
     // Idempotent: disabling an already-disabled user is a 200 with 0 sessions
     // ended, not a 409. The state the caller asked for is the state they get.
-    return c.json({ ok: true, sessionsEnded });
+    return c.json({ ok: true, sessionsEnded, listingsReassigned });
   });
 
   /**

@@ -13,9 +13,26 @@ import {
 import { doorStatus } from "../door";
 import { clearSessionCookie, requireAuth, sessionCookieName } from "../middleware";
 import { listSessions, revokeSession, revokeSessionByToken } from "../repo/sessions";
-import { setDisplayName } from "../repo/users";
+import { updateProfile } from "../repo/users";
 
-const ProfileBody = z.object({ displayName: str().min(1).max(120).trim() }).partial().strict();
+/**
+ * Everything on the card a buyer meets, in one patch.
+ *
+ * `.partial()` on all four, so a screen that only wants to attach a photo does
+ * not have to send the name back and race a rename it never saw. An avatar is
+ * clearable, which is why it accepts "" rather than requiring a URL: an agent
+ * who uploaded the wrong picture must be able to take it down without waiting
+ * for a replacement.
+ */
+const ProfileBody = z
+  .object({
+    displayName: str().min(1).max(120).trim(),
+    avatarUrl: str().max(600).trim(),
+    title: str().max(120).trim(),
+    phone: str().max(60).trim(),
+  })
+  .partial()
+  .strict();
 
 /**
  * The account's own surface.
@@ -59,8 +76,8 @@ export function authRoutes(): Hono<AppEnv> {
     const user = currentUser(c);
     // An empty patch is a no-op 200, not a 400. The caller asked for the state
     // it already has and it got it.
-    if (body.displayName === undefined) return c.json({ user });
-    const updated = await setDisplayName(await currentDb(c), user.id, body.displayName);
+    if (Object.keys(body).length === 0) return c.json({ user });
+    const updated = await updateProfile(await currentDb(c), user.id, body);
     if (!updated) throw new NotFoundError(user.id);
     return c.json({ user: updated });
   });
