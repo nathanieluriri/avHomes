@@ -59,12 +59,14 @@ export default function AgentPanel({ property }: { property: Property }) {
             buyer to a mail client they may not have configured, lost everyone on
             a shared machine, and left the team with no record until somebody
             forwarded it. */}
+        {/* The agent's name and face are no longer passed down. The widget
+            resolves them live from the thread, so an agent who uploads a photo
+            or a site that switches to a team identity is reflected in an open
+            conversation without this page knowing anything about it. */}
         <AgentChat
           propertyId={property.id}
           propertySlug={property.slug ?? undefined}
           propertyTitle={property.title}
-          agentName={agent.name}
-          agentAvatarUrl={agent.avatarUrl}
         />
         <a
           href={telHref}

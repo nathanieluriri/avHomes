@@ -217,9 +217,63 @@
   .card-soft:hover { transform: none; }
   html { scroll-behavior: auto; }
   .marquee-track { animation: none !important; }
+  /* The panel still appears and the launcher still marks an arrival: only the
+     movement goes. The expanding ring carries the signal on its own, which is
+     why it is a separate rule from the shake. */
+  .chat-panel { animation: none; }
+  .chat-launcher--nudge { animation: none; }
 }
 
 html { scroll-behavior: smooth; }
+
+/* The chat panel arrives from the corner it is anchored to, not from nowhere.
+   Short and eased out, because it opens on a click and a slow panel makes the
+   click feel unregistered. */
+@keyframes chat-rise {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.chat-panel {
+  transform-origin: bottom right;
+  animation: chat-rise 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/*
+ * The launcher's attention nudge, played ONCE per arriving message rather than
+ * looped while a count is non-zero. A badge that animates forever is one a
+ * reader learns to ignore in about a minute, and the thing worth signalling is
+ * that something just arrived.
+ */
+@keyframes chat-nudge {
+  0%, 100% { transform: none; }
+  15% { transform: translateY(-6px) rotate(-8deg); }
+  30% { transform: translateY(0) rotate(7deg); }
+  45% { transform: translateY(-3px) rotate(-5deg); }
+  60% { transform: translateY(0) rotate(3deg); }
+  75% { transform: rotate(-1deg); }
+}
+
+.chat-launcher--nudge {
+  animation: chat-nudge 1200ms ease-in-out 2;
+}
+
+/* The ring that says it without moving. Kept for reduced motion, where it
+   becomes the whole signal rather than a decoration on top of one. */
+.chat-launcher--nudge::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid var(--wine-500);
+  animation: chat-ping 1200ms ease-out 2;
+  pointer-events: none;
+}
+
+@keyframes chat-ping {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.35); }
+}
 
 /*
  * The customize studio's copy picker, applied INSIDE the framed site.

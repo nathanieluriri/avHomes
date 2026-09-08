@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Cookie, X } from "lucide-react";
 
@@ -22,6 +22,7 @@ type Choice = "accepted" | "rejected";
  */
 export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     /*
@@ -57,10 +58,49 @@ export default function CookieBanner() {
     setVisible(false);
   }
 
+  /*
+   * Publishes its own height so the chat launcher can sit clear of it.
+   *
+   * MEASURED, not a constant: this banner is one row on a desktop and three
+   * stacked on a phone, so any number hard coded on the other side is wrong at
+   * some width. The ResizeObserver also catches a reflow when the text wraps
+   * differently, which a single measurement at mount would miss.
+   *
+   * The value goes on the root element rather than down a prop, because the
+   * launcher is portalled to the body and is not a descendant of anything this
+   * component could hand a prop to. The cleanup zeroes it, which is what makes
+   * dismissal drop the launcher back to the corner.
+   */
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return;
+    const publish = () => {
+      document.documentElement.style.setProperty(
+        "--cookie-banner-h",
+        `${Math.ceil(node.getBoundingClientRect().height)}px`,
+      );
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.setProperty("--cookie-banner-h", "0px");
+    };
+    /*
+     * Keyed on `visible`, and it has to be. The banner starts hidden while the
+     * stored consent is read, so on the first run the ref is null and there is
+     * nothing to measure. With no dependency this effect never ran again and the
+     * variable stayed unset for the whole visit, which is precisely the case it
+     * exists to handle.
+     */
+  }, [visible]);
+
   if (!visible) return null;
 
   return (
     <div
+      ref={box}
       role="dialog"
       aria-modal="false"
       aria-labelledby="cookie-title"
