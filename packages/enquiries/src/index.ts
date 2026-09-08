@@ -113,15 +113,26 @@ interface EnquiryDoc {
   revision: number;
 }
 
-/** Enumerated, so `sourceIp` and `threadKey` cannot arrive in a response. */
-const WIRE_PROJECTION = {
+/**
+ * The inbox row. Enumerated, so `sourceIp` and `threadKey` cannot arrive in a
+ * response, and DELIBERATELY WITHOUT THE TRANSCRIPT: a hundred threads of three
+ * hundred messages each is a response measured in megabytes, for a screen that
+ * renders one line per row.
+ *
+ * The narrow one is the BASE and the detail projection adds to it. The obvious
+ * shape, spreading the full projection and setting `messages: 0`, is what shipped
+ * first and it is not a projection at all: MongoDB refuses to mix an exclusion
+ * into an inclusion (the only field allowed both ways is `_id`), so every load of
+ * the inbox answered "Cannot do exclusion on field messages in inclusion
+ * projection" as a 500. Building narrow-to-wide makes that mistake unexpressible.
+ */
+const LIST_PROJECTION = {
   _id: 1,
   name: 1,
   email: 1,
   phone: 1,
   message: 1,
   channel: 1,
-  messages: 1,
   propertyId: 1,
   propertySlug: 1,
   propertyTitle: 1,
@@ -135,14 +146,8 @@ const WIRE_PROJECTION = {
   revision: 1,
 } as const;
 
-/**
- * The list does NOT carry the transcript.
- *
- * A hundred threads of three hundred messages each is a response measured in
- * megabytes, for a screen that renders one line per row. The inbox gets the
- * preview it actually paints; the detail route reads the thread.
- */
-const LIST_PROJECTION = { ...WIRE_PROJECTION, messages: 0 } as const;
+/** The detail read, which is the only one that wants the conversation. */
+const WIRE_PROJECTION = { ...LIST_PROJECTION, messages: 1 } as const;
 
 const SORT: SortSpec = { field: "createdAt", direction: -1 };
 const SORT_NAME = "newest";
@@ -365,14 +370,26 @@ const OpenChatBody = SubmitBody.omit({ phone: true }).extend({
   phone: str().min(4).max(60).trim(),
 });
 
-const SendMessageBody = z
-  .object({
-    token: str().min(1).max(400),
-    body: str().min(1).max(CHAT_MAX_BODY).trim(),
-  })
-  .strict();
+const SendMessageBody = z.object({ body: str().min(1).max(CHAT_MAX_BODY).trim() }).strict();
 
-const ThreadQuery = z.object({ token: str().min(1).max(400) }).strict();
+/**
+ * The thread token travels in a HEADER, never in the query string.
+ *
+ * A URL is the one part of a request that gets written down everywhere: proxy
+ * and server access logs, the browser's own history, and the `Referer` on any
+ * request the page makes afterwards. A bearer token for somebody's private
+ * conversation does not belong in any of them, and it was in all of them while
+ * this was `?token=`.
+ *
+ * A custom header buys a second thing for free: it makes the request
+ * non-simple, so a browser preflights it cross-origin and no plain HTML form
+ * can forge one.
+ */
+const THREAD_TOKEN_HEADER = "x-thread-token";
+
+function threadToken(c: { req: { header: (name: string) => string | undefined } }): string {
+  return c.req.header(THREAD_TOKEN_HEADER)?.trim() ?? "";
+}
 
 function openingDoc(
   body: z.infer<typeof SubmitBody>,
@@ -529,7 +546,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const db = await currentDb(c);
     await limit(db, `chat:${ip}`, CHAT_MESSAGE_IP_LIMIT, CHAT_MESSAGE_WINDOW_MS);
 
-    const doc = await loadOwnedThread(db, id, body.token);
+    const doc = await loadOwnedThread(db, id, threadToken(c));
     if ((doc.messages ?? []).length >= CHAT_MAX_MESSAGES) {
       throw new BadRequestError(
         "This conversation has reached its length limit. Reply to the email transcript and it reaches the same person.",
@@ -584,9 +601,8 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
    */
   routes.get("/enquiries/chat/:id", async (c) => {
     const id = pathParam(c, "id");
-    const q = readQuery(c, ThreadQuery);
     const db = await currentDb(c);
-    const doc = await loadOwnedThread(db, id, q.token);
+    const doc = await loadOwnedThread(db, id, threadToken(c));
     c.header("cache-control", "no-store, private");
     return c.json({ thread: await toThread(db, doc) });
   });

@@ -166,10 +166,12 @@ function ChatDialog({
     async (signal?: AbortSignal) => {
       if (!handle) return;
       try {
-        const res = await fetch(
-          `/api/enquiries/chat/${encodeURIComponent(handle.id)}?token=${encodeURIComponent(handle.token)}`,
-          { signal },
-        );
+        const res = await fetch(`/api/enquiries/chat/${encodeURIComponent(handle.id)}`, {
+          signal,
+          // In a header, never the URL: a query string is written to access
+          // logs, browser history and the Referer of every later request.
+          headers: { "x-thread-token": handle.token },
+        });
         if (res.status === 404) {
           /* The thread is gone, or this token no longer opens it. Drop the dead
              key rather than polling it forever, and let the buyer start again. */
@@ -287,8 +289,8 @@ function ChatDialog({
     try {
       const res = await fetch(`/api/enquiries/chat/${encodeURIComponent(handle.id)}/messages`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: handle.token, body }),
+        headers: { "content-type": "application/json", "x-thread-token": handle.token },
+        body: JSON.stringify({ body }),
       });
       if (!res.ok) throw new Error(await readError(res));
       const data = (await res.json()) as { thread: EnquiryThread };
