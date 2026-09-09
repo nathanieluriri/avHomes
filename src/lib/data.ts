@@ -6,20 +6,47 @@ import { demoProperties, demoStats, demoTestimonials } from "./demo-data";
  * The single data access layer. Pages never fetch directly, so what the site
  * reads and how it reads it stay one decision.
  *
- * EVERY READ FALLS BACK TO THE BUNDLED FIXTURES. That is not defensiveness, it
- * is what makes `next build` work with no MONGODB_URI: static generation runs
- * these functions, and a build that fails because a database is not wired yet is
- * a build gate that tests the environment rather than the code. The fallback is
- * logged loudly enough to find, and a deployed site with a working database
- * never reaches it.
+ * A FAILED READ FALLS BACK TO THE BUNDLED FIXTURES, BUT ONLY OUTSIDE
+ * PRODUCTION, and the second half of that sentence is the important one.
+ *
+ * The fixtures exist so `npm run dev` is useful before a database is wired and
+ * so `next build` is a gate that tests the code rather than the environment.
+ * What they must never do is reach a visitor. This file used to fall back
+ * unconditionally, and the comment here asserted that "a deployed site with a
+ * working database never reaches it", which turned out to be exactly the wrong
+ * guarantee to rely on: the API answered 501 for a missing MONGODB_URI, every
+ * read failed, and the live site advertised three invented luxury properties in
+ * Lekki and Ikoyi. On a real estate site that is not a cosmetic bug. A buyer
+ * can open one, send an enquiry about it, and be answered about a house that
+ * does not exist.
+ *
+ * So in production a failure yields EMPTY rather than fiction. An empty
+ * storefront is a true statement about a site with no listings yet, and a
+ * caller who wants to know why has the warning below in the runtime log.
  */
+
+/*
+ * `NODE_ENV`, not a variable of our own, because the two moments that need
+ * fixtures are exactly the two where Next sets this to something other than
+ * "production": `next dev`, and a test runner. `next build` sets it to
+ * "production", so a build with no database now prerenders an empty site
+ * instead of a fake one, which is still a passing gate and a more honest
+ * artifact.
+ */
+const FIXTURES_ALLOWED = process.env.NODE_ENV !== "production";
 
 interface FetchOptions {
   revalidate: number;
   tags?: string[];
 }
 
-async function apiGet<T>(path: string, fallback: T, options: FetchOptions): Promise<T> {
+/**
+ * `fallback` is the fixture shape and `empty` is the same shape with nothing in
+ * it. Two arguments rather than one, because only the caller knows what "none
+ * of these" looks like for its own payload: a list read wants
+ * `{ items: [], nextCursor: null }` and a detail read wants null.
+ */
+async function apiGet<T>(path: string, fallback: T, empty: T, options: FetchOptions): Promise<T> {
   const url = `${apiBase()}/api/public${path}`;
   try {
     const res = await fetch(url, {
@@ -34,11 +61,16 @@ async function apiGet<T>(path: string, fallback: T, options: FetchOptions): Prom
     }
     return (await res.json()) as T;
   } catch (err) {
-    console.warn(
-      `[data] ${path} unavailable, serving bundled fixtures:`,
-      err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-    );
-    return fallback;
+    const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    if (FIXTURES_ALLOWED) {
+      console.warn(`[data] ${path} unavailable, serving bundled fixtures:`, reason);
+      return fallback;
+    }
+    // Loud, and an error rather than a warning: in production this is the site
+    // showing a visitor less than it holds, and the line has to be findable in
+    // a log that is filtered to errors.
+    console.error(`[data] ${path} unavailable, serving nothing:`, reason);
+    return empty;
   }
 }
 
@@ -46,6 +78,7 @@ export async function getProperties(): Promise<Property[]> {
   const page = await apiGet<Page<Property>>(
     "/properties?limit=48",
     { items: demoProperties, nextCursor: null },
+    { items: [], nextCursor: null },
     { revalidate: LIST_REVALIDATE, tags: ["properties"] },
   );
   return page.items;
@@ -55,6 +88,7 @@ export async function getFeaturedProperties(): Promise<Property[]> {
   const page = await apiGet<Page<Property>>(
     "/properties?featured=1&limit=6",
     { items: demoProperties.filter((p) => p.featured), nextCursor: null },
+    { items: [], nextCursor: null },
     { revalidate: LIST_REVALIDATE, tags: ["properties"] },
   );
   return page.items;
@@ -92,11 +126,15 @@ export async function getPropertyDetail(slug: string): Promise<PropertyDetail | 
     if (!res.ok) throw new Error(`${res.status}`);
     return (await res.json()) as PropertyDetail;
   } catch (err) {
-    console.warn(
-      `[data] property ${slug} unavailable, serving bundled fixtures:`,
-      err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-    );
-    return fallback;
+    const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    if (FIXTURES_ALLOWED) {
+      console.warn(`[data] property ${slug} unavailable, serving bundled fixtures:`, reason);
+      return fallback;
+    }
+    // Null, which the page renders as a 404. A fixture here would be a detail
+    // page for a house nobody is selling, with a working enquiry form on it.
+    console.error(`[data] property ${slug} unavailable, serving nothing:`, reason);
+    return null;
   }
 }
 
@@ -113,6 +151,7 @@ async function getSite(): Promise<SitePayload> {
   return apiGet<SitePayload>(
     "/site",
     { testimonials: demoTestimonials, stats: demoStats },
+    { testimonials: [], stats: [] },
     { revalidate: DETAIL_REVALIDATE, tags: ["site"] },
   );
 }
