@@ -26,6 +26,35 @@ const TYPES = [
 
 const ANY = "any";
 
+/*
+ * THE TRIGGERS LABEL THEMSELVES rather than letting Radix do it, and that is a
+ * correctness fix, not a preference.
+ *
+ * Radix takes a trigger's text from the DOM node of the selected `SelectItem`,
+ * and the items live inside `SelectContent`, which is not mounted while the
+ * dropdown is closed. So a value set from anywhere other than a user's own
+ * click has no text to show: on every fresh load of `/listings?status=For+Rent`
+ * all four controls rendered BLANK while the URL and the heading said
+ * otherwise, which reads as the filters having been silently dropped. The
+ * placeholder does not cover it either, because Radix only shows a placeholder
+ * for an empty value and "no filter" here is the string `any`.
+ *
+ * Passing children to `SelectValue` overrides that lookup entirely, so the
+ * label is a pure function of the value and is correct on the server, on a
+ * hard load, and after a client navigation alike.
+ */
+function statusLabel(value: string): string {
+  return value === ANY ? "Any status" : value;
+}
+
+function typeLabel(value: string): string {
+  return value === ANY ? "Any type" : value;
+}
+
+function bedsLabel(value: string): string {
+  return value === ANY ? "Any beds" : `${value}+ beds`;
+}
+
 /**
  * The bar STAGES a search; it does not run one as you type.
  *
@@ -152,7 +181,7 @@ export default function FilterBar() {
               aria-label="Status"
               className="w-full rounded-full border-0 bg-mist-100 text-sm lg:w-[132px] lg:bg-transparent"
             >
-              <SelectValue placeholder="Any status" />
+              <SelectValue placeholder="Any status">{statusLabel(status)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ANY}>Any status</SelectItem>
@@ -170,7 +199,7 @@ export default function FilterBar() {
               aria-label="Property type"
               className="w-full rounded-full border-0 bg-mist-100 text-sm lg:w-[140px] lg:bg-transparent"
             >
-              <SelectValue placeholder="Any type" />
+              <SelectValue placeholder="Any type">{typeLabel(type)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ANY}>Any type</SelectItem>
@@ -191,7 +220,7 @@ export default function FilterBar() {
               aria-label="Minimum bedrooms"
               className="w-full rounded-full border-0 bg-mist-100 text-sm lg:w-[118px] lg:bg-transparent"
             >
-              <SelectValue placeholder="Any beds" />
+              <SelectValue placeholder="Any beds">{bedsLabel(beds)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ANY}>Any beds</SelectItem>
