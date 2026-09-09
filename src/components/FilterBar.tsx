@@ -57,6 +57,45 @@ export default function FilterBar() {
   const [type, setType] = useState(applied.type);
   const [beds, setBeds] = useState(applied.beds);
 
+  /*
+   * THE CONTROLS FOLLOW THE URL WHEN THE URL MOVES UNDER THEM.
+   *
+   * `useState(applied.x)` reads its argument on the FIRST RENDER ONLY, and
+   * every other way into this screen is a same-route navigation that leaves
+   * this component mounted: "Buy" and "Rent" in the header are
+   * `/listings?status=...`, a category chip pushes `?type=...`, and the back
+   * button restores an older query. In all of those the search params change
+   * and the four controls keep whatever they were last set to.
+   *
+   * The result was a bar that disagreed with the page it sat on. Arriving from
+   * "Buy" with `5+ beds` left over from a previous search, the heading read
+   * "Homes For Sale", the controls read "Any status" and "5+ beds", and the bar
+   * announced "2 changes not applied yet" about a change nobody made. Pressing
+   * Search then submitted the stale controls, so `?status=For+Sale` became
+   * `?beds=5` and the status the reader had just chosen was thrown away.
+   *
+   * Adjusted DURING RENDER rather than in an effect, which is React's own
+   * answer to "start over when an input changed": it re-renders immediately
+   * instead of painting one frame of the stale controls first. The same pattern
+   * the admin's `useAsync` and `useCursorStack` use.
+   *
+   * A staged edit that has not been submitted is discarded when this fires, and
+   * that is the intended reading rather than a cost: these controls describe
+   * the list underneath them, and the navigation just replaced that list.
+   */
+  // Serialised rather than concatenated: these values contain spaces ("For
+  // Sale"), and a plain join lets `q="a" status="b c"` and `q="a b" status="c"`
+  // collapse to one key, which would skip a sync that was owed.
+  const key = JSON.stringify([applied.q, applied.status, applied.type, applied.beds]);
+  const [syncedTo, setSyncedTo] = useState(key);
+  if (syncedTo !== key) {
+    setSyncedTo(key);
+    setQ(applied.q);
+    setStatus(applied.status);
+    setType(applied.type);
+    setBeds(applied.beds);
+  }
+
   const hasFilters =
     Boolean(params.get("q")) ||
     Boolean(params.get("status")) ||
