@@ -245,8 +245,13 @@ Money formatting
    formatPriceShort(minor, { listingType, rentPeriod, currency }): string
 
 Both stop taking ``status``. This is a deliberately breaking signature change: the
-compiler then walks the implementer to all seven call sites instead of a grep being
+compiler then walks the implementer to all four call sites instead of a grep being
 trusted to find them.
+
+The limit of that trick is worth stating, because the spec relies on it and it does
+not cover everything. A bare interpolation is not a call site, so the compiler says
+nothing about ``{property.status}`` rendered directly into JSX. There is exactly one
+of those and it is listed in the surface inventory below.
 
 Suffix comes from the period, not the status: ``year`` gives ``/yr``, ``month``
 gives ``/mo``, ``night`` gives ``/night``, and a sale gets no suffix.
@@ -287,27 +292,100 @@ Their absence is meaningful and the read path resolves it. This keeps the migrat
 a single ``updateMany`` per status value instead of a full-collection document
 rewrite.
 
-Validator and index
--------------------
+Where the coalesce lives
+------------------------
+
+Saying "the read path resolves it" is not enough, because **the read path currently
+cannot**. ``toProperty`` in ``packages/listings/src/schema.ts`` is a blind spread:
+
+.. code-block:: ts
+
+   export function toProperty(doc: PropertyDoc): Property {
+     const { _id, ...rest } = doc;
+     return { id: _id, ...rest };
+   }
+
+A spread carries absence straight through. ``Property.fees`` is declared
+non-optional, so every legacy row would hand the UI ``undefined`` and the first
+``.map`` would throw.
+
+So ``toProperty`` **becomes a field-by-field mapper**, in the idiom
+``toEnquiry`` already uses in ``packages/enquiries/src/index.ts`` for exactly this
+reason:
+
+.. code-block:: ts
+
+   rentPeriod: readRentPeriod(doc.rentPeriod, doc.listingType),
+   fees: normalizeFees(doc.fees ?? []),
+   priceHistory: doc.priceHistory ?? [],
+
+``PropertyDoc`` marks those three optional. That optionality exists in exactly one
+file and never escapes it: everything above ``toProperty`` sees the resolved shape.
+
+Creating a listing
+------------------
+
+``createProperty`` builds a full ``PropertyDoc`` literal, so a required
+``listingType`` that it does not set makes **every new listing fail the validator**
+and the "New listing" button stop working. The literal gains:
+
+.. code-block:: ts
+
+   listingType: "sale",
+
+A new draft is a sale until somebody says otherwise, which is both the common case
+and the same default the backfill uses.
+
+Order of operations inside ``up()``
+-----------------------------------
+
+**The validator is collMod'd BEFORE the data is rewritten, and that order is the only
+one that works.** ``ensureCollection`` sets ``validationLevel: "moderate"``
+(``migrate.ts:119``), which validates every update to a document that *currently
+satisfies* the schema. A row holding ``status: "for-sale"`` satisfies the 0001
+validator, so an ``updateMany`` setting ``status: "live"`` under that validator is
+checked against the old enum and rejected. Once the new validator is installed, that
+same row no longer satisfies the schema, moderate stops validating updates to it, and
+the backfill goes through.
+
+Data-first looks natural and fails on the first run. Validator, then data, then
+indexes.
+
+Validator
+---------
 
 The ``properties`` validator gains ``listingType`` (required, enum), ``rentPeriod``
-(enum or null, **not** required), ``fees`` (array with an item schema pinning
-``kind`` to the enum) and ``priceHistory`` (array with an item schema). The ``status``
-enum is replaced.
+(enum or null), ``fees`` (array with an item schema pinning ``kind`` to the enum) and
+``priceHistory`` (array with an item schema). The ``status`` enum is replaced.
 
-The index at ``0001_init.ts:204`` currently leads on status:
+``listingType`` is the **only** one of the four added to ``required``. The other three
+are absent on every legacy row by design, and requiring them would reject the very
+rows the migration deliberately does not rewrite.
+
+Index
+-----
+
+**The existing ``properties_public`` index is left exactly as it is.** Two reasons,
+and the first is fatal on its own:
+
+1. ``ensureIndex`` is a bare ``createIndex`` with no drop (``migrate.ts:124``).
+   Recreating a live index name with different keys is a MongoDB
+   ``IndexKeySpecsConflict``, and 0001 always runs first, so ``npm run db:migrate``
+   would throw on a fresh database as well as an existing one.
+2. Putting ``listingType`` between the ``status`` prefix and the ``publishedAt`` sort
+   key would cost the sort on the hottest read. The default public query never sets
+   ``listingType`` (``repo.ts:84``), and an unused equality field in the middle of a
+   compound index stops the sort being index-provided.
+
+Instead 0007 **adds a second index**, used only when a type is actually named:
 
 .. code-block:: text
 
-   { status: 1, deletedAt: 1, publishedAt: -1, _id: -1 }
+   properties_public_type
+   { listingType: 1, status: 1, deletedAt: 1, publishedAt: -1, _id: -1 }
 
-It becomes:
-
-.. code-block:: text
-
-   { status: 1, listingType: 1, deletedAt: 1, publishedAt: -1, _id: -1 }
-
-because ``repo.ts:84`` filters status first and will now filter type second.
+New name, so no conflict. Equality fields first, sort key last, which is the shape
+that lets Mongo serve the filter and the order from one index.
 
 Compatibility: the public URL does not change
 =============================================
@@ -363,8 +441,14 @@ Two things outside the packages read the property shape and both must move with 
 
 The public API route keeps accepting the legacy ``status`` trio
 (``for-sale``, ``for-rent``, ``sold``) for one release, translating each into the new
-pair, so a browser tab left open across a deploy does not start failing. This shim is
-marked in the code as deletable.
+pair. This shim is marked in the code as deletable.
+
+It is worth being precise about what the shim does and does not buy, because the
+obvious justification for it is wrong. The listings page fetches the whole list and
+filters **in memory**; it never sends ``status`` to the API. So the shim does not
+protect the site across a deploy. It ships because ``/api/public/properties`` is a
+public surface whoever is calling it, and silently dropping a query value that worked
+yesterday is a breaking change to that surface regardless of who noticed.
 
 API
 ===
@@ -376,14 +460,71 @@ Public (``packages/listings/src/routes/public.ts``)
   prices in one sort was already the caller's choice.
 
 Admin (``packages/listings/src/routes/admin.ts``)
-  ``listingType``, ``rentPeriod`` and ``fees`` join the write schema. The action map
-  at line 111 changes ``publish: "for-sale"`` to ``publish: "live"`` and gains
-  ``markUnderOffer: "under-offer"`` and ``close: "closed"``. The update path appends
-  to ``priceHistory`` when ``priceMinor`` changes, trimming to 50.
+  ``listingType``, ``rentPeriod`` and ``fees`` join the write schema.
+  ``AdminListQuery`` is ``.strict()``, so the admin list's new type filter is a 400
+  until ``listingType`` is added there too, alongside a ``listingType`` clause in
+  ``ListQuery`` and ``buildFilter`` in the repo. A UI filter with no server behind it
+  is not a filter.
 
 Validation refusals reuse ``parseMajor`` and ``moneyRefusalMessage``, so a bad fee is
 refused with the same wording as a bad price. A ``rentPeriod`` on a sale is a 400
 naming the field, not a silent null.
+
+Lifecycle transitions
+---------------------
+
+``LifecycleOp`` is a union in ``repo.ts`` and ``TRANSITIONS`` is a
+``Record<LifecycleOp, PropertyStatus>``, so adding keys without extending the union
+is a compile error. The union gains two ops, and the full map becomes:
+
+===============  ==============  ================================
+Op               To status       Allowed from
+===============  ==============  ================================
+``publish``      live            draft, archived
+``unpublish``    draft           live, under-offer
+``markOffer``    under-offer     live
+``relist``       live            under-offer, closed
+``close``        closed          live, under-offer
+``archive``      archived        anything not archived
+``unarchive``    draft           archived
+``restore``      draft           a trashed row
+===============  ==============  ================================
+
+``relist`` is not optional. The whole justification for adding ``under-offer`` was
+that a collapsed deal must not force a lie, and without a way back out of
+``under-offer`` and ``closed`` the new state is a trap that is worse than what it
+replaced. Every op carries a ``when`` guard in the admin's ``LIFECYCLE`` array so an
+op that cannot apply is not offered.
+
+Price history mechanics
+-----------------------
+
+``saveProperty(db, id, patch, baseRevision)`` has no actor and does a single
+``findOneAndUpdate``, so as it stands it can supply neither ``byName`` nor
+``fromMinor``. It takes an actor, and reads the current row before the write:
+
+.. code-block:: ts
+
+   saveProperty(db, id, patch, baseRevision, actor: { userId: string; name: string })
+
+The read-then-write is safe **because of the CAS**, not in spite of it. If anything
+changed the price between the read and the write, ``revision`` moved too and the
+guarded update misses, which is the existing 409. The history push rides in the same
+atomic update:
+
+.. code-block:: ts
+
+   $push: { priceHistory: { $each: [change], $slice: -PRICE_HISTORY_MAX } }
+
+**A change is recorded only when the old price was greater than zero and the new one
+differs.** ``createProperty`` seeds ``priceMinor: 0``, so without that guard the first
+real price an agent types would be recorded as a reduction from nothing, and every
+listing would carry a junk first entry. A listing that never had a price did not have
+a price change.
+
+That guard is also what makes the currency rule work: the currency stays editable
+while ``priceHistory`` is empty, and a brand new listing's first price leaves it
+empty, so an agent can still fix a currency they picked wrongly.
 
 Admin UI
 ========
@@ -403,7 +544,14 @@ Property editor (``src/app/admin/properties/[id]/page.tsx``)
   shows or hides the rent fields. Switching to Sale does not delete fee values the
   agent typed; it hides the rent-only kinds and drops them on save, which is stated
   next to the control.
-- **Period** select, visible only for Rent: "Per year", "Per month", "Per night".
+- **Period** select, visible only for Rent: "Per year", "Per month", "Per night". It
+  carries no blank option, and a rental with no period stored shows "Per year",
+  which is what such a row already means. Clearing a period is done by switching the
+  listing back to Sale, which is the only state where a null period is meaningful.
+- **Lifecycle buttons for the new ops.** The ``LIFECYCLE`` array at line 118 is what
+  renders these, so the server ops are unreachable until it gains rows for
+  ``markOffer``, ``relist`` and ``close``, each with the ``when`` guard from the
+  transition table. A backend capability with no button is not shipped.
 - **Fees**, one row per allowed kind, each an amount input that refuses like the
   price input does. Empty means the fee does not apply, not zero.
 - A **move-in total** line under the fee rows for rentals, recalculated live, with
@@ -416,10 +564,24 @@ Property list (``src/app/admin/properties/page.tsx``)
 -----------------------------------------------------
 
 - Status filter lists the five lifecycle values.
-- A new type filter beside it: All / Sale / Rent.
+- A new type filter beside it: All / Sale / Rent. It needs a server: ``AdminListQuery``
+  is ``.strict()``, and ``ListQuery`` and ``buildFilter`` in the repo need a
+  ``listingType`` clause of their own. **Do not fold it into the existing ``type``
+  filter**, which already means ``PropertyType`` (Villa, Duplex) in that same
+  function. Two different things called type in one filter builder is how the wrong
+  one gets read.
 - The row badge shows lifecycle; a second, quieter chip shows Sale or Rent.
-- ``STATUS_TONE`` is rekeyed to the new statuses: live green, under-offer amber,
-  closed slate, draft grey, archived faint.
+- ``STATUS_TONE`` is rekeyed. ``Tone`` is
+  ``"neutral" | "green" | "amber" | "wine" | "red"`` (``ui.tsx:670``) and nothing
+  else type-checks, so:
+
+  .. code-block:: ts
+
+     draft: "amber",          // unchanged, draft already reads as needs attention
+     live: "green",
+     "under-offer": "wine",
+     closed: "neutral",
+     archived: "neutral",
 
 Dashboard (``src/app/admin/page.tsx:319``)
 ------------------------------------------
@@ -458,6 +620,57 @@ Non-obvious, and it cost time once already, so it is written down:
    the previous result for up to five minutes after the data changes, so a UI check
    immediately after a write can be reading a stale page rather than a broken one.
    Restart the dev server or wait it out before concluding anything.
+
+Surface inventory
+=================
+
+Every place the changed vocabulary is read or written. A file not on this list does
+not know about listing status; a file on it must be visited.
+
+=================================================  ==========================================
+File                                               What it does with the vocabulary
+=================================================  ==========================================
+``packages/contracts/src/types.ts``                declares the enums
+``packages/contracts/src/money.ts``                labels and formatting
+``packages/contracts/src/index.ts``                re-exports them
+``packages/listings/src/schema.ts``                ``PropertyDoc`` and ``toProperty``
+``packages/listings/src/repo.ts``                  ``ListQuery``, ``buildFilter``,
+                                                   ``createProperty``, ``saveProperty``,
+                                                   ``LifecycleOp``
+``packages/listings/src/routes/public.ts``         public query enum, legacy shim
+``packages/listings/src/routes/admin.ts``          ``AdminListQuery``, ``TRANSITIONS``,
+                                                   write schema
+``packages/db/src/migrations/0001_init.ts``        the old validator and index (read only)
+``packages/db/src/migrations/0007_*.ts``           the new validator, backfill, index
+``src/lib/types.ts``                               **named** re-export list, not ``export *``
+``src/lib/data.ts``                                **named** re-export list
+``src/lib/demo-data.ts``                           ``PropertySeed``, ``statusMap``
+``scripts/seed-demo.ts``                           writes property docs (no edit, but must
+                                                   still pass the validator)
+``src/app/(site)/listings/page.tsx``               the broken filter, the header ternary
+``src/app/(site)/listings/[slug]/page.tsx``        **renders ``{property.status}`` raw**
+``src/components/PropertyCard.tsx``                badge and short price
+``src/components/AgentPanel.tsx``                  badge and price
+``src/components/FilterBar.tsx``                   mints the URL values
+``src/components/SearchStrip.tsx``                 mints the URL values ("Buy"/"Rent")
+``src/components/Navbar.tsx``                      **links to the broken filter**
+``src/components/admin/Palette.tsx``               ``statusLabel`` in search results
+``src/app/admin/page.tsx``                         the live count
+``src/app/admin/properties/page.tsx``              filters, tone map, badge
+``src/app/admin/properties/[id]/page.tsx``         editor, ``LIFECYCLE`` array
+=================================================  ==========================================
+
+Two entries in bold are live defects rather than migration work:
+
+``[slug]/page.tsx``
+  The hero badge interpolates the raw status, so a buyer is shown ``for-sale`` today
+  and would be shown ``under-offer`` after this lands. It becomes ``listingLabel``.
+
+``Navbar.tsx``
+  The main navigation's Buy and Rent links are ``?status=For+Sale`` and
+  ``?status=For+Rent``. They are the primary entry points to the two most important
+  pages on the site, and both currently land on an empty grid. This is what makes the
+  filter defect a priority rather than a detail.
 
 Visual bar
 ==========
@@ -532,9 +745,10 @@ Named so a later reader knows it was decided, not forgotten:
 - **No fee percentages.** Agency fee is entered as an amount. A "10% of rent"
   calculator is a form convenience that can be added without changing storage.
 - **No public price history.** The site shows a reduced marker, not a table.
-- **No per-listing currency change after creation.** Editing the currency on a
-  listing with price history would make the history incomparable. The field stays
-  editable only while ``priceHistory`` is empty.
+- **No per-listing currency change once a price has actually moved.** Editing the
+  currency on a listing with price history would make the history incomparable, so
+  the field stays editable only while ``priceHistory`` is empty. Because a listing's
+  first real price is not recorded as a change, a new listing stays correctable.
 
 Roadmap position
 ================
