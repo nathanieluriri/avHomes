@@ -5,6 +5,21 @@ import { getProperties } from "@/lib/data";
 import { listPosts } from "@/lib/blog/client";
 
 /**
+ * Revalidating, because a sitemap generated once at build time is wrong for a
+ * site whose stock is published from an admin screen. Without it the route is
+ * prerendered and frozen: a listing published on Tuesday is absent from the
+ * crawl map until somebody deploys, and one taken down stays in it just as
+ * long.
+ *
+ * The EFFECTIVE interval is 300s, not this number. Next takes the lowest
+ * revalidate across a route, and the inner property read carries
+ * `LIST_REVALIDATE = 300`. This is a ceiling that nothing currently reaches;
+ * it stays as the route's own statement of intent, and the manifest is the
+ * place to check what actually happens.
+ */
+export const revalidate = 3600;
+
+/**
  * The crawl map, which did not exist: `/sitemap.xml` answered 404.
  *
  * It matters more here than on most sites. The homepage's featured grid resolves
@@ -26,20 +41,14 @@ import { listPosts } from "@/lib/blog/client";
  * than fiction. A sitemap missing its listings is a bad day; a sitemap that
  * fails the whole route is a 500 where a crawler expected XML.
  */
-/**
- * Hourly, because a sitemap generated once at build time is wrong for a site
- * whose stock is published from an admin screen.
- *
- * Without this the route is prerendered and frozen: a listing published on
- * Tuesday is absent from the crawl map until somebody deploys, and one taken
- * down stays in it just as long. The inner reads carry their own shorter
- * revalidate, but that only refreshes the DATA, not this route, so the route
- * has to say it too.
- */
-export const revalidate = 3600;
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [properties, posts] = await Promise.all([getProperties(), listPosts(200)]);
+  /*
+   * 100, not 200. `clampLimit` refuses anything above MAX_PAGE_LIMIT, so a
+   * limit of 200 was a guaranteed 400 that `listPosts` caught and turned into
+   * an empty array. The sitemap could never have contained a single post, and
+   * nothing said so: the journal is empty today, so the hole was invisible.
+   */
+  const [properties, posts] = await Promise.all([getProperties(), listPosts(100)]);
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${SITE_DOMAIN}/`, changeFrequency: "daily", priority: 1 },

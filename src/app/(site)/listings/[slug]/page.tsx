@@ -162,7 +162,6 @@ export default async function PropertyPage({
    * indexable, and getting it wrong here would put the lie in structured data
    * where a person cannot see it.
    */
-  const price = formatPrice(property.priceMinor, property);
   const canonical = absolute(`/listings/${property.slug}`);
   const listingJsonLd = {
     "@context": "https://schema.org",

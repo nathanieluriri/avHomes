@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { Building2, Plus, Star, Trash2 } from "lucide-react";
 import {
   LISTING_TYPES,
@@ -102,7 +102,7 @@ function PropertiesScreen() {
   const sortParam = params.get("sort");
   const sort = (SORTS.some((s) => s.value === sortParam) ? sortParam : "updated") as
     (typeof SORTS)[number]["value"];
-  const search = params.get("q") ?? "";
+  const urlQuery = params.get("q") ?? "";
 
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ApiError | null>(null);
@@ -131,7 +131,14 @@ function PropertiesScreen() {
   const setParam = useCallback(
     (key: string, value: string) => {
       const next = new URLSearchParams(params.toString());
-      if (value === "" || value === "all") next.delete(key);
+      /*
+       * EMPTY deletes. "all" does not, and treating it as a sentinel for every
+       * key was a bug with teeth: `q` is free text, so typing "allen" into the
+       * filter box deleted the param on the third keystroke and the input
+       * snapped back to empty. Allen Avenue is one of the best-known addresses
+       * in Lagos. The tabs that do use "all" now map it to "" themselves.
+       */
+      if (value === "") next.delete(key);
       else next.set(key, value);
       const qs = next.toString();
       router.replace(qs ? `?${qs}` : "/admin/properties", { scroll: false });
@@ -145,7 +152,27 @@ function PropertiesScreen() {
    * state then quoted the trimmed string back: the console showed the operator
    * a query that works next to the news that it did not.
    */
-  const query = useDebounced(search).trim();
+  /*
+   * The box keeps its OWN state and the URL gets the settled value.
+   *
+   * Reading the box straight off the query string made every keystroke a
+   * `router.replace`, which is a full RSC round trip: eight characters cost
+   * eight history writes, eight server renders and eight API calls, and typing
+   * a word took tens of seconds. `useDebounced` could not coalesce anything,
+   * because consecutive values never arrived inside its window when each one
+   * had to wait for the router to commit first.
+   *
+   * So the input is local, the debounce sits between it and the URL, and the
+   * URL still ends up carrying exactly what the operator meant, which is what
+   * makes a filtered view shareable.
+   */
+  const [searchInput, setSearchInput] = useState(urlQuery);
+  const query = useDebounced(searchInput).trim();
+
+  useEffect(() => {
+    if (query === urlQuery.trim()) return;
+    setParam("q", query);
+  }, [query, urlQuery, setParam]);
 
   /* Keyset paging, and the reset that comes with a changed filter, both live in
      one hook so three list screens cannot drift apart. */
@@ -384,15 +411,16 @@ function PropertiesScreen() {
             tabs={{
               value: tab,
               options: TABS,
-              onChange: (value) => refilter(() => setParam("status", value)),
+              onChange: (value) =>
+                refilter(() => setParam("status", value === "all" ? "" : value)),
             }}
             search={{
-              value: search,
+              value: searchInput,
               // The admin endpoint matches substrings across title, city,
               // location and tagline, so the box narrows as you type and the
               // placeholder can say so without overclaiming.
               placeholder: "Filter by title, city or area",
-              onChange: (value) => setParam("q", value),
+              onChange: setSearchInput,
             }}
             trailing={
               <>
@@ -404,7 +432,9 @@ function PropertiesScreen() {
                   <select
                     value={listingTypeFilter}
                     onChange={(event) =>
-                      refilter(() => setParam("type", event.target.value))
+                      refilter(() =>
+                        setParam("type", event.target.value === "all" ? "" : event.target.value),
+                      )
                     }
                     className={`${inputClass} font-medium sm:h-8 sm:w-auto sm:px-2 sm:py-0`}
                   >
@@ -463,7 +493,10 @@ function PropertiesScreen() {
                   onClick={() =>
                     /* One replace, not three: three would each read a stale
                        `params` from this render and the last would win. */
-                    refilter(() => router.replace("/admin/properties", { scroll: false }))
+                    refilter(() => {
+                      setSearchInput("");
+                      router.replace("/admin/properties", { scroll: false });
+                    })
                   }
                 >
                   Clear the filter

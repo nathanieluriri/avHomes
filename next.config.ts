@@ -23,6 +23,16 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "placehold.co" },
       // Every uploaded image is served from Cloudinary's CDN.
       { protocol: "https", hostname: "res.cloudinary.com" },
+      /*
+       * Vercel Blob, which this application no longer uploads to and still has
+       * to be able to RENDER. `.env.example` keeps `IMAGE_STORAGE=blob` "only so
+       * images uploaded to Vercel Blob before the switch still resolve", and the
+       * image library says the same. While `unoptimized: true` was set the
+       * loader was short-circuited and an unlisted host was simply passed
+       * through; without it, `next/image` THROWS on one, so a storefront page
+       * showing a pre-switch image would have crashed rather than degraded.
+       */
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
     ],
     /*
      * `unoptimized: true` used to sit here, and both halves of its reasoning

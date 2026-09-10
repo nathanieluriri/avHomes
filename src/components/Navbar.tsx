@@ -5,6 +5,14 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import type { SocialPlatform } from "@avhomes/contracts";
+
+/** Nothing linked. For a surface that renders before settings are read. */
+const EMPTY_SOCIAL: Record<SocialPlatform, string> = {
+  linkedin: "",
+  instagram: "",
+  facebook: "",
+  x: "",
+};
 import { socialLinksFrom } from "./SocialIcons";
 
 const links = [
@@ -21,10 +29,10 @@ const FOCUSABLE = "a[href], button:not([disabled])";
 
 export default function Navbar({
   contactEmail = "",
-  social,
+  social = EMPTY_SOCIAL,
 }: {
   contactEmail?: string;
-  social: Record<SocialPlatform, string>;
+  social?: Record<SocialPlatform, string>;
 }) {
   const socialLinks = socialLinksFrom(social);
   const [mounted, setMounted] = useState(false);

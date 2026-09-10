@@ -25,15 +25,7 @@ import PropertyCard from "@/components/PropertyCard";
  * `(site)` inherits the navbar and footer while the root one, which catches a
  * URL matching no route at all, does not. Both render this.
  */
-export default async function NotFoundBody() {
-  /*
-   * `live` only, not everything public. Somebody who just followed a dead link
-   * to a house is the last person to show an under-offer or a sold one.
-   */
-  const available = (await getProperties())
-    .filter((p) => p.status === "live" && p.slug !== null)
-    .slice(0, 3);
-
+export default function NotFoundBody({ children }: { children?: React.ReactNode }) {
   return (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-10 lg:py-28">
       <div className="mx-auto max-w-2xl text-center">
@@ -67,21 +59,38 @@ export default async function NotFoundBody() {
         </div>
       </div>
 
-      {available.length > 0 && (
-        <section aria-labelledby="still-available" className="mt-16 lg:mt-20">
-          <h2
-            id="still-available"
-            className="text-center text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl"
-          >
-            Still available
-          </h2>
-          <div className="mx-auto mt-8 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {available.map((p) => (
-              <PropertyCard key={p.id} property={p} />
-            ))}
-          </div>
-        </section>
-      )}
+      {children}
     </div>
+  );
+}
+
+/**
+ * Three properties that are actually available, streamed in behind a boundary.
+ *
+ * Separated from the shell above so the 404 can render without waiting on a
+ * database read. `live` only, not everything public: somebody who has just
+ * followed a dead link to a house is the last person to be shown one that is
+ * under offer or already sold.
+ */
+export async function StillAvailable() {
+  const available = (await getProperties())
+    .filter((p) => p.status === "live" && p.slug !== null)
+    .slice(0, 3);
+  if (available.length === 0) return null;
+
+  return (
+    <section aria-labelledby="still-available" className="mt-16 lg:mt-20">
+      <h2
+        id="still-available"
+        className="text-center text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl"
+      >
+        Still available
+      </h2>
+      <div className="mx-auto mt-8 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {available.map((p) => (
+          <PropertyCard key={p.id} property={p} />
+        ))}
+      </div>
+    </section>
   );
 }

@@ -1,6 +1,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { SocialPlatform } from "@avhomes/contracts";
+
+/** Nothing linked. For a surface that renders before settings are read. */
+const EMPTY_SOCIAL: Record<SocialPlatform, string> = {
+  linkedin: "",
+  instagram: "",
+  facebook: "",
+  x: "",
+};
 import { socialLinksFrom } from "./SocialIcons";
 import FooterSubscribe from "./FooterSubscribe";
 
@@ -44,9 +52,9 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
 ];
 
 export default function Footer({
-  social,
+  social = EMPTY_SOCIAL,
 }: {
-  social: Record<SocialPlatform, string>;
+  social?: Record<SocialPlatform, string>;
 }) {
   const links = socialLinksFrom(social);
   return (
