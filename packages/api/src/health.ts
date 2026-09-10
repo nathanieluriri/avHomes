@@ -35,6 +35,13 @@ export function healthRoutes(): Hono<AppEnv> {
    * ANY SIGNED-IN member, then filtered to what their role could actually act
    * on. The alternative was an admin-only endpoint, which would leave an agent
    * with no way to see that half their listings have no photographs.
+   *
+   * That takes TWO things, and for a while it only had one. `requireAuth()`
+   * here is the second; the first is the `domain: null` rule for this path in
+   * `packages/identity/src/middleware.ts`. Without it the path fell to the
+   * `/api/admin/` catch-all, resolved to `danger`, and 403'd every role except
+   * owner and developer, which is the exact set this comment claims to serve.
+   * If that rule is ever removed, this comment becomes a lie again.
    */
   routes.get("/admin/health", requireAuth(), async (c) => {
     const db = await currentDb(c);

@@ -83,7 +83,16 @@ export function sessionMiddleware(): MiddlewareHandler<AppEnv> {
 
 interface Rule {
   readonly prefix: string;
-  readonly domain: Domain;
+  /**
+   * `null` means this path gates ITSELF and the table must not gate it.
+   *
+   * Reserved for a route that answers every role a DIFFERENT thing rather than
+   * answering some roles nothing. There is exactly one, and the bar for a
+   * second is that its handler already filters its own output per role: a null
+   * here opts a path out of the catch-all below, so anything that merely wants
+   * to be reachable by several roles wants a domain, not this.
+   */
+  readonly domain: Domain | null;
 }
 
 /**
@@ -108,6 +117,23 @@ const RULES: readonly Rule[] = [
   { prefix: "/api/admin/images", domain: "media" },
   { prefix: "/api/admin/enquiries", domain: "enquiries" },
   { prefix: "/api/admin/dashboard", domain: "analytics" },
+  /*
+   * SELF-GATING, and it has to be, because no single domain describes it.
+   *
+   * The health read returns the alerts the caller could act on and nothing
+   * else: `visibleAlerts` filters each one by its own domain, so an editor is
+   * handed their empty journal and an agent their listings with no photographs,
+   * out of the same request. Classifying the ROUTE therefore misclassifies
+   * somebody whichever domain is chosen. `analytics` is the closest fit and
+   * still locks out `editor`, who holds only content and media, and the empty
+   * journal is theirs to fix.
+   *
+   * Falling to the catch-all resolved it to `danger`, which is owner and
+   * developer only, so the screen was unreachable for all three roles it was
+   * written for while its nav row was still shown to them. The route keeps
+   * `requireAuth()`, so this is not open: it is signed-in, then filtered.
+   */
+  { prefix: "/api/admin/health", domain: null },
   { prefix: "/api/admin/users", domain: "team" },
   { prefix: "/api/admin/invites", domain: "team" },
   { prefix: "/api/admin/", domain: "danger" },
