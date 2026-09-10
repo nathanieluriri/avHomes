@@ -28,9 +28,9 @@ export default async function Home() {
       <Suspense fallback={<div className="h-24" />}>
         <SearchStrip />
       </Suspense>
-      <Suspense fallback={<div className="h-96" />}>
-        <FeaturedListings properties={properties} />
-      </Suspense>
+      {/* No boundary here any more: it made the whole section client-rendered
+          for the sake of one chip row. FeaturedListings wraps that row itself. */}
+      <FeaturedListings properties={properties} />
       <LogoMarquee clients={site.clientLogos.map((c) => ({ name: c.name, logo: c.imageUrl }))} />
       <WhyChooseUs stats={stats} />
       <Testimonials testimonials={testimonials} />

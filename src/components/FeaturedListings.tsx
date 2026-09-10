@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Property } from "@/lib/types";
@@ -19,7 +20,22 @@ export default function FeaturedListings({ properties }: { properties: Property[
 
       <Reveal delay={80}>
         <div className="mt-9">
-          <CategoryChips scrollOnSelect />
+          {/*
+           * The boundary sits HERE, around the one client child that reads the
+           * query string, and not around this whole section as it used to.
+           *
+           * A Suspense boundary containing a `useSearchParams` client component
+           * bails the ENTIRE boundary to client rendering during a prerender.
+           * With it wrapped around `<FeaturedListings>` on the homepage, the
+           * heading, the six cards and every `/listings/<slug>` link vanished
+           * from the server HTML: a crawler got the hero and a fallback div, so
+           * there was no path from the front door to a single property. The
+           * data was never the problem; it is awaited server-side and passed in
+           * as a prop.
+           */}
+          <Suspense fallback={<div className="h-11" />}>
+            <CategoryChips scrollOnSelect />
+          </Suspense>
         </div>
       </Reveal>
 

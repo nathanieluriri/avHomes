@@ -440,13 +440,37 @@ function PropertyEditor({ initial }: { initial: Property }) {
     }
   }
 
+  /*
+   * The refusal is shown AT THE BUTTON, not only at the top of the page.
+   *
+   * This wrote to `saveError`, which renders in the header block. The trash
+   * control is the last thing in the aside, so on a desk a 409 scrolled a
+   * screen and a half out of view: the button disarmed, nothing moved, and the
+   * listing was still there. That is indistinguishable from a dead button, and
+   * it is what a QA pass reported it as.
+   *
+   * A stale revision is the likely refusal and the one worth naming. It means
+   * somebody else changed this listing since the page loaded, and the fix is a
+   * reload rather than a retry, which a generic "something went wrong" does not
+   * tell anybody.
+   */
+  const [trashError, setTrashError] = useState<string | null>(null);
+
   async function trash() {
     setBusy(true);
+    setTrashError(null);
     try {
       await api.del(`/admin/properties/${property.id}?baseRevision=${property.revision}`);
       router.push("/admin/properties");
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+      const stale = err instanceof ApiError && err.body.error === "stale_write";
+      setTrashError(
+        stale
+          ? "This listing changed since you opened it, so it was not moved. Reload and try again."
+          : err instanceof ApiError
+            ? `It was not moved: ${err.body.error}.`
+            : "It was not moved. Check your connection and try again.",
+      );
       setBusy(false);
     }
   }
@@ -877,6 +901,11 @@ function PropertyEditor({ initial }: { initial: Property }) {
               >
                 Move to trash
               </ConfirmButton>
+              {trashError && (
+                <p role="alert" className="mt-2 text-[12px] leading-relaxed text-red-700">
+                  {trashError}
+                </p>
+              )}
             </Card>
           )}
 
