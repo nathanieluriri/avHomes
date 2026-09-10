@@ -114,6 +114,7 @@ next-env.d.ts
 .cline/
 .gemini/
 .opencode/
+.superpowers/
 
 # markdown is agent and scratch territory, docs live in .rst
 *.md
