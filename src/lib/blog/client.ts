@@ -6,11 +6,28 @@ import { demoPostDetails, demoPosts } from "./demo-posts";
 /**
  * The blog's read client.
  *
- * Same origin as the site now, and the same fall-back-to-fixtures contract the
+ * Same origin as the site, and the same fall-back-to-fixtures contract the
  * property reads use: `next build` runs these during static generation, and a
  * build that fails because a database is not wired yet tests the environment
  * rather than the code.
+ *
+ * THAT CONTRACT IS GATED ON `NODE_ENV`, and this file used to say it followed
+ * `src/lib/data.ts` while doing the older, unconditional thing. `data.ts` was
+ * changed because an API returning 501 made the site advertise three invented
+ * properties in Lekki; the same shape here served fifteen invented posts, and
+ * once a sitemap existed it offered every one of them to a crawler as a real
+ * URL. Less alarming than a fake house, the same broken promise.
+ *
+ * So in production a failed read yields NOTHING rather than fiction. Outside
+ * production the fixtures are unchanged, which is the case they exist for.
  */
+
+/*
+ * `NODE_ENV`, not a variable of our own, for the reason `data.ts` gives: the
+ * two moments that need fixtures are exactly the two where Next sets this to
+ * something other than "production", which are `next dev` and a test runner.
+ */
+const FIXTURES_ALLOWED = process.env.NODE_ENV !== "production";
 
 export class BlogAPIError extends Error {
   override readonly name = "BlogAPIError";
@@ -94,8 +111,14 @@ export async function getPostBySlug(slug: string): Promise<PublicPostDetail | nu
     return post;
   } catch (error) {
     if (error instanceof BlogAPIError && error.status === 404) return null;
-    console.warn(`[blog] post ${slug} unavailable, serving bundled fixtures:`, String(error));
-    return demoPostDetails.find((p) => p.slug === slug) ?? null;
+    if (FIXTURES_ALLOWED) {
+      console.warn(`[blog] post ${slug} unavailable, serving bundled fixtures:`, String(error));
+      return demoPostDetails.find((p) => p.slug === slug) ?? null;
+    }
+    // Null, which the page renders as a 404. An error rather than a warning:
+    // in production this is the site showing a reader less than it holds.
+    console.error(`[blog] post ${slug} unavailable, serving nothing:`, String(error));
+    return null;
   }
 }
 
@@ -108,8 +131,12 @@ export async function listPosts(limit = 50): Promise<PublicPost[]> {
     });
     return page.items;
   } catch (error) {
-    console.warn("[blog] list unavailable, serving bundled fixtures:", String(error));
-    return demoPosts.slice(0, limit);
+    if (FIXTURES_ALLOWED) {
+      console.warn("[blog] list unavailable, serving bundled fixtures:", String(error));
+      return demoPosts.slice(0, limit);
+    }
+    console.error("[blog] list unavailable, serving nothing:", String(error));
+    return [];
   }
 }
 

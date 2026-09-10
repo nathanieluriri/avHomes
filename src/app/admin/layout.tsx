@@ -27,6 +27,26 @@ export const metadata: Metadata = {
     default: "Dashboard | AVHomes console",
     template: "%s | AVHomes console",
   },
+  /*
+   * Inherited by every console screen, and NOT the same job as the disallow in
+   * `robots.ts`.
+   *
+   * That file asks a crawler not to fetch, is advisory, and is only seen by a
+   * crawler that reads it first. This asks it not to INDEX, and it travels with
+   * the page for anything that arrives by a link instead. Both are wanted here
+   * because the console answers a 200 HTML shell to an anonymous request rather
+   * than redirecting: the sign-in bounce happens after hydration, so a crawler
+   * gets a page, not a 302.
+   *
+   * `nocache` and the Google-specific pair keep an already-indexed URL from
+   * lingering as a stale snippet after it stops being served.
+   */
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false },
+  },
 };
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
