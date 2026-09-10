@@ -47,8 +47,29 @@ export function setSessionCookie(
   });
 }
 
+/**
+ * The attributes have to MATCH the ones it was set with, and on a `__Host-`
+ * cookie that is not a nicety.
+ *
+ * This passed only `path`, and in production `sessionCookieName()` returns the
+ * `__Host-` prefixed name. That prefix requires `Secure`, so Hono refused to
+ * write the expiry and threw, and `POST /api/auth/logout` answered 500 on every
+ * real build. Nobody could sign out: the 500 left the cookie exactly where it
+ * was, which is the one outcome the comment on `sessionMiddleware` says logout
+ * exists to prevent.
+ *
+ * It never showed up in development because the name is not `__Host-` prefixed
+ * there, so the same call is legal and the route returns its 200. A bug that is
+ * invisible in dev and total in production is worth the four lines it takes to
+ * make the two calls symmetrical.
+ */
 export function clearSessionCookie(c: Context<AppEnv>): void {
-  deleteCookie(c, sessionCookieName(), { path: "/" });
+  deleteCookie(c, sessionCookieName(), {
+    path: "/",
+    secure: isProduction(),
+    sameSite: "Lax",
+    httpOnly: true,
+  });
 }
 
 /* ──────────────────────────── session resolve ─────────────────────────── */
