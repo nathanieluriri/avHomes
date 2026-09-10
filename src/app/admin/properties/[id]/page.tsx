@@ -290,6 +290,8 @@ function PropertyEditor({ initial }: { initial: Property }) {
   });
   // A value typed in before the switch to Sale is still sitting in
   // `draft.fees`, just off screen. This is true only while that is so.
+  // TODO(verify): the Sale/Rent toggle hides rent fields without losing typed
+  // values before save. Needs a browser.
   const hasHiddenFeeValues =
     draft.listingType === "sale" && RENT_ONLY_FEE_KINDS.some((kind) => draft.fees[kind].trim() !== "");
 
@@ -528,6 +530,9 @@ function PropertyEditor({ initial }: { initial: Property }) {
             </Field>
           </Card>
 
+          {/* TODO(verify): the admin editor's new sections match the Shopify
+              bar's section rhythm rather than reading as an appended block.
+              Needs a browser and a human eye. */}
           <Card className="space-y-4">
             {/* `as="group"`: this wraps two buttons, not one input, so a bare
                 label would forward a click on its own whitespace to the first
