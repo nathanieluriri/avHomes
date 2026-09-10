@@ -9,6 +9,7 @@ import {
   PROPERTY_TYPES,
   RENT_PERIODS,
   formatPrice,
+  listingPublishBlockers,
   moneyRefusalMessage,
   moveInTotalMinor,
   parseMajor,
@@ -247,6 +248,16 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /*
+   * Read off `property`, the SAVED record, not `draft`.
+   *
+   * The server checks what is stored, so checking the draft here would enable
+   * Publish the moment somebody typed a price and then hand them a refusal from
+   * the API for a value they can see on their own screen. Save first, publish
+   * second, and the save bar above already says so.
+   */
+  const publishBlockers = listingPublishBlockers(property);
 
   /*
    * Dirty is derived, never tracked. A boolean set by every field handler drifts
@@ -761,13 +772,39 @@ function PropertyEditor({ initial }: { initial: Property }) {
                   key={l.op}
                   variant="ghost"
                   className="w-full sm:w-auto"
-                  disabled={busy}
+                  disabled={busy || (l.op === "publish" && publishBlockers.length > 0)}
                   onClick={() => transition(l.op)}
                 >
                   {l.label}
                 </Button>
               ))}
             </div>
+
+            {/* DISABLED AND EXPLAINED, never hidden. A Publish button that is
+                simply absent reads as a bug, and the reader is left guessing
+                which of a dozen fields the screen is unhappy about. */}
+            {publishBlockers.length > 0 &&
+              LIFECYCLE.some((l) => l.op === "publish" && l.when(property)) && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-[12px] font-semibold text-amber-900">
+                    Not ready to publish
+                  </p>
+                  <ul className="mt-1.5 space-y-1">
+                    {publishBlockers.map((b) => (
+                      <li
+                        key={b.field}
+                        className="flex items-start gap-2 text-[12px] leading-relaxed text-amber-900/90"
+                      >
+                        <span
+                          className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-700"
+                          aria-hidden="true"
+                        />
+                        {b.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             {/* A real row below `sm`, not a 16px box beside a line of text: this
                 is the control that decides what the landing page shows, and with
                 a thumb its whole target was the height of one line of 14px type.

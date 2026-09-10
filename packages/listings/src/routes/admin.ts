@@ -22,6 +22,8 @@ import {
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
   RENT_PERIODS,
+  UNTITLED_LISTING,
+  listingPublishBlockers,
   moneyRefusalMessage,
   normalizeFees,
   parseMajor,
@@ -119,7 +121,7 @@ const SaveBody = z
   })
   .strict();
 
-const CreateBody = z.object({ title: str().min(1).max(300).default("Untitled listing") }).strict();
+const CreateBody = z.object({ title: str().min(1).max(300).default(UNTITLED_LISTING) }).strict();
 
 const AdminListQuery = z
   .object({
@@ -323,11 +325,25 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
         detail: "This listing is not in the trash.",
       });
     }
-    if (operation === "publish" && current.title.trim() === "") {
-      throw new PreconditionFailedError("no_title", {
-        propertyId: id,
-        detail: "Give the listing a title before publishing. The slug is derived from it.",
-      });
+    /*
+     * `publish` is the ONLY transition that carries a listing from a private
+     * status into a public one: it runs from draft or archived, and every other
+     * op either starts public already (markOffer, relist, close) or lands
+     * private (unpublish, archive, unarchive, restore). So this is the one gate
+     * a blank listing has to get past, and gating it is enough.
+     */
+    if (operation === "publish") {
+      const blockers = listingPublishBlockers(current);
+      if (blockers.length > 0) {
+        throw new PreconditionFailedError("not_ready", {
+          propertyId: id,
+          blockers,
+          detail:
+            blockers.length === 1
+              ? blockers[0].message
+              : `This listing is not ready: ${blockers.map((b) => b.field).join(", ")}.`,
+        });
+      }
     }
 
     const property = await transitionProperty(db, id, operation, TRANSITIONS[operation]);

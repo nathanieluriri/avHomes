@@ -151,3 +151,85 @@ export function publishWarnings(post: {
 
   return out;
 }
+
+/* ═══════════════════════════════════════════════════════════ listings ════ */
+
+/**
+ * The title `createProperty` seeds. A listing still wearing it has not been
+ * named by anybody.
+ *
+ * Exported so the create route's default and the check below cannot drift into
+ * disagreeing about what "untitled" spells.
+ */
+export const UNTITLED_LISTING = "Untitled listing";
+
+export interface PublishBlocker {
+  field: string;
+  message: string;
+}
+
+/**
+ * The reasons a listing may not go public. NOT warnings: these BLOCK.
+ *
+ * That is the opposite call to `publishWarnings` twenty lines up, and the
+ * difference is worth stating because the two look like the same problem.
+ *
+ * A post with no excerpt is a writer's judgement. Somebody weighed it and chose
+ * to publish, and an editor that refuses is an editor people learn to route
+ * around. A listing at a price of zero with no address is nobody's judgement.
+ * It is a record that was created and never filled in, and the only reason it
+ * reaches the public site is that the person who made it clicked twice. Nothing
+ * is gained by letting it through: a blank listing gets a URL, a 200 and an
+ * index entry, and it tells a buyer the company does not check its own work.
+ *
+ * So the bar here is not "is this listing good", which is a judgement and stays
+ * out of it. It is "does this listing say what it is", which has one answer.
+ * Photographs are deliberately NOT on this list, because "photos on Saturday"
+ * is a real and common reason to list early; the alerts registry raises those
+ * separately, where they can be seen without blocking anybody.
+ */
+export function listingPublishBlockers(listing: {
+  title: string;
+  priceMinor: number;
+  city: string;
+  address: string;
+}): PublishBlocker[] {
+  const out: PublishBlocker[] = [];
+  const title = listing.title.trim();
+
+  if (title === "") {
+    out.push({
+      field: "title",
+      message: "Give the listing a title. The web address is derived from it.",
+    });
+  } else if (title === UNTITLED_LISTING) {
+    // The seeded title is not empty, so the old `title.trim() === ""` guard
+    // could never fire for a listing made with the New button and published
+    // straight away, which is exactly the path that produced live listings
+    // called "Untitled listing".
+    out.push({
+      field: "title",
+      message: "The listing is still called Untitled listing. Give it a real title.",
+    });
+  }
+
+  if (listing.priceMinor <= 0) {
+    out.push({
+      field: "price",
+      message: "Set a price. A listing at zero reads as a mistake, and it cannot be filtered on.",
+    });
+  }
+
+  if (listing.city.trim() === "") {
+    out.push({ field: "city", message: "Add the city. Every search starts with one." });
+  }
+
+  if (listing.address.trim() === "") {
+    out.push({
+      field: "address",
+      message: "Add the address. The detail page has no location block without it.",
+    });
+  }
+
+  return out;
+}
