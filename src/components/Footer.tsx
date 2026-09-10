@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { socialLinks } from "./SocialIcons";
+import FooterSubscribe from "./FooterSubscribe";
 
 const columns: { title: string; links: { label: string; href: string }[] }[] = [
   {
@@ -79,27 +80,7 @@ export default function Footer() {
           </div>
 
           <div className="lg:text-right">
-            <label
-              htmlFor="footer-email"
-              className="block text-xs font-semibold uppercase tracking-[0.18em] text-white/60"
-            >
-              Sign Up To Our Newsletter
-            </label>
-            <form className="mt-3 flex items-center gap-1 rounded-full border border-white/20 bg-white/5 p-1.5 lg:ml-auto lg:w-full lg:max-w-sm">
-              <input
-                id="footer-email"
-                name="email"
-                type="email"
-                placeholder="Your email address"
-                className="min-w-0 flex-1 bg-transparent px-4 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="shrink-0 rounded-full bg-wine-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-wine-700"
-              >
-                Subscribe
-              </button>
-            </form>
+            <FooterSubscribe />
           </div>
         </div>
 

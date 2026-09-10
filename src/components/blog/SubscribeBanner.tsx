@@ -1,13 +1,10 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId } from "react";
 import { Check, Loader2, Mail } from "lucide-react";
 
 import { SITE_NAME } from "@/lib/blog/config";
-
-type Status = "idle" | "sending" | "done" | "error";
-
-const ENDPOINT = "/api/public/subscribe";
+import { useSubscribe } from "@/lib/subscribe";
 
 /**
  * The ask at the foot of a post.
@@ -16,6 +13,9 @@ const ENDPOINT = "/api/public/subscribe";
  * finished reading is the one worth asking and the reader who has just arrived
  * is the one a dialog drives away. It is also why this is a banner in the flow
  * and not a modal: nothing here is worth taking the page away from someone.
+ *
+ * The fetch itself lives in `useSubscribe`, shared with the footer's pill, so
+ * the endpoint and the error sentences have one spelling.
  */
 export default function SubscribeBanner({
   /** The post's slug, stored so an operator can see which writing earns readers. */
@@ -24,59 +24,7 @@ export default function SubscribeBanner({
   source?: string;
 }) {
   const fieldId = useId();
-  const [status, setStatus] = useState<Status>("idle");
-  const [problem, setProblem] = useState("");
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (status === "sending") return;
-
-    const data = new FormData(event.currentTarget);
-    const email = String(data.get("email") ?? "").trim();
-    const website = String(data.get("website") ?? "").trim();
-    if (email === "") return;
-
-    setStatus("sending");
-    setProblem("");
-
-    try {
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email,
-          // Sent only when a bot filled it. An empty string on every request is
-          // a field the schema has to keep accepting for nothing.
-          ...(website === "" ? {} : { website }),
-          ...(source ? { source } : {}),
-        }),
-      });
-
-      if (res.ok) {
-        setStatus("done");
-        return;
-      }
-
-      setStatus("error");
-      /*
-       * Three answers, because a reader can act on three different things: fix
-       * the address, wait, or try again later. Anything more specific would be
-       * repeating an error code at somebody who cannot use one.
-       */
-      setProblem(
-        res.status === 429
-          ? "That is a few too many tries. Give it a minute and go again."
-          : res.status === 400
-            ? "That address does not look right. Check it and try again."
-            : "Something went wrong at our end. Please try again shortly.",
-      );
-    } catch {
-      // A refused fetch is offline, a blocked request or a dead deployment, and
-      // the reader can only usefully be told to retry.
-      setStatus("error");
-      setProblem("We could not reach the server. Check your connection and try again.");
-    }
-  }
+  const { status, problem, submit } = useSubscribe(source);
 
   return (
     <aside className="sub" aria-labelledby={`${fieldId}-title`}>
