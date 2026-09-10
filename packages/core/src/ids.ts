@@ -34,6 +34,7 @@ export const ID_PREFIXES = {
   note: "note",
   attempt: "att",
   subscriber: "sub",
+  audit: "aud",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

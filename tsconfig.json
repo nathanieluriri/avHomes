@@ -28,6 +28,7 @@
       "@avhomes/feedback": ["./packages/feedback/src/index.ts"],
       "@avhomes/analytics": ["./packages/analytics/src/index.ts"],
       "@avhomes/audience": ["./packages/audience/src/index.ts"],
+      "@avhomes/audit": ["./packages/audit/src/index.ts"],
       "@avhomes/api": ["./packages/api/src/index.ts"]
     }
   },

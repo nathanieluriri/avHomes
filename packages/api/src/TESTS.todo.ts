@@ -166,3 +166,38 @@ export {};
  *   sale side cannot carry (`caution`, `service-charge`) rather than
  *   rejecting the save, whether or not `fees` itself rides the same patch.
  */
+
+/* ────────────────────── 7. AUDIT TRAIL (audit middleware) ─────────────────
+ *
+ * The cross-cutting half. The redaction and derivation intentions live beside
+ * the code in `packages/audit/src/`, where the claims they pin are written.
+ *
+ * TODO(test): coverage is structural, not a convention. Register a NEW mutating
+ *   route below the middleware with no audit code of its own and assert it
+ *   still produces exactly one entry. This is the property the whole design
+ *   exists for, and the one a per-route approach loses on the day somebody adds
+ *   route forty-one.
+ *
+ * TODO(test): a GET produces no entry. A 400 produces none and a 200 produces
+ *   exactly one, driven through `createApp()` so the real mount order decides.
+ *
+ * TODO(test): a public route mounted ABOVE the middleware produces none. The
+ *   enquiry intake, the visit beacon and the subscribe intake are all public
+ *   writes, and they are excluded by position rather than by a filter.
+ *
+ * TODO(test): each of the four `/api/auth/` routes produces an entry whose
+ *   `requested` is null while still naming who and when. Assert on the STORED
+ *   entry, not on a redaction helper: the control being tested is the path
+ *   exclusion in the middleware, and a test of `redact` alone would pass with
+ *   the exclusion deleted.
+ *
+ * TODO(test): NO ACTOR, NO ENTRY. An anonymous `POST /api/auth/logout` writes
+ *   nothing. It carries no `requireAuth`, has no rate limiter and always
+ *   answers 200, so without that rule a stranger can loop it and mint unbounded
+ *   two-year rows.
+ *
+ * TODO(test): a successful sign-in DOES produce an entry, through `setActor`.
+ *   `sessionMiddleware` runs before the door, so the actor is still anonymous
+ *   when the middleware looks, and this is the one case where forgetting a
+ *   handle call costs coverage rather than detail.
+ */

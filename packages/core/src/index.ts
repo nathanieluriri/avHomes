@@ -67,8 +67,12 @@ export {
   currentUser,
   requestId,
   clientIp,
+  auditBefore,
+  auditActor,
+  auditEntityId,
   type AppEnv,
   type AppVariables,
+  type AuditHandle,
 } from "./app-env";
 
 export { newId, isId, idTime, slugify, disambiguateSlug, ID_PREFIXES, type IdPrefix } from "./ids";
