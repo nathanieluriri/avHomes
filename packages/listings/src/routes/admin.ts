@@ -363,6 +363,10 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
 
     const current = await getPropertyById(db, id);
     if (!current) throw new NotFoundError(`property ${id}`);
+    // The row is already read, and it is the only record of what a trashed
+    // listing said: "who deleted the one a buyer saw last week" needs the
+    // listing, not just its id.
+    auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, currentUser(c), "write");
 
     const property = await trashProperty(db, id, base.baseRevision);

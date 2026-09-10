@@ -1,4 +1,5 @@
 import type { AuditEntity } from "@avhomes/contracts";
+import { dateTime } from "./format";
 
 /**
  * Turns a raw audit entry into the sentence a person reads, and turns its
@@ -66,6 +67,9 @@ const OP_PREDICATES: Record<string, (target: string) => string> = {
   restore: (t) => `restored ${t}`,
   disable: (t) => `disabled ${t}`,
   enable: (t) => `enabled ${t}`,
+  // The one op that is a possessive rather than a verb on the target, and the
+  // reason this table takes the target instead of appending it.
+  role: (t) => `changed ${t}'s role`,
   reply: (t) => `replied to ${t}`,
 };
 
@@ -162,17 +166,92 @@ function historyPredicate(action: string): string {
   return "changed this";
 }
 
-/** A link to the record itself, where the console has a page for one. */
-export function entityHref(entity: AuditEntity, entityId: string | null): string | null {
-  if (!entityId) return null;
-  if (entity === "property") return `/admin/properties/${entityId}`;
-  if (entity === "post") return `/admin/posts/${entityId}`;
-  if (entity === "enquiry") return `/admin/enquiries/${entityId}`;
+/* ────────────────────────────── the target ─────────────────────────────── */
+
+/** The three kinds with a page of their own, by the collection that page sits under. */
+const OWN_PAGE: Partial<Record<AuditEntity, string>> = {
+  property: "/admin/properties",
+  post: "/admin/posts",
+  enquiry: "/admin/enquiries",
+};
+
+/**
+ * Where the rest are managed, for the kinds the console shows somewhere.
+ *
+ * A screen holding all of them is still the right destination: an image lives
+ * in the library and a role lives on the team screen, and sending a reader
+ * there beats sending them nowhere. The kinds absent from this table have no
+ * screen at all, so their rows name the record and stop.
+ */
+const ENTITY_SCREEN: Partial<Record<AuditEntity, { href: string; label: string }>> = {
+  property: { href: "/admin/properties", label: "the listings" },
+  post: { href: "/admin/posts", label: "the journal" },
+  enquiry: { href: "/admin/enquiries", label: "the inbox" },
+  user: { href: "/admin/team", label: "the team screen" },
+  // The team screen's "Open invites" panel is where an invite is read and
+  // revoked, so it is a destination even though an invite has no page.
+  invite: { href: "/admin/team", label: "the team screen" },
+  image: { href: "/admin/images", label: "the image library" },
+  note: { href: "/admin/customize", label: "the customize studio" },
+  stat: { href: "/admin", label: "the dashboard" },
+  settings: { href: "/admin/settings", label: "the settings screen" },
+};
+
+/** Where the console shows this record, and what the link should call it. */
+function destinationFor(
+  entity: AuditEntity,
+  entityId: string | null,
+): { href: string; label: string } | null {
+  const own = OWN_PAGE[entity];
+  if (own && entityId) return { href: `${own}/${entityId}`, label: `this ${ENTITY_NOUN[entity]}` };
+  return ENTITY_SCREEN[entity] ?? null;
+}
+
+/**
+ * What the entry acted on, for a reader who needs to tell one row from the
+ * next.
+ *
+ * Every kind gets a name here, not only the three with a page. Three role
+ * changes on three different people carry three different ids and read
+ * identically without one.
+ */
+export interface EntityTarget {
+  /** "Listing", "Team member". Always present. */
+  label: string;
+  /** The record's own name where the entry carries one, else its id, else null. */
+  name: string | null;
+  href: string | null;
+  /** "Open the team screen". Empty when there is nowhere to send the reader. */
+  linkText: string;
+}
+
+/** The keys a stored document puts its own name under, best first. */
+const NAME_KEYS = ["displayName", "title", "name", "email", "slug"];
+
+/** The name the before-image goes by, so a row names a person rather than an id. */
+function recordName(before: Record<string, unknown> | null): string | null {
+  const flat = beforePayload(before);
+  if (!flat) return null;
+  for (const key of NAME_KEYS) {
+    const value = flat[key];
+    if (typeof value === "string" && value.trim() !== "") return value.trim();
+  }
   return null;
 }
 
-export function entityNoun(entity: AuditEntity): string {
-  return ENTITY_NOUN[entity];
+export function entityTarget(entry: {
+  entity: AuditEntity;
+  entityId: string | null;
+  before: Record<string, unknown> | null;
+}): EntityTarget {
+  const noun = ENTITY_NOUN[entry.entity];
+  const destination = destinationFor(entry.entity, entry.entityId);
+  return {
+    label: noun.charAt(0).toUpperCase() + noun.slice(1),
+    name: recordName(entry.before) ?? entry.entityId,
+    href: destination?.href ?? null,
+    linkText: destination ? `Open ${destination.label}` : "",
+  };
 }
 
 /* ───────────────────────────────── diffing ──────────────────────────────── */
@@ -191,7 +270,7 @@ export interface DiffRow {
  * diffing in the writer" rule, which leaves this exactly the kind of read-time
  * adjustment that must not require a migration.
  */
-export function afterPayload(requested: Record<string, unknown> | null): Record<string, unknown> | null {
+function afterPayload(requested: Record<string, unknown> | null): Record<string, unknown> | null {
   if (requested && typeof requested === "object") {
     const patch = requested.patch;
     if (patch && typeof patch === "object" && !Array.isArray(patch)) {
@@ -202,39 +281,143 @@ export function afterPayload(requested: Record<string, unknown> | null): Record<
 }
 
 /**
- * Only a genuine field-level edit is worth diffing. A lifecycle move such as
- * `op:publish` carries the record's full `before` but an empty `requested`,
- * because nothing about the record was submitted: a status flag flipped on
- * the server. Diffing those two would report every field as cleared, which is
- * not what happened.
+ * The mirror of `afterPayload` on the other side.
+ *
+ * `auditBefore` on the team routes hands over what `findUserById` returns,
+ * `{ user, disabledAt }`, so a role change stores the old role at
+ * `before.user.role` while the patch that changed it is a flat `{ role }`.
+ * Lifting the nested user to the top is what lets the two line up; without it
+ * the one row that answers "who made them an owner" reads "Not set".
  */
-export function isFieldEdit(action: string): boolean {
-  return action === "create" || action === "update" || action === "delete";
+function beforePayload(before: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!before) return null;
+  const user = before.user;
+  if (user && typeof user === "object" && !Array.isArray(user)) {
+    const { user: nested, ...rest } = before;
+    return { ...(nested as Record<string, unknown>), ...rest };
+  }
+  return before;
 }
 
-export function diffFields(
-  before: Record<string, unknown> | null,
-  after: Record<string, unknown> | null,
+/** `trim`'s last resort replaces the whole payload, so it is a note, not a row. */
+function isTruncated(payload: Record<string, unknown> | null): boolean {
+  return payload !== null && payload._truncated === true && Object.keys(payload).length === 1;
+}
+
+/**
+ * The keys of `after`, looked up in `before`. NEVER the union of the two.
+ *
+ * `after` is a PATCH and `before` is the whole stored document, so a union
+ * reports every field the patch did not mention as changed to nothing: a price
+ * edit rendered thirty-one rows of which twenty-seven were invented, including
+ * "Status: draft to Not set" and the agent's own email address. A field the
+ * patch did not send was not changed and does not belong on this screen.
+ *
+ * A field submitted with the value it already held is dropped too. The editors
+ * send the whole patch on every save, so most keys in a save are resubmitted
+ * unchanged, and listing them buries the one that moved. A save where every
+ * field matched is reported as such by the caller rather than as an empty
+ * table, so "nothing changed" and "nothing recorded" never look alike.
+ */
+function diffFields(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
 ): DiffRow[] {
-  if (!before && !after) return [];
-  const b = before ?? {};
-  const a = after ?? {};
-  const keys = Array.from(new Set([...Object.keys(b), ...Object.keys(a)])).sort();
   const rows: DiffRow[] = [];
-  for (const key of keys) {
-    if (JSON.stringify(b[key]) !== JSON.stringify(a[key])) rows.push({ key, before: b[key], after: a[key] });
+  for (const key of Object.keys(after).sort()) {
+    if (JSON.stringify(before[key]) === JSON.stringify(after[key])) continue;
+    rows.push({ key, before: before[key], after: after[key] });
   }
   return rows;
+}
+
+function listRows(payload: Record<string, unknown>): DiffRow[] {
+  return Object.keys(payload)
+    .sort()
+    .map((key) => ({ key, before: undefined, after: payload[key] }));
+}
+
+/**
+ * What an expanded row shows, and which of six honest things it is saying.
+ *
+ * `changed`    a before-image and a patch: Field, Before, After.
+ * `unchanged`  fields were submitted and every one already held that value.
+ * `submitted`  no before-image, so the values are shown without claiming a
+ *              prior one. A create is the ordinary case.
+ * `snapshot`   a trash, which submits nothing and removes something: the
+ *              record as it stood is the answer to "what did I just lose".
+ * `truncated`  the payload was past the writer's byte cap. Changes were made
+ *              and the values are gone, which is not the same as none.
+ * `none`       nothing was submitted and nothing is worth showing.
+ */
+export type FieldTableMode =
+  | "changed"
+  | "unchanged"
+  | "submitted"
+  | "snapshot"
+  | "truncated"
+  | "none";
+
+export interface FieldTable {
+  mode: FieldTableMode;
+  rows: DiffRow[];
+}
+
+/**
+ * Gated on what the entry actually carries, not on its action.
+ *
+ * An earlier version asked `isFieldEdit(action)` and excluded every `op:*`,
+ * which hid the submitted role on `PATCH /admin/users/:id/role`: the old and
+ * new role were both in the row and neither reached the screen. The concern
+ * that rule existed for was a lifecycle move diffing its full `before` against
+ * an empty body, and `diffFields` walking only the submitted keys already
+ * answers that: an empty body yields no rows whatever the action was.
+ */
+export function fieldTable(entry: {
+  action: string;
+  before: Record<string, unknown> | null;
+  requested: Record<string, unknown> | null;
+}): FieldTable {
+  const after = afterPayload(entry.requested);
+  if (isTruncated(after)) return { mode: "truncated", rows: [] };
+
+  const before = isTruncated(entry.before) ? null : beforePayload(entry.before);
+
+  if (after && Object.keys(after).length > 0) {
+    if (!before) return { mode: "submitted", rows: listRows(after) };
+    const rows = diffFields(before, after);
+    return rows.length > 0 ? { mode: "changed", rows } : { mode: "unchanged", rows: [] };
+  }
+
+  if (entry.action === "delete" && before) return { mode: "snapshot", rows: listRows(before) };
+  return { mode: "none", rows: [] };
 }
 
 /* ─────────────────────────────── rendering ──────────────────────────────── */
 
 /**
- * The literal string `packages/audit/src/redact.ts` writes for a secret
- * field. Duplicated rather than imported: that package pulls in the Mongo
- * driver, and `@avhomes/contracts` is the only package the browser compiles.
+ * Every literal `packages/audit/src/redact.ts` can write in place of a value.
+ * Duplicated rather than imported: that package pulls in the Mongo driver, and
+ * `@avhomes/contracts` is the only package the browser compiles.
+ *
+ * All six are here because all six reach this screen. Only `[redacted]` was
+ * translated before, so a deep payload showed a reader the string `[deep]` and
+ * left them to guess whether it was a value somebody typed.
  */
-const REDACTED_MARKER = "[redacted]";
+const MARKER_TEXT: Record<string, string> = {
+  "[redacted]": "hidden",
+  "[deep]": "nested too deeply to record",
+  "[cycle]": "the same value again from higher up",
+  "[budget]": "too large to record",
+};
+
+/** `[long: 20000 chars]` and `[list: 40 items]`, which carry a count. */
+const LONG_STRING = /^\[long: (\d+) chars\]$/;
+const LONG_LIST = /^\[list: (\d+) items\]$/;
+
+function count(digits: string): string {
+  return Number(digits).toLocaleString("en-GB");
+}
 
 /** Overrides for the keys whose humanised form reads worse than a chosen one. */
 const FIELD_LABEL_OVERRIDES: Record<string, string> = {
@@ -258,22 +441,58 @@ export function fieldLabel(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
-/** Replaces the redaction marker at any depth. See `REDACTED_MARKER` above. */
-function hideRedactedMarkers(value: unknown): unknown {
-  if (value === REDACTED_MARKER) return "hidden";
-  if (Array.isArray(value)) return value.map(hideRedactedMarkers);
+/** Replaces every writer marker at any depth. See `MARKER_TEXT` above. */
+function humaniseMarkers(value: unknown): unknown {
+  if (typeof value === "string") {
+    const named = MARKER_TEXT[value];
+    if (named) return named;
+    const long = LONG_STRING.exec(value);
+    if (long) return `${count(long[1]!)} characters, too long to record`;
+    const list = LONG_LIST.exec(value);
+    if (list) return `${count(list[1]!)} items, too many to record`;
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(humaniseMarkers);
   if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, hideRedactedMarkers(v)]));
+    const entries = Object.entries(value);
+    // The whole-payload marker, met here when it sits inside a value rather
+    // than at the top, where `fieldTable` catches it first.
+    if (entries.length === 1 && entries[0]![0] === "_truncated" && entries[0]![1] === true) {
+      return "too large to record";
+    }
+    return Object.fromEntries(entries.map(([k, v]) => [k, humaniseMarkers(v)]));
   }
   return value;
 }
 
-/** A stored value, as a person reads it. Never the raw `[redacted]` marker. */
-export function displayValue(raw: unknown): string {
-  const value = hideRedactedMarkers(raw);
+/**
+ * Epoch milliseconds, which is every timestamp this API stores. The naming
+ * convention is the whole test: see the README's data conventions.
+ */
+function isTimestampKey(key: string): boolean {
+  return key === "at" || key.endsWith("At");
+}
+
+/**
+ * A stored value, as a person reads it. Never a raw writer marker, and never a
+ * raw epoch for a field whose name says it is a time.
+ *
+ * `key` is optional because the same function renders a whole query object,
+ * which has no field of its own.
+ */
+export function displayValue(raw: unknown, key?: string): string {
+  const value = humaniseMarkers(raw);
   if (value === undefined) return "Not set";
   if (value === null) return "None";
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") {
+    // A zero or a negative is not a time anybody recorded, so it stays a number
+    // rather than becoming 1 Jan 1970.
+    if (key !== undefined && isTimestampKey(key) && Number.isFinite(value) && value > 0) {
+      return dateTime(value);
+    }
+    return String(value);
+  }
   if (typeof value === "string") return value === "" ? "Empty" : value;
   if (Array.isArray(value)) {
     if (value.length === 0) return "None";

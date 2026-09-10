@@ -371,10 +371,18 @@ What is not audited
   ``rolePermissions`` does not authenticate, so "everything below the mount is
   captured" cuts both ways: anonymous requests reach the middleware too.
   ``POST /auth/logout`` is the sharp case. It deliberately carries no
-  ``requireAuth``, has no rate limiter, and always answers 200, so without this
-  rule a stranger with no cookie could loop it and write one two-year row per
-  request. With it, an anonymous logout writes nothing, because there is nobody to
-  attribute it to and nothing was changed.
+  ``requireAuth`` and has no rate limiter, so without this rule a stranger with no
+  cookie could loop it and write one two-year row per request. With it, an
+  anonymous logout writes nothing, because there is nobody to attribute it to and
+  nothing was changed.
+
+  An earlier draft of this section said that route "always answers 200" and
+  offered it as part of the reason the rule matters. It does not. In a production
+  build ``clearSessionCookie`` deletes a ``__Host-`` cookie without ``secure``,
+  Hono refuses that, and the route answers 500 anonymously, so the 2xx check
+  drops the row for a reason that has nothing to do with who asked. Outside
+  production the same request is a 200. The rule stands on the actor alone, which
+  is the only half of it that holds in both builds.
 
   The routes that *can* mint an actor from nothing are the two doors, and both are
   rate limited on the caller's IP already
@@ -433,6 +441,8 @@ Routes instrumented with ``setBefore`` in this unit, chosen because they are the
 ones an argument is actually about:
 
 - ``PATCH /admin/properties/:id`` and its lifecycle ops
+- ``DELETE /admin/properties/:id``, which reads the row two lines earlier and is
+  the only record of what the trashed listing said
 - ``PATCH /admin/users/:id/role``, disable and enable
 
 And that is the whole list. Three routes that looked like obvious candidates are
@@ -611,17 +621,25 @@ File                                             What changes
 ``packages/contracts/src/types.ts``              ``AuditEntry``, action and entity consts
 ``packages/contracts/src/index.ts``              ``export *``, nothing to do
 ``packages/core/src/app-env.ts``                 ``AppVariables`` gains the audit handle
+``packages/core/src/index.ts``                   exports the three handle helpers
+``packages/core/src/ids.ts``                     the ``aud`` id prefix
 ``packages/audit/**``                            NEW package: middleware, repo, routes
 ``packages/api/src/app.ts``                      mounts it at position 10
+``packages/api/src/TESTS.todo.ts``               the cross-cutting test intentions
 ``packages/db/src/collections.ts``               ``audit``
 ``packages/db/src/migrations/0008_audit.ts``     NEW: validator, TTL, two read indexes
 ``packages/db/src/migrations/index.ts``          register 0008
-``packages/identity/src/middleware.ts``          explicit ``/api/admin/audit`` rule
-``packages/listings/src/routes/admin.ts``        ``setBefore`` on patch and ops
+``packages/identity/src/routes/doors.ts``        ``setActor`` on all three sign-in doors
 ``packages/identity/src/routes/team.ts``         ``setBefore`` on role, disable, enable
-``packages/content/src/routes.ts``               ``setBefore`` on patch and ops
-``packages/enquiries/src/index.ts``              ``setBefore`` on patch
+``packages/listings/src/routes/admin.ts``        ``setBefore`` on patch, ops and trash
+``packages/content/src/routes.ts``               the minted post and category ids
+``packages/media/src/routes.ts``                 the minted image id
+``packages/feedback/src/index.ts``               the minted note id
+``tsconfig.json``                                the ``@avhomes/audit`` path alias
+``README.rst``                                   the package table and the mount order
 ``src/app/admin/audit/page.tsx``                 NEW screen
+``src/app/admin/audit/layout.tsx``               NEW: the screen's tab title
+``src/lib/admin/audit.ts``                       NEW: the screen's sentences and grid
 ``src/app/admin/properties/[id]/page.tsx``       history panel
 ``src/components/admin/nav.tsx``                 nav entry, danger-gated
 ``src/lib/types.ts``                             named re-export list
@@ -631,6 +649,17 @@ File                                             What changes
 others: it imports ``contracts``, ``core`` and ``db``, and no other feature
 package imports it. The middleware is injected at the composition root, which is
 the only place allowed to know both halves of a seam.
+
+Two files an earlier draft of this table promised are deliberately absent, and
+this is the table a reader checks, so their absence is recorded here rather than
+left to look like an oversight. ``packages/identity/src/middleware.ts`` gets no
+explicit ``/api/admin/audit`` rule: the section on the two readers argues at
+length that the ``/api/admin/`` catch-all already resolves that path to
+``danger``, and that a rule of its own would be a second place for the answer to
+drift. ``packages/enquiries/src/index.ts`` gets no ``setBefore``, for the reason given
+with the instrumented list above: that route never reads the prior document, so
+a before-image there costs a database round trip on every write rather than
+nothing.
 
 ``nav.tsx`` is being actively edited by concurrent work at the time of writing.
 Coordinate before touching it, or add the nav entry last.

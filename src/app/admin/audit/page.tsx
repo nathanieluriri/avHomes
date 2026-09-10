@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown, History } from "lucide-react";
 import type { Page, TeamUser } from "@avhomes/contracts";
 import { AUDIT_ENTITIES, type AuditEntity, type AuditEntry } from "@/lib/types";
@@ -10,14 +10,12 @@ import { useAsync, useCursorStack } from "@/lib/admin/hooks";
 import { dateTime, initials, relative } from "@/lib/admin/format";
 import {
   ENTITY_FILTER_LABEL,
-  afterPayload,
   auditSentence,
-  diffFields,
   displayValue,
-  entityHref,
-  entityNoun,
+  entityTarget,
   fieldLabel,
-  isFieldEdit,
+  fieldTable,
+  type FieldTable,
 } from "@/lib/admin/audit";
 import { TablePager } from "@/components/admin/DataTable";
 import {
@@ -268,13 +266,8 @@ function RowsSkeleton() {
  */
 function AuditRow({ entry }: { entry: AuditEntry }) {
   const [open, setOpen] = useState(false);
-  const href = entityHref(entry.entity, entry.entityId);
-  const after = afterPayload(entry.requested);
-  // Only a create, update or trash is a field-level edit worth diffing. A
-  // lifecycle move such as "published" carries the record's full `before` but
-  // an empty `requested`, and diffing those two would report every field as
-  // cleared, which did not happen.
-  const diff = isFieldEdit(entry.action) ? diffFields(entry.before, after) : [];
+  const target = entityTarget(entry);
+  const table = fieldTable(entry);
 
   return (
     <li className="border-b border-mist-100 last:border-0">
@@ -302,50 +295,23 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
 
       {open && (
         <div className="border-t border-mist-100 bg-mist-50/60 px-4 py-3 sm:px-5">
-          {href && (
-            <Link
-              href={href}
-              className="text-[12px] font-semibold text-wine-700 underline underline-offset-2"
-            >
-              Open this {entityNoun(entry.entity)}
-            </Link>
-          )}
+          <p className="text-[12px] text-slate-600">
+            <span className="font-semibold text-plum-950">{target.label}</span>
+            {target.name && <span className="[overflow-wrap:anywhere]"> {target.name}</span>}
+            {target.href && (
+              <>
+                {" "}
+                <Link
+                  href={target.href}
+                  className="font-semibold text-wine-700 underline underline-offset-2"
+                >
+                  {target.linkText}
+                </Link>
+              </>
+            )}
+          </p>
 
-          {diff.length > 0 ? (
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full text-left text-[12px]">
-                <caption className="sr-only">Changed fields</caption>
-                <thead>
-                  <tr className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    <th scope="col" className="py-1 pr-3">
-                      Field
-                    </th>
-                    <th scope="col" className="py-1 pr-3">
-                      Before
-                    </th>
-                    <th scope="col" className="py-1">
-                      After
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {diff.map((row) => (
-                    <tr key={row.key} className="border-t border-mist-200/70 align-top">
-                      <td className="py-1.5 pr-3 font-medium text-plum-950">{fieldLabel(row.key)}</td>
-                      <td className="py-1.5 pr-3 text-slate-600 [overflow-wrap:anywhere]">
-                        {displayValue(row.before)}
-                      </td>
-                      <td className="py-1.5 text-plum-950 [overflow-wrap:anywhere]">
-                        {displayValue(row.after)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="mt-2 text-[12px] text-slate-600">No field changes recorded for this entry.</p>
-          )}
+          <FieldGrid table={table} />
 
           <details className="mt-3">
             <summary className="cursor-pointer text-[11px] text-slate-500">Technical details</summary>
@@ -369,5 +335,87 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
         </div>
       )}
     </li>
+  );
+}
+
+function Note({ children }: { children: ReactNode }) {
+  return <p className="mt-2 text-[12px] text-slate-600">{children}</p>;
+}
+
+/**
+ * The grid under the sentence, or the sentence that replaces it.
+ *
+ * Six modes rather than a table and an empty state, because "nothing changed",
+ * "nothing was recorded" and "it was too big to record" are three different
+ * answers and a reader settling an argument needs to know which one they got.
+ */
+function FieldGrid({ table }: { table: FieldTable }) {
+  if (table.mode === "none") {
+    return <Note>No field changes recorded for this entry.</Note>;
+  }
+  if (table.mode === "unchanged") {
+    return <Note>Every field submitted already held the value it was given, so nothing changed.</Note>;
+  }
+  if (table.mode === "truncated") {
+    return (
+      <Note>
+        The submitted values were too large to record, so this entry keeps who and when but not what.
+      </Note>
+    );
+  }
+
+  const changed = table.mode === "changed";
+  const caption = changed
+    ? "Changed fields"
+    : table.mode === "snapshot"
+      ? "The record as it stood"
+      : "Submitted fields";
+
+  return (
+    <>
+      {table.mode === "submitted" && (
+        <Note>
+          Nothing was recorded for how this looked first, so these are the values submitted rather
+          than a comparison.
+        </Note>
+      )}
+      {table.mode === "snapshot" && <Note>The record as it stood when it was removed.</Note>}
+
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-left text-[12px]">
+          <caption className="sr-only">{caption}</caption>
+          <thead>
+            <tr className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <th scope="col" className="py-1 pr-3">
+                Field
+              </th>
+              {changed && (
+                <th scope="col" className="py-1 pr-3">
+                  Before
+                </th>
+              )}
+              <th scope="col" className="py-1">
+                {changed ? "After" : table.mode === "snapshot" ? "Value" : "Submitted"}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {table.rows.map((row) => (
+              <tr key={row.key} className="border-t border-mist-200/70 align-top">
+                <td className="py-1.5 pr-3 font-medium text-plum-950">{fieldLabel(row.key)}</td>
+                {changed && (
+                  <td className="py-1.5 pr-3 text-slate-600 [overflow-wrap:anywhere]">
+                    {displayValue(row.before, row.key)}
+                  </td>
+                )}
+                <td className="py-1.5 text-plum-950 [overflow-wrap:anywhere]">
+                  {displayValue(row.after, row.key)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

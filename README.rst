@@ -109,8 +109,10 @@ the session" is a convention.
     7. POST /api/enquiries   a public MUTATION, deliberately not cacheable
     8. sessionMiddleware     resolves the cookie to a user or null
     9. rolePermissions       the domain gate over URL prefixes
+   10. auditTrail            BELOW the gate: a refused request changed nothing
+                             and is not activity worth recording
    ------------------------------------------------------------------
-   10. auth, team, listings, content, media, enquiries, dashboard
+   11. auth, team, listings, content, media, enquiries, dashboard
 
 Authentication
 ==============

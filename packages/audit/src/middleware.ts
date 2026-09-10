@@ -272,9 +272,16 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
     /*
      * NO ACTOR, NO ENTRY, and this rule is load-bearing rather than tidy.
      * `rolePermissions` does not authenticate, so anonymous requests reach this
-     * middleware too. `POST /auth/logout` carries no `requireAuth`, has no rate
-     * limiter and always answers 200: without this rule a stranger could loop it
-     * and write one two-year row per request.
+     * middleware too. `POST /auth/logout` carries no `requireAuth` and no rate
+     * limiter: without this rule a stranger could loop it and write one
+     * two-year row per request.
+     *
+     * Its status is not the thing stopping them, and an earlier version of this
+     * comment claimed it was. In a production build `clearSessionCookie` deletes
+     * a `__Host-` cookie without `secure`, which Hono refuses, so the route
+     * answers 500 and the status check below drops the row for the wrong reason.
+     * That is a bug in logout rather than a control: outside production the same
+     * request is a 200, and this rule is what holds either way.
      *
      * `setActor` is the other half. `sessionMiddleware` resolves the cookie
      * before the auth routes run, so somebody in the act of signing in is still

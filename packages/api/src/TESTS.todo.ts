@@ -192,9 +192,12 @@ export {};
  *   the exclusion deleted.
  *
  * TODO(test): NO ACTOR, NO ENTRY. An anonymous `POST /api/auth/logout` writes
- *   nothing. It carries no `requireAuth`, has no rate limiter and always
- *   answers 200, so without that rule a stranger can loop it and mint unbounded
- *   two-year rows.
+ *   nothing. It carries no `requireAuth` and no rate limiter, so without that
+ *   rule a stranger can loop it and mint unbounded two-year rows. Drive it
+ *   outside production, where the route answers 200: in a production build
+ *   `clearSessionCookie` deletes a `__Host-` cookie without `secure`, Hono
+ *   refuses, and a 500 would drop the row for the wrong reason and pass a test
+ *   of the rule with the rule deleted.
  *
  * TODO(test): a successful sign-in DOES produce an entry, through `setActor`.
  *   `sessionMiddleware` runs before the door, so the actor is still anonymous
