@@ -512,8 +512,13 @@ Two read indexes, because there are exactly two questions:
 
 .. code-block:: text
 
-   audit_recent  { at: -1, _id: -1 }                  the log, newest first
-   audit_entity  { entity: 1, entityId: 1, at: -1 }   this record's history
+   audit_recent  { at: -1, _id: -1 }                          the log, newest first
+   audit_entity  { entity: 1, entityId: 1, at: -1, _id: -1 }  this record's history
+
+Both carry ``_id`` as the final key. Paging here is keyset, and ``at`` is not
+unique: two entries written in the same millisecond would page inconsistently
+without a tiebreak. That is the same shape as every other keyset index in this
+repository.
 
 The validator pins ``actorRole`` to the role enum and ``action``/``entity`` to
 strings. ``requested`` and ``before`` are free-form objects by necessity: they
