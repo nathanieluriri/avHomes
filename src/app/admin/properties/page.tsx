@@ -106,6 +106,22 @@ function PropertiesScreen() {
 
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ApiError | null>(null);
+  /*
+   * The New button ASKS FOR A TITLE before it writes anything.
+   *
+   * It used to POST on the click and navigate, so a mis-click persisted a row
+   * titled "Untitled listing" with a price of zero, and backing out left it
+   * behind for somebody to find and clear later. The only feedback during the
+   * round trip was the label changing.
+   *
+   * Naming it first removes both problems at once and one more besides: the
+   * slug is derived from the title at publish and never regenerated, so a
+   * listing published while still called "Untitled listing" was stuck at
+   * /listings/untitled-listing for good. A title typed here is the title that
+   * becomes the URL.
+   */
+  const [namingNew, setNamingNew] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
 
   /*
    * `replace`, not `push`: typing in the filter box would otherwise put one
@@ -164,11 +180,11 @@ function PropertiesScreen() {
     { keepPrevious: true },
   );
 
-  async function create() {
+  async function create(title: string) {
     setCreating(true);
     setCreateError(null);
     try {
-      const res = await api.post<{ property: Property }>("/admin/properties");
+      const res = await api.post<{ property: Property }>("/admin/properties", { title });
       router.push(`/admin/properties/${res.property.id}`);
     } catch (err) {
       setCreateError(
@@ -305,10 +321,41 @@ function PropertiesScreen() {
         title="Listings"
         subtitle="Every property, including drafts and the trash."
         actions={
-          <Button onClick={create} disabled={creating} size="lg">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {creating ? "Creating" : "New listing"}
-          </Button>
+          namingNew ? (
+            <form
+              className="flex w-full items-center gap-2 sm:w-auto"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const title = newTitle.trim();
+                if (title !== "") void create(title);
+              }}
+            >
+              <input
+                className={`${inputClass} sm:w-64`}
+                autoFocus
+                required
+                maxLength={300}
+                value={newTitle}
+                placeholder="What is it called?"
+                aria-label="New listing title"
+                onChange={(event) => setNewTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setNamingNew(false);
+                    setNewTitle("");
+                  }
+                }}
+              />
+              <Button type="submit" disabled={creating || newTitle.trim() === ""} size="lg">
+                {creating ? "Creating" : "Create"}
+              </Button>
+            </form>
+          ) : (
+            <Button onClick={() => setNamingNew(true)} disabled={creating} size="lg">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              New listing
+            </Button>
+          )
         }
       />
 
@@ -428,8 +475,10 @@ function PropertiesScreen() {
               bare
               title="No listings yet"
               hint="A listing starts as a draft, so you can create one now and fill it in as the photos and the price arrive."
+              /* Sends the reader to the same naming step as the header button,
+                 rather than being a second door that writes a row on click. */
               action={
-                <Button onClick={create} disabled={creating} size="lg">
+                <Button onClick={() => setNamingNew(true)} disabled={creating} size="lg">
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   Create the first listing
                 </Button>
