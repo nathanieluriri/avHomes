@@ -1,13 +1,32 @@
 import type { Metadata } from "next";
-import { MapPin, Phone, Mail, Clock } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import ContactForm from "@/components/ContactForm";
+import { getSiteSettings, whatsappHref } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Contact | AVHomes",
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  /*
+   * Every block below is CONDITIONAL on a stored value. This page used to print
+   * a phone number of +234 800 000 0000, two invented office addresses and a
+   * note to the developer about a maps provider, all of which a visitor read as
+   * evidence that nobody was home. Nothing renders here that somebody has not
+   * actually entered in the console.
+   */
+  const site = await getSiteSettings();
+  const whatsapp = whatsappHref(
+    site.whatsappNumber,
+    "Hi, I found you on avhomes. I would like to ask about a property.",
+  );
+  const hasAny =
+    site.offices.length > 0 ||
+    site.contactPhone !== "" ||
+    site.contactEmail !== "" ||
+    whatsapp !== null;
+
   return (
     <>
       <section className="border-b border-mist-200 bg-mist-50">
@@ -29,7 +48,7 @@ export default function ContactPage() {
       <div className="mx-auto max-w-7xl px-6 py-14 lg:px-10 lg:py-20">
         <div className="grid gap-8 lg:grid-cols-5 lg:gap-10">
           <Reveal className="lg:col-span-3">
-            <ContactForm />
+            <ContactForm contactEmail={site.contactEmail} />
           </Reveal>
 
           <Reveal delay={80} className="lg:col-span-2">
@@ -42,87 +61,101 @@ export default function ContactPage() {
                 during business hours.
               </p>
 
-              <div className="mt-6 space-y-5">
-                <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
-                    <MapPin className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-plum-950">Lagos Office</p>
-                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                      12 Admiralty Way, Lekki Phase 1, Lagos
-                    </p>
-                  </div>
-                </div>
+              {hasAny ? (
+                <div className="mt-6 space-y-5">
+                  {site.offices.map((office) => (
+                    <div key={`${office.label}-${office.address}`} className="flex gap-3.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                        <MapPin className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-plum-950">{office.label}</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                          {office.address}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
 
-                <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
-                    <MapPin className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-plum-950">Abuja Office</p>
-                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                      9 Gana Street, Maitama, Abuja
-                    </p>
-                  </div>
-                </div>
+                  {site.contactPhone !== "" && (
+                    <div className="flex gap-3.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                        <Phone className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-plum-950">Phone</p>
+                        <a
+                          href={`tel:${site.contactPhone.replace(/\s+/g, "")}`}
+                          className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
+                        >
+                          {site.contactPhone}
+                        </a>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
-                    <Phone className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-plum-950">Phone</p>
-                    <a
-                      href="tel:+2348000000000"
-                      className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
-                    >
-                      +234 800 000 0000
-                    </a>
-                  </div>
-                </div>
+                  {whatsapp && (
+                    <div className="flex gap-3.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                        <MessageCircle className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-plum-950">WhatsApp</p>
+                        <a
+                          href={whatsapp}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
+                        >
+                          Start a chat
+                        </a>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
-                    <Mail className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-plum-950">Email</p>
-                    <a
-                      href="mailto:hello@avhomes.com"
-                      className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
-                    >
-                      hello@avhomes.com
-                    </a>
-                  </div>
-                </div>
+                  {site.contactEmail !== "" && (
+                    <div className="flex gap-3.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                        <Mail className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-plum-950">Email</p>
+                        <a
+                          href={`mailto:${site.contactEmail}`}
+                          className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
+                        >
+                          {site.contactEmail}
+                        </a>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="flex gap-3.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
-                    <Clock className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-plum-950">Office Hours</p>
-                    <div className="mt-0.5 space-y-0.5 text-sm leading-relaxed text-muted-foreground">
-                      <p>Monday to Friday: 9am to 6pm</p>
-                      <p>Saturday: 10am to 4pm</p>
-                      <p>Sunday: Closed</p>
+                  <div className="flex gap-3.5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50">
+                      <Clock className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-plum-950">Office Hours</p>
+                      <div className="mt-0.5 space-y-0.5 text-sm leading-relaxed text-muted-foreground">
+                        <p>Monday to Friday: 9am to 6pm</p>
+                        <p>Saturday: 10am to 4pm</p>
+                        <p>Sunday: Closed</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* No stored contact details yet. Saying so plainly beats an
+                   empty panel with a heading over it, and the form beside this
+                   still works. */
+                <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
+                  The form is the fastest way to reach us right now, and it goes
+                  straight to the team.
+                </p>
+              )}
             </div>
           </Reveal>
         </div>
-
-        <Reveal delay={140} className="mt-10">
-          <div className="flex h-72 items-center justify-center rounded-2xl border border-mist-200 bg-mist-50 px-6 text-center">
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              An interactive map of our Lagos and Abuja offices will appear here once the site
-              is connected to a maps provider.
-            </p>
-          </div>
-        </Reveal>
       </div>
     </>
   );

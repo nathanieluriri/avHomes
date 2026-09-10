@@ -23,19 +23,22 @@ import { useEffect, useRef, useState } from "react";
 
 interface Client {
   name: string;
-  /** A file in `public/brand/clients/`. Anything the browser draws is fine. */
+  /** An uploaded image. Empty is filtered out before this component sees it. */
   logo: string;
 }
 
-const CLIENTS: readonly Client[] = [
-  { name: "Sahara Group", logo: "/brand/clients/sahara-group.png" },
-  { name: "Comfort Agba Foundation", logo: "/brand/clients/comfort-agba-foundation.png" },
-  { name: "Greenville LNG", logo: "/brand/clients/greenville-lng.png" },
-  { name: "Lenzo Homes", logo: "/brand/clients/lenzo-homes.png" },
-  { name: "Up Ltd", logo: "/brand/clients/up-ltd.png" },
-];
+/**
+ * NAMES COME FROM SETTINGS, not from a constant in this file.
+ *
+ * The list used to be hardcoded against five files in `public/brand/clients/`
+ * that were never added, so the band rendered as plain scrolling text on the
+ * one section of the homepage whose entire job is credibility. Worse, it named
+ * five companies the site could not show. Now an empty list renders NOTHING:
+ * a missing section is invisible, and an empty one is an admission.
+ */
+export default function LogoMarquee({ clients }: { clients: readonly Client[] }) {
+  if (clients.length === 0) return null;
 
-export default function LogoMarquee() {
   return (
     <section className="border-y border-mist-200 bg-mist-50 py-8 lg:py-10">
       <div className="mx-auto max-w-7xl px-6 lg:px-10">
@@ -59,7 +62,7 @@ export default function LogoMarquee() {
                 aria-hidden={rep === 1 ? "true" : undefined}
                 className="flex shrink-0 items-center gap-10 pl-10"
               >
-                {CLIENTS.map((client) => (
+                {clients.map((client) => (
                   <span key={client.name} className="flex shrink-0 items-center gap-10">
                     <ClientLogo client={client} />
                     <span

@@ -25,7 +25,7 @@ import { hasDomain, type AuthUser } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useIsNarrow, useKeyboardInset, useSession } from "@/lib/admin/hooks";
 import { initials } from "@/lib/admin/format";
-import { NAV, homeFor, isSectionActive } from "./nav";
+import { NAV, canSeeNavItem, homeFor, isSectionActive } from "./nav";
 import { Palette } from "./Palette";
 import { ResponsiveMenu } from "./BottomSheet";
 import { ButtonLink, Spinner } from "./ui";
@@ -378,7 +378,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           className="c-rail flex flex-col gap-1 overflow-y-auto border-r border-mist-200 px-3 py-3 lg:gap-0.5"
         >
           {NAV.map((group) => {
-            const visible = group.items.filter((item) => hasDomain(user.role, item.domain));
+            const visible = group.items.filter((item) => canSeeNavItem(user.role, item));
             if (visible.length === 0) return null;
             return (
               <div key={group.label ?? "root"} className="contents">

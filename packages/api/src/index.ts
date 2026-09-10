@@ -6,3 +6,4 @@
  */
 export { createApp, app, API_PREFIX, type AppDeps } from "./app";
 export { dashboardRoutes } from "./dashboard";
+export { healthRoutes } from "./health";

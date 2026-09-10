@@ -18,7 +18,7 @@ const links = [
 const EXIT_MS = 420;
 const FOCUSABLE = "a[href], button:not([disabled])";
 
-export default function Navbar() {
+export default function Navbar({ contactEmail = "" }: { contactEmail?: string }) {
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -219,7 +219,9 @@ export default function Navbar() {
                 ))}
               </div>
 
-              <p className="mt-8 text-center text-xs text-white/40">hello@avhomes.com</p>
+              {contactEmail !== "" && (
+                <p className="mt-8 text-center text-xs text-white/40">{contactEmail}</p>
+              )}
             </div>
           </div>
         </div>

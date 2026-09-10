@@ -343,12 +343,42 @@ export interface EnquiryThread {
 export const REPLY_IDENTITIES = ["individual", "team"] as const;
 export type ReplyIdentity = (typeof REPLY_IDENTITIES)[number];
 
+/** A staffed address a visitor can turn up to. */
+export interface Office {
+  label: string;
+  address: string;
+}
+
+/**
+ * A client the site names in its trust strip.
+ *
+ * The logo is required. The strip previously named five companies against image
+ * paths that did not exist, which rendered the one band whose whole job is
+ * credibility as plain scrolling text. A client with no logo is not shown.
+ */
+export interface ClientLogo {
+  name: string;
+  imageUrl: string;
+}
+
 export interface SiteSettings {
   replyIdentity: ReplyIdentity;
   /** The name used when `replyIdentity` is `team`. */
   teamName: string;
   /** The avatar shown beside that name. Empty falls back to an initial. */
   teamAvatarUrl: string;
+  /**
+   * Owner-supplied contact facts. Empty means NOT SET, and every surface that
+   * renders one hides its block rather than printing a placeholder. A site with
+   * no phone number reads better than a site with a fake one, and a fake one is
+   * what these fields exist to stop shipping.
+   */
+  contactPhone: string;
+  contactEmail: string;
+  /** Digits only, country code first, no `+`. Empty disables every wa.me link. */
+  whatsappNumber: string;
+  offices: Office[];
+  clientLogos: ClientLogo[];
   updatedAt: number;
   revision: number;
 }

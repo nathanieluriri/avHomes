@@ -1,4 +1,12 @@
-import type { Page, PriceChange, Property, SiteStat, Testimonial } from "@avhomes/contracts";
+import type {
+  ClientLogo,
+  Office,
+  Page,
+  PriceChange,
+  Property,
+  SiteStat,
+  Testimonial,
+} from "@avhomes/contracts";
 import { apiBase, DETAIL_REVALIDATE, LIST_REVALIDATE } from "./api-config";
 import { demoProperties, demoStats, demoTestimonials } from "./demo-data";
 
@@ -176,6 +184,47 @@ export function isPriceReduced(
   const newest = priceHistory[priceHistory.length - 1];
   if (!newest) return false;
   return newest.toMinor < newest.fromMinor && now - newest.at <= PRICE_REDUCED_WINDOW_MS;
+}
+
+export interface PublicSettings {
+  contactPhone: string;
+  contactEmail: string;
+  whatsappNumber: string;
+  offices: Office[];
+  clientLogos: ClientLogo[];
+}
+
+/**
+ * The contact facts, which have NO fixture and never will.
+ *
+ * Every other read in this file has a bundled fallback so `npm run dev` is
+ * useful before a database exists. This one deliberately does not: a phone
+ * number is the exact kind of value that must never be invented, and the site
+ * already shipped `+234 800 000 0000` once. Both arms return empty, and every
+ * surface treats empty as "hide the block".
+ */
+const NO_SETTINGS: PublicSettings = {
+  contactPhone: "",
+  contactEmail: "",
+  whatsappNumber: "",
+  offices: [],
+  clientLogos: [],
+};
+
+export async function getSiteSettings(): Promise<PublicSettings> {
+  const payload = await apiGet<{ settings: PublicSettings }>(
+    "/settings",
+    { settings: NO_SETTINGS },
+    { settings: NO_SETTINGS },
+    { revalidate: DETAIL_REVALIDATE, tags: ["settings"] },
+  );
+  return payload.settings;
+}
+
+/** `wa.me/<digits>` with the enquiry already typed, or null when unset. */
+export function whatsappHref(number: string, message: string): string | null {
+  if (number.trim() === "") return null;
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
 
 /** Re-exported so components import their formatting from one place. */

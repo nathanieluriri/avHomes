@@ -46,7 +46,7 @@ import {
   requireAuth,
   tokenId,
 } from "@avhomes/identity";
-import { readSettings, replySignature } from "./settings";
+import { readSettings, replySignature } from "@avhomes/settings";
 
 /**
  * @avhomes/enquiries
@@ -828,4 +828,3 @@ export async function enquiryCounts(db: Db): Promise<Record<EnquiryStatus, numbe
   return out;
 }
 
-export { readSettings, replySignature, settingsRoutes } from "./settings";

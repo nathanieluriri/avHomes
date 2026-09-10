@@ -8,15 +8,17 @@ import Testimonials from "@/components/Testimonials";
 import CTABanner from "@/components/CTABanner";
 import {
   getFeaturedProperties,
+  getSiteSettings,
   getStats,
   getTestimonials,
 } from "@/lib/data";
 
 export default async function Home() {
-  const [properties, stats, testimonials] = await Promise.all([
+  const [properties, stats, testimonials, site] = await Promise.all([
     getFeaturedProperties(),
     getStats(),
     getTestimonials(),
+    getSiteSettings(),
   ]);
 
   return (
@@ -29,7 +31,7 @@ export default async function Home() {
       <Suspense fallback={<div className="h-96" />}>
         <FeaturedListings properties={properties} />
       </Suspense>
-      <LogoMarquee />
+      <LogoMarquee clients={site.clientLogos.map((c) => ({ name: c.name, logo: c.imageUrl }))} />
       <WhyChooseUs stats={stats} />
       <Testimonials testimonials={testimonials} />
       <CTABanner />

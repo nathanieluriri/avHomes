@@ -6,6 +6,7 @@ import {
   Newspaper,
   PencilRuler,
   SlidersHorizontal,
+  TriangleAlert,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -27,7 +28,9 @@ export interface NavItem {
   /** The one-line answer to "what is this screen for", used by the palette. */
   hint: string;
   icon: LucideIcon;
-  domain: Domain;
+  /** Null means every signed-in member. Alerts is the only row that needs it:
+   *  the list behind it is filtered per alert, so the row itself gates nothing. */
+  domain: Domain | null;
 }
 
 export interface NavGroup {
@@ -35,6 +38,11 @@ export interface NavGroup {
    *  front door and a label over a single row is more chrome than navigation. */
   label: string | null;
   items: readonly NavItem[];
+}
+
+/** The one filter every surface that renders a nav row must use. */
+export function canSeeNavItem(role: Role, item: NavItem): boolean {
+  return item.domain === null || hasDomain(role, item.domain);
 }
 
 export const NAV: readonly NavGroup[] = [
@@ -47,6 +55,17 @@ export const NAV: readonly NavGroup[] = [
         hint: "Traffic, storefront and what is waiting",
         icon: Gauge,
         domain: "analytics",
+      },
+      {
+        href: "/admin/alerts",
+        label: "Alerts",
+        hint: "What the public site is getting wrong",
+        icon: TriangleAlert,
+        /* Null rather than a domain: the page filters each alert to what the
+           reader could actually act on, so an editor sees their empty journal
+           and nothing about listings. Gating the ROW by a domain would hide
+           that from the one person who can fix it. */
+        domain: null,
       },
       {
         href: "/admin/properties",
@@ -149,5 +168,5 @@ export function sectionFor(pathname: string): NavItem | null {
  * the matrix does. Better a wrong screen than a link with no href.
  */
 export function homeFor(role: Role): string {
-  return NAV_ITEMS.find((item) => hasDomain(role, item.domain))?.href ?? "/admin";
+  return NAV_ITEMS.find((item) => canSeeNavItem(role, item))?.href ?? "/admin";
 }

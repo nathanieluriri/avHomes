@@ -28,11 +28,13 @@ import {
   vercelBlobStorage,
   type StoragePort,
 } from "@avhomes/media";
-import { enquiriesAdminRoutes, enquiriesPublicRoutes, settingsRoutes } from "@avhomes/enquiries";
+import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
+import { settingsPublicRoutes, settingsRoutes } from "@avhomes/settings";
 import { feedbackRoutes } from "@avhomes/feedback";
 import { analyticsPublicRoutes } from "@avhomes/analytics";
 import { audiencePublicRoutes } from "@avhomes/audience";
 import { dashboardRoutes } from "./dashboard";
+import { healthRoutes } from "./health";
 
 /**
  * The composition root.
@@ -255,6 +257,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * the handler remembered.
    */
   app.route(API_PREFIX, audiencePublicRoutes());
+  app.route(API_PREFIX, settingsPublicRoutes());
 
   /* ═════════════════ 9. session, then the domain gate ═════════════════ */
 
@@ -295,6 +298,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * existing route.
    */
   app.route(API_PREFIX, dashboardRoutes());
+  app.route(API_PREFIX, healthRoutes());
 
   return app;
 }

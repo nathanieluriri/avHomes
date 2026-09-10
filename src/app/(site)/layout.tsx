@@ -4,6 +4,7 @@ import CookieBanner from "@/components/CookieBanner";
 import SitePulse from "@/components/SitePulse";
 import ChatWidget from "@/components/chat/ChatWidget";
 import { ChatProvider } from "@/lib/chat/provider";
+import { getSiteSettings } from "@/lib/data";
 
 /**
  * The marketing site's chrome.
@@ -16,7 +17,11 @@ import { ChatProvider } from "@/lib/chat/provider";
  *
  * The root layout keeps html, body, fonts and globals, which every route wants.
  */
-export default function SiteLayout({ children }: { children: React.ReactNode }) {
+export default async function SiteLayout({ children }: { children: React.ReactNode }) {
+  // One read for the whole group. Next dedupes it against the page's own call
+  // within a request, so the homepage asking for the same settings costs nothing.
+  const site = await getSiteSettings();
+
   return (
     /*
      * The chat provider wraps the whole group rather than sitting beside it,
@@ -29,7 +34,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
      * chat bubble over its sign-in form.
      */
     <ChatProvider>
-      <Navbar />
+      <Navbar contactEmail={site.contactEmail} />
       <main className="flex-1">{children}</main>
       <Footer />
       <CookieBanner />

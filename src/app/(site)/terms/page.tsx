@@ -57,7 +57,7 @@ export default function TermsPage() {
           <p>
             You are responsible for maintaining the confidentiality of any login credentials
             associated with your account and for all activity that takes place under it.
-            Notify us promptly at hello@avhomes.com if you suspect any unauthorised use of your
+            Notify us promptly if you suspect any unauthorised use of your
             account.
           </p>
         </div>

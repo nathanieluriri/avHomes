@@ -29,9 +29,12 @@ const SUBJECTS = [
 export default function ContactForm({
   propertyId,
   propertySlug,
+  contactEmail = "",
 }: {
   propertyId?: string;
   propertySlug?: string;
+  /** Empty drops the "you can also email" line rather than printing a fake. */
+  contactEmail?: string;
 }) {
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -208,14 +211,20 @@ export default function ContactForm({
       </button>
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        We reply within one business day. You can also email{" "}
-        <a
-          href="mailto:hello@avhomes.com"
-          className="font-semibold text-wine-600 transition-colors hover:text-wine-700"
-        >
-          hello@avhomes.com
-        </a>
-        .
+        We reply within one business day.
+        {contactEmail !== "" && (
+          <>
+            {" "}
+            You can also email{" "}
+            <a
+              href={`mailto:${contactEmail}`}
+              className="font-semibold text-wine-600 transition-colors hover:text-wine-700"
+            >
+              {contactEmail}
+            </a>
+            .
+          </>
+        )}
       </p>
     </form>
   );

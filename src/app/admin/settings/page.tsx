@@ -1,17 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
-import { REPLY_IDENTITIES, type ReplyIdentity, type SiteSettings } from "@avhomes/contracts";
+import { Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import {
+  REPLY_IDENTITIES,
+  type ClientLogo,
+  type Office,
+  type ReplyIdentity,
+  type SiteSettings,
+} from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { SaveBar } from "@/components/admin/SaveBar";
 import {
+  Button,
   Card,
   CardHead,
+  EmptyState,
   ErrorNote,
   Field,
+  IconButton,
   PageColumns,
   PageHeader,
   Skeleton,
@@ -44,6 +53,11 @@ interface Draft {
   replyIdentity: ReplyIdentity;
   teamName: string;
   teamAvatarUrl: string;
+  contactPhone: string;
+  contactEmail: string;
+  whatsappNumber: string;
+  offices: Office[];
+  clientLogos: ClientLogo[];
 }
 
 function toDraft(s: SiteSettings): Draft {
@@ -51,7 +65,25 @@ function toDraft(s: SiteSettings): Draft {
     replyIdentity: s.replyIdentity,
     teamName: s.teamName,
     teamAvatarUrl: s.teamAvatarUrl,
+    contactPhone: s.contactPhone,
+    contactEmail: s.contactEmail,
+    whatsappNumber: s.whatsappNumber,
+    offices: s.offices,
+    clientLogos: s.clientLogos,
   };
+}
+
+/**
+ * `wa.me` takes digits, and a person types a phone number.
+ *
+ * Stripping on the way in rather than validating and refusing: everyone writes
+ * `+234 801 234 5678`, nobody writes `2348012345678`, and a settings screen that
+ * rejects the format printed on a business card is a settings screen that gets
+ * left empty. A leading `00` is the same intent as a `+`.
+ */
+function toWhatsappDigits(input: string): string {
+  const digits = input.replace(/[^0-9]/gu, "");
+  return digits.startsWith("00") ? digits.slice(2) : digits;
 }
 
 export default function SettingsPage() {
@@ -209,6 +241,206 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
           {/* Revealed only when it does something. A team name field under an
               "individual" setting is a control with no effect, and one of those
               on screen teaches people that the settings do not do anything. */}
+          <Card className="space-y-4">
+            <CardHead title="How buyers reach you" />
+            <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
+              Every field here is empty until you fill it, and the public site
+              hides the block rather than printing something that looks real. A
+              site with no phone number reads better than a site with a fake one.
+            </p>
+
+            <Field label="Phone" hint="Shown on the contact page as a tap-to-call link.">
+              <input
+                className={inputClass}
+                inputMode="tel"
+                value={draft.contactPhone}
+                placeholder="+234 801 234 5678"
+                onChange={(event) => set("contactPhone", event.target.value)}
+              />
+            </Field>
+
+            <Field label="Email" hint="Shown on the contact page and in the footer.">
+              <input
+                className={inputClass}
+                type="email"
+                value={draft.contactEmail}
+                placeholder="hello@yourdomain.com"
+                onChange={(event) => set("contactEmail", event.target.value)}
+              />
+            </Field>
+
+            <Field
+              label="WhatsApp"
+              hint="Country code first. Most property conversations here start on WhatsApp."
+            >
+              <input
+                className={inputClass}
+                inputMode="tel"
+                value={draft.whatsappNumber}
+                placeholder="2348012345678"
+                onChange={(event) => set("whatsappNumber", toWhatsappDigits(event.target.value))}
+              />
+            </Field>
+          </Card>
+
+          <Card className="space-y-4">
+            <CardHead
+              title="Offices"
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => set("offices", [...draft.offices, { label: "", address: "" }])}
+                >
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+                  Add
+                </Button>
+              }
+            />
+            {draft.offices.length === 0 ? (
+              <EmptyState
+                bare
+                title="No office published"
+                hint="A visitor has no way to check there is a real place behind the site."
+              />
+            ) : (
+              draft.offices.map((office, index) => (
+                <div key={index} className="rounded-xl border border-mist-200 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      Office {index + 1}
+                    </span>
+                    <IconButton
+                      label={`Remove office ${index + 1}`}
+                      icon={Trash2}
+                      size="dense"
+                      variant="danger"
+                      onClick={() =>
+                        set(
+                          "offices",
+                          draft.offices.filter((_, i) => i !== index),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      className={inputClass}
+                      value={office.label}
+                      placeholder="Lagos"
+                      aria-label={`Office ${index + 1} name`}
+                      onChange={(event) =>
+                        set(
+                          "offices",
+                          draft.offices.map((o, i) =>
+                            i === index ? { ...o, label: event.target.value } : o,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className={inputClass}
+                      value={office.address}
+                      placeholder="14 Admiralty Way, Lekki Phase 1"
+                      aria-label={`Office ${index + 1} address`}
+                      onChange={(event) =>
+                        set(
+                          "offices",
+                          draft.offices.map((o, i) =>
+                            i === index ? { ...o, address: event.target.value } : o,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </Card>
+
+          <Card className="space-y-4">
+            <CardHead
+              title="Clients you can name"
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    set("clientLogos", [...draft.clientLogos, { name: "", imageUrl: "" }])
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+                  Add
+                </Button>
+              }
+            />
+            <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
+              One client you can actually show beats five you cannot. A row with
+              no logo is not rendered on the site, so the strip never falls back
+              to a line of plain scrolling text.
+            </p>
+            {draft.clientLogos.length === 0 ? (
+              <EmptyState
+                bare
+                title="No clients named"
+                hint="The trust strip on the homepage stays hidden until there is one."
+              />
+            ) : (
+              draft.clientLogos.map((client, index) => (
+                <div key={index} className="rounded-xl border border-mist-200 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      Client {index + 1}
+                    </span>
+                    <IconButton
+                      label={`Remove client ${index + 1}`}
+                      icon={Trash2}
+                      size="dense"
+                      variant="danger"
+                      onClick={() =>
+                        set(
+                          "clientLogos",
+                          draft.clientLogos.filter((_, i) => i !== index),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      className={inputClass}
+                      value={client.name}
+                      placeholder="Sahara Group"
+                      aria-label={`Client ${index + 1} name`}
+                      onChange={(event) =>
+                        set(
+                          "clientLogos",
+                          draft.clientLogos.map((c, i) =>
+                            i === index ? { ...c, name: event.target.value } : c,
+                          ),
+                        )
+                      }
+                    />
+                    <Field label="Logo" as="group">
+                      <ImagePicker
+                        value={client.imageUrl ? [client.imageUrl] : []}
+                        onChange={(urls) =>
+                          set(
+                            "clientLogos",
+                            draft.clientLogos.map((c, i) =>
+                              i === index ? { ...c, imageUrl: urls[0] ?? "" } : c,
+                            ),
+                          )
+                        }
+                        max={1}
+                        coverLabel="Logo"
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ))
+            )}
+          </Card>
+
           {isTeam && (
             <Card className="space-y-4">
               <Field label="Team name" hint="What a buyer sees instead of a person's name.">
