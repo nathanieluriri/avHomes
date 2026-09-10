@@ -8,7 +8,7 @@ import { api } from "@/lib/admin/client";
 import { useDebounced, useIsTouch } from "@/lib/admin/hooks";
 import { BottomSheet } from "./BottomSheet";
 import { IconButton } from "./ui";
-import { NAV_ITEMS, canSeeNavItem, type NavItem } from "./nav";
+import { NAV_ITEMS, type NavItem } from "./nav";
 
 /**
  * The topbar's search, opened by its handle or by Ctrl+K.
@@ -63,7 +63,7 @@ export function Palette({
   const isTouch = useIsTouch();
 
   const destinations = useMemo(
-    () => NAV_ITEMS.filter((item) => canSeeNavItem(user.role, item)),
+    () => NAV_ITEMS.filter((item) => hasDomain(user.role, item.domain)),
     [user.role],
   );
 
