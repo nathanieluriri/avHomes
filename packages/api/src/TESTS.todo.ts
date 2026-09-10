@@ -133,3 +133,36 @@ export {};
  *   dashboard does nothing until the next deploy, which is exactly why
  *   `GET /api/auth/door` answers at runtime instead.
  */
+
+/* ──────────────────── 6. LISTING TRUTH (listings routes) ──────────────────
+ *
+ * TODO(test): the public route's legacy status shim. `GET
+ *   /api/public/properties?status=for-sale` (then `for-rent`, `sold`) still
+ *   returns exactly the live listings of the matching deal type, driven
+ *   through the real Hono app so the translation table and `buildFilter` are
+ *   exercised together, not `buildFilter` called in isolation.
+ *
+ * TODO(test): a `rentPeriod` on a sale is refused with 400 naming the field,
+ *   driven through `PATCH /api/admin/properties/:id`, the only caller that
+ *   can set one.
+ *
+ * TODO(test): a price change. `PATCH /api/admin/properties/:id` with a
+ *   changed `priceMinor` appends exactly one `priceHistory` entry, carrying
+ *   the signed-in user's id and display name; a patch that changes only the
+ *   title appends none, because `saveProperty` reads the old price itself
+ *   rather than trusting a flag from the caller.
+ *
+ * TODO(test): the 51st price change trims the oldest entry, not the newest.
+ *
+ * TODO(test): a stale `baseRevision` on a price-changing PATCH is the
+ *   existing 409, and appends nothing: the CAS miss must discard the whole
+ *   guarded update, history push included, not just the `$set` half.
+ *
+ * TODO(test): the currency lock. `PATCH /api/admin/properties/:id` refuses a
+ *   changed `currency` with 409 once `priceHistory` is non-empty, and still
+ *   allows it on a listing whose price has never actually changed.
+ *
+ * TODO(test): switching `listingType` from rent to sale drops a fee kind the
+ *   sale side cannot carry (`caution`, `service-charge`) rather than
+ *   rejecting the save, whether or not `fees` itself rides the same patch.
+ */

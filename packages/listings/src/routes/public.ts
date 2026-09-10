@@ -10,7 +10,7 @@ import {
   str,
   type AppEnv,
 } from "@avhomes/core";
-import { PROPERTY_TYPES } from "@avhomes/contracts";
+import { LISTING_TYPES, PROPERTY_TYPES, type ListingType, type PropertyStatus } from "@avhomes/contracts";
 import {
   getPropertyBySlug,
   getSimilarProperties,
@@ -43,15 +43,32 @@ const ListQuery = z
     limit: str().optional(),
     cursor: str().max(600).optional(),
     type: z.enum(PROPERTY_TYPES).optional(),
+    listingType: z.enum(LISTING_TYPES).optional(),
     city: str().max(120).optional(),
     bedrooms: z.coerce.number().int().min(0).max(50).optional(),
     minPrice: z.coerce.number().int().min(0).optional(),
     maxPrice: z.coerce.number().int().min(0).optional(),
     featured: z.enum(["1", "0"]).optional(),
-    status: z.enum(["for-sale", "for-rent", "sold"]).optional(),
+    // The legacy trio, plus the native vocabulary for the statuses this route
+    // ever shows. `draft` and `archived` are deliberately absent: this route
+    // must never accept a status that names a hidden listing.
+    status: z.enum(["for-sale", "for-rent", "sold", "live", "under-offer", "closed"]).optional(),
     q: str().max(200).optional(),
   })
   .strict();
+
+/**
+ * Deletable one release after this ships. A tab left open across a deploy
+ * still sends the old vocabulary.
+ */
+const LEGACY_STATUS = {
+  "for-sale": { listingType: "sale", status: "live" },
+  "for-rent": { listingType: "rent", status: "live" },
+  sold: { listingType: "sale", status: "closed" },
+} as const;
+// TODO(test): each legacy status value maps to the documented (listingType,
+// status) pair; a native status value (live, under-offer, closed) passes
+// through unchanged.
 
 /** Public reads may be cached; the numbers are the site's ISR window, not a guess. */
 const LIST_CACHE = "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
@@ -67,17 +84,29 @@ export function listingsPublicRoutes(): Hono<AppEnv> {
     const limit = clampLimit(q.limit);
     assertCursorSort(q.cursor, q.sort);
 
+    // The legacy trio names both axes in one word. A tab left open across a
+    // deploy still sends it, so it is translated here before it reaches the
+    // repo; a native status value passes through unchanged.
+    let listingType: ListingType | undefined = q.listingType;
+    let status: PropertyStatus | undefined;
+    if (q.status === "for-sale" || q.status === "for-rent" || q.status === "sold") {
+      ({ listingType, status } = LEGACY_STATUS[q.status]);
+    } else {
+      status = q.status;
+    }
+
     const page = await listProperties(await currentDb(c), {
       sort: q.sort,
       limit,
       cursor: q.cursor,
       type: q.type,
+      listingType,
       city: q.city,
       bedrooms: q.bedrooms,
       minPriceMinor: q.minPrice,
       maxPriceMinor: q.maxPrice,
       featured: q.featured === undefined ? undefined : q.featured === "1",
-      status: q.status,
+      status,
       q: q.q,
       includeHidden: false,
     });

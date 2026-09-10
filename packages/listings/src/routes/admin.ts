@@ -16,8 +16,16 @@ import {
   type AppEnv,
 } from "@avhomes/core";
 import {
+  FEE_KINDS,
+  FEE_KINDS_FOR,
+  LISTING_TYPES,
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
+  RENT_PERIODS,
+  moneyRefusalMessage,
+  normalizeFees,
+  parseMajor,
+  type ListingFee,
   type PropertyStatus,
   type SiteStat,
   type Testimonial,
@@ -39,8 +47,22 @@ import {
   upsertSiteStat,
   upsertTestimonial,
   type LifecycleOp,
+  type PropertyPatch,
 } from "../repo";
 import { PROPERTY_SORT_NAMES } from "../schema";
+
+/**
+ * A fee as the form sends it: an amount in major units, exactly as the price
+ * input works, not the minor-unit integer the document stores.
+ */
+const FeeInput = z
+  .object({
+    kind: z.enum(FEE_KINDS),
+    amount: str().max(30),
+    /** Defaults to the patch's (or listing's) own currency; set only to disagree. */
+    currency: str().length(3).toUpperCase().optional(),
+  })
+  .strict();
 
 /**
  * `slug`, `status`, `publishedAt` and `revision` are ABSENT on purpose.
@@ -57,6 +79,11 @@ const PatchBody = z
     description: str().max(20_000),
     priceMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
     currency: str().length(3).toUpperCase(),
+    listingType: z.enum(LISTING_TYPES),
+    // Null on a sale. A sale carrying a non-null period is refused, not
+    // silently nulled: see the check beside the PATCH route below.
+    rentPeriod: z.enum(RENT_PERIODS).nullable(),
+    fees: z.array(FeeInput).max(FEE_KINDS.length),
     type: z.enum(PROPERTY_TYPES),
     location: str().max(200),
     city: str().max(120),
@@ -100,6 +127,7 @@ const AdminListQuery = z
     limit: str().optional(),
     cursor: str().max(600).optional(),
     status: z.enum(PROPERTY_STATUSES).optional(),
+    listingType: z.enum(LISTING_TYPES).optional(),
     mine: z.enum(["1", "0"]).optional(),
     q: str().max(200).optional(),
     withTotal: z.enum(["1", "0"]).optional(),
@@ -108,8 +136,13 @@ const AdminListQuery = z
 
 /** Which lifecycle ops carry a listing from one status to the next. */
 const TRANSITIONS: Record<LifecycleOp, PropertyStatus> = {
-  publish: "for-sale",
-  unpublish: "draft",
+  publish: "live", // from draft, archived
+  unpublish: "draft", // from live, under-offer
+  markOffer: "under-offer", // from live
+  // Not optional: under-offer and closed both need a way back to live, or a
+  // collapsed deal forces an agent to lie about the listing's state.
+  relist: "live", // from under-offer, closed
+  close: "closed", // from live, under-offer
   archive: "archived",
   unarchive: "draft",
   restore: "draft",
@@ -151,6 +184,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       limit,
       cursor: q.cursor,
       status: q.status,
+      listingType: q.listingType,
       q: q.q,
       agentUserId: q.mine === "1" ? user.id : undefined,
       includeHidden: true,
@@ -199,12 +233,68 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     const db = await currentDb(c);
     const id = pathParam(c, "id");
     const body = await readJson(c, SaveBody);
+    const user = currentUser(c);
 
     const current = await getPropertyById(db, id);
     if (!current) throw new NotFoundError(`property ${id}`);
-    assertAuthorized(current, currentUser(c), "write");
+    assertAuthorized(current, user, "write");
 
-    const property = await saveProperty(db, id, body.patch, body.baseRevision);
+    const listingType = body.patch.listingType ?? current.listingType;
+
+    // Not a silent null: a stale rent period left on a sale is refused with a
+    // named field rather than discarded, so the caller knows to clear it.
+    // TODO(test): a rentPeriod on a sale patch is refused with 400 naming the field.
+    if (listingType === "sale" && body.patch.rentPeriod !== undefined && body.patch.rentPeriod !== null) {
+      throw new BadRequestError("rentPeriod", [
+        { path: "rentPeriod", message: "a sale cannot carry a rent period" },
+      ]);
+    }
+
+    // A history in mixed currencies is not comparable, so the field locks the
+    // moment there is a history to protect. createProperty's first real price is
+    // never recorded as a change, so a brand new listing's currency stays fixable.
+    // TODO(test): currency is refused with 409 once priceHistory is non-empty,
+    // and stays editable on a listing whose price has never actually changed.
+    if (
+      body.patch.currency !== undefined &&
+      body.patch.currency !== current.currency &&
+      current.priceHistory.length > 0
+    ) {
+      throw new PreconditionFailedError("currency_locked", {
+        propertyId: id,
+        detail: "The currency cannot change once this listing has price history.",
+      });
+    }
+
+    const { fees: feeInput, ...patchRest } = body.patch;
+    const patch: PropertyPatch = { ...patchRest };
+
+    // Fees are resolved whenever they are sent, or whenever listingType changes
+    // and might strand a fee kind the new type cannot carry: a caution fee left
+    // over from a rental is dropped on the switch to sale, not rejected.
+    // TODO(test): a fee kind the new listingType cannot carry is dropped on
+    // save, not rejected, whether or not fees itself rides the same patch.
+    if (feeInput !== undefined || listingType !== current.listingType) {
+      const effectiveCurrency = body.patch.currency ?? current.currency;
+      const source: ListingFee[] = feeInput
+        ? feeInput.map((fee) => {
+            const currency = fee.currency ?? effectiveCurrency;
+            const money = parseMajor(fee.amount, currency);
+            if (!money.ok) {
+              throw new BadRequestError("fees", [
+                { path: `fees.${fee.kind}`, message: moneyRefusalMessage(money.reason, currency) },
+              ]);
+            }
+            return { kind: fee.kind, amountMinor: money.minor, currency };
+          })
+        : current.fees;
+      patch.fees = normalizeFees(source).filter((fee) => FEE_KINDS_FOR[listingType].includes(fee.kind));
+    }
+
+    const property = await saveProperty(db, id, patch, body.baseRevision, {
+      userId: user.id,
+      name: user.displayName,
+    });
     // Every mutation answers with the entity, so the client adopts the bumped
     // revision without a second request.
     return c.json({ property });

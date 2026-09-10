@@ -13,8 +13,11 @@ import {
 } from "@avhomes/core";
 import {
   DEFAULT_CURRENCY,
+  PRICE_HISTORY_MAX,
   PUBLIC_PROPERTY_STATUSES,
+  type ListingType,
   type Page,
+  type PriceChange,
   type Property,
   type PropertyStatus,
   type PropertyType,
@@ -42,6 +45,8 @@ export interface ListQuery {
   cursor?: string | undefined;
   status?: PropertyStatus | undefined;
   type?: PropertyType | undefined;
+  /** The deal (sale/rent). Separate from `type`, which is PropertyType (Villa, Duplex). */
+  listingType?: ListingType | undefined;
   city?: string | undefined;
   bedrooms?: number | undefined;
   minPriceMinor?: number | undefined;
@@ -86,6 +91,7 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
   }
 
   if (query.type) and.push({ type: query.type });
+  if (query.listingType) and.push({ listingType: query.listingType });
   if (query.city) and.push({ city: query.city });
   if (query.bedrooms !== undefined) and.push({ bedrooms: { $gte: query.bedrooms } });
   if (query.featured !== undefined) and.push({ featured: query.featured });
@@ -221,6 +227,9 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     priceMinor: 0,
     currency: DEFAULT_CURRENCY,
     status: "draft",
+    // Required by the validator: moderate validation checks every insert, and
+    // an insert with no listingType fails it outright.
+    listingType: "sale",
     type: "Apartment",
     location: "",
     city: "",
@@ -246,7 +255,10 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
 }
 
 export type PropertyPatch = Partial<
-  Omit<PropertyDoc, "_id" | "slug" | "status" | "createdAt" | "updatedAt" | "publishedAt" | "deletedAt" | "revision">
+  Omit<
+    PropertyDoc,
+    "_id" | "slug" | "status" | "priceHistory" | "createdAt" | "updatedAt" | "publishedAt" | "deletedAt" | "revision"
+  >
 >;
 
 /**
@@ -259,17 +271,50 @@ export type PropertyPatch = Partial<
  * No transaction, and none is wanted: a single-document update in MongoDB is
  * atomic by definition. Needing more than one document here would mean the
  * aggregate boundary was drawn wrong.
+ *
+ * Takes an actor because a price change needs somewhere to put `byName`, the
+ * same snapshot idiom `EnquiryMessage.authorName` uses. Never a join.
  */
 export async function saveProperty(
   db: Db,
   id: string,
   patch: PropertyPatch,
   baseRevision: number,
+  actor: { userId: string; name: string },
 ): Promise<Property> {
   const now = Date.now();
+  // Reads the row BEFORE the write: the price comparison needs the OLD price,
+  // which a $set alone cannot see. Safe under the CAS the write enforces below:
+  // if this read is already stale, the guarded update misses regardless and the
+  // 409 path fires untouched, so a price change computed from a stale read is
+  // simply discarded rather than applied.
+  const before = await properties(db).findOne({ _id: id, deletedAt: null });
+
+  // A change is recorded only when the old price was real and the new one
+  // differs. createProperty seeds priceMinor 0, so a brand new listing's first
+  // price is not a change: recording one would lie about a rise from nothing,
+  // and it would trip the currency lock on a listing that never had a price.
+  // TODO(test): a price change appends exactly one priceHistory entry, capped
+  // at PRICE_HISTORY_MAX; an unrelated field change appends none.
+  const change: PriceChange | null =
+    before && patch.priceMinor !== undefined && before.priceMinor > 0 && patch.priceMinor !== before.priceMinor
+      ? {
+          at: now,
+          fromMinor: before.priceMinor,
+          toMinor: patch.priceMinor,
+          currency: patch.currency ?? before.currency,
+          byUserId: actor.userId,
+          byName: actor.name,
+        }
+      : null;
+
   const after = await properties(db).findOneAndUpdate(
     { _id: id, revision: baseRevision, deletedAt: null },
-    { $set: { ...patch, updatedAt: now }, $inc: { revision: 1 } },
+    {
+      $set: { ...patch, updatedAt: now },
+      $inc: { revision: 1 },
+      ...(change ? { $push: { priceHistory: { $each: [change], $slice: -PRICE_HISTORY_MAX } } } : {}),
+    },
     { returnDocument: "after" },
   );
   if (after) return toProperty(after);
@@ -284,7 +329,15 @@ export async function saveProperty(
  * change. They are absent from the patch schema on purpose, so a body carrying
  * one is refused rather than accepted and discarded.
  */
-export type LifecycleOp = "publish" | "unpublish" | "archive" | "unarchive" | "restore";
+export type LifecycleOp =
+  | "publish"
+  | "unpublish"
+  | "markOffer"
+  | "relist"
+  | "close"
+  | "archive"
+  | "unarchive"
+  | "restore";
 
 export async function transitionProperty(
   db: Db,
