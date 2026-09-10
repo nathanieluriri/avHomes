@@ -52,7 +52,8 @@ export interface SessionSummary {
 
 /* ─────────────────────────────── listings ─────────────────────────────── */
 
-export const PROPERTY_STATUSES = ["draft", "for-sale", "for-rent", "sold", "archived"] as const;
+/** Lifecycle only. What kind of deal a listing is lives in ListingType, not here. */
+export const PROPERTY_STATUSES = ["draft", "live", "under-offer", "closed", "archived"] as const;
 export type PropertyStatus = (typeof PROPERTY_STATUSES)[number];
 
 export const PROPERTY_TYPES = [
@@ -69,7 +70,44 @@ export const PROPERTY_TYPES = [
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
 /** Only these reach the public site. Draft and archived are admin-only. */
-export const PUBLIC_PROPERTY_STATUSES: readonly PropertyStatus[] = ["for-sale", "for-rent", "sold"];
+export const PUBLIC_PROPERTY_STATUSES: readonly PropertyStatus[] = ["live", "under-offer", "closed"];
+
+export const LISTING_TYPES = ["sale", "rent"] as const;
+export type ListingType = (typeof LISTING_TYPES)[number];
+
+export const RENT_PERIODS = ["year", "month", "night"] as const;
+export type RentPeriod = (typeof RENT_PERIODS)[number];
+
+export const FEE_KINDS = ["agency", "legal", "caution", "service-charge"] as const;
+export type FeeKind = (typeof FEE_KINDS)[number];
+
+/** Recurs with the rent rather than being paid once at move in. */
+export const RECURRING_FEE_KINDS: readonly FeeKind[] = ["service-charge"];
+
+/** Which fee kinds a listing of each type can carry. */
+export const FEE_KINDS_FOR: Record<ListingType, readonly FeeKind[]> = {
+  sale: ["agency", "legal"],
+  rent: ["agency", "legal", "caution", "service-charge"],
+};
+
+export interface ListingFee {
+  kind: FeeKind;
+  amountMinor: number;
+  /** Defaults to the listing's currency. Stored so a fee can disagree. */
+  currency: string;
+}
+
+export interface PriceChange {
+  at: number;
+  fromMinor: number;
+  toMinor: number;
+  currency: string;
+  byUserId: string | null;
+  /** SNAPSHOT of who changed it, as EnquiryMessage.authorName is. */
+  byName: string;
+}
+
+export const PRICE_HISTORY_MAX = 50;
 
 export interface Agent {
   id: string;
@@ -90,6 +128,11 @@ export interface Property {
   priceMinor: number;
   currency: string;
   status: PropertyStatus;
+  listingType: ListingType;
+  /** Null on a sale. Absent on a legacy row; see readRentPeriod. */
+  rentPeriod: RentPeriod | null;
+  fees: ListingFee[];
+  priceHistory: PriceChange[];
   type: PropertyType;
   location: string;
   city: string;
