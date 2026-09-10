@@ -48,18 +48,22 @@ README calls that a guarantee where "we remembered not to read the session" is
 merely a habit.
 
 The same argument applies here. ``app.ts`` mounts ``sessionMiddleware`` and
-``rolePermissions`` at lines 264 and 265, and every admin router below them. An
+``rolePermissions`` at lines 261 and 262, and every admin router below them. An
 audit middleware mounted immediately after them sees every authenticated,
 authorised, mutating request that reaches any of those routers. Nothing below it
 can escape it, including routers that do not exist yet.
 
 .. code-block:: text
 
-    8. sessionMiddleware       resolves the cookie to a user or null
-    9. rolePermissions         the domain gate over URL prefixes
-   10. auditTrail              <- NEW. everything below is recorded
-   ------------------------------------------------------------------
-   11. auth, team, listings, content, media, enquiries, settings, ...
+   app.ts:261   sessionMiddleware()   resolves the cookie to a user or null
+   app.ts:262   rolePermissions()     the domain gate over URL prefixes
+   app.ts:263   auditTrail()          <- NEW. everything below is recorded
+   ----------------------------------------------------------------------
+   app.ts:265+  auth, team, listings, content, media, enquiries, settings
+
+Cited by line rather than by a step number on purpose. The README carries its own
+numbered mount-order table, and inventing a second numbering here would leave two
+lists to keep in agreement.
 
 Mounting it *below* ``rolePermissions`` is deliberate. A request that is refused
 by the domain gate never happened as far as the data is concerned, and recording
@@ -68,6 +72,11 @@ like activity.
 
 What an entry holds
 ===================
+
+Two shapes, as everywhere else here: ``AuditEntry`` is the wire shape and lives in
+``contracts`` with an ``id``; ``AuditEntryDoc`` is the stored shape and lives in
+the audit package with an ``_id``, the way ``PropertyDoc`` sits beside
+``Property``. The read indexes below are written against ``_id``.
 
 .. code-block:: ts
 
@@ -80,18 +89,24 @@ What an entry holds
      actorId: string;
      actorName: string;
      actorRole: Role;
-     /** "property", "post", "user", "enquiry", ... derived from the path. */
-     entity: string;
-     /** The id from the path, or null on a create where the path has none. */
+     /** "property", "post", "user", "enquiry", ... see the derivation table. */
+     entity: AuditEntity;
+     /** The record's id, or null where there is not one. See the table. */
      entityId: string | null;
-     /** "create" | "update" | "delete" | "op:<name>", derived from method and path. */
+     /** "create" | "update" | "delete" | "op:<name>". See the table. */
      action: string;
      /** What the caller asked for. The request body, redacted. */
      requested: Record<string, unknown> | null;
      /** What the record looked like first. Only where a route supplies it. */
      before: Record<string, unknown> | null;
      method: string;
+     /** Path only. The query string is captured separately, below. */
      path: string;
+     /** Parsed query parameters, redacted like any other payload. Null when
+      *  there were none. `DELETE /admin/properties/:id?baseRevision=7` carries
+      *  its only interesting argument here, so dropping it would record a
+      *  deletion with no record of what was asked for. */
+     query: Record<string, string> | null;
      status: number;
      /** Ties an entry to the error-table line and the server log for the same call. */
      requestId: string;
@@ -122,38 +137,128 @@ of this design rather than optional extras:
 - No audit entry is reachable from any public route. The reader is mounted with
   the admin routers, below the session middleware.
 
-Redaction is not optional
--------------------------
+And one consequence that the mitigations do **not** cover, stated plainly because
+a design that names a problem and quietly implies it is handled is worse than one
+that admits the gap:
 
-**Three routes carry plaintext passwords in their bodies**:
-``/auth/password/login``, ``/auth/password/change`` and ``/auth/password/claim``.
-Writing those into a collection with a two year retention would be a genuine
-security defect, and "full values" plainly did not mean that.
+**An erasure request cannot be honoured against this collection.** The reader
+filters on entity, entityId, actor and date. None of those finds "every entry
+containing this person's email or phone", ``requested`` is free-form and unindexed,
+and there is no delete path at all. So deleting a buyer's enquiry leaves its full
+text in the audit rows, and the two year clock runs from the audit write rather
+than from the request to be forgotten. If that becomes a real obligation rather
+than a hypothetical one, the answer is a targeted delete path and an index to
+support it, and that is a change to this design rather than a configuration of it.
 
-So before an entry is stored, ``requested`` is walked and any key matching the
-redaction list is replaced with the string ``"[redacted]"``, at any depth:
+Credentials: excluded by path, not by field name
+------------------------------------------------
+
+The first draft of this spec tried to solve this with a denylist of key names and
+got it wrong in the most instructive way. It listed ``newPassword`` and
+``currentPassword``. Neither name exists anywhere in this repository. The route
+that actually changes a password is:
 
 .. code-block:: ts
 
-   const REDACT = ["password", "newPassword", "currentPassword", "token",
-                   "secret", "passwordHash", "threadKey"];
+   // packages/identity/src/routes/doors.ts, POST /auth/password/change
+   z.object({
+     current: z.string().min(1).max(400),
+     next:    z.string().min(12).max(400),
+   }).strict()
 
-The list is a denylist by key name, which is the weaker of the two designs, and
-it is chosen with the weakness understood: an allowlist would have to be
-maintained per route, and a body field it did not know about would be dropped
-silently rather than recorded, which defeats the point of recording bodies at
-all. A denylist fails towards recording too much; an allowlist fails towards
-recording nothing. Given the choice that was made about values, failing towards
-recording is the consistent one. ``TODO(test)`` covers every name on the list.
+``current`` and ``next``. Two innocuous words, both carrying a plaintext
+password, and a denylist would have written both into a two year store while
+looking like it had handled the problem.
+
+That is the argument against name matching, made concretely: **a key name is a
+convention and the secret does not have to honour it.** So the auth surface is
+excluded structurally instead.
+
+.. code-block:: ts
+
+   /** Bodies here are never captured. Every route under it exists to receive a
+    *  credential, so there is nothing on this prefix worth recording and no way
+    *  to be sure which field is the secret. */
+   const NO_BODY_PREFIXES = ["/api/auth/"];
+
+An auth request still produces an entry, with ``requested: null``. Who signed in,
+who changed their password, and when, are all preserved. What they typed is not
+captured at all rather than captured and filtered.
+
+This is the same shape of argument the README makes about mount order: a router
+that cannot reach the session middleware is *structurally* incapable of reading a
+cookie, where remembering not to read it is merely a habit. A prefix that is
+never read cannot leak a field somebody adds to it next year.
+
+A denylist still runs, for everything else
+------------------------------------------
+
+Outside ``/api/auth/``, ``requested`` is walked and any key whose name matches is
+replaced with ``"[redacted]"``, at any depth, through objects and arrays alike:
+
+.. code-block:: ts
+
+   const REDACT_KEYS = ["password", "token", "secret", "passwordHash",
+                        "threadKey", "sessionId", "apiKey"];
+
+This is defence in depth rather than the primary control, and it is worth being
+honest about what it is for. The primary control is the path exclusion above. The
+denylist catches a credential that turns up on a route nobody expected to carry
+one, which is exactly the case where a name match is better than nothing and
+worse than a guarantee.
+
+Matching is case-insensitive on the key name. Recursion is depth capped, so a
+cyclic or absurdly nested body cannot hang a request; past the cap the subtree
+becomes ``"[deep]"``.
+
+``TODO(test)`` covers every name on the list, and separately asserts that each of
+the four ``/api/auth/`` routes produces an entry whose ``requested`` is ``null``.
+
+Both payload fields get the same treatment
+------------------------------------------
+
+Redaction and the size limit apply to ``requested`` **and** to ``before``. The
+first draft scoped both to ``requested`` alone, which was backwards: ``before`` is
+the field designed to carry an entire stored document, so it is the one with the
+most to leak and the most to bloat.
+
+Today ``before`` on the users path happens to be safe, because ``findUserById``
+projects through ``AUTH_PROJECTION`` and that enumeration excludes
+``passwordHash``. That is luck, not a design. It holds only while every present
+and future ``setBefore`` caller passes a narrow projection, which is precisely the
+habit-versus-guarantee distinction this document opens by rejecting. So
+``before`` goes through the same walk as ``requested``, and a hash that reaches it
+is redacted whatever the projection did.
 
 Bodies that are not JSON
 ------------------------
 
 ``POST /admin/images`` is a multipart upload. Capturing its body would put image
 bytes in a database row. The middleware reads a body **only** when the
-content type is JSON, and stores ``requested: null`` otherwise. A body over 16KB
-after redaction is replaced by ``{ "_truncated": true }`` rather than stored, so
-one pathological request cannot write a document that approaches Mongo's limit.
+``content-type`` is JSON, and stores ``requested: null`` otherwise.
+
+Trimming is per field, not all or nothing
+-----------------------------------------
+
+The first draft replaced any payload over 16KB with ``{ "_truncated": true }``.
+That destroys the flagship record. The property editor sends the whole patch on
+every save, and ``PatchBody`` permits a 20,000 character description plus forty
+image URLs. One long description pushes the payload over the line and the
+``priceMinor`` field goes over the cliff with it, so "who dropped the price on the
+Ikoyi house" has no answer. The cap was justified against pathological traffic and
+set where it bites ordinary traffic.
+
+So oversized payloads are trimmed **field by field**:
+
+- Scalars are always kept. A number, a boolean, a short string, an id.
+- A string over 512 characters becomes ``"[long: 20431 chars]"``.
+- An array over 20 entries becomes ``["[list: 40 items]"]``.
+- If the result still exceeds 64KB, the whole field becomes
+  ``{ "_truncated": true }`` as a last resort.
+
+The values that settle arguments are small: a price, a status, a role, a date.
+Keeping every scalar and dropping the prose is what makes an entry answer the
+question it exists for.
 
 Reading the body safely
 -----------------------
@@ -162,6 +267,91 @@ The middleware reads the body **after** ``next()``, not before. Hono caches the
 parsed body on ``c.req.json()``, so by that point the route has usually already
 parsed it and the second call is free. Reading before ``next()`` would risk
 consuming the stream ahead of the route that needs it.
+
+Deriving entity, entityId and action
+====================================
+
+All three are required fields, so "derived from the path" is not a specification
+until it covers every path. At runtime ``c.req.path`` carries the ``/api``
+prefix, so it reads ``/api/admin/properties/abc``, not ``/admin/properties/abc``.
+Strip ``/api/`` first; an implementer indexing segments from an unprefixed
+example is off by one.
+
+.. code-block:: text
+
+   segments = path without "/api/", split on "/"
+
+   segments[0] === "auth"    -> the auth table below
+   segments[0] === "admin"   -> entity = ENTITY_BY_SEGMENT[segments[1]]
+                                rest   = segments.slice(2)
+   anything else             -> entity "unknown", action from the method
+
+For an ``admin`` path, ``rest`` decides the rest:
+
+==================  ==========================================================
+``rest``            Result
+==================  ==========================================================
+``[]``              POST is ``create``, PATCH is ``update`` (a singleton such
+                    as settings). ``entityId`` null.
+``[id]``            PATCH is ``update``, DELETE is ``delete``, PUT is
+                    ``create`` when ``id`` is the literal ``"new"`` and
+                    ``update`` otherwise. ``entityId`` is ``id``, or null for
+                    that ``"new"`` case.
+``[id, op]``        ``op:<op>``, ``entityId`` is ``id``.
+``[a, b, op]``      ``op:<op>``, ``entityId`` is ``a``. This is
+                    ``/admin/revisions/:postId/:revisionId/restore``, and the
+                    record being changed is the post, so the post's id is the
+                    one worth indexing.
+==================  ==========================================================
+
+The ``"new"`` sentinel is not a detail. ``PUT /admin/testimonials/:id``,
+``/stats/:id`` and ``/categories/:id`` all resolve ``id === "new" ? null : id``
+and mint an id in the handler. Taking the path segment literally would file every
+create in the system's history under the id ``"new"``, where they would collide
+with each other and where ``audit_entity`` would answer nothing for any of them.
+So a create records ``entityId: null`` and the route hands back the id it minted:
+
+.. code-block:: ts
+
+   setEntityId(id: string): void    // third method on the handle
+
+============================  ===========================================
+``ENTITY_BY_SEGMENT``         maps to
+============================  ===========================================
+properties                    ``property``
+posts                         ``post``
+revisions                     ``post``  (the post is what changed)
+categories                    ``category``
+images                        ``image``
+enquiries                     ``enquiry``
+users                         ``user``
+invites                       ``invite``
+testimonials                  ``testimonial``
+stats                         ``stat``
+notes                         ``note``
+settings                      ``settings``
+anything else                 ``unknown``
+============================  ===========================================
+
+The auth surface has no entity noun in its paths, so it gets its own small table:
+
+=================================  ==============  ====================
+Path                               ``entity``      ``action``
+=================================  ==============  ====================
+``/auth/logout``                   session         ``op:logout``
+``/auth/sessions/:id``             session         ``delete``
+``/auth/me``                       user            ``update``
+``/auth/clerk/exchange``           auth            ``op:login``
+``/auth/password/login``           auth            ``op:login``
+``/auth/password/claim``           auth            ``op:claim``
+``/auth/password/change``          auth            ``op:password-change``
+=================================  ==============  ====================
+
+``unknown`` is a real member of ``AuditEntity``, not a defensive afterthought. A
+route added later whose segment nothing recognises must still produce a valid
+entry: a validator that rejected it would convert "nobody taught the mapper about
+this route" into "this write is silently unaudited", which is the failure this
+whole unit exists to prevent.
 
 What is not audited
 ===================
@@ -175,8 +365,22 @@ What is not audited
   structurally excluded rather than filtered.
 - **Failed requests.** An entry is written only for a ``2xx``. A 400 changed
   nothing, and a 403 was already refused by the gate above.
-- **Anonymous requests below the gate.** ``/auth/password/login`` on a failed
-  attempt has no actor and changed nothing, so it produces nothing.
+- **Anything with no actor.** This rule is load-bearing and not merely tidy, so
+  it is stated as a rule rather than left implicit: **no actor, no entry.**
+
+  ``rolePermissions`` does not authenticate, so "everything below the mount is
+  captured" cuts both ways: anonymous requests reach the middleware too.
+  ``POST /auth/logout`` is the sharp case. It deliberately carries no
+  ``requireAuth``, has no rate limiter, and always answers 200, so without this
+  rule a stranger with no cookie could loop it and write one two-year row per
+  request. With it, an anonymous logout writes nothing, because there is nobody to
+  attribute it to and nothing was changed.
+
+  The routes that *can* mint an actor from nothing are the two doors, and both are
+  rate limited on the caller's IP already
+  (``limit(db, "login:<ip>", LOGIN_IP_LIMIT, LOGIN_WINDOW_MS)`` in ``doors.ts``),
+  so the one anonymous path that does produce entries is bounded by a limiter
+  that already exists.
 
 Signing in, which the middleware cannot see on its own
 ------------------------------------------------------
@@ -230,9 +434,30 @@ ones an argument is actually about:
 
 - ``PATCH /admin/properties/:id`` and its lifecycle ops
 - ``PATCH /admin/users/:id/role``, disable and enable
-- ``PATCH /admin/posts/:id`` and its ops
-- ``PATCH /admin/enquiries/:id``
-- ``PUT`` on testimonials, stats and categories
+
+And that is the whole list. Three routes that looked like obvious candidates are
+deliberately excluded:
+
+``PATCH /admin/posts/:id``
+  **Excluded, and this one matters.** The post editor autosaves 1.5 seconds after
+  each pause and sends the full patch, where ``content`` may run to a megabyte.
+  Attaching ``before`` to it would write a complete prior copy of the post on
+  every keystroke pause, retained two years. This repository already met that
+  problem and solved it: ``savePostRevision`` keeps only the twenty most recent
+  autosaves per post, with the comment "Unbounded history of keystrokes is the
+  largest collection in a blog nobody reads twice." Reintroducing it uncapped in
+  the audit collection would undo that fix in a second place. Posts already have a
+  before-image mechanism in ``post_revisions``; audit records who and when, and
+  points at the revision for what.
+
+``PATCH /admin/enquiries/:id`` and the three ``PUT`` upserts
+  Excluded because they do not read the prior document. The first draft claimed
+  routes that already read one "pay nothing to call it", which is true for
+  properties and users and false for these: the enquiry patch goes straight to
+  ``findOneAndUpdate``, and the upserts never read at all. Adding a read to
+  manufacture a before-image buys detail with a database round trip on every
+  write, which is the wrong trade. They produce complete entries with
+  ``before: null``.
 
 Failure policy
 ==============
@@ -248,6 +473,23 @@ the second loses a record of work that succeeded.
 This is a real trade and it is being made deliberately. A deployment that needs
 audit to be a hard precondition of the write would need the write and the entry
 in one transaction, which is a different and much more expensive design.
+
+The trade has a consequence the first draft did not state: **a persistently
+broken writer degrades to no audit at all, and an empty log looks exactly like a
+quiet week.** For a trail whose entire purpose is settling disputes, silently
+reading as "nothing happened" is the worst available failure. Three things
+follow, and they are part of this design rather than nice-to-haves:
+
+- The swallowed error is logged at ``error`` level, not ``warn``, beside the same
+  ``requestId``, so it is findable in a log filtered to errors.
+- The insert is **awaited** before the response returns. Deferring it past the
+  response is unreliable on this deployment, where a function can suspend once it
+  has answered, which would turn "occasionally misses a row" into systematic loss.
+  The cost is one database round trip added to each mutating request, and that
+  cost is named here rather than discovered later.
+- The audit screen shows when the most recent entry was recorded. A trail that
+  stopped three days ago is then visible as a stale timestamp instead of an empty
+  list, which is the only cheap way to tell the two apart.
 
 Storage
 =======
@@ -284,12 +526,35 @@ Reading it
 cursor machinery every other list uses. Filters: ``entity``, ``entityId``,
 ``actorId``, and a date range.
 
-It falls into the ``danger`` domain automatically. ``RULES`` in
-``packages/identity/src/middleware.ts`` already ends with
-``{ prefix: "/api/admin/", domain: "danger" }``, so no new rule is needed and no
-existing rule has to move. An explicit rule is added anyway, directly above the
-catch-all, because relying on a fallthrough for an access decision is exactly the
-kind of thing that breaks silently when somebody inserts a rule below it.
+**It carries ``requireAuth()`` on the route itself, and that is not belt and
+braces.** The first draft rested access control entirely on the ``danger`` domain
+falling out of the ``RULES`` catch-all, which does not do what it needed to do.
+``rolePermissions`` says so in its own header:
+
+  *It acts ONLY when an admin session resolved, so an anonymous request falls
+  through to each route's own guards exactly as it did before this file existed.*
+
+It is strictly tightening. It can 403 a signed-in editor; it never authenticates
+anybody. An anonymous request passes through it untouched, so a read route with
+no guard of its own would have served the entire log, which this same document
+describes as a second store of buyer emails, phone numbers and message text, to
+anyone who asked without a cookie.
+
+Every other admin route in this repository already attaches ``requireAuth()`` or
+``requireAdmin()`` per route, and the reason is exactly this. The audit route is
+not an exception to that pattern, and the two controls compose:
+
+- ``requireAuth()`` establishes that there is a session at all.
+- ``rolePermissions`` then finds ``danger`` for the path and refuses any role that
+  does not hold it, which is owner and developer only.
+
+**No extra ``RULES`` entry is added.** The first draft proposed one directly above
+the catch-all, justified as protection against somebody inserting a rule below it.
+That justification is wrong twice over: ``domainFor`` is first match wins, so a
+rule inserted below the catch-all can never match anything under ``/api/admin/``
+and is inert, and the file argues at length that unmatched-falls-to-``danger`` is
+the deliberate safe default rather than a fragility. Adding a redundant rule to
+guard against an impossible failure would make that file worse.
 
 Admin UI
 ========
@@ -310,6 +575,24 @@ reads.
 - A **"History" panel on the property editor**, filtered to that listing, so the
   question "what happened to this house" is answered where it is asked rather
   than only on a separate screen.
+
+  **It cannot be served from ``/api/admin/audit``.** Agents are the primary users
+  of that editor and they hold ``listings``, not ``danger``, so that endpoint
+  403s for exactly the role the panel is for. The obvious fix is worse than the
+  problem: exposing the same data under a ``/api/admin/properties/`` path would
+  resolve to the ``listings`` domain and hand every agent the full trail,
+  ``before`` bodies and buyer personal data included.
+
+  So the panel is served by a second, narrower endpoint:
+
+  .. code-block:: text
+
+     GET /api/admin/properties/:id/history   ->  { at, actorName, action }[]
+
+  Three fields, no ``requested``, no ``before``, no ``path``. "Tobi marked this
+  under offer two days ago" is the whole question an agent has on that screen, and
+  it carries no personal data beyond a colleague's name. The full entry stays
+  behind ``danger``.
 
 Visual bar: the Shopify admin (2026), as with unit 1, so the new screen and panel
 share the existing section rhythm rather than reading as bolted on.
