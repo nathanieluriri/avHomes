@@ -91,6 +91,8 @@ interface Rule {
    * second is that its handler already filters its own output per role: a null
    * here opts a path out of the catch-all below, so anything that merely wants
    * to be reachable by several roles wants a domain, not this.
+   *
+   * Matched EXACTLY, unlike a domain rule, which is a prefix. See `domainFor`.
    */
   readonly domain: Domain | null;
 }
@@ -141,7 +143,22 @@ const RULES: readonly Rule[] = [
 
 export function domainFor(path: string): Domain | null {
   for (const rule of RULES) {
-    if (path.startsWith(rule.prefix)) return rule.domain;
+    /*
+     * A DOMAIN rule is a prefix, which is what lets one entry cover a whole
+     * router. A BYPASS rule is exact, and the asymmetry is deliberate.
+     *
+     * `startsWith` on a bypass would hand the bypass to every path that merely
+     * begins with the same letters. A future `/api/admin/health-report` would
+     * have inherited `/api/admin/health`'s exemption instead of falling to the
+     * `danger` catch-all, and it would have looked gated, because every route
+     * around it is. Getting a domain wrong that way costs a 403 somebody
+     * notices; getting a bypass wrong that way costs a silent hole.
+     *
+     * So a bypass has to name its path, and a new subpath under one has to be
+     * exempted on purpose rather than by sharing a stem.
+     */
+    const matched = rule.domain === null ? path === rule.prefix : path.startsWith(rule.prefix);
+    if (matched) return rule.domain;
   }
   return null;
 }
