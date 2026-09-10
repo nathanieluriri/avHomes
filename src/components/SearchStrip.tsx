@@ -65,6 +65,8 @@ export default function SearchStrip() {
             <SelectContent>
               <SelectItem value="For Sale">Buy</SelectItem>
               <SelectItem value="For Rent">Rent</SelectItem>
+              <SelectItem value="Under Offer">Under Offer</SelectItem>
+              <SelectItem value="Let Agreed">Let Agreed</SelectItem>
             </SelectContent>
           </Select>
         </div>

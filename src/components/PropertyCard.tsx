@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Bed, Bath, Maximize } from "lucide-react";
 import { Property } from "@/lib/types";
-import { formatPriceShort, statusLabel } from "@/lib/data";
+import { formatPriceShort, isPriceReduced, listingLabel } from "@/lib/data";
 
 export default function PropertyCard({
   property,
@@ -11,6 +11,8 @@ export default function PropertyCard({
   property: Property;
   priority?: boolean;
 }) {
+  const reduced = isPriceReduced(property.priceHistory);
+
   return (
     <Link
       href={`/listings/${property.slug}`}
@@ -26,8 +28,13 @@ export default function PropertyCard({
           className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.05]"
         />
         <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-plum-950 backdrop-blur">
-          {statusLabel(property.status)}
+          {listingLabel(property.listingType, property.status)}
         </span>
+        {reduced && (
+          <span className="absolute right-3 top-3 rounded-full bg-wine-600 px-3 py-1 text-xs font-semibold text-white">
+            Price reduced
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col p-5">
@@ -53,7 +60,11 @@ export default function PropertyCard({
 
         <div className="mt-auto flex items-center justify-between border-t border-mist-200 pt-4 mt-5">
           <span className="text-lg font-bold tracking-tight text-plum-950">
-            {formatPriceShort(property.priceMinor, property.status, property.currency)}
+            {formatPriceShort(property.priceMinor, {
+              listingType: property.listingType,
+              rentPeriod: property.rentPeriod,
+              currency: property.currency,
+            })}
           </span>
           <span className="text-sm font-medium text-wine-600 transition-transform duration-200 group-hover:translate-x-1">
             View

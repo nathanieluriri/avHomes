@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getProperties } from "@/lib/data";
-import { PropertyStatus, PropertyType } from "@/lib/types";
+import { ListingType, PropertyStatus, PropertyType } from "@/lib/types";
 import PropertyCard from "@/components/PropertyCard";
 import CategoryChips from "@/components/CategoryChips";
 import FilterBar from "@/components/FilterBar";
@@ -18,6 +18,27 @@ interface Search {
   beds?: string;
 }
 
+/**
+ * The URL keeps the reader's vocabulary ("For Sale"), the store keeps the
+ * lifecycle and deal type split apart. This is the one place that translates
+ * between them, so a listing's status can change shape without breaking a
+ * bookmarked or indexed `/listings?status=...` link.
+ *
+ * A key with no match here (a typo, an old link) filters nothing: see the
+ * unmatched branch below.
+ */
+// TODO(test): every URL_STATUS key returns only rows of its own (listingType, status) pair,
+//   an unrecognised ?status= value returns the full list, and ?status=For+Sale is non-empty
+//   against the fixtures. This is the regression that shipped; it needs a caller-level test.
+const URL_STATUS: Record<string, { listingType: ListingType; status: PropertyStatus }> = {
+  "For Sale": { listingType: "sale", status: "live" },
+  "For Rent": { listingType: "rent", status: "live" },
+  "Under Offer": { listingType: "sale", status: "under-offer" },
+  "Let Agreed": { listingType: "rent", status: "under-offer" },
+  Sold: { listingType: "sale", status: "closed" },
+  Let: { listingType: "rent", status: "closed" },
+};
+
 export default async function ListingsPage({
   searchParams,
 }: {
@@ -32,7 +53,11 @@ export default async function ListingsPage({
       const haystack = `${p.title} ${p.location} ${p.city} ${p.address}`.toLowerCase();
       if (!haystack.includes(q)) return false;
     }
-    if (sp.status && p.status !== (sp.status as PropertyStatus)) return false;
+    if (sp.status) {
+      const target = URL_STATUS[sp.status];
+      // Unrecognised value: filter nothing rather than show an empty page.
+      if (target && (p.listingType !== target.listingType || p.status !== target.status)) return false;
+    }
     if (sp.type && p.type !== (sp.type as PropertyType)) return false;
     if (sp.beds && p.bedrooms < Number(sp.beds)) return false;
     return true;
@@ -90,15 +115,11 @@ export default async function ListingsPage({
         </div>
 
         {filtered.length === 0 ? (
-          <div className="mt-12 rounded-2xl border border-mist-200 bg-white px-8 py-16 text-center">
-            <p className="text-lg font-semibold text-plum-950">No matches yet</p>
-            <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
-              Nothing fits those filters right now. Try widening the search or clearing
-              a filter or two.
-            </p>
+          <div className="mt-10 rounded-2xl border border-mist-200 bg-white px-6 py-10 text-center sm:py-12">
+            <p className="text-sm font-semibold text-plum-950">Nothing matches those filters right now.</p>
             <Link
               href="/listings"
-              className="mt-6 inline-flex rounded-full bg-wine-600 px-7 py-3 text-sm font-semibold text-white transition-colors hover:bg-wine-700"
+              className="mt-4 inline-flex rounded-full bg-wine-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700"
             >
               Clear filters
             </Link>

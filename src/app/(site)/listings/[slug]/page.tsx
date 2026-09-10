@@ -8,6 +8,7 @@ import {
   getPropertyBySlug,
   getPropertyDetail,
   formatPrice,
+  listingLabel,
 } from "@/lib/data";
 import PropertyCard from "@/components/PropertyCard";
 import Reveal from "@/components/Reveal";
@@ -71,7 +72,7 @@ export default async function PropertyPage({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-wine-50 px-3.5 py-1.5 text-xs font-semibold text-wine-700">
-                {property.status}
+                {listingLabel(property.listingType, property.status)}
               </span>
               <span className="inline-flex items-center rounded-full bg-mist-100 px-3.5 py-1.5 text-xs font-semibold text-plum-950">
                 {property.type}
@@ -89,7 +90,11 @@ export default async function PropertyPage({
 
           <div className="mt-8 shrink-0 border-t border-mist-200 pt-6 lg:mt-0 lg:border-t-0 lg:pt-0 lg:text-right">
             <p className="break-words text-3xl font-bold leading-none tracking-tight text-plum-950 sm:text-4xl">
-              {formatPrice(property.priceMinor, property.status, property.currency)}
+              {formatPrice(property.priceMinor, {
+                listingType: property.listingType,
+                rentPeriod: property.rentPeriod,
+                currency: property.currency,
+              })}
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
-import type { Agent, Property, SiteStat, Testimonial } from "@avhomes/contracts";
+import type { Agent, ListingFee, PriceChange, Property, RentPeriod, SiteStat, Testimonial } from "@avhomes/contracts";
+import { normalizeFees, readRentPeriod } from "@avhomes/contracts";
 
 /**
  * Bundled fixtures.
@@ -51,6 +52,10 @@ type PropertySeed = Omit<
   | "priceMinor"
   | "currency"
   | "status"
+  | "listingType"
+  | "rentPeriod"
+  | "fees"
+  | "priceHistory"
   | "createdAt"
   | "updatedAt"
   | "publishedAt"
@@ -60,7 +65,12 @@ type PropertySeed = Omit<
   | "featured"
 > & {
   price: number;
-  status: "For Sale" | "For Rent" | "Sold";
+  status: "For Sale" | "For Rent" | "Sold" | "Under Offer" | "Let Agreed" | "Let";
+  /** Rentals only. Omitted means "year", the same default `readRentPeriod` gives a legacy row. */
+  rentPeriod?: RentPeriod;
+  fees?: ListingFee[];
+  /** Epoch ms. Written with `Date.parse` at the call site, same as `createdAt` below. */
+  priceHistory?: PriceChange[];
   createdAt: string;
   featured?: boolean;
 };
@@ -75,6 +85,10 @@ const propertySeeds: PropertySeed[] = [
       "A private pool villa wrapped in modern amenities, set within a quiet gated Lekki estate. Sun washed interiors, floor to ceiling glazing, and a resort style garden make this a rare full time or weekend retreat.",
     price: 245000000,
     status: "For Sale",
+    fees: [
+      { kind: "agency", amountMinor: 1225000000, currency: "NGN" },
+      { kind: "legal", amountMinor: 735000000, currency: "NGN" },
+    ],
     type: "Villa",
     location: "Lekki Phase 1, Lagos",
     city: "Lagos",
@@ -123,6 +137,17 @@ const propertySeeds: PropertySeed[] = [
       "An architect's own home. Blackened timber cladding, a two storey glazed spine, and living space that folds fully open onto the lawn. Quiet, warm, and unlike anything else on the island.",
     price: 480000000,
     status: "For Sale",
+    // Reduced from 495,000,000 three weeks ago, so the "Price reduced" marker has a fixture to render on.
+    priceHistory: [
+      {
+        at: Date.parse("2026-08-20T09:00:00Z"),
+        fromMinor: 49500000000,
+        toMinor: 48000000000,
+        currency: "NGN",
+        byUserId: null,
+        byName: "Adaeze Vincent",
+      },
+    ],
     type: "Duplex",
     location: "Old Ikoyi, Lagos",
     city: "Lagos",
@@ -147,6 +172,7 @@ const propertySeeds: PropertySeed[] = [
       "The entire top floor, wrapped in glass on three sides. A 20 metre terrace runs the length of the living space, and the primary suite looks straight down the lagoon at sunset.",
     price: 18500000,
     status: "For Rent",
+    rentPeriod: "year",
     type: "Penthouse",
     location: "Victoria Island, Lagos",
     city: "Lagos",
@@ -171,6 +197,7 @@ const propertySeeds: PropertySeed[] = [
       "Built for a family that lives outdoors. A shaded loggia runs the full width of the house, the pool sits in afternoon sun, and every bedroom opens to a balcony.",
     price: 9800000,
     status: "For Rent",
+    rentPeriod: "year",
     type: "Villa",
     location: "Chevron Drive, Lekki",
     city: "Lagos",
@@ -218,6 +245,7 @@ const propertySeeds: PropertySeed[] = [
       "One of six terraces on a gated close, each with a private rear garden. Generous ceiling heights, a proper utility room, and covered parking at the door.",
     price: 7200000,
     status: "For Rent",
+    rentPeriod: "year",
     type: "Terrace",
     location: "Maitama, Abuja",
     city: "Abuja",
@@ -282,11 +310,12 @@ const propertySeeds: PropertySeed[] = [
     id: "10",
     slug: "wuse-studio-loft",
     title: "Wuse Studio Loft",
-    tagline: "Compact loft, walkable to everything",
+    tagline: "Compact loft, walkable to everything, let by the night",
     description:
-      "A well planned studio with a proper sleeping alcove rather than a corner. Good light, good storage, and a building with a lift that actually works.",
-    price: 3100000,
+      "A well planned studio with a proper sleeping alcove rather than a corner. Good light, good storage, and a building with a lift that actually works. Run as a short let, so it comes furnished and serviced.",
+    price: 85000,
     status: "For Rent",
+    rentPeriod: "night",
     type: "Studio",
     location: "Wuse 2, Abuja",
     city: "Abuja",
@@ -310,6 +339,7 @@ const propertySeeds: PropertySeed[] = [
       "Corner unit on the seventh floor, so the balcony gets both the lake and the evening light. Quiet building, mostly long term residents.",
     price: 5400000,
     status: "For Rent",
+    rentPeriod: "year",
     type: "Apartment",
     location: "Jabi, Abuja",
     city: "Abuja",
@@ -355,9 +385,16 @@ const propertySeeds: PropertySeed[] = [
     title: "Oniru Beachfront Apartment",
     tagline: "Three bed with an ocean-facing balcony",
     description:
-      "A corner unit on the seventh floor, so the balcony gets the water on one side and the estate's gardens on the other. Service charge covers the pool, the gym and a manned gate.",
-    price: 8500000,
+      "A corner unit on the seventh floor, so the balcony gets the water on one side and the estate's gardens on the other. Service charge covers the pool, the gym and a manned gate. Let as a serviced apartment, billed monthly.",
+    price: 750000,
     status: "For Rent",
+    rentPeriod: "month",
+    fees: [
+      { kind: "agency", amountMinor: 90000000, currency: "NGN" },
+      { kind: "legal", amountMinor: 45000000, currency: "NGN" },
+      { kind: "caution", amountMinor: 75000000, currency: "NGN" },
+      { kind: "service-charge", amountMinor: 30000000, currency: "NGN" },
+    ],
     type: "Apartment",
     location: "Oniru, Victoria Island, Lagos",
     city: "Lagos",
@@ -404,6 +441,7 @@ const propertySeeds: PropertySeed[] = [
       "Built for the way people actually work now: one open room, a proper desk wall, fibre already pulled in, and a lift that runs on the estate's own inverter.",
     price: 4200000,
     status: "For Rent",
+    rentPeriod: "year",
     type: "Studio",
     location: "Herbert Macaulay Way, Yaba, Lagos",
     city: "Lagos",
@@ -450,6 +488,7 @@ const propertySeeds: PropertySeed[] = [
       "Converted from offices in 2024 and done properly: acoustic floors, new stack, and windows that open. The row below closes at six, so evenings are quieter than the address suggests.",
     price: 6800000,
     status: "For Rent",
+    rentPeriod: "year",
     type: "Apartment",
     location: "Wuse 2, Abuja",
     city: "Abuja",
@@ -519,6 +558,7 @@ const propertySeeds: PropertySeed[] = [
       "The whole top floor, furnished to a standard that survives a corporate let, with a private lift lobby and staff quarters on the same level.",
     price: 24000000,
     status: "For Rent",
+    rentPeriod: "year",
     type: "Penthouse",
     location: "Banana Island, Ikoyi, Lagos",
     city: "Lagos",
@@ -533,18 +573,75 @@ const propertySeeds: PropertySeed[] = [
     agent: agents[1],
     createdAt: "2026-08-30",
   },
+  {
+    id: "21",
+    slug: "parkview-estate-townhouse",
+    title: "Parkview Estate Townhouse",
+    tagline: "Under offer, exchange expected this month",
+    description:
+      "A four bedroom townhouse on Parkview's tree lined loop, offered with the buyer's survey already back. The garden backs onto the estate's own running track.",
+    price: 220000000,
+    status: "Under Offer",
+    fees: [
+      { kind: "agency", amountMinor: 1100000000, currency: "NGN" },
+      { kind: "legal", amountMinor: 660000000, currency: "NGN" },
+    ],
+    type: "Townhouse",
+    location: "Parkview Estate, Ikoyi, Lagos",
+    city: "Lagos",
+    address: "14 Bourdillon Close, Parkview Estate, Ikoyi, Lagos",
+    bedrooms: 4,
+    bathrooms: 4,
+    areaSqft: 3300,
+    parkingSpaces: 2,
+    yearBuilt: 2020,
+    amenities: ["Running Track", "Gated Estate", "24/7 Security", "Fitted Kitchen"],
+    images: [ext(11), int(9), int(12)],
+    agent: agents[1],
+    createdAt: "2026-08-28",
+  },
+  {
+    id: "22",
+    slug: "utako-garden-flat",
+    title: "Utako Garden Flat",
+    tagline: "Let agreed, tenant moving in next month",
+    description:
+      "A ground floor two bedroom with its own garden gate, in a small block off the Utako roundabout. The first viewing had an offer in by the end of the week.",
+    price: 4800000,
+    status: "Let Agreed",
+    rentPeriod: "year",
+    type: "Apartment",
+    location: "Utako, Abuja",
+    city: "Abuja",
+    address: "6 Obafemi Awolowo Way, Utako, Abuja",
+    bedrooms: 2,
+    bathrooms: 2,
+    areaSqft: 1150,
+    parkingSpaces: 1,
+    yearBuilt: 2021,
+    amenities: ["Private Garden Gate", "Secure Parking", "Backup Power"],
+    images: [ext(9), int(6)],
+    agent: agents[2],
+    createdAt: "2026-08-27",
+  },
 ];
 
+
+/** Readable status into the pair the contract actually stores. */
+const statusMap = {
+  "For Sale":    { listingType: "sale", status: "live" },
+  "For Rent":    { listingType: "rent", status: "live" },
+  Sold:          { listingType: "sale", status: "closed" },
+  "Under Offer": { listingType: "sale", status: "under-offer" },
+  "Let Agreed":  { listingType: "rent", status: "under-offer" },
+  Let:           { listingType: "rent", status: "closed" },
+} as const;
 
 /** Readable fixture units into the stored contract. */
 function toProperty(seed: PropertySeed): Property {
   const published = Date.parse(`${seed.createdAt}T09:00:00Z`);
-  const { price, status, featured, ...rest } = seed;
-  const statusMap = {
-    "For Sale": "for-sale",
-    "For Rent": "for-rent",
-    Sold: "sold",
-  } as const;
+  const { price, status, featured, rentPeriod, fees, priceHistory, ...rest } = seed;
+  const { listingType, status: lifecycle } = statusMap[status];
   const { createdAt: _isoDate, ...fields } = rest;
   void _isoDate;
   return {
@@ -552,7 +649,11 @@ function toProperty(seed: PropertySeed): Property {
     // 100 kobo per naira. The fixture writes naira; the contract stores minor units.
     priceMinor: price * 100,
     currency: "NGN",
-    status: statusMap[status],
+    status: lifecycle,
+    listingType,
+    rentPeriod: readRentPeriod(rentPeriod, listingType),
+    fees: normalizeFees(fees ?? []),
+    priceHistory: priceHistory ?? [],
     featured: featured ?? false,
     agentUserId: null,
     createdAt: published,

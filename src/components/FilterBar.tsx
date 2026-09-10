@@ -187,6 +187,8 @@ export default function FilterBar() {
               <SelectItem value={ANY}>Any status</SelectItem>
               <SelectItem value="For Sale">For Sale</SelectItem>
               <SelectItem value="For Rent">For Rent</SelectItem>
+              <SelectItem value="Under Offer">Under Offer</SelectItem>
+              <SelectItem value="Let Agreed">Let Agreed</SelectItem>
             </SelectContent>
           </Select>
         </div>
