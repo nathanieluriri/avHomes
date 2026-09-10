@@ -1,6 +1,7 @@
 import {
   Building2,
   Gauge,
+  History,
   Images,
   Inbox,
   Newspaper,
@@ -132,6 +133,7 @@ export const NAV: readonly NavGroup[] = [
         icon: SlidersHorizontal,
         domain: "team",
       },
+      { href: "/admin/audit", label: "Audit trail", hint: "Who changed what, and when", icon: History, domain: "danger" },
     ],
   },
 ];

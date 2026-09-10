@@ -24,7 +24,8 @@ import {
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { SaveBar } from "@/components/admin/SaveBar";
-import { fullDate, shortDate } from "@/lib/admin/format";
+import { historySentence } from "@/lib/admin/audit";
+import { fullDate, relative, shortDate } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import {
@@ -97,6 +98,22 @@ type Draft = {
   amenities: string;
   images: string[];
 };
+
+/**
+ * The History panel's own reader, not `AuditEntry`.
+ *
+ * `GET /admin/properties/:id/history` is a second, narrower endpoint rather
+ * than a filtered read of `/admin/audit`: agents hold `listings` on this
+ * screen, not `danger`, so the full reader 403s for exactly the role the
+ * panel is for. These three fields are the whole answer to "what happened to
+ * this house", and none of them is personal data belonging to anyone but a
+ * colleague's own name.
+ */
+interface HistoryLine {
+  at: number;
+  actorName: string;
+  action: string;
+}
 
 /** Every fee kind gets a key, so a row never reads a fee that has not been typed yet as `undefined`. */
 function toFeeDraft(fees: readonly ListingFee[]): Record<FeeKind, string> {
@@ -248,6 +265,14 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // A failed load leaves `history.data` null, and the panel below stays
+  // absent rather than showing an error box for what is a secondary,
+  // read-only surface on a screen whose own save flow already has one.
+  const history = useAsync<{ items: HistoryLine[] }>(
+    (signal) => api.get<{ items: HistoryLine[] }>(`/admin/properties/${property.id}/history`, signal),
+    [property.id],
+  );
 
   /*
    * Read off `property`, the SAVED record, not `draft`.
@@ -852,6 +877,25 @@ function PropertyEditor({ initial }: { initial: Property }) {
               >
                 Move to trash
               </ConfirmButton>
+            </Card>
+          )}
+
+          {/* Collapsed to nothing while loading, on a failed fetch, and when
+              the listing has no history yet, the same rule "Price history"
+              above follows: a shell with a heading and no rows is not a
+              lighter version of this panel, it is a panel with nothing to
+              say. */}
+          {history.data && history.data.items.length > 0 && (
+            <Card className="space-y-3">
+              <CardHead title="History" />
+              <ul className="space-y-3">
+                {history.data.items.map((line, index) => (
+                  <li key={`${line.at}-${index}`} className="text-[13px]">
+                    <p className="text-plum-950">{historySentence(line.actorName, line.action)}</p>
+                    <p className="mt-0.5 text-xs text-slate-600">{relative(line.at)}</p>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
         </div>

@@ -7,6 +7,8 @@
  */
 export type {
   Agent,
+  AuditEntity,
+  AuditEntry,
   Category,
   CoverImage,
   DocNode,
@@ -33,6 +35,7 @@ export type {
 } from "@avhomes/contracts";
 
 export {
+  AUDIT_ENTITIES,
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
   PUBLIC_PROPERTY_STATUSES,
