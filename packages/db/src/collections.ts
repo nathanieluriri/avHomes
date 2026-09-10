@@ -26,6 +26,7 @@ export const COLLECTIONS = {
   subscribers: "subscribers",
   settings: "settings",
   designNotes: "design_notes",
+  audit: "audit",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
