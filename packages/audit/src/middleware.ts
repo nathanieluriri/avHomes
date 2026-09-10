@@ -277,11 +277,16 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
      * two-year row per request.
      *
      * Its status is not the thing stopping them, and an earlier version of this
-     * comment claimed it was. In a production build `clearSessionCookie` deletes
-     * a `__Host-` cookie without `secure`, which Hono refuses, so the route
-     * answers 500 and the status check below drops the row for the wrong reason.
-     * That is a bug in logout rather than a control: outside production the same
-     * request is a 200, and this rule is what holds either way.
+     * comment claimed it was. That version was written while logout answered 500
+     * on every production build, because `clearSessionCookie` deleted a
+     * `__Host-` cookie without `secure` and Hono refuses that. The status check
+     * below dropped the row, but for the wrong reason: a bug in logout standing
+     * in for a control.
+     *
+     * That bug is fixed (f11aa1c), so the route now answers 200 everywhere and
+     * THIS RULE IS THE ONLY THING LEFT. The fix removed the accident that was
+     * covering it, which makes the rule more load-bearing than when it was
+     * written, not less.
      *
      * `setActor` is the other half. `sessionMiddleware` resolves the cookie
      * before the auth routes run, so somebody in the act of signing in is still
