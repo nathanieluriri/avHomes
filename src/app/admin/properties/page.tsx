@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Building2, Plus, Star, Trash2 } from "lucide-react";
 import {
+  LISTING_TYPES,
   PROPERTY_STATUSES,
   formatPriceShort,
   statusLabel,
+  type ListingType,
   type Page,
   type Property,
   type PropertyStatus,
@@ -53,16 +55,19 @@ const SORTS = [
 ] as const;
 
 const STATUS_TONE: Record<PropertyStatus, Tone> = {
-  "for-sale": "green",
-  "for-rent": "wine",
-  sold: "neutral",
   draft: "amber",
+  live: "green",
+  "under-offer": "wine",
+  closed: "neutral",
   archived: "neutral",
 };
 
 export default function PropertiesPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"all" | PropertyStatus>("all");
+  // Separate from `tab`: lifecycle and deal type are two different axes, and
+  // "Sale" is not a status. See STATUS_TONE and PropertyStatus in @avhomes/contracts.
+  const [listingTypeFilter, setListingTypeFilter] = useState<"all" | ListingType>("all");
   const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("updated");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -93,12 +98,13 @@ export default function PropertiesPage() {
           sort,
           withTotal: "1",
           ...(tab === "all" ? {} : { status: tab }),
+          ...(listingTypeFilter === "all" ? {} : { listingType: listingTypeFilter }),
           ...(query ? { q: query } : {}),
           ...(paging.cursor ? { cursor: paging.cursor } : {}),
         })}`,
         signal,
       ),
-    [tab, sort, query, paging.cursor],
+    [tab, listingTypeFilter, sort, query, paging.cursor],
     /* Hold the rows while the next filter loads. Blanking a list this long to
        four skeleton rows clamps the console's scroller back to the top, so a
        tap on a status pill silently relocates the reader. */
@@ -122,7 +128,7 @@ export default function PropertiesPage() {
   }
 
   const rows = data?.items ?? [];
-  const filtered = tab !== "all" || query !== "";
+  const filtered = tab !== "all" || listingTypeFilter !== "all" || query !== "";
 
   const columns: Column<Property>[] = [
     {
@@ -179,6 +185,10 @@ export default function PropertiesPage() {
       render: (p) => (
         <span className="inline-flex flex-wrap items-center gap-1.5">
           <Badge tone={STATUS_TONE[p.status]}>{statusLabel(p.status)}</Badge>
+          {/* Quieter than the lifecycle badge on purpose: the deal type does not
+              change on its own the way a status does, so it reads as a label
+              rather than as a second thing that just happened. */}
+          <Badge tone="neutral">{p.listingType === "sale" ? "Sale" : "Rent"}</Badge>
           {p.featured && (
             <span className="md:hidden">
               <Badge tone="amber">Featured</Badge>
@@ -213,7 +223,11 @@ export default function PropertiesPage() {
       mobile: "keep",
       render: (p) => (
         <span className="font-semibold text-plum-950">
-          {formatPriceShort(p.priceMinor, p.status, p.currency)}
+          {formatPriceShort(p.priceMinor, {
+            listingType: p.listingType,
+            rentPeriod: p.rentPeriod,
+            currency: p.currency,
+          })}
         </span>
       ),
     },
@@ -281,25 +295,47 @@ export default function PropertiesPage() {
               onChange: setSearch,
             }}
             trailing={
-              <label className="w-full sm:w-auto sm:shrink-0">
-                <span className="sr-only">Sort listings</span>
-                {/* `inputClass` rather than a hand-rolled height, so the phone
-                    inherits the console's one answer to field sizing and to the
-                    iOS focus zoom. Below `sm` this control lives in the filter
-                    sheet and wants the full width; the `sm:` overrides put the
-                    dense 32px toolbar box back exactly as it was. */}
-                <select
-                  value={sort}
-                  onChange={(event) => refilter(() => setSort(event.target.value as typeof sort))}
-                  className={`${inputClass} font-medium sm:h-8 sm:w-auto sm:px-2 sm:py-0`}
-                >
-                  {SORTS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <>
+                {/* A separate axis from the status tabs. "Type" already means
+                    Villa or Duplex on this screen, so this is named for what it
+                    actually filters rather than reusing that word. */}
+                <label className="w-full sm:w-auto sm:shrink-0">
+                  <span className="sr-only">Filter by sale or rent</span>
+                  <select
+                    value={listingTypeFilter}
+                    onChange={(event) =>
+                      refilter(() => setListingTypeFilter(event.target.value as "all" | ListingType))
+                    }
+                    className={`${inputClass} font-medium sm:h-8 sm:w-auto sm:px-2 sm:py-0`}
+                  >
+                    <option value="all">All types</option>
+                    {LISTING_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t === "sale" ? "Sale" : "Rent"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="w-full sm:w-auto sm:shrink-0">
+                  <span className="sr-only">Sort listings</span>
+                  {/* `inputClass` rather than a hand-rolled height, so the phone
+                      inherits the console's one answer to field sizing and to the
+                      iOS focus zoom. Below `sm` this control lives in the filter
+                      sheet and wants the full width; the `sm:` overrides put the
+                      dense 32px toolbar box back exactly as it was. */}
+                  <select
+                    value={sort}
+                    onChange={(event) => refilter(() => setSort(event.target.value as typeof sort))}
+                    className={`${inputClass} font-medium sm:h-8 sm:w-auto sm:px-2 sm:py-0`}
+                  >
+                    {SORTS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
             }
           />
         }
@@ -327,6 +363,7 @@ export default function PropertiesPage() {
                   onClick={() =>
                     refilter(() => {
                       setTab("all");
+                      setListingTypeFilter("all");
                       setSearch("");
                     })
                   }

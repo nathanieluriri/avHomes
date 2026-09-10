@@ -4,23 +4,33 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Building2 } from "lucide-react";
 import {
+  FEE_KINDS_FOR,
+  LISTING_TYPES,
   PROPERTY_TYPES,
+  RENT_PERIODS,
+  formatPrice,
+  moneyRefusalMessage,
+  moveInTotalMinor,
   parseMajor,
   plainMajor,
-  moneyRefusalMessage,
   statusLabel,
+  type FeeKind,
+  type ListingFee,
+  type ListingType,
   type Property,
   type PropertyType,
+  type RentPeriod,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { SaveBar } from "@/components/admin/SaveBar";
-import { fullDate } from "@/lib/admin/format";
+import { fullDate, shortDate } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import {
   Badge,
   Button,
   Card,
+  CardHead,
   ConfirmButton,
   DRow,
   DefinitionList,
@@ -44,12 +54,35 @@ import {
  *    below is a real choice rather than a silent overwrite.
  */
 
+const FEE_KIND_LABELS: Record<FeeKind, string> = {
+  agency: "Agency fee",
+  legal: "Legal fee",
+  caution: "Caution deposit",
+  "service-charge": "Service charge",
+};
+
+const PERIOD_OPTION_LABELS: Record<RentPeriod, string> = {
+  year: "Per year",
+  month: "Per month",
+  night: "Per night",
+};
+
+/** The kinds a sale cannot carry, for the notice under the fee rows. */
+const RENT_ONLY_FEE_KINDS: readonly FeeKind[] = FEE_KINDS_FOR.rent.filter(
+  (kind) => !FEE_KINDS_FOR.sale.includes(kind),
+);
+
 type Draft = {
   title: string;
   tagline: string;
   description: string;
   price: string;
   currency: string;
+  listingType: ListingType;
+  /** Held even on a sale, so switching back to Rent does not forget the choice. */
+  rentPeriod: RentPeriod;
+  /** One raw amount per fee kind, in major units, same idiom as `price`. */
+  fees: Record<FeeKind, string>;
   type: PropertyType;
   location: string;
   city: string;
@@ -64,6 +97,13 @@ type Draft = {
   images: string[];
 };
 
+/** Every fee kind gets a key, so a row never reads a fee that has not been typed yet as `undefined`. */
+function toFeeDraft(fees: readonly ListingFee[]): Record<FeeKind, string> {
+  const draft: Record<FeeKind, string> = { agency: "", legal: "", caution: "", "service-charge": "" };
+  for (const fee of fees) draft[fee.kind] = plainMajor(fee.amountMinor, fee.currency);
+  return draft;
+}
+
 function toDraft(p: Property): Draft {
   return {
     title: p.title,
@@ -71,6 +111,11 @@ function toDraft(p: Property): Draft {
     description: p.description,
     price: plainMajor(p.priceMinor, p.currency),
     currency: p.currency,
+    listingType: p.listingType,
+    // A sale carries no period. Defaulted rather than left null, so the select
+    // has a real value ready the moment the operator switches to Rent.
+    rentPeriod: p.rentPeriod ?? "year",
+    fees: toFeeDraft(p.fees),
     type: p.type,
     location: p.location,
     city: p.city,
@@ -123,9 +168,26 @@ const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => bo
     when: (p) => p.deletedAt === null && (p.status === "draft" || p.status === "archived"),
   },
   {
+    op: "markOffer",
+    label: "Mark under offer",
+    when: (p) => p.status === "live",
+  },
+  {
+    // Under offer and closed both need a way back to live, or a collapsed deal
+    // forces an agent to lie about the listing's state.
+    op: "relist",
+    label: "Back on the market",
+    when: (p) => p.status === "under-offer" || p.status === "closed",
+  },
+  {
+    op: "close",
+    label: "Mark closed",
+    when: (p) => p.status === "live" || p.status === "under-offer",
+  },
+  {
     op: "unpublish",
     label: "Unpublish",
-    when: (p) => p.deletedAt === null && (p.status === "for-sale" || p.status === "for-rent"),
+    when: (p) => p.deletedAt === null && (p.status === "live" || p.status === "under-offer"),
   },
   { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
   /* No `restore` here. A listing can only be restored out of the trash, and
@@ -203,6 +265,34 @@ function PropertyEditor({ initial }: { initial: Property }) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
 
+  function setFee(kind: FeeKind, value: string) {
+    setDraft((d) => ({ ...d, fees: { ...d.fees, [kind]: value } }));
+  }
+
+  /*
+   * Recalculated live, straight from the draft, on every render: nothing here
+   * is state of its own to fall out of sync. A row left empty contributes
+   * nothing rather than parsing as zero, matching the rule the fee inputs
+   * themselves follow.
+   */
+  const liveFees: ListingFee[] = FEE_KINDS_FOR[draft.listingType].flatMap((kind) => {
+    const raw = draft.fees[kind].trim();
+    if (raw === "") return [];
+    const parsed = parseMajor(raw, draft.currency);
+    return parsed.ok ? [{ kind, amountMinor: parsed.minor, currency: draft.currency }] : [];
+  });
+  const livePrice = parseMajor(draft.price, draft.currency);
+  const moveIn = moveInTotalMinor({
+    priceMinor: livePrice.ok ? livePrice.minor : 0,
+    currency: draft.currency,
+    listingType: draft.listingType,
+    fees: liveFees,
+  });
+  // A value typed in before the switch to Sale is still sitting in
+  // `draft.fees`, just off screen. This is true only while that is so.
+  const hasHiddenFeeValues =
+    draft.listingType === "sale" && RENT_ONLY_FEE_KINDS.some((kind) => draft.fees[kind].trim() !== "");
+
   async function save() {
     setBusy(true);
     setSaveError(null);
@@ -220,6 +310,34 @@ function PropertyEditor({ initial }: { initial: Property }) {
       return;
     }
 
+    // Only the kinds this listing type can carry are sent. A caution deposit
+    // typed in before a switch to Sale stays in `draft.fees` but never reaches
+    // the request: this is the "dropped on save" the pricing card warns about,
+    // made true rather than just claimed.
+    const feeIssues: { path: string; message: string }[] = [];
+    const fees: { kind: FeeKind; amount: string }[] = [];
+    for (const kind of FEE_KINDS_FOR[draft.listingType]) {
+      const raw = draft.fees[kind].trim();
+      if (raw === "") continue; // Empty means the fee does not apply, not zero.
+      const parsed = parseMajor(raw, draft.currency);
+      if (!parsed.ok) {
+        feeIssues.push({ path: `fees.${kind}`, message: moneyRefusalMessage(parsed.reason, draft.currency) });
+        continue;
+      }
+      fees.push({ kind, amount: raw });
+    }
+    if (feeIssues.length > 0) {
+      setSaveError(
+        new ApiError(400, {
+          error: "bad_request",
+          detail: "Fix the fee amounts before saving.",
+          issues: feeIssues,
+        }),
+      );
+      setBusy(false);
+      return;
+    }
+
     try {
       const res = await api.patch<{ property: Property }>(`/admin/properties/${property.id}`, {
         patch: {
@@ -228,6 +346,10 @@ function PropertyEditor({ initial }: { initial: Property }) {
           description: draft.description,
           priceMinor: money.minor,
           currency: draft.currency,
+          listingType: draft.listingType,
+          // A sale cannot carry a period; the server refuses anything else.
+          rentPeriod: draft.listingType === "rent" ? draft.rentPeriod : null,
+          fees,
           type: draft.type,
           location: draft.location,
           city: draft.city,
@@ -406,30 +528,147 @@ function PropertyEditor({ initial }: { initial: Property }) {
             </Field>
           </Card>
 
+          <Card className="space-y-4">
+            {/* `as="group"`: this wraps two buttons, not one input, so a bare
+                label would forward a click on its own whitespace to the first
+                one. Named "Sale or rent" rather than "Type", which already
+                means Villa or Duplex two cards down. */}
+            <Field label="Sale or rent" as="group">
+              <div className="inline-flex gap-2">
+                {LISTING_TYPES.map((t) => {
+                  const active = draft.listingType === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => set("listingType", t)}
+                      className={`c-tap h-9 rounded-lg px-4 text-[13px] font-semibold transition-colors sm:h-7 sm:px-3.5 ${
+                        active
+                          ? "bg-plum-950 text-white"
+                          : "bg-mist-100 text-slate-600 hover:bg-mist-200/70 hover:text-plum-950"
+                      }`}
+                    >
+                      {t === "sale" ? "Sale" : "Rent"}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Price" hint={`In ${draft.currency}, major units. Stored as minor units.`}>
+                {/* `decimal` rather than `numeric`: a price is the one field here
+                    that carries a separator, and the digits-only keypad has no key
+                    for it. Autocomplete off, because what a browser has saved for a
+                    bare text box is somebody's address, not a price. */}
+                <input
+                  className={inputClass}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={draft.price}
+                  onChange={(e) => set("price", e.target.value)}
+                />
+              </Field>
+              <Field label="Currency">
+                <input
+                  className={inputClass}
+                  maxLength={3}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  value={draft.currency}
+                  onChange={(e) => set("currency", e.target.value.toUpperCase())}
+                />
+              </Field>
+              {draft.listingType === "rent" && (
+                <div className="sm:col-span-2">
+                  <Field label="Period">
+                    <select
+                      className={inputClass}
+                      value={draft.rentPeriod}
+                      onChange={(e) => set("rentPeriod", e.target.value as RentPeriod)}
+                    >
+                      {RENT_PERIODS.map((period) => (
+                        <option key={period} value={period}>
+                          {PERIOD_OPTION_LABELS[period]}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 border-t border-mist-200 pt-4">
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                Fees
+              </span>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {FEE_KINDS_FOR[draft.listingType].map((kind) => (
+                  <Field key={kind} label={FEE_KIND_LABELS[kind]} hint="Leave blank if it doesn't apply.">
+                    <input
+                      className={inputClass}
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="0"
+                      value={draft.fees[kind]}
+                      onChange={(e) => setFee(kind, e.target.value)}
+                    />
+                  </Field>
+                ))}
+              </div>
+
+              {hasHiddenFeeValues && (
+                <p className="text-xs text-amber-700">Rent-only fees are not saved for a sale.</p>
+              )}
+
+              {draft.listingType === "rent" && (
+                <div className="flex items-center justify-between gap-4 rounded-lg bg-mist-50 px-3 py-2.5">
+                  <span className="text-[13px] font-semibold text-plum-950">Total to move in</span>
+                  <span className="text-[13px] font-bold text-plum-950">
+                    {formatPrice(moveIn.minor, { listingType: "rent", rentPeriod: null, currency: draft.currency })}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Collapsed to nothing when there is none, rather than a table shell
+              with a header row and no body: a price that has never changed is
+              the common case, not an edge case to apologise for. */}
+          {property.priceHistory.length > 0 && (
+            <Card className="space-y-3">
+              <CardHead title="Price history" />
+              {[...property.priceHistory].reverse().map((change, index) => (
+                <div key={`${change.at}-${index}`} className="rounded-xl border border-mist-200 p-3">
+                  <p className="text-[13px]">
+                    <span className="text-slate-600">
+                      {formatPrice(change.fromMinor, {
+                        listingType: property.listingType,
+                        rentPeriod: null,
+                        currency: change.currency,
+                      })}
+                    </span>
+                    <span className="mx-1.5 text-mist-300" aria-hidden="true">
+                      →
+                    </span>
+                    <span className="font-semibold text-plum-950">
+                      {formatPrice(change.toMinor, {
+                        listingType: property.listingType,
+                        rentPeriod: null,
+                        currency: change.currency,
+                      })}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {shortDate(change.at)} · {change.byName || "Unknown"}
+                  </p>
+                </div>
+              ))}
+            </Card>
+          )}
+
           <Card className="grid gap-4 sm:grid-cols-2">
-            <Field label="Price" hint={`In ${draft.currency}, major units. Stored as minor units.`}>
-              {/* `decimal` rather than `numeric`: a price is the one field here
-                  that carries a separator, and the digits-only keypad has no key
-                  for it. Autocomplete off, because what a browser has saved for a
-                  bare text box is somebody's address, not a price. */}
-              <input
-                className={inputClass}
-                inputMode="decimal"
-                autoComplete="off"
-                value={draft.price}
-                onChange={(e) => set("price", e.target.value)}
-              />
-            </Field>
-            <Field label="Currency">
-              <input
-                className={inputClass}
-                maxLength={3}
-                autoComplete="off"
-                autoCapitalize="characters"
-                value={draft.currency}
-                onChange={(e) => set("currency", e.target.value.toUpperCase())}
-              />
-            </Field>
             <Field label="Type">
               <select
                 className={inputClass}

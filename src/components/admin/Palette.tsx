@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, CornerDownLeft, Search, X } from "lucide-react";
-import { hasDomain, statusLabel, type AuthUser, type Page, type Property } from "@avhomes/contracts";
+import { hasDomain, listingLabel, type AuthUser, type Page, type Property } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useDebounced, useIsTouch } from "@/lib/admin/hooks";
 import { BottomSheet } from "./BottomSheet";
 import { IconButton } from "./ui";
-import { NAV_ITEMS, type NavItem } from "./nav";
+import { NAV_ITEMS, canSeeNavItem, type NavItem } from "./nav";
 
 /**
  * The topbar's search, opened by its handle or by Ctrl+K.
@@ -63,7 +63,7 @@ export function Palette({
   const isTouch = useIsTouch();
 
   const destinations = useMemo(
-    () => NAV_ITEMS.filter((item) => hasDomain(user.role, item.domain)),
+    () => NAV_ITEMS.filter((item) => canSeeNavItem(user.role, item)),
     [user.role],
   );
 
@@ -143,7 +143,10 @@ export function Palette({
       key: `listing:${p.id}`,
       href: `/admin/properties/${p.id}`,
       title: p.title || "Untitled listing",
-      meta: [statusLabel(p.status), p.city].filter(Boolean).join(" · "),
+      // The reader's own vocabulary, not the raw lifecycle: "Live" alone no
+      // longer says whether this is a sale or a rental, now that the two are
+      // split. listingLabel says both.
+      meta: [listingLabel(p.listingType, p.status), p.city].filter(Boolean).join(" · "),
       icon: <Building2 className="h-4 w-4" aria-hidden="true" />,
       group: "Listings",
     }));
