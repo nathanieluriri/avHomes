@@ -2,8 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useState } from "react";
 import { Building2, Plus, Star, Trash2 } from "lucide-react";
 import {
   LISTING_TYPES,
@@ -62,16 +62,66 @@ const STATUS_TONE: Record<PropertyStatus, Tone> = {
   archived: "neutral",
 };
 
+/**
+ * A Suspense boundary, because the screen below reads `useSearchParams`.
+ *
+ * Next prerenders this route, and a client component reading the query string
+ * inside a prerender has to sit under a boundary or the build refuses. This is
+ * the same construct that costs the PUBLIC listings page its server-rendered
+ * grid, and it is free here: the console is noindex, client-driven, and fetches
+ * everything after mount anyway, so there is no crawler to lose and nothing to
+ * server-render that was not already going to arrive late.
+ */
 export default function PropertiesPage() {
+  return (
+    <Suspense fallback={null}>
+      <PropertiesScreen />
+    </Suspense>
+  );
+}
+
+function PropertiesScreen() {
   const router = useRouter();
-  const [tab, setTab] = useState<"all" | PropertyStatus>("all");
-  // Separate from `tab`: lifecycle and deal type are two different axes, and
-  // "Sale" is not a status. See STATUS_TONE and PropertyStatus in @avhomes/contracts.
-  const [listingTypeFilter, setListingTypeFilter] = useState<"all" | ListingType>("all");
-  const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("updated");
-  const [search, setSearch] = useState("");
+  const params = useSearchParams();
+
+  /*
+   * THE URL IS THE SOURCE OF TRUTH for every filter on this screen.
+   *
+   * All four lived in `useState`, so `location.search` stayed empty and a
+   * filtered view could not be bookmarked, sent to somebody, or survive a
+   * refresh: an operator working through drafts lost their place on every
+   * reload. The public listings page has always done this correctly, which made
+   * the console the odd one out.
+   *
+   * Derived rather than mirrored. A second copy in state would need syncing
+   * back on every navigation, including the browser's own Back button, and that
+   * is the bug this shape avoids rather than manages.
+   */
+  const tab = (params.get("status") ?? "all") as "all" | PropertyStatus;
+  const listingTypeFilter = (params.get("type") ?? "all") as "all" | ListingType;
+  const sortParam = params.get("sort");
+  const sort = (SORTS.some((s) => s.value === sortParam) ? sortParam : "updated") as
+    (typeof SORTS)[number]["value"];
+  const search = params.get("q") ?? "";
+
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<ApiError | null>(null);
+
+  /*
+   * `replace`, not `push`: typing in the filter box would otherwise put one
+   * history entry per keystroke between the operator and wherever they came
+   * from. `scroll: false` because a filter change is not a navigation.
+   */
+  const setParam = useCallback(
+    (key: string, value: string) => {
+      const next = new URLSearchParams(params.toString());
+      if (value === "" || value === "all") next.delete(key);
+      else next.set(key, value);
+      const qs = next.toString();
+      router.replace(qs ? `?${qs}` : "/admin/properties", { scroll: false });
+    },
+    [params, router],
+  );
 
   /*
    * Trimmed once, here, and every consumer reads this. Passing the raw box
@@ -89,6 +139,9 @@ export default function PropertiesPage() {
     apply();
     paging.reset();
   }
+
+  /* The debounce still applies to what is TYPED; the URL carries the settled
+     value, so a bookmarked link is the query the operator meant. */
 
   const { data, error, loading, reload } = useAsync<Page<Property>>(
     (signal) =>
@@ -284,7 +337,7 @@ export default function PropertiesPage() {
             tabs={{
               value: tab,
               options: TABS,
-              onChange: (value) => refilter(() => setTab(value as "all" | PropertyStatus)),
+              onChange: (value) => refilter(() => setParam("status", value)),
             }}
             search={{
               value: search,
@@ -292,7 +345,7 @@ export default function PropertiesPage() {
               // location and tagline, so the box narrows as you type and the
               // placeholder can say so without overclaiming.
               placeholder: "Filter by title, city or area",
-              onChange: setSearch,
+              onChange: (value) => setParam("q", value),
             }}
             trailing={
               <>
@@ -304,7 +357,7 @@ export default function PropertiesPage() {
                   <select
                     value={listingTypeFilter}
                     onChange={(event) =>
-                      refilter(() => setListingTypeFilter(event.target.value as "all" | ListingType))
+                      refilter(() => setParam("type", event.target.value))
                     }
                     className={`${inputClass} font-medium sm:h-8 sm:w-auto sm:px-2 sm:py-0`}
                   >
@@ -325,7 +378,7 @@ export default function PropertiesPage() {
                       dense 32px toolbar box back exactly as it was. */}
                   <select
                     value={sort}
-                    onChange={(event) => refilter(() => setSort(event.target.value as typeof sort))}
+                    onChange={(event) => refilter(() => setParam("sort", event.target.value))}
                     className={`${inputClass} font-medium sm:h-8 sm:w-auto sm:px-2 sm:py-0`}
                   >
                     {SORTS.map((option) => (
@@ -361,11 +414,9 @@ export default function PropertiesPage() {
                 <Button
                   variant="ghost"
                   onClick={() =>
-                    refilter(() => {
-                      setTab("all");
-                      setListingTypeFilter("all");
-                      setSearch("");
-                    })
+                    /* One replace, not three: three would each read a stale
+                       `params` from this render and the last would win. */
+                    refilter(() => router.replace("/admin/properties", { scroll: false }))
                   }
                 >
                   Clear the filter

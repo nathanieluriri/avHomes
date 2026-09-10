@@ -26,7 +26,11 @@ export default function FeaturedListings({ properties }: { properties: Property[
       <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {properties.map((p, i) => (
           <Reveal key={p.id} delay={(i % 3) * 90}>
-            <PropertyCard property={p} priority={i < 3} />
+            {/* No `priority`. These sit below the fold on every viewport, and
+                preloading three of them put them in contention with the hero,
+                which is the LCP element. The hero is the only image on the
+                homepage that earns a preload. */}
+            <PropertyCard property={p} />
           </Reveal>
         ))}
       </div>

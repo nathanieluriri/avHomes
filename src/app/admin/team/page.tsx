@@ -306,7 +306,19 @@ function PersonRow({
 function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
   const assignable = ASSIGNABLE_ROLES.filter((r) => canAssign(actor, r));
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<AssignableRole>(assignable[0] ?? "agent");
+  /*
+   * UNSET, deliberately, rather than defaulting to `assignable[0]`.
+   *
+   * ASSIGNABLE_ROLES is ordered most-privileged first, so `assignable[0]` was
+   * always `developer` for an owner: the picker opened on owner-equivalent
+   * access, under a hint that says so in as many words. One hurried submit
+   * granted it, and nothing about the form suggested a choice had been made.
+   *
+   * Least-privileged-by-default was the other option and is worse here. It
+   * still makes a silent choice, and the roles are not a line anyway: an editor
+   * and a support user hold two domains each and neither contains the other.
+   */
+  const [role, setRole] = useState<AssignableRole | "">("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [result, setResult] = useState<{ url: string; emailed: boolean } | null>(null);
@@ -356,12 +368,19 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
             onChange={(e) => setEmail(e.target.value)}
           />
         </Field>
-        <Field label="Role" hint={ROLE_INFO[role].description}>
+        <Field
+          label="Role"
+          hint={role ? ROLE_INFO[role].description : "Pick what they may touch. There is no default."}
+        >
           <select
             className={inputClass}
+            required
             value={role}
             onChange={(e) => setRole(e.target.value as AssignableRole)}
           >
+            <option value="" disabled>
+              Choose a role
+            </option>
             {assignable.map((r) => (
               <option key={r} value={r}>
                 {ROLE_INFO[r].label}
@@ -372,7 +391,7 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
 
         {error && <ErrorNote error={error} />}
 
-        <Button type="submit" disabled={busy} className="w-full">
+        <Button type="submit" disabled={busy || role === ""} className="w-full">
           {busy ? "Sending" : "Send invite"}
         </Button>
       </form>

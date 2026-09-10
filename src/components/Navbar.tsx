@@ -55,6 +55,17 @@ export default function Navbar({
     document.body.style.overflow = "hidden";
     const trigger = triggerRef.current;
 
+    /*
+     * MOVE FOCUS IN. The Tab trap below has been correct for a while and did
+     * nothing, because a trap only engages once focus is already inside: on
+     * open, focus stayed on `document.body`, so the first Tab walked into the
+     * header links rendered ABOVE the panel in DOM order, behind the overlay.
+     *
+     * The first focusable in the panel rather than the panel itself, so the
+     * first Tab moves to the second item instead of into the sheet.
+     */
+    panelRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         closeMenu();

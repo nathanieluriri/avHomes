@@ -112,7 +112,23 @@ export default function ContactForm({
 
   if (state === "sent") {
     return (
-      <div className="rounded-2xl border border-mist-200 bg-white p-6 sm:p-8 lg:p-10">
+      /*
+       * `role="status"` and focus, because this REPLACES the form rather than
+       * appearing beside it. Without the live region a screen reader was told
+       * nothing at all: the form vanished and something else took its place,
+       * which is a DOM change no assistive technology announces on its own.
+       *
+       * `tabIndex={-1}` with an autofocus makes it programmatically focusable
+       * without adding it to the tab order, which also solves the sighted half:
+       * submitting from the bottom of a long form left the confirmation above
+       * the fold, so the page looked like it had simply emptied.
+       */
+      <div
+        role="status"
+        tabIndex={-1}
+        ref={(el) => el?.focus()}
+        className="rounded-2xl border border-mist-200 bg-white p-6 outline-none sm:p-8 lg:p-10"
+      >
         <h2 className="text-lg font-bold tracking-tight text-plum-950">Message received</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Thank you. A member of the team will respond within one business day. If it is urgent, call
