@@ -4,6 +4,20 @@ import type { AuthUser } from "@avhomes/contracts";
 import { UnauthenticatedError } from "./errors";
 
 /**
+ * What a route hands the audit middleware that it has no other way to reach:
+ * the record's state before a change, an actor established mid-request, or an
+ * id minted during a create. A shape, not behaviour, so it lives here instead
+ * of pulling the audit package into core.
+ */
+export interface AuditHandle {
+  setBefore(doc: Record<string, unknown>): void;
+  /** For routes that establish an actor rather than inherit one. */
+  setActor(user: AuthUser): void;
+  /** For creates, which mint an id the path does not carry. */
+  setEntityId(id: string): void;
+}
+
+/**
  * The Hono context typing every router in the application shares.
  *
  * `dbFactory` rather than `db`, and the difference is measurable: a request that
@@ -18,6 +32,8 @@ export interface AppVariables {
   user: AuthUser | null;
   /** The session id, so a caller can see which of its own sessions is current. */
   sessionId: string | null;
+  /** Set by the audit middleware. Absent above it, which is why it is optional. */
+  audit?: AuditHandle;
 }
 
 export type AppEnv = { Variables: AppVariables };
@@ -60,4 +76,17 @@ export function clientIp(c: Context<AppEnv>): string {
   const forwarded = c.req.header("x-forwarded-for");
   const first = forwarded?.split(",")[0]?.trim();
   return first || c.req.header("x-real-ip") || "unknown";
+}
+
+/** All three no-op when called above the middleware, so a route need not check. */
+export function auditBefore(c: Context<AppEnv>, doc: Record<string, unknown>): void {
+  c.get("audit")?.setBefore(doc);
+}
+
+export function auditActor(c: Context<AppEnv>, user: AuthUser): void {
+  c.get("audit")?.setActor(user);
+}
+
+export function auditEntityId(c: Context<AppEnv>, id: string): void {
+  c.get("audit")?.setEntityId(id);
 }

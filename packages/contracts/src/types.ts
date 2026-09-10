@@ -473,6 +473,50 @@ export interface SitePulse {
   views: number;
 }
 
+/* ───────────────────────────────── audit ──────────────────────────────── */
+
+/** The entity kinds an audit entry can name. See the spec's derivation table. */
+export const AUDIT_ENTITIES = [
+  "property", "post", "category", "image", "enquiry", "user", "invite",
+  "testimonial", "stat", "note", "settings", "session", "auth", "unknown",
+] as const;
+export type AuditEntity = (typeof AUDIT_ENTITIES)[number];
+
+export interface AuditEntry {
+  id: string;
+  /** Epoch ms, like every other timestamp here. */
+  at: number;
+  /** SNAPSHOT of the actor, not a join. A renamed or deleted user must not
+   *  rewrite who did a thing last year. */
+  actorId: string;
+  actorName: string;
+  actorRole: Role;
+  /** "property", "post", "user", "enquiry", ... see the derivation table. */
+  entity: AuditEntity;
+  /** The record's id, or null where there is not one. See the table. */
+  entityId: string | null;
+  /** "create" | "update" | "delete" | "op:<name>". See the table. */
+  action: string;
+  /** What the caller asked for. The request body, redacted. */
+  requested: Record<string, unknown> | null;
+  /** What the record looked like first. Only where a route supplies it. */
+  before: Record<string, unknown> | null;
+  method: string;
+  /** Path only. The query string is captured separately, below. */
+  path: string;
+  /** Parsed query parameters, redacted like any other payload. Null when
+   *  there were none. `DELETE /admin/properties/:id?baseRevision=7` carries
+   *  its only interesting argument here, so dropping it would record a
+   *  deletion with no record of what was asked for. */
+  query: Record<string, string> | null;
+  status: number;
+  /** Ties an entry to the error-table line and the server log for the same call. */
+  requestId: string;
+  /** Written beside the real expiry solely so a TTL index can sweep the row.
+   *  Never read by the application. */
+  expiresAtDate: Date;
+}
+
 /* ───────────────────────────── shared paging ──────────────────────────── */
 
 export interface Page<T> {
