@@ -18,6 +18,7 @@ import {
   sessionMiddleware,
   teamRoutes,
 } from "@avhomes/identity";
+import { auditRoutes, auditTrail } from "@avhomes/audit";
 import { listingsAdminRoutes, listingsPublicRoutes } from "@avhomes/listings";
 import { contentAdminRoutes, contentPublicRoutes } from "@avhomes/content";
 import {
@@ -259,10 +260,17 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, audiencePublicRoutes());
   app.route(API_PREFIX, settingsPublicRoutes());
 
-  /* ═════════════════ 9. session, then the domain gate ═════════════════ */
+  /* ═════════════════ 9. session, the domain gate, then the audit trail ═════════ */
 
   app.use(`${API_PREFIX}/*`, sessionMiddleware());
   app.use(`${API_PREFIX}/*`, rolePermissions());
+
+  /*
+   * BELOW rolePermissions, not above it: a request the domain gate refuses
+   * never happened as far as the data is concerned, and recording correctly
+   * rejected attempts would fill the log with noise that looks like activity.
+   */
+  app.use(`${API_PREFIX}/*`, auditTrail());
 
   /* ═════════════════ 10. the authenticated surface ════════════════════ */
 
@@ -278,6 +286,17 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, passwordRoutes());
 
   app.route(API_PREFIX, teamRoutes({ mailer }));
+  /*
+   * BEFORE listingsAdminRoutes, deliberately. Its second route, GET
+   * /admin/properties/:id/history, sits on a path listingsAdminRoutes also
+   * claims a piece of, and Hono resolves two routers claiming one path by
+   * registration order. The only route that package registers on a fourth
+   * path segment is POST /admin/properties/:id/:op, a different method, so
+   * there is nothing on GET for it to collide with today. Mounted first
+   * anyway: a GET ever added to that same shape would be the one shadowed,
+   * not this route.
+   */
+  app.route(API_PREFIX, auditRoutes());
   app.route(API_PREFIX, listingsAdminRoutes());
   app.route(API_PREFIX, contentAdminRoutes());
   app.route(API_PREFIX, mediaRoutes({ storage }));

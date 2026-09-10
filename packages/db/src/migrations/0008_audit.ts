@@ -81,8 +81,9 @@ carry no inner schema beyond "object or null": every one of them mirrors
 whatever the audited route already accepts, and shaping them here would turn
 every new field any admin route adds to its own body into a migration in this
 package too, exactly the cross-package coupling the feature-package import
-rule (audit may depend on contracts, core and db, and nothing else) exists to
-keep out.`,
+rule (audit may depend on contracts, core, db and identity, identity being a
+shared lower tier every feature package imports rather than a peer, and
+nothing else) exists to keep out.`,
 
   async up(db) {
     await ensureCollection(db, COLLECTIONS.audit, {

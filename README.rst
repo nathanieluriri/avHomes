@@ -70,6 +70,7 @@ Package                       Holds
 ``@avhomes/media``            The image library and its storage port
                               (Cloudinary, Vercel Blob, or a local folder).
 ``@avhomes/enquiries``        Contact intake and the inbox.
+``@avhomes/audit``            The audit middleware, its collection and reader.
 ``@avhomes/api``              ``createApp()``: the composition root.
 ============================  ================================================
 
