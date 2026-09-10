@@ -1,6 +1,7 @@
 import type {
   ClientLogo,
   Office,
+  SocialPlatform,
   Page,
   PriceChange,
   Property,
@@ -192,6 +193,7 @@ export interface PublicSettings {
   whatsappNumber: string;
   offices: Office[];
   clientLogos: ClientLogo[];
+  social: Record<SocialPlatform, string>;
 }
 
 /**
@@ -209,6 +211,7 @@ const NO_SETTINGS: PublicSettings = {
   whatsappNumber: "",
   offices: [],
   clientLogos: [],
+  social: { linkedin: "", instagram: "", facebook: "", x: "" },
 };
 
 export async function getSiteSettings(): Promise<PublicSettings> {

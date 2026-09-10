@@ -343,6 +343,16 @@ export interface EnquiryThread {
 export const REPLY_IDENTITIES = ["individual", "team"] as const;
 export type ReplyIdentity = (typeof REPLY_IDENTITIES)[number];
 
+/**
+ * The platforms the footer and the mobile sheet draw an icon for.
+ *
+ * A fixed list rather than free text, because each one needs a hand-drawn SVG
+ * and an unknown platform would render an empty hole. Adding one means adding
+ * an icon, which is the point of making it a closed set.
+ */
+export const SOCIAL_PLATFORMS = ["linkedin", "instagram", "facebook", "x"] as const;
+export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
+
 /** A staffed address a visitor can turn up to. */
 export interface Office {
   label: string;
@@ -379,6 +389,15 @@ export interface SiteSettings {
   whatsappNumber: string;
   offices: Office[];
   clientLogos: ClientLogo[];
+  /**
+   * Profile URLs, keyed by platform. Empty means the icon is not drawn.
+   *
+   * These were hardcoded, and two of the four pointed at `linkedin.com` and
+   * `facebook.com`, the sites' own front pages rather than any profile. An icon
+   * that looks like a link to your company and lands on a login wall is the
+   * same broken promise as the placeholder phone number.
+   */
+  social: Record<SocialPlatform, string>;
   updatedAt: number;
   revision: number;
 }

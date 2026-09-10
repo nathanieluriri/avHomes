@@ -4,7 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { socialLinks } from "./SocialIcons";
+import type { SocialPlatform } from "@avhomes/contracts";
+import { socialLinksFrom } from "./SocialIcons";
 
 const links = [
   { href: "/", label: "Home" },
@@ -18,7 +19,14 @@ const links = [
 const EXIT_MS = 420;
 const FOCUSABLE = "a[href], button:not([disabled])";
 
-export default function Navbar({ contactEmail = "" }: { contactEmail?: string }) {
+export default function Navbar({
+  contactEmail = "",
+  social,
+}: {
+  contactEmail?: string;
+  social: Record<SocialPlatform, string>;
+}) {
+  const socialLinks = socialLinksFrom(social);
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);

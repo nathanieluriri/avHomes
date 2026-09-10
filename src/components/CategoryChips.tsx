@@ -16,10 +16,23 @@ const TYPES: (PropertyType | "All")[] = [
   "Mansion",
 ];
 
-/** Plural display label so the row reads like a category nav, not a schema dump. */
+/**
+ * Plural display label so the row reads like a category nav, not a schema dump.
+ *
+ * A map, not a suffix. `${t}s` with one hardcoded exception for Terrace read
+ * "Duplexs" on the two most-viewed pages on the site, and the next type ending
+ * in -x, -s or -h would have joined it silently. Anything absent falls back to
+ * the suffix, which is right for the regular cases and wrong loudly rather
+ * than quietly for a new irregular one.
+ */
+const PLURALS: Record<string, string> = {
+  Terrace: "Terraces",
+  Duplex: "Duplexes",
+};
+
 function label(t: string) {
   if (t === "All") return "All";
-  return t === "Terrace" ? "Terraces" : `${t}s`;
+  return PLURALS[t] ?? `${t}s`;
 }
 
 export default function CategoryChips({ scrollOnSelect = false }: { scrollOnSelect?: boolean }) {

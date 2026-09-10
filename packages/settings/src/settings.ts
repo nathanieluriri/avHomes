@@ -8,6 +8,7 @@ import {
   type Office,
   type ReplyIdentity,
   type SiteSettings,
+  type SocialPlatform,
 } from "@avhomes/contracts";
 import { requireAdmin, requireAuth } from "@avhomes/identity";
 
@@ -44,6 +45,7 @@ interface SettingsDoc {
   whatsappNumber: string;
   offices: Office[];
   clientLogos: ClientLogo[];
+  social: Record<SocialPlatform, string>;
   updatedAt: number;
   revision: number;
 }
@@ -64,6 +66,18 @@ const DEFAULTS: SiteSettings = {
   whatsappNumber: "",
   offices: [],
   clientLogos: [],
+  /*
+   * Instagram and X carry the accounts the site already advertised and that the
+   * QA pass confirmed are real. LinkedIn and Facebook start EMPTY rather than
+   * keeping what was there, because what was there was `linkedin.com` and
+   * `facebook.com`: not profiles, and not ours to guess.
+   */
+  social: {
+    linkedin: "",
+    instagram: "https://www.instagram.com/_avconstruction",
+    facebook: "",
+    x: "https://x.com/_avconstruction",
+  },
   updatedAt: 0,
   revision: 0,
 };
@@ -78,6 +92,7 @@ const WRITABLE = [
   "whatsappNumber",
   "offices",
   "clientLogos",
+  "social",
 ] as const;
 
 function settings(db: Db) {
@@ -98,6 +113,7 @@ export async function readSettings(db: Db): Promise<SiteSettings> {
     whatsappNumber: doc.whatsappNumber ?? "",
     offices: doc.offices ?? [],
     clientLogos: doc.clientLogos ?? [],
+    social: { ...DEFAULTS.social, ...(doc.social ?? {}) },
     updatedAt: doc.updatedAt,
     revision: doc.revision,
   };
@@ -115,6 +131,7 @@ export interface PublicSiteSettings {
   whatsappNumber: string;
   offices: Office[];
   clientLogos: ClientLogo[];
+  social: Record<SocialPlatform, string>;
 }
 
 export async function readPublicSettings(db: Db): Promise<PublicSiteSettings> {
@@ -125,6 +142,7 @@ export async function readPublicSettings(db: Db): Promise<PublicSiteSettings> {
     whatsappNumber: s.whatsappNumber,
     offices: s.offices,
     clientLogos: s.clientLogos,
+    social: s.social,
   };
 }
 
@@ -158,6 +176,18 @@ const optionalEmail = z.union([z.literal(""), email()]);
  */
 const whatsapp = z.union([z.literal(""), str().trim().regex(/^[0-9]{7,15}$/u, "digits")]);
 
+/**
+ * An absolute https URL, or empty.
+ *
+ * `https` specifically: every one of these is rendered as an outbound link in
+ * the footer, and a stored `javascript:` or a scheme-relative `//evil` would be
+ * an injection through the settings screen.
+ */
+const socialUrl = z.union([
+  z.literal(""),
+  str().trim().max(300).regex(/^https:\/\/[^\s]+$/u, "https-url"),
+]);
+
 const OfficeBody = z
   .object({
     label: str().min(1).max(80).trim(),
@@ -182,6 +212,19 @@ const UpdateBody = z
     whatsappNumber: whatsapp.optional(),
     offices: z.array(OfficeBody).max(8).optional(),
     clientLogos: z.array(ClientLogoBody).max(16).optional(),
+    /* Spelled out rather than built from SOCIAL_PLATFORMS. A generated shape
+       needs a cast to satisfy zod's inference, and a cast here would be the one
+       place a new platform could slip past validation unnoticed. */
+    social: z
+      .object({
+        linkedin: socialUrl,
+        instagram: socialUrl,
+        facebook: socialUrl,
+        x: socialUrl,
+      })
+      .partial()
+      .strict()
+      .optional(),
   })
   .strict();
 

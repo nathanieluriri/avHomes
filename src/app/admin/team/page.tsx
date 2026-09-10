@@ -232,7 +232,8 @@ function PersonRow({
           {user.email}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {user.listingCount} listings · {user.postCount} posts
+          {user.listingCount} {user.listingCount === 1 ? "listing" : "listings"} ·{" "}
+          {user.postCount} {user.postCount === 1 ? "post" : "posts"}
         </p>
       </div>
 

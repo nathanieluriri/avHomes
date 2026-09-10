@@ -45,7 +45,11 @@ export default function ContactForm({
     setState("sending");
     setError(null);
 
-    const subject = String(form.get("subject") ?? "general");
+    /* The LABEL, not the stored value. This put "[viewing]" at the head of
+       the message an operator reads, where "[Book a viewing]" was meant. */
+    const subjectValue = String(form.get("subject") ?? "general");
+    const subject =
+      SUBJECTS.find((s) => s.value === subjectValue)?.label ?? subjectValue;
     const message = String(form.get("message") ?? "");
 
     try {

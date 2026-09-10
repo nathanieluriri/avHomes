@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ChevronRight, Check, MapPin, ArrowUpRight } from "lucide-react";
+import { ChevronRight, Check, ArrowUpRight } from "lucide-react";
 
 import {
   getProperties,
-  getPropertyBySlug,
   getPropertyDetail,
   formatPrice,
   listingLabel,
 } from "@/lib/data";
+import { SITE_DOMAIN, SITE_NAME } from "@/lib/api-config";
+import JsonLd from "@/components/JsonLd";
 import PropertyCard from "@/components/PropertyCard";
 import Reveal from "@/components/Reveal";
 import Gallery from "@/components/Gallery";
@@ -23,14 +24,85 @@ export async function generateStaticParams() {
     .map((property) => ({ slug: property.slug }));
 }
 
+/** Absolute, because an og:image or a structured-data URL resolves nothing. */
+function absolute(path: string): string {
+  return path.startsWith("http") ? path : `${SITE_DOMAIN}${path}`;
+}
+
+/**
+ * What a listing says about itself when it is not being looked at directly.
+ *
+ * This used to be a title and nothing else. No og tags, no twitter card, no
+ * canonical, so a listing forwarded on WhatsApp arrived as a bare blue link
+ * with no photograph, no price and no address, which is most of how property
+ * moves here. The description was inherited from the root layout, so all
+ * twenty-odd listings and the homepage shared one sentence.
+ *
+ * The shape follows the post route, which already did all of this. The one
+ * difference is what goes in the description: a post has an excerpt somebody
+ * wrote, and a listing has facts, so it is assembled from the ones a reader
+ * decides on. Price first, because that is the question.
+ */
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const property = await getPropertyBySlug(slug);
-  return { title: property ? `${property.title} | AVHomes` : "Property | AVHomes" };
+  const detail = await getPropertyDetail(slug);
+  // Empty object lets the page itself produce the 404.
+  if (!detail) return {};
+  const { property } = detail;
+
+  const price = formatPrice(property.priceMinor, property);
+  const deal = listingLabel(property.listingType, property.status);
+  /*
+   * `location` is authored as a whole trail, "Banana Island, Ikoyi, Lagos", and
+   * on every row it already ends with the city. Appending the city produced
+   * "Banana Island, Ikoyi, Lagos, Lagos", so it is added only when genuinely
+   * absent rather than assumed missing.
+   */
+  const where = property.city && !property.location.includes(property.city)
+    ? [property.location, property.city].filter(Boolean).join(", ")
+    : property.location;
+  const description = [
+    `${deal} at ${price}.`,
+    `${property.bedrooms} bed, ${property.bathrooms} bath ${property.type.toLowerCase()} in ${where}.`,
+    property.tagline,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  /*
+   * The CITY here, not the full trail. This is read in a chat list where the
+   * line is truncated, so it carries the two things that decide whether anybody
+   * opens it, and the title usually names the neighbourhood already.
+   */
+  const headline = `${[property.title, property.city].filter(Boolean).join(", ")} at ${price}`;
+
+  const canonical = `/listings/${property.slug}`;
+  const hero = property.images[0] ? absolute(property.images[0]) : null;
+
+  return {
+    title: property.title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      // Carries the price, because a forwarded link is read in a chat list
+      // where the title is often the only line that survives.
+      title: headline,
+      description,
+      url: absolute(canonical),
+      siteName: SITE_NAME,
+      ...(hero ? { images: [{ url: hero, alt: property.title }] } : {}),
+    },
+    twitter: {
+      card: hero ? "summary_large_image" : "summary",
+      title: headline,
+      description,
+      ...(hero ? { images: [hero] } : {}),
+    },
+  };
 }
 
 export default async function PropertyPage({
@@ -74,8 +146,73 @@ export default async function PropertyPage({
     property.address
   )}`;
 
+  /*
+   * RealEstateListing, not Product.
+   *
+   * Product plus Offer is the tempting shape because the price maps cleanly,
+   * but it describes something with a stock level that ships, and it invites
+   * rich results this page cannot honour. RealEstateListing is the type Google
+   * documents for exactly this, and the fields it wants are ones the page is
+   * already rendering: the address, the room counts, the floor area and the
+   * price are all on screen a few lines below.
+   *
+   * `availability` follows the lifecycle rather than being hardcoded, so a
+   * listing marked under offer or closed does not keep telling a crawler it is
+   * for sale. That is the same class of bug as the archived listing that stayed
+   * indexable, and getting it wrong here would put the lie in structured data
+   * where a person cannot see it.
+   */
+  const price = formatPrice(property.priceMinor, property);
+  const canonical = absolute(`/listings/${property.slug}`);
+  const listingJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateListing",
+    name: property.title,
+    description: property.description || property.tagline,
+    url: canonical,
+    datePosted: property.publishedAt ? new Date(property.publishedAt).toISOString() : undefined,
+    image: property.images.map(absolute),
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: property.address,
+      addressLocality: property.city,
+      addressCountry: "NG",
+    },
+    numberOfBedrooms: property.bedrooms,
+    numberOfBathroomsTotal: property.bathrooms,
+    floorSize: { "@type": "QuantitativeValue", value: property.areaSqft, unitCode: "FTK" },
+    offers: {
+      "@type": "Offer",
+      price: property.priceMinor / 100,
+      priceCurrency: property.currency,
+      availability:
+        property.status === "live"
+          ? "https://schema.org/InStock"
+          : property.status === "under-offer"
+            ? "https://schema.org/LimitedAvailability"
+            : "https://schema.org/SoldOut",
+    },
+  };
+
+  /*
+   * Matching the breadcrumb the page actually draws, three lines down. A
+   * BreadcrumbList that disagrees with the visible trail is worse than none:
+   * it is the one piece of structured data a reader can check by looking.
+   */
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: absolute("/") },
+      { "@type": "ListItem", position: 2, name: "Listings", item: absolute("/listings") },
+      { "@type": "ListItem", position: 3, name: property.title, item: canonical },
+    ],
+  };
+
   return (
     <>
+      <JsonLd data={listingJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <nav
         aria-label="Breadcrumb"
         className="border-b border-mist-200 bg-white pb-3 pt-24"
@@ -183,19 +320,6 @@ export default async function PropertyPage({
                 <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
                   {property.address}
                 </p>
-
-                <div className="mt-5 flex items-start gap-3 rounded-xl border border-dashed border-slate-500/30 bg-mist-50 p-4">
-                  <MapPin
-                    className="mt-0.5 h-5 w-5 shrink-0 text-slate-500"
-                    strokeWidth={1.8}
-                    aria-hidden="true"
-                  />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    An interactive map loads here once this listing is connected to
-                    the live API. Use the link below to open the address in Google
-                    Maps.
-                  </p>
-                </div>
 
                 <a
                   href={mapsHref}

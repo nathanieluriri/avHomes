@@ -1,25 +1,27 @@
 import Link from "next/link";
 import Image from "next/image";
-import { socialLinks } from "./SocialIcons";
+import type { SocialPlatform } from "@avhomes/contracts";
+import { socialLinksFrom } from "./SocialIcons";
 import FooterSubscribe from "./FooterSubscribe";
 
 const columns: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "About Us",
     links: [
-      { label: "Our Story", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Press", href: "#" },
-      { label: "Blog", href: "/posts" },
+      /* Our Story, Careers and Press were href="#". An honest short column
+         beats a long one where most of it does nothing: a reader who clicks
+         two dead links stops trusting the third. Put them back when the pages
+         exist. */
+      { label: "Journal", href: "/posts" },
     ],
   },
   {
     title: "Resources",
     links: [
-      { label: "FAQs", href: "#" },
-      { label: "Buying Guide", href: "#" },
-      { label: "Renting Guide", href: "#" },
-      { label: "Market Reports", href: "#" },
+      /* FAQs, Buying Guide, Renting Guide and Market Reports were all
+         href="#". The two guides are worth writing, and when they are they are
+         posts, which is where this points. */
+      { label: "Guides", href: "/posts" },
     ],
   },
   {
@@ -36,13 +38,17 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: "Get in Touch", href: "/contact" },
       { label: "Book a Viewing", href: "/contact" },
-      { label: "Agent Network", href: "#" },
       { label: "Support", href: "/contact" },
     ],
   },
 ];
 
-export default function Footer() {
+export default function Footer({
+  social,
+}: {
+  social: Record<SocialPlatform, string>;
+}) {
+  const links = socialLinksFrom(social);
   return (
     <footer className="relative overflow-hidden bg-plum-950 text-white/70">
       {/* Faint architectural photo under a near opaque navy wash, so the footer still carries real imagery without losing text contrast. */}
@@ -103,8 +109,11 @@ export default function Footer() {
           ))}
         </div>
 
+        {/* Hidden entirely when nothing is set, rather than drawn as an empty
+            row of nothing. */}
+        {links.length > 0 && (
         <div className="mt-12 flex gap-3">
-          {socialLinks.map(({ label, href, Icon }) => (
+          {links.map(({ label, href, Icon }) => (
             <a
               key={label}
               href={href}
@@ -117,6 +126,7 @@ export default function Footer() {
             </a>
           ))}
         </div>
+        )}
 
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/15 pt-8 text-xs text-white/50 sm:flex-row">
           <p>&copy; 2026 AVHomes. All rights reserved.</p>

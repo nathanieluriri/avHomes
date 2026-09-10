@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif, Spectral, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
+import { SITE_DOMAIN } from "@/lib/api-config";
+
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 // preload:false keeps six Spectral files out of the head of every shop page
@@ -28,9 +30,19 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
+  /*
+   * Every `alternates.canonical` and `openGraph.url` written as a path in this
+   * tree resolves against this. Without it Next emits the path unchanged, and a
+   * canonical or an og:url that is not absolute is one a crawler discards.
+   *
+   * It comes from the deployment rather than a constant, so a preview names
+   * itself and production names the stable alias. See SITE_DOMAIN.
+   */
+  metadataBase: new URL(SITE_DOMAIN),
   title: "AVHomes | Buy. Sell. Rent.",
   description:
     "AVHomes lists vetted homes across Lagos and Abuja, backed by the build quality of AV Constructions.",
+  alternates: { canonical: "/" },
 };
 
 /**

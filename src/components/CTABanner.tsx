@@ -37,8 +37,11 @@ export default function CTABanner() {
                   strokeWidth={2}
                 />
               </Link>
+              {/* `/posts`, not `#insights`. There is no element with that id on
+                  this page or any other, so the site's secondary call to action
+                  scrolled nowhere and produced no error either. */}
               <Link
-                href="#insights"
+                href="/posts"
                 className="rounded-full border border-white/35 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:border-white hover:bg-white/10"
               >
                 Learn More

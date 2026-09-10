@@ -4,10 +4,12 @@ import { useState } from "react";
 import { Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
   REPLY_IDENTITIES,
+  SOCIAL_PLATFORMS,
   type ClientLogo,
   type Office,
   type ReplyIdentity,
   type SiteSettings,
+  type SocialPlatform,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
@@ -58,7 +60,16 @@ interface Draft {
   whatsappNumber: string;
   offices: Office[];
   clientLogos: ClientLogo[];
+  social: Record<SocialPlatform, string>;
 }
+
+/** Field labels only. What is stored is the whole URL. */
+const SOCIAL_LABEL: Record<SocialPlatform, string> = {
+  linkedin: "LinkedIn",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  x: "X",
+};
 
 function toDraft(s: SiteSettings): Draft {
   return {
@@ -70,6 +81,7 @@ function toDraft(s: SiteSettings): Draft {
     whatsappNumber: s.whatsappNumber,
     offices: s.offices,
     clientLogos: s.clientLogos,
+    social: s.social,
   };
 }
 
@@ -281,6 +293,29 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
                 onChange={(event) => set("whatsappNumber", toWhatsappDigits(event.target.value))}
               />
             </Field>
+          </Card>
+
+          <Card className="space-y-4">
+            <CardHead title="Social profiles" />
+            <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
+              The full URL of each profile. An icon is drawn only for the ones
+              you fill in, so leaving one empty hides it rather than linking
+              somewhere that is not yours.
+            </p>
+            {SOCIAL_PLATFORMS.map((platform) => (
+              <Field key={platform} label={SOCIAL_LABEL[platform]}>
+                <input
+                  className={inputClass}
+                  type="url"
+                  inputMode="url"
+                  value={draft.social[platform]}
+                  placeholder="https://..."
+                  onChange={(event) =>
+                    set("social", { ...draft.social, [platform]: event.target.value })
+                  }
+                />
+              </Field>
+            ))}
           </Card>
 
           <Card className="space-y-4">

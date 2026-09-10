@@ -1,3 +1,4 @@
+import { SOCIAL_PLATFORMS, type SocialPlatform } from "@avhomes/contracts";
 /**
  * Brand glyphs as inline SVG. lucide dropped brand icons over trademark
  * concerns, so the marks live here rather than pulling another dependency.
@@ -37,9 +38,27 @@ export function XIcon({ className }: IconProps) {
   );
 }
 
-export const socialLinks = [
-  { label: "LinkedIn", href: "https://www.linkedin.com", Icon: LinkedInIcon },
-  { label: "Instagram", href: "https://www.instagram.com/_avconstruction", Icon: InstagramIcon },
-  { label: "Facebook", href: "https://www.facebook.com", Icon: FacebookIcon },
-  { label: "X", href: "https://x.com/_avconstruction", Icon: XIcon },
-];
+/**
+ * The ICONS, keyed by platform. The URLs live in settings.
+ *
+ * This file used to own both, and two of the four hrefs were `linkedin.com`
+ * and `facebook.com`: the sites' own front pages, not any profile of ours. An
+ * icon that looks like a link to the company and lands on a login wall is the
+ * same broken promise as the placeholder phone number, and neither belongs in
+ * source where nobody can correct it.
+ */
+export const SOCIAL_META: Record<SocialPlatform, { label: string; Icon: typeof LinkedInIcon }> = {
+  linkedin: { label: "LinkedIn", Icon: LinkedInIcon },
+  instagram: { label: "Instagram", Icon: InstagramIcon },
+  facebook: { label: "Facebook", Icon: FacebookIcon },
+  x: { label: "X", Icon: XIcon },
+};
+
+/** The ones with a URL set, in a stable order. An unset platform is not drawn. */
+export function socialLinksFrom(social: Record<SocialPlatform, string>) {
+  return SOCIAL_PLATFORMS.filter((p) => social[p]?.trim()).map((p) => ({
+    platform: p,
+    href: social[p],
+    ...SOCIAL_META[p],
+  }));
+}

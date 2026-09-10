@@ -34,9 +34,9 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
      * chat bubble over its sign-in form.
      */
     <ChatProvider>
-      <Navbar contactEmail={site.contactEmail} />
+      <Navbar contactEmail={site.contactEmail} social={site.social} />
       <main className="flex-1">{children}</main>
-      <Footer />
+      <Footer social={site.social} />
       <CookieBanner />
       {/* Counts storefront visits only, and only once the banner above is accepted. */}
       <SitePulse />

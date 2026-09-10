@@ -8,7 +8,7 @@ import ArticleTemplate from "@/components/blog/ArticleTemplate";
 import ShareLinks from "@/components/blog/ShareLinks";
 import ReadingProgress from "@/components/blog/ReadingProgress";
 import SubscribeBanner from "@/components/blog/SubscribeBanner";
-import JsonLd from "@/components/blog/JsonLd";
+import JsonLd from "@/components/JsonLd";
 
 /** Absolute, because structured data and og:url consumers resolve nothing. */
 function absolute(path: string): string {

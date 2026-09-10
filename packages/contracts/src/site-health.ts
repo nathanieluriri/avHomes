@@ -94,6 +94,8 @@ export interface SiteHealthSnapshot {
     whatsappNumber: string;
     offices: Office[];
     clientLogos: ClientLogo[];
+    /** Profile URLs by platform. Empty means that icon is not drawn. */
+    social: Record<string, string>;
   };
   enquiries: {
     /** New and unanswered for more than two days. */
@@ -234,6 +236,22 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
         "The contact page can only offer a form, so a visitor has no way to check there is a real place and a real company behind the site.",
       action: { label: "Add an office", href: "/admin/settings" },
     });
+  }
+
+  {
+    const unset = Object.entries(settings.social)
+      .filter(([, url]) => url.trim() === "")
+      .map(([platform]) => platform);
+    if (unset.length > 0) {
+      out.push({
+        id: "social-links-unset",
+        severity: "advisory",
+        domain: null,
+        title: `${unset.length} social ${plural(unset.length, "profile is", "profiles are")} not linked`,
+        message: `The footer draws an icon only for the profiles you have filled in, so ${unset.join(" and ")} ${plural(unset.length, "is", "are")} missing rather than wrong. Two of these used to point at the platforms' own front pages instead of at you.`,
+        action: { label: "Add your profiles", href: "/admin/settings" },
+      });
+    }
   }
 
   if (settings.clientLogos.length === 0) {

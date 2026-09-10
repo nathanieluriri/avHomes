@@ -88,8 +88,22 @@ export default async function PostsIndexPage({
       </div>
 
       {posts.length === 0 ? (
+        /* TWO empty states, because they are two different facts. This printed
+           "Nothing tagged ." with the interpolation hole showing and an
+           orphaned full stop whenever the journal was simply empty, and offered
+           "See every post" as a link to the page the reader was already on. */
         <p className="idx__empty">
-          Nothing tagged {tag}. <Link href="/posts" className="doc-link">See every post</Link>.
+          {tag ? (
+            <>
+              Nothing tagged {tag}.{" "}
+              <Link href="/posts" className="doc-link">
+                See every post
+              </Link>
+              .
+            </>
+          ) : (
+            "No posts yet. Guides on buying, renting and building here are on the way."
+          )}
         </p>
       ) : (
         <div className="idx__grid">

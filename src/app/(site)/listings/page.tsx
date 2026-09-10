@@ -9,6 +9,18 @@ import Reveal from "@/components/Reveal";
 
 export const metadata = {
   title: "Listings | AVHomes",
+  description:
+    "Every AVHomes property for sale and to rent across Lagos and Abuja, checked on site before it goes live.",
+  /*
+   * ONE canonical for every filter permutation. `?type=Villa`, `?beds=5` and
+   * `?q=Lekki` all serve near-identical markup over a subset of the same rows,
+   * and left uncanonicalised they compete with each other and with the bare
+   * page for the same result.
+   *
+   * The filtered URLs stay perfectly usable and shareable. This says which one
+   * of them is the page.
+   */
+  alternates: { canonical: "/listings" },
 };
 
 interface Search {
