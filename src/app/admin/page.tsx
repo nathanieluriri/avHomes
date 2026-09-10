@@ -10,12 +10,11 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { hasDomain, type Domain, type SiteAlert, type SitePulse } from "@avhomes/contracts";
+import { hasDomain, type Domain, type SitePulse } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync, useSession } from "@/lib/admin/hooks";
 import { relative } from "@/lib/admin/format";
 import { Badge, Card, ErrorNote, Skeleton } from "@/components/admin/ui";
-import { AlertBanner } from "@/components/admin/Alerts";
 import { PulseStrip } from "@/components/admin/PulseStrip";
 import { StorefrontCard } from "@/components/admin/StorefrontCard";
 
@@ -120,19 +119,6 @@ export default function DashboardPage() {
     [],
   );
 
-  /*
-   * A SECOND, INDEPENDENT read rather than another field on the dashboard
-   * payload. The alerts page and the rail both want this list without the
-   * counts, and a launcher that fails to render its destinations because a
-   * health check timed out has broken the one thing it is for. Its error is
-   * swallowed on purpose: a missing banner is a quiet degradation, and there is
-   * already a red box on this screen for the read that matters.
-   */
-  const { data: health } = useAsync<{ alerts: SiteAlert[] }>(
-    (signal) => api.get<{ alerts: SiteAlert[] }>("/admin/health", signal),
-    [],
-  );
-
   const user = session.status === "signed-in" ? session.user : null;
   const firstName = user?.displayName.trim().split(/\s+/)[0] ?? "";
 
@@ -141,15 +127,6 @@ export default function DashboardPage() {
        the destinations first on a phone with `order` and leave the desktop
        sequence exactly as it is. The two produce the same 32px rhythm. */
     <div className="flex flex-col gap-8">
-      {/* Above everything, on a phone as well. The rest of this screen is a
-          briefing that reorders itself around what a thumb can reach; this is
-          the one block that is already a list of things to press. */}
-      {health && health.alerts.length > 0 && (
-        <div className="order-first">
-          <AlertBanner alerts={health.alerts} />
-        </div>
-      )}
-
       {/*
         A greeting above the banner, even when nothing loaded. A screen whose
         whole body is a red box has thrown away every landmark on it, and the

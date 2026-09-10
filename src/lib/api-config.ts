@@ -17,24 +17,11 @@
  * An absolute base, because `fetch("/api/...")` has no origin to resolve
  * against inside a server component.
  *
- * ON A PRODUCTION DEPLOYMENT THIS IS THE PUBLIC ALIAS, NOT `VERCEL_URL`, and
- * the distinction is not cosmetic. `VERCEL_URL` is the deployment's own
- * immutable host (`avhomes-a1b2c3.vercel.app`), and Vercel Authentication
- * protects deployment URLs while leaving the production alias public. With
- * protection on, a server component fetching its own `VERCEL_URL` is answered
- * by a 401 login page rather than by the API, so every read on the site fails
- * at once while the same endpoint works perfectly from a browser. That failure
- * is silent by design here, because the layer above it catches and degrades.
- *
- * `VERCEL_PROJECT_PRODUCTION_URL` is the stable alias and is public whenever
- * the site is. Previews deliberately keep `VERCEL_URL`: a preview should read
- * its own data rather than production's, and a preview being behind
- * authentication is the point of a preview.
+ * VERCEL_URL is the deployment's own host and is present on every Vercel
+ * runtime, including preview builds, which is what makes this work without an
+ * environment variable per environment.
  */
 export function apiBase(): string {
-  if (process.env.VERCEL_ENV === "production" && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-  }
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
