@@ -507,8 +507,14 @@ export interface AuditEntry {
   /** Parsed query parameters, redacted like any other payload. Null when
    *  there were none. `DELETE /admin/properties/:id?baseRevision=7` carries
    *  its only interesting argument here, so dropping it would record a
-   *  deletion with no record of what was asked for. */
-  query: Record<string, string> | null;
+   *  deletion with no record of what was asked for.
+   *
+   *  Values are strings, since that is what a query string carries, EXCEPT for
+   *  the one marker `requested` and `before` can also hold: a query too large
+   *  to keep becomes `{ _truncated: true }`, with the same real boolean the
+   *  other two use rather than the string `"true"`. Typed like its two siblings
+   *  so a reader can test all three the same way. */
+  query: Record<string, unknown> | null;
   status: number;
   /** Ties an entry to the error-table line and the server log for the same call. */
   requestId: string;

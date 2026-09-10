@@ -32,7 +32,7 @@ export interface AuditEntryDoc {
   before: Record<string, unknown> | null;
   method: string;
   path: string;
-  query: Record<string, string> | null;
+  query: Record<string, unknown> | null;
   status: number;
   requestId: string;
   /** Read by nothing but the `audit_ttl` index. See migration 0008. */

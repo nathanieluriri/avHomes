@@ -30,6 +30,9 @@ import { AUDIT_RETENTION_MS, insertEntry, type AuditEntryDoc } from "./repo";
  *   bytes.
  * TODO(test): an insert that throws is logged at error level with the request's
  *   own requestId, and the response is unchanged and still 2xx.
+ * TODO(test): the same holds for a throw while BUILDING the document, not only
+ *   while inserting it. Drive `setBefore` an object with a throwing getter: the
+ *   route's 2xx survives. This is the case the narrow `try` turned into a 500.
  * TODO(test): `expiresAtDate` lands two years ahead of `at` and is a real Date,
  *   so `audit_ttl` can sweep it.
  * TODO(test): the four fields the validator does not require are written
@@ -205,24 +208,25 @@ function clean(value: unknown): Record<string, unknown> | null {
 }
 
 /**
+ * The SAME `clean` the other two payload fields get, and the same markers.
+ *
  * Query values are strings by construction, since `c.req.query()` returns them
- * that way. This keeps the type honest after the walk rather than casting.
+ * that way, so every ordinary value survives the walk as a string. The one
+ * exception is `trim`'s last resort, which replaces the whole object with
+ * `{ _truncated: true }`. An earlier version ran that result through a
+ * stringifying loop to keep the field typed `Record<string, string>`, which
+ * stored the marker as the STRING `"true"` while `requested` and `before`
+ * stored the boolean, so a reader could not test the three fields the same way.
  *
  * Checked against `NO_CAPTURE_PREFIXES` first, the same guard `readBody` opens
  * with: a `?code=` or `?ticket=` on a future auth route is the query-string
  * shape of the same problem the body exclusion exists for, and matching on the
  * path is the control, not the `token` entry in `REDACT_KEYS`.
  */
-function cleanQuery(path: string, raw: Record<string, string>): Record<string, string> | null {
+function cleanQuery(path: string, raw: Record<string, string>): Record<string, unknown> | null {
   if (NO_CAPTURE_PREFIXES.some((prefix) => path.startsWith(prefix))) return null;
   if (Object.keys(raw).length === 0) return null;
-  const walked = clean(raw);
-  if (!walked) return null;
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(walked)) {
-    out[key] = typeof value === "string" ? value : JSON.stringify(value) ?? "";
-  }
-  return out;
+  return clean(raw);
 }
 
 /* ─────────────────────────── the middleware ───────────────────────────── */
@@ -289,36 +293,9 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
     if (status < 200 || status > 299) return;
 
     const path = c.req.path;
-    const derived = derive(path, method);
-    const now = Date.now();
-
-    const doc: AuditEntryDoc = {
-      _id: newId("aud", now),
-      at: now,
-      actorId: actor.id,
-      actorName: actor.displayName,
-      actorRole: actor.role,
-      entity: derived.entity,
-      // A route that minted an id wins over the path, which carried "new".
-      entityId: captured.entityId ?? derived.entityId,
-      action: derived.action,
-      /*
-       * All four spelled out, `null` included. The validator does not require
-       * them but the wire type declares them always present, so a row written
-       * without one reads back as `undefined` where the contract promised null.
-       */
-      requested: clean(await readBody(c)),
-      before: clean(captured.before),
-      method,
-      path,
-      query: cleanQuery(path, c.req.query()),
-      status,
-      requestId: requestId(c),
-      expiresAtDate: new Date(now + AUDIT_RETENTION_MS),
-    };
 
     /*
-     * AWAITED, and never allowed to fail the request.
+     * THE WHOLE BLOCK, not just the insert, and the boundary is the point.
      *
      * Awaited because this deployment can suspend a function once it has
      * answered, so deferring the insert past the response would turn
@@ -327,18 +304,66 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
      *
      * Swallowed because an audit system that can turn a successful save into a
      * 500 is worse than one that occasionally misses a row: the first loses the
-     * user's work, the second loses a record of work that succeeded. Logged at
-     * ERROR beside the same requestId, because a persistently broken writer
-     * degrades to an empty log, and an empty log looks exactly like a quiet
-     * week.
+     * user's work, the second loses a record of work that succeeded.
+     *
+     * An earlier version opened the `try` at the insert, which honoured that
+     * rule for exactly one of the things it does. Everything that BUILDS the
+     * document sat outside: `derive`, `readBody`, and the `clean` calls that run
+     * `redact` and `trim` over whatever a route handed `setBefore`. A body with
+     * a throwing getter, or any future bug in the walk, discarded a 2xx the
+     * route had already produced and answered 500 with no row written. The
+     * response was already decided before this line; nothing done on behalf of
+     * auditing may change it now.
+     *
+     * Logged at ERROR beside the same requestId, because a persistently broken
+     * writer degrades to an empty log, and an empty log looks exactly like a
+     * quiet week.
      */
     try {
+      const derived = derive(path, method);
+      const now = Date.now();
+
+      const doc: AuditEntryDoc = {
+        _id: newId("aud", now),
+        at: now,
+        actorId: actor.id,
+        actorName: actor.displayName,
+        actorRole: actor.role,
+        entity: derived.entity,
+        // A route that minted an id wins over the path, which carried "new".
+        entityId: captured.entityId ?? derived.entityId,
+        action: derived.action,
+        /*
+         * All four spelled out, `null` included. The validator does not require
+         * them but the wire type declares them always present, so a row written
+         * without one reads back as `undefined` where the contract promised
+         * null.
+         */
+        requested: clean(await readBody(c)),
+        before: clean(captured.before),
+        method,
+        path,
+        query: cleanQuery(path, c.req.query()),
+        status,
+        requestId: requestId(c),
+        expiresAtDate: new Date(now + AUDIT_RETENTION_MS),
+      };
+
       await insertEntry(await currentDb(c), doc);
     } catch (error) {
-      console.error(
-        "[audit]",
-        JSON.stringify(logLine(error, { requestId: requestId(c), method, path })),
-      );
+      /*
+       * The report gets its own guard for the reason the block above exists: an
+       * error whose own `message` getter throws, or a `cause` that will not
+       * render, must not become the request's 500 either.
+       */
+      try {
+        console.error(
+          "[audit]",
+          JSON.stringify(logLine(error, { requestId: requestId(c), method, path })),
+        );
+      } catch {
+        console.error("[audit] entry lost, and the error would not render", method, path);
+      }
     }
   };
 }
