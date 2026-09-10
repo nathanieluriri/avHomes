@@ -504,7 +504,11 @@ function PropertyEditor({ initial }: { initial: Property }) {
             {property.deletedAt ? "In trash" : statusLabel(property.status)}
           </Badge>
         }
-        subtitle={property.slug ? `/listings/${property.slug}` : "No slug yet. It is derived when you publish."}
+        subtitle={
+          property.slug
+            ? `/listings/${property.slug} · fixed at publish, so shared links keep working`
+            : "No web address yet. It is made from the title when you publish, and does not change afterwards."
+        }
         /* NO SAVE IN THE HEADER. Saving belongs to the bar, which appears the
            moment there is anything to save and follows the work down the page.
            A permanently greyed-out Save up here is a control that has never
