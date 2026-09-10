@@ -4,6 +4,7 @@ import {
   BadRequestError,
   NotFoundError,
   assertCursorSort,
+  auditEntityId,
   clampLimit,
   currentDb,
   currentUser,
@@ -197,6 +198,7 @@ export function contentAdminRoutes(): Hono<AppEnv> {
       z.object({ title: str().min(1).max(300).default("Untitled post") }).strict(),
     );
     const post = await createPost(await currentDb(c), currentUser(c).id, title);
+    auditEntityId(c, post.id);
     return c.json({ post }, 201);
   });
 
@@ -306,6 +308,7 @@ export function contentAdminRoutes(): Hono<AppEnv> {
       id === "new" ? null : id,
       body as Omit<Category, "id">,
     );
+    if (id === "new") auditEntityId(c, category.id);
     return c.json({ category });
   });
 

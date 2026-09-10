@@ -5,6 +5,8 @@ import {
   NotFoundError,
   PreconditionFailedError,
   assertCursorSort,
+  auditBefore,
+  auditEntityId,
   clampLimit,
   currentDb,
   currentUser,
@@ -220,6 +222,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
         avatarUrl: "",
       },
     });
+    auditEntityId(c, property.id);
     return c.json({ property }, 201);
   });
 
@@ -239,6 +242,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
 
     const current = await getPropertyById(db, id);
     if (!current) throw new NotFoundError(`property ${id}`);
+    auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, user, "write");
 
     const listingType = body.patch.listingType ?? current.listingType;
@@ -315,6 +319,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
 
     const current = await getPropertyById(db, id);
     if (!current) throw new NotFoundError(`property ${id}`);
+    auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, currentUser(c), "write");
 
     // Refusals name the operation, so a screen can say what is wrong rather than
@@ -374,6 +379,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     const id = pathParam(c, "id");
     const body = await readJson(c, TestimonialBody);
     const item = await upsertTestimonial(await currentDb(c), id === "new" ? null : id, body as Omit<Testimonial, "id">);
+    if (id === "new") auditEntityId(c, item.id);
     return c.json({ testimonial: item });
   });
 
@@ -391,6 +397,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     const id = pathParam(c, "id");
     const body = await readJson(c, StatBody);
     const item = await upsertSiteStat(await currentDb(c), id === "new" ? null : id, body as Omit<SiteStat, "id">);
+    if (id === "new") auditEntityId(c, item.id);
     return c.json({ stat: item });
   });
 

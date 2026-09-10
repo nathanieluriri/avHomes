@@ -5,6 +5,7 @@ import {
   NotImplementedError,
   UnauthenticatedError,
   UpstreamError,
+  auditActor,
   clientIp,
   currentDb,
   email,
@@ -121,6 +122,9 @@ export function clerkRoutes(deps: { verifier?: ClerkVerifier } = {}): Hono<AppEn
     if (!result.ok) return c.json({ ...refusalBody(result.reason), requestId: c.get("requestId") }, 403);
 
     await issueSession(c, db, result.user.id);
+    // sessionMiddleware resolved the cookie before this route ran, so the
+    // signer-in is still anonymous to the middleware without this.
+    auditActor(c, result.user);
     return c.json({ user: result.user });
   });
 
@@ -173,6 +177,9 @@ export function passwordRoutes(): Hono<AppEnv> {
 
     await clearLimit(db, `login:${ip}`, LOGIN_WINDOW_MS);
     await issueSession(c, db, found.user.id);
+    // Same reason as the Clerk exchange: nobody is signed in yet when
+    // sessionMiddleware looks, so the route has to name the actor itself.
+    auditActor(c, found.user);
     return c.json({ user: found.user });
   });
 
@@ -217,6 +224,9 @@ export function passwordRoutes(): Hono<AppEnv> {
         passwordHash: await hashPassword(body.password),
       });
       await issueSession(c, db, user.id);
+      // Claim also establishes a session for someone who was anonymous a
+      // moment ago, same as login and the Clerk exchange above.
+      auditActor(c, user);
       return c.json({ user }, 201);
     } catch (err) {
       if (invite.acceptedAt != null) await releaseInvite(db, invite._id, invite.acceptedAt);

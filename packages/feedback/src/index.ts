@@ -4,6 +4,7 @@ import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import {
   NotFoundError,
   StaleWriteError,
+  auditEntityId,
   clampLimit,
   currentDb,
   currentUser,
@@ -239,6 +240,7 @@ export function feedbackRoutes(): Hono<AppEnv> {
       revision: 1,
     };
     await notes(db).insertOne(doc);
+    auditEntityId(c, doc._id);
     return c.json({ note: toNote(doc) }, 201);
   });
 

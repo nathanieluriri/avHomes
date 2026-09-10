@@ -12,6 +12,8 @@ import {
   ForbiddenError,
   NotFoundError,
   PreconditionFailedError,
+  auditBefore,
+  auditEntityId,
   currentDb,
   currentUser,
   email,
@@ -141,6 +143,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const target = await findUserById(db, id);
     // An id naming nobody is a 404, not a silent no-op reported as ok.
     if (!target) throw new NotFoundError(id);
+    auditBefore(c, target as unknown as Record<string, unknown>);
 
     if (!canManage(actor.role, target.user.role)) refuse("manage_peer", id);
 
@@ -182,6 +185,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const id = pathParam(c, "id");
     const target = await findUserById(db, id);
     if (!target) throw new NotFoundError(id);
+    auditBefore(c, target as unknown as Record<string, unknown>);
     if (!canManage(currentUser(c).role, target.user.role)) refuse("manage_peer", id);
     await enableUser(db, id);
     return c.json({ ok: true });
@@ -195,6 +199,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
 
     const target = await findUserById(db, id);
     if (!target) throw new NotFoundError(id);
+    auditBefore(c, target as unknown as Record<string, unknown>);
     if (target.user.id === actor.id) refuse("role_self", id);
     if (target.user.role === "owner") refuse("role_owner", id);
     if (!canManage(actor.role, target.user.role) || !canAssign(actor.role, next as Role)) {
@@ -249,6 +254,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     }
 
     const invite = await createInvite(db, { email: address, role: role as Role, invitedBy: actor.id });
+    auditEntityId(c, invite._id);
 
     /*
      * THE LINK CARRIES NO CREDENTIAL.

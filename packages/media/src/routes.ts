@@ -4,6 +4,7 @@ import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import {
   BadRequestError,
   NotFoundError,
+  auditEntityId,
   clampLimit,
   currentDb,
   currentUser,
@@ -185,6 +186,7 @@ export function mediaRoutes(deps: { storage: StoragePort }): Hono<AppEnv> {
       uploadedBy: user.id,
     };
     await images(db).insertOne(doc);
+    auditEntityId(c, doc._id);
     return c.json({ image: toImageRecord(doc) }, 201);
   });
 
