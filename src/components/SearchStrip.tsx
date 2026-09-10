@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import LocationInput from "@/components/LocationInput";
+import { ESTATE_TYPE, type PropertyType } from "@/lib/types";
 import {
   Select,
   SelectContent,
@@ -12,16 +13,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const TYPES = [
-  "Villa",
-  "Apartment",
-  "Duplex",
-  "Penthouse",
-  "Townhouse",
-  "Terrace",
-  "Bungalow",
-  "Studio",
-  "Mansion",
+// Estates first, as in the category chips. The value is the stored type, the label what a buyer calls it.
+const TYPES: { value: PropertyType; label: string }[] = [
+  { value: ESTATE_TYPE, label: "Estates" },
+  { value: "Villa", label: "Villa" },
+  { value: "Apartment", label: "Apartment" },
+  { value: "Duplex", label: "Duplex" },
+  { value: "Penthouse", label: "Penthouse" },
+  { value: "Townhouse", label: "Townhouse" },
+  { value: "Terrace", label: "Terrace" },
+  { value: "Bungalow", label: "Bungalow" },
+  { value: "Studio", label: "Studio" },
+  { value: "Mansion", label: "Mansion" },
 ];
 
 /**
@@ -83,8 +86,8 @@ export default function SearchStrip() {
             </SelectTrigger>
             <SelectContent>
               {TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
                 </SelectItem>
               ))}
             </SelectContent>

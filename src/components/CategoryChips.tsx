@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { PropertyType } from "@/lib/types";
+import { ESTATE_TYPE, PropertyType } from "@/lib/types";
 
+// Estates sit right after All: they are the other group the listings page shows.
 const TYPES: (PropertyType | "All")[] = [
   "All",
+  ESTATE_TYPE,
   "Villa",
   "Apartment",
   "Duplex",
@@ -28,6 +30,7 @@ const TYPES: (PropertyType | "All")[] = [
 const PLURALS: Record<string, string> = {
   Terrace: "Terraces",
   Duplex: "Duplexes",
+  [ESTATE_TYPE]: "Estates",
 };
 
 function label(t: string) {

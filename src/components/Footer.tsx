@@ -35,6 +35,7 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "Category",
     links: [
+      { label: "Estates", href: "/listings?type=Estate%20Land" },
       { label: "Villas", href: "/listings?type=Villa" },
       { label: "Apartments", href: "/listings?type=Apartment" },
       { label: "Duplexes", href: "/listings?type=Duplex" },

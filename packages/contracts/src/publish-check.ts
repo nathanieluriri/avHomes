@@ -1,5 +1,7 @@
 import type { DocNode } from "./doc";
 import { docToText } from "./doc";
+import { isEstate, prototypeLabel } from "./listing-rules";
+import type { EstatePrototype, PropertyType } from "./types";
 
 export interface PublishWarning {
   id: string;
@@ -193,6 +195,8 @@ export function listingPublishBlockers(listing: {
   priceMinor: number;
   city: string;
   address: string;
+  type?: PropertyType;
+  prototypes?: readonly EstatePrototype[];
 }): PublishBlocker[] {
   const out: PublishBlocker[] = [];
   const title = listing.title.trim();
@@ -213,7 +217,23 @@ export function listingPublishBlockers(listing: {
     });
   }
 
-  if (listing.priceMinor <= 0) {
+  if (listing.type !== undefined && isEstate(listing.type)) {
+    // An estate's price is derived from its options, so the options are what to fix.
+    const prototypes = listing.prototypes ?? [];
+    if (prototypes.length === 0) {
+      out.push({
+        field: "prototypes",
+        message: "Add at least one option, such as a 3 bedroom or a 500 sqm plot.",
+      });
+    }
+    const unpriced = prototypes.filter((p) => p.priceMinor <= 0);
+    if (unpriced.length > 0) {
+      out.push({
+        field: "prototypes",
+        message: `Set a price on ${unpriced.map((p) => prototypeLabel(p)).join(", ")}.`,
+      });
+    }
+  } else if (listing.priceMinor <= 0) {
     out.push({
       field: "price",
       message: "Set a price. A listing at zero reads as a mistake, and it cannot be filtered on.",

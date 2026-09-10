@@ -12,6 +12,7 @@ import {
 } from "@avhomes/core";
 import { LISTING_TYPES, PROPERTY_TYPES, type ListingType, type PropertyStatus } from "@avhomes/contracts";
 import {
+  LISTING_KINDS,
   getPropertyBySlug,
   getSimilarProperties,
   listProperties,
@@ -43,6 +44,7 @@ const ListQuery = z
     limit: str().optional(),
     cursor: str().max(600).optional(),
     type: z.enum(PROPERTY_TYPES).optional(),
+    kind: z.enum(LISTING_KINDS).optional(),
     listingType: z.enum(LISTING_TYPES).optional(),
     city: str().max(120).optional(),
     bedrooms: z.coerce.number().int().min(0).max(50).optional(),
@@ -100,6 +102,7 @@ export function listingsPublicRoutes(): Hono<AppEnv> {
       limit,
       cursor: q.cursor,
       type: q.type,
+      kind: q.kind,
       listingType,
       city: q.city,
       bedrooms: q.bedrooms,

@@ -16,6 +16,8 @@ export {
   getSimilarProperties,
   listTestimonials,
   listSiteStats,
+  LISTING_KINDS,
+  type ListingKind,
   type ListQuery,
   type PropertyPatch,
   type LifecycleOp,

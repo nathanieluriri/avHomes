@@ -1,26 +1,46 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Building2 } from "lucide-react";
 import {
+  BUILD_STAGES,
+  BUILD_STAGE_LABELS,
+  ESTATE_AMENITY_SUGGESTIONS,
   FEE_KINDS_FOR,
+  HOME_AMENITY_SUGGESTIONS,
   LISTING_TYPES,
   PROPERTY_TYPES,
   RENT_PERIODS,
+  TITLE_DOCUMENTS,
+  TITLE_DOCUMENT_LABELS,
+  canFeature,
+  estateSummary,
+  fieldsFor,
   formatPrice,
+  formatPriceShort,
+  formatSqm,
+  isEstate,
   listingPublishBlockers,
+  minStayUnit,
   moneyRefusalMessage,
   moveInTotalMinor,
   parseMajor,
   plainMajor,
+  prototypeLabel,
+  sqftToSqm,
+  sqmToSqft,
   statusLabel,
+  type BuildStage,
+  type EstatePrototype,
+  type EstateSummary,
   type FeeKind,
   type ListingFee,
   type ListingType,
   type Property,
   type PropertyType,
   type RentPeriod,
+  type TitleDocument,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { SaveBar } from "@/components/admin/SaveBar";
@@ -28,6 +48,27 @@ import { historySentence } from "@/lib/admin/audit";
 import { fullDate, relative, shortDate } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
+import { AmenityPicker } from "@/components/admin/listing/AmenityPicker";
+import { NumberField } from "@/components/admin/listing/NumberInput";
+import {
+  PaymentPlanFields,
+  toPaymentPlanDraft,
+  type PaymentPlanDraft,
+} from "@/components/admin/listing/PaymentPlanFields";
+import {
+  PrototypeTable,
+  readPrototypes,
+  toPrototypeDraft,
+  withoutUntouched,
+  type PrototypeDraft,
+} from "@/components/admin/listing/PrototypeTable";
+import {
+  RentTerms,
+  availableFromToDate,
+  dateToAvailableFrom,
+  type RentTermsDraft,
+} from "@/components/admin/listing/RentTerms";
+import { Segmented } from "@/components/admin/listing/Segmented";
 import {
   Badge,
   Button,
@@ -54,6 +95,10 @@ import {
  *  - Every save carries the `baseRevision` the form was LOADED with. A lost race
  *    comes back as a 409 carrying the other person's version, so the choice
  *    below is a real choice rather than a silent overwrite.
+ *
+ * `fieldsFor` decides which sections exist. A field it rules out is hidden AND
+ * sent cleared, so the form never shows or saves something the listing's type
+ * cannot carry.
  */
 
 const FEE_KIND_LABELS: Record<FeeKind, string> = {
@@ -69,10 +114,15 @@ const PERIOD_OPTION_LABELS: Record<RentPeriod, string> = {
   night: "Per night",
 };
 
+const DEAL_OPTIONS = LISTING_TYPES.map((t) => ({ value: t, label: t === "sale" ? "Sale" : "Rent" }));
+
 /** The kinds a sale cannot carry, for the notice under the fee rows. */
 const RENT_ONLY_FEE_KINDS: readonly FeeKind[] = FEE_KINDS_FOR.rent.filter(
   (kind) => !FEE_KINDS_FOR.sale.includes(kind),
 );
+
+/** Field's label, for a block that labels text rather than a control. */
+const LABEL = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600";
 
 type Draft = {
   title: string;
@@ -80,6 +130,7 @@ type Draft = {
   description: string;
   price: string;
   currency: string;
+  /** Held even on an estate, which is always saved as a sale, so switching the type back keeps it. */
   listingType: ListingType;
   /** Held even on a sale, so switching back to Rent does not forget the choice. */
   rentPeriod: RentPeriod;
@@ -95,8 +146,13 @@ type Draft = {
   parkingSpaces: number;
   yearBuilt: number;
   featured: boolean;
-  amenities: string;
+  amenities: string[];
   images: string[];
+  prototypes: PrototypeDraft[];
+  paymentPlan: PaymentPlanDraft;
+  buildStage: BuildStage | null;
+  titleDocument: TitleDocument | null;
+  rentTerms: RentTermsDraft;
 };
 
 /**
@@ -144,9 +200,47 @@ function toDraft(p: Property): Draft {
     parkingSpaces: p.parkingSpaces,
     yearBuilt: p.yearBuilt,
     featured: p.featured,
-    amenities: p.amenities.join("\n"),
+    amenities: p.amenities,
     images: p.images,
+    prototypes: p.prototypes.map((prototype) => toPrototypeDraft(prototype, p.currency)),
+    paymentPlan: toPaymentPlanDraft(p.paymentPlan),
+    buildStage: p.buildStage,
+    titleDocument: p.titleDocument,
+    rentTerms: {
+      furnishing: p.furnishing,
+      serviced: p.serviced,
+      availableFrom: availableFromToDate(p.availableFrom),
+      minStay: p.minStay,
+    },
   };
+}
+
+/** "From ₦25M · 3 options · 2 to 4 bed", the estate's price as its options decide it. */
+function estatePriceLine(s: EstateSummary, currency: string): string {
+  if (s.count === 0) return "No options yet";
+  const parts: string[] = [];
+  if (s.fromMinor > 0) {
+    parts.push(`From ${formatPriceShort(s.fromMinor, { listingType: "sale", rentPeriod: null, currency })}`);
+  }
+  parts.push(`${s.count} ${s.count === 1 ? "option" : "options"}`);
+  if (s.bedroomsMax > 0) {
+    // A house row added blank has 0 beds; it is not the smallest option.
+    const min = s.bedroomsMin > 0 ? s.bedroomsMin : s.bedroomsMax;
+    parts.push(min === s.bedroomsMax ? `${min} bed` : `${min} to ${s.bedroomsMax} bed`);
+  }
+  if (s.plotSqmMin > 0) parts.push(`plots from ${formatSqm(s.plotSqmMin)}`);
+  if (s.soldOut) parts.push("sold out");
+  return parts.join(" · ");
+}
+
+/** The cheapest priced option a buyer can still pick, else the cheapest priced one. */
+function cheapestOption(prototypes: readonly EstatePrototype[]): EstatePrototype | null {
+  const priced = prototypes.filter((p) => p.priceMinor > 0);
+  const pool = priced.some((p) => p.available) ? priced.filter((p) => p.available) : priced;
+  return pool.reduce<EstatePrototype | null>(
+    (best, p) => (best === null || p.priceMinor < best.priceMinor ? p : best),
+    null,
+  );
 }
 
 /**
@@ -182,13 +276,14 @@ const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => bo
   {
     op: "publish",
     label: "Publish",
-    // Out of the trash first. `transitionProperty` has no deletedAt guard.
+    // Mirrors the server's allowed-from table, which refuses publish from the trash.
     when: (p) => p.deletedAt === null && (p.status === "draft" || p.status === "archived"),
   },
   {
     op: "markOffer",
     label: "Mark under offer",
-    when: (p) => p.status === "live",
+    // An estate sells option by option; its options carry the sold out state.
+    when: (p) => p.status === "live" && !isEstate(p.type),
   },
   {
     // Under offer and closed both need a way back to live, or a collapsed deal
@@ -200,7 +295,7 @@ const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => bo
   {
     op: "close",
     label: "Mark closed",
-    when: (p) => p.status === "live" || p.status === "under-offer",
+    when: (p) => (p.status === "live" || p.status === "under-offer") && !isEstate(p.type),
   },
   {
     op: "unpublish",
@@ -208,6 +303,7 @@ const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => bo
     when: (p) => p.deletedAt === null && (p.status === "live" || p.status === "under-offer"),
   },
   { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
+  { op: "unarchive", label: "Back to draft", when: (p) => p.status === "archived" && p.deletedAt === null },
   /* No `restore` here. A listing can only be restored out of the trash, and
      while it is in the trash the banner at the top of the screen carries that
      button. Listing it here too drew the same control twice, once inside the
@@ -297,6 +393,9 @@ function PropertyEditor({ initial }: { initial: Property }) {
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(property));
 
+  // The server refuses a currency change once there is a price history.
+  const currencyLocked = property.priceHistory.length > 0;
+
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
@@ -306,12 +405,20 @@ function PropertyEditor({ initial }: { initial: Property }) {
   }
 
   /*
+   * The type drives the form. An estate has no Sale/Rent choice of its own, so
+   * everything below reads `dealType`, never `draft.listingType`, which may
+   * still hold the Rent a switch to Estate Land left behind.
+   */
+  const fields = fieldsFor({ type: draft.type, listingType: draft.listingType });
+  const dealType: ListingType = fields.dealChoice ? draft.listingType : "sale";
+
+  /*
    * Recalculated live, straight from the draft, on every render: nothing here
    * is state of its own to fall out of sync. A row left empty contributes
    * nothing rather than parsing as zero, matching the rule the fee inputs
    * themselves follow.
    */
-  const liveFees: ListingFee[] = FEE_KINDS_FOR[draft.listingType].flatMap((kind) => {
+  const liveFees: ListingFee[] = FEE_KINDS_FOR[dealType].flatMap((kind) => {
     const raw = draft.fees[kind].trim();
     if (raw === "") return [];
     const parsed = parseMajor(raw, draft.currency);
@@ -321,7 +428,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const moveIn = moveInTotalMinor({
     priceMinor: livePrice.ok ? livePrice.minor : 0,
     currency: draft.currency,
-    listingType: draft.listingType,
+    listingType: dealType,
     fees: liveFees,
   });
   // A value typed in before the switch to Sale is still sitting in
@@ -329,23 +436,45 @@ function PropertyEditor({ initial }: { initial: Property }) {
   // TODO(verify): the Sale/Rent toggle hides rent fields without losing typed
   // values before save. Needs a browser.
   const hasHiddenFeeValues =
-    draft.listingType === "sale" && RENT_ONLY_FEE_KINDS.some((kind) => draft.fees[kind].trim() !== "");
+    dealType === "sale" && RENT_ONLY_FEE_KINDS.some((kind) => draft.fees[kind].trim() !== "");
+
+  const liveOptions = readPrototypes(draft.prototypes, draft.currency).prototypes;
+  const cheapest = cheapestOption(liveOptions);
+
+  // The same idea as the fee notice, for whole sections a type or deal switch hid.
+  const hiddenNotice = [
+    !fields.prototypes &&
+      (draft.prototypes.length > 0 || draft.paymentPlan.on || draft.buildStage !== null) &&
+      "Estate options, the payment plan and the build stage are only saved for Estate Land.",
+    !fields.rentTerms &&
+      (draft.rentTerms.furnishing !== null ||
+        draft.rentTerms.serviced ||
+        draft.rentTerms.availableFrom !== "" ||
+        draft.rentTerms.minStay !== null) &&
+      "Rent terms are not saved for a sale.",
+    !fields.titleDocument && draft.titleDocument !== null && "The title document is not saved for a rent.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  function refuse(detail: string, issues: { path: string; message: string }[]) {
+    setSaveError(new ApiError(400, { error: "bad_request", detail, issues }));
+    setBusy(false);
+  }
 
   async function save() {
     setBusy(true);
     setSaveError(null);
 
-    const money = parseMajor(draft.price, draft.currency);
-    if (!money.ok) {
-      setSaveError(
-        new ApiError(400, {
-          error: "bad_request",
-          detail: moneyRefusalMessage(money.reason, draft.currency),
-          issues: [{ path: "price", message: money.reason }],
-        }),
-      );
-      setBusy(false);
-      return;
+    // An estate's price is derived from its options on the server.
+    let priceMinor: number | undefined;
+    if (fields.price) {
+      const money = parseMajor(draft.price, draft.currency);
+      if (!money.ok) {
+        refuse(moneyRefusalMessage(money.reason, draft.currency), [{ path: "price", message: money.reason }]);
+        return;
+      }
+      priceMinor = money.minor;
     }
 
     // Only the kinds this listing type can carry are sent. A caution deposit
@@ -354,7 +483,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
     // made true rather than just claimed.
     const feeIssues: { path: string; message: string }[] = [];
     const fees: { kind: FeeKind; amount: string }[] = [];
-    for (const kind of FEE_KINDS_FOR[draft.listingType]) {
+    for (const kind of FEE_KINDS_FOR[dealType]) {
       const raw = draft.fees[kind].trim();
       if (raw === "") continue; // Empty means the fee does not apply, not zero.
       const parsed = parseMajor(raw, draft.currency);
@@ -365,16 +494,21 @@ function PropertyEditor({ initial }: { initial: Property }) {
       fees.push({ kind, amount: raw });
     }
     if (feeIssues.length > 0) {
-      setSaveError(
-        new ApiError(400, {
-          error: "bad_request",
-          detail: "Fix the fee amounts before saving.",
-          issues: feeIssues,
-        }),
-      );
-      setBusy(false);
+      refuse("Fix the fee amounts before saving.", feeIssues);
       return;
     }
+
+    let prototypes: EstatePrototype[] = [];
+    if (fields.prototypes) {
+      const read = readPrototypes(withoutUntouched(draft.prototypes), draft.currency);
+      if (read.issues.length > 0) {
+        refuse("Fix the option prices before saving.", read.issues);
+        return;
+      }
+      prototypes = read.prototypes;
+    }
+
+    const plan = draft.paymentPlan;
 
     try {
       const res = await api.patch<{ property: Property }>(`/admin/properties/${property.id}`, {
@@ -382,24 +516,41 @@ function PropertyEditor({ initial }: { initial: Property }) {
           title: draft.title,
           tagline: draft.tagline,
           description: draft.description,
-          priceMinor: money.minor,
+          ...(priceMinor !== undefined && { priceMinor }),
           currency: draft.currency,
-          listingType: draft.listingType,
+          listingType: dealType,
           // A sale cannot carry a period; the server refuses anything else.
-          rentPeriod: draft.listingType === "rent" ? draft.rentPeriod : null,
+          rentPeriod: fields.rentPeriod ? draft.rentPeriod : null,
           fees,
           type: draft.type,
           location: draft.location,
           city: draft.city,
           address: draft.address,
-          bedrooms: draft.bedrooms,
-          bathrooms: draft.bathrooms,
-          areaSqft: draft.areaSqft,
-          parkingSpaces: draft.parkingSpaces,
-          yearBuilt: draft.yearBuilt,
-          featured: draft.featured,
-          amenities: splitLines(draft.amenities),
+          // An estate's bedrooms and bathrooms are derived too, and it has no
+          // parking, area or year built of its own, so those keep what is stored.
+          ...(fields.rooms && {
+            bedrooms: draft.bedrooms,
+            bathrooms: draft.bathrooms,
+            parkingSpaces: draft.parkingSpaces,
+          }),
+          ...(fields.area && { areaSqft: draft.areaSqft }),
+          ...(fields.yearBuilt && { yearBuilt: draft.yearBuilt }),
+          // Only while the switch is on screen. The server refuses featuring a
+          // listing that is not live or under offer.
+          ...(canFeature(property) && { featured: draft.featured }),
+          amenities: draft.amenities,
           images: draft.images,
+          prototypes,
+          paymentPlan:
+            fields.paymentPlan && plan.on
+              ? { depositPercent: plan.depositPercent, months: plan.months, note: plan.note.trim() }
+              : null,
+          buildStage: fields.buildStage ? draft.buildStage : null,
+          titleDocument: fields.titleDocument ? draft.titleDocument : null,
+          furnishing: fields.rentTerms ? draft.rentTerms.furnishing : null,
+          serviced: fields.rentTerms ? draft.rentTerms.serviced : false,
+          availableFrom: fields.rentTerms ? dateToAvailableFrom(draft.rentTerms.availableFrom) : null,
+          minStay: fields.rentTerms ? draft.rentTerms.minStay : null,
         },
         baseRevision: property.revision,
       });
@@ -412,6 +563,24 @@ function PropertyEditor({ initial }: { initial: Property }) {
     }
   }
 
+  // Ctrl/Cmd+S saves exactly when the save bar would, and never offers the browser's own save.
+  const runKeyedSave = useEffectEvent(() => {
+    if (dirty && !trashed && !busy) void save();
+  });
+  const onSaveKey = useEffectEvent((e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== "s") return;
+    e.preventDefault();
+    // Blur first so fields that commit on blur (a clamped number, a typed
+    // amenity) reach the draft, then save a task later, once that has rendered.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    setTimeout(() => runKeyedSave(), 0);
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => onSaveKey(e);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   async function transition(op: string) {
     setBusy(true);
     setSaveError(null);
@@ -420,19 +589,22 @@ function PropertyEditor({ initial }: { initial: Property }) {
        * NO FORM RE-SEED HERE, and that is the point.
        *
        * A lifecycle op writes `status`, `publishedAt`, `slug` and `deletedAt`
-       * and touches no field on this form. Re-seeding from its response could
-       * therefore only ever do one of two things: overwrite the form with the
-       * values it already held, or throw away edits the operator had not saved.
-       * It did the second, silently, and the save bar disappeared in the same
-       * tick, so the screen reported itself clean immediately after losing the
-       * work. A body edit was unrecoverable, because remounting the editor takes
-       * its undo stack with it.
+       * and touches no field on this form but `featured`. Re-seeding from its
+       * response could therefore only ever do one of two things: overwrite the
+       * form with the values it already held, or throw away edits the operator
+       * had not saved. It did the second, silently, and the save bar disappeared
+       * in the same tick, so the screen reported itself clean immediately after
+       * losing the work. A body edit was unrecoverable, because remounting the
+       * editor takes its undo stack with it.
        *
        * Adopting the record is still right: it carries the new status and the
        * bumped revision the next save has to quote.
        */
       const res = await api.post<{ property: Property }>(`/admin/properties/${property.id}/${op}`);
       setProperty(res.property);
+      // Leaving live or under offer clears `featured` on the server. Adopt that
+      // one field, or its now hidden switch would hold the form dirty.
+      if (!canFeature(res.property)) set("featured", res.property.featured);
     } catch (err) {
       setSaveError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
     } finally {
@@ -577,7 +749,15 @@ function PropertyEditor({ initial }: { initial: Property }) {
           forty-photo gallery. Changing a listing's status is the most common
           thing done on this screen and it was the last thing on it. */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="order-2 min-w-0 space-y-6 lg:order-none lg:col-span-2">
+        {/* READ-ONLY IN THE TRASH. A disabled fieldset disables its form
+            controls and nothing else: the gallery's tile drag and file drop are
+            div and li handlers it never reaches, and that drop really uploads.
+            So in the trash the gallery is drawn as plain thumbnails and the
+            option photo sheet is not mounted, and nothing here can write. */}
+        <fieldset
+          disabled={trashed}
+          className="order-2 min-w-0 space-y-6 lg:order-none lg:col-span-2"
+        >
           <Card className="space-y-4">
             <Field label="Title">
               <input className={inputClass} value={draft.title} onChange={(e) => set("title", e.target.value)} />
@@ -598,64 +778,95 @@ function PropertyEditor({ initial }: { initial: Property }) {
               bar's section rhythm rather than reading as an appended block.
               Needs a browser and a human eye. */}
           <Card className="space-y-4">
-            {/* `as="group"`: this wraps two buttons, not one input, so a bare
-                label would forward a click on its own whitespace to the first
-                one. Named "Sale or rent" rather than "Type", which already
-                means Villa or Duplex two cards down. */}
-            <Field label="Sale or rent" as="group">
-              <div className="inline-flex gap-2">
-                {LISTING_TYPES.map((t) => {
-                  const active = draft.listingType === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => set("listingType", t)}
-                      className={`c-tap h-9 rounded-lg px-4 text-[13px] font-semibold transition-colors sm:h-7 sm:px-3.5 ${
-                        active
-                          ? "bg-plum-950 text-white"
-                          : "bg-mist-100 text-slate-600 hover:bg-mist-200/70 hover:text-plum-950"
-                      }`}
-                    >
-                      {t === "sale" ? "Sale" : "Rent"}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
+            {/* Type first, because it decides what the rest of the form asks. */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Type">
+                <select
+                  className={inputClass}
+                  value={draft.type}
+                  onChange={(e) => set("type", e.target.value as PropertyType)}
+                >
+                  {PROPERTY_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {fields.dealChoice ? (
+                /* `as="group"`: this wraps two buttons, not one input, so a bare
+                   label would forward a click on its own whitespace to the first
+                   one. Named "Sale or rent" rather than "Type", which already
+                   means Villa or Duplex in the select beside it. */
+                <Field label="Sale or rent" as="group">
+                  <Segmented options={DEAL_OPTIONS} value={draft.listingType} onChange={(t) => set("listingType", t)} />
+                </Field>
+              ) : (
+                <div>
+                  <span className={LABEL}>Sale or rent</span>
+                  <p className="py-2 text-[13px] text-slate-600">Always a sale. An estate is sold, not let.</p>
+                </div>
+              )}
+            </div>
+
+            {hiddenNotice && <p className="text-xs text-amber-700">{hiddenNotice}</p>}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Price" hint={`In ${draft.currency}, major units. Stored as minor units.`}>
-                {/* `decimal` rather than `numeric`: a price is the one field here
-                    that carries a separator, and the digits-only keypad has no key
-                    for it. Autocomplete off, because what a browser has saved for a
-                    bare text box is somebody's address, not a price. */}
-                <input
-                  className={inputClass}
-                  inputMode="decimal"
-                  autoComplete="off"
-                  value={draft.price}
-                  onChange={(e) => set("price", e.target.value)}
-                />
-              </Field>
-              <Field label="Currency">
+              {fields.price ? (
+                <Field label="Price" hint={`In ${draft.currency}, major units. Stored as minor units.`}>
+                  {/* `decimal` rather than `numeric`: a price is the one field here
+                      that carries a separator, and the digits-only keypad has no key
+                      for it. Autocomplete off, because what a browser has saved for a
+                      bare text box is somebody's address, not a price. */}
+                  <input
+                    className={inputClass}
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={draft.price}
+                    onChange={(e) => set("price", e.target.value)}
+                  />
+                </Field>
+              ) : (
+                <div>
+                  <span className={LABEL}>Price</span>
+                  <p className="rounded-lg bg-mist-50 px-3 py-2 text-[13px] font-semibold text-plum-950">
+                    {estatePriceLine(estateSummary(liveOptions), draft.currency)}
+                  </p>
+                  <span className="mt-1 block text-xs text-slate-600">Worked out from the options below.</span>
+                </div>
+              )}
+              <Field
+                label="Currency"
+                hint={currencyLocked ? "Locked once the price has changed, so the history stays in one currency." : undefined}
+              >
                 <input
                   className={inputClass}
                   maxLength={3}
                   autoComplete="off"
                   autoCapitalize="characters"
+                  disabled={currencyLocked}
                   value={draft.currency}
                   onChange={(e) => set("currency", e.target.value.toUpperCase())}
                 />
               </Field>
-              {draft.listingType === "rent" && (
+              {fields.rentPeriod && (
                 <div className="sm:col-span-2">
                   <Field label="Period">
                     <select
                       className={inputClass}
                       value={draft.rentPeriod}
-                      onChange={(e) => set("rentPeriod", e.target.value as RentPeriod)}
+                      onChange={(e) => {
+                        const period = e.target.value as RentPeriod;
+                        // Months and nights are different units, so a minimum stay does not carry across.
+                        setDraft((d) => ({
+                          ...d,
+                          rentPeriod: period,
+                          rentTerms:
+                            minStayUnit(period) === minStayUnit(d.rentPeriod)
+                              ? d.rentTerms
+                              : { ...d.rentTerms, minStay: null },
+                        }));
+                      }}
                     >
                       {RENT_PERIODS.map((period) => (
                         <option key={period} value={period}>
@@ -666,14 +877,46 @@ function PropertyEditor({ initial }: { initial: Property }) {
                   </Field>
                 </div>
               )}
+              {fields.buildStage && (
+                <Field label="Build stage">
+                  <select
+                    className={inputClass}
+                    value={draft.buildStage ?? ""}
+                    onChange={(e) => set("buildStage", e.target.value === "" ? null : (e.target.value as BuildStage))}
+                  >
+                    <option value="">Not stated</option>
+                    {BUILD_STAGES.map((stage) => (
+                      <option key={stage} value={stage}>
+                        {BUILD_STAGE_LABELS[stage]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              {fields.titleDocument && (
+                <Field label="Title document">
+                  <select
+                    className={inputClass}
+                    value={draft.titleDocument ?? ""}
+                    onChange={(e) =>
+                      set("titleDocument", e.target.value === "" ? null : (e.target.value as TitleDocument))
+                    }
+                  >
+                    <option value="">Not stated</option>
+                    {TITLE_DOCUMENTS.map((doc) => (
+                      <option key={doc} value={doc}>
+                        {TITLE_DOCUMENT_LABELS[doc]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </div>
 
             <div className="space-y-3 border-t border-mist-200 pt-4">
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                Fees
-              </span>
+              <span className={LABEL}>Fees</span>
               <div className="grid gap-4 sm:grid-cols-2">
-                {FEE_KINDS_FOR[draft.listingType].map((kind) => (
+                {FEE_KINDS_FOR[dealType].map((kind) => (
                   <Field key={kind} label={FEE_KIND_LABELS[kind]} hint="Leave blank if it doesn't apply.">
                     <input
                       className={inputClass}
@@ -691,7 +934,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 <p className="text-xs text-amber-700">Rent-only fees are not saved for a sale.</p>
               )}
 
-              {draft.listingType === "rent" && (
+              {dealType === "rent" && (
                 <div className="flex items-center justify-between gap-4 rounded-lg bg-mist-50 px-3 py-2.5">
                   <span className="text-[13px] font-semibold text-plum-950">Total to move in</span>
                   <span className="text-[13px] font-bold text-plum-950">
@@ -701,6 +944,37 @@ function PropertyEditor({ initial }: { initial: Property }) {
               )}
             </div>
           </Card>
+
+          {fields.prototypes && (
+            <Card>
+              <CardHead title="Options" />
+              <PrototypeTable
+                rows={draft.prototypes}
+                onChange={(rows) => set("prototypes", rows)}
+                currency={draft.currency}
+                readOnly={trashed}
+              />
+              <div className="mt-4 border-t border-mist-200 pt-4">
+                <PaymentPlanFields
+                  value={draft.paymentPlan}
+                  onChange={(patch) => setDraft((d) => ({ ...d, paymentPlan: { ...d.paymentPlan, ...patch } }))}
+                  example={cheapest && { label: prototypeLabel(cheapest), priceMinor: cheapest.priceMinor }}
+                  currency={draft.currency}
+                />
+              </div>
+            </Card>
+          )}
+
+          {fields.rentTerms && (
+            <Card>
+              <CardHead title="Rent terms" />
+              <RentTerms
+                value={draft.rentTerms}
+                rentPeriod={draft.rentPeriod}
+                onChange={(patch) => setDraft((d) => ({ ...d, rentTerms: { ...d.rentTerms, ...patch } }))}
+              />
+            </Card>
+          )}
 
           {/* Collapsed to nothing when there is none, rather than a table shell
               with a header row and no body: a price that has never changed is
@@ -738,19 +1012,6 @@ function PropertyEditor({ initial }: { initial: Property }) {
           )}
 
           <Card className="grid gap-4 sm:grid-cols-2">
-            <Field label="Type">
-              <select
-                className={inputClass}
-                value={draft.type}
-                onChange={(e) => set("type", e.target.value as PropertyType)}
-              >
-                {PROPERTY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </Field>
             <Field label="City">
               <input
                 className={inputClass}
@@ -762,49 +1023,87 @@ function PropertyEditor({ initial }: { initial: Property }) {
             <Field label="Location">
               <input className={inputClass} value={draft.location} onChange={(e) => set("location", e.target.value)} />
             </Field>
-            <Field label="Address">
-              <input
-                className={inputClass}
-                autoComplete="street-address"
-                value={draft.address}
-                onChange={(e) => set("address", e.target.value)}
-              />
-            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Address">
+                <input
+                  className={inputClass}
+                  autoComplete="street-address"
+                  value={draft.address}
+                  onChange={(e) => set("address", e.target.value)}
+                />
+              </Field>
+            </div>
           </Card>
 
-          <Card className="grid gap-4 sm:grid-cols-3">
-            <NumberField label="Bedrooms" value={draft.bedrooms} onChange={(v) => set("bedrooms", v)} />
-            <NumberField label="Bathrooms" value={draft.bathrooms} onChange={(v) => set("bathrooms", v)} />
-            <NumberField label="Parking" value={draft.parkingSpaces} onChange={(v) => set("parkingSpaces", v)} />
-            <NumberField label="Area (sqft)" value={draft.areaSqft} onChange={(v) => set("areaSqft", v)} />
-            <NumberField label="Year built" value={draft.yearBuilt} onChange={(v) => set("yearBuilt", v)} />
-          </Card>
+          {(fields.rooms || fields.area || fields.yearBuilt) && (
+            <Card className="grid gap-4 sm:grid-cols-3">
+              {fields.rooms && (
+                <>
+                  <NumberField label="Bedrooms" value={draft.bedrooms} onChange={(v) => set("bedrooms", v)} />
+                  <NumberField label="Bathrooms" value={draft.bathrooms} onChange={(v) => set("bathrooms", v)} />
+                  <NumberField label="Parking" value={draft.parkingSpaces} onChange={(v) => set("parkingSpaces", v)} />
+                </>
+              )}
+              {fields.area && (
+                <NumberField
+                  label="Area (sqm)"
+                  value={sqftToSqm(draft.areaSqft)}
+                  onChange={(v) => set("areaSqft", sqmToSqft(v))}
+                />
+              )}
+              {fields.yearBuilt && (
+                <NumberField label="Year built" value={draft.yearBuilt} onChange={(v) => set("yearBuilt", v)} />
+              )}
+            </Card>
+          )}
 
           <Card className="space-y-4">
-            <Field label="Amenities" hint="One per line.">
-              <textarea
-                className={`${inputClass} min-h-32`}
-                value={draft.amenities}
-                onChange={(e) => set("amenities", e.target.value)}
-              />
-            </Field>
+            <AmenityPicker
+              value={draft.amenities}
+              onChange={(amenities) => set("amenities", amenities)}
+              suggestions={isEstate(draft.type) ? ESTATE_AMENITY_SUGGESTIONS : HOME_AMENITY_SUGGESTIONS}
+            />
             {/* `as="group"`, not a label. ImagePicker owns a hidden file input,
                 and a bare label forwards a tap on any of its own whitespace to
                 the first labelable descendant, so a short scroll that starts on
                 the gallery opened the camera roll. */}
-            <Field
-              label="Photos"
-              hint="The first one leads the listing card and the gallery."
-              as="group"
-            >
-              <ImagePicker
-                value={draft.images}
-                onChange={(images) => set("images", images)}
-                coverLabel="Main photo"
-              />
-            </Field>
+            {trashed ? (
+              <Field label="Photos" as="group">
+                {draft.images.length > 0 ? (
+                  <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {draft.images.map((url, index) => (
+                      <li key={`${url}-${index}`} className="overflow-hidden rounded-lg border border-mist-200 bg-white">
+                        {/* A plain img, as in ImagePicker. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt=""
+                          className="aspect-[4/3] w-full bg-mist-100 object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[13px] text-slate-600">No photos.</p>
+                )}
+              </Field>
+            ) : (
+              <Field
+                label="Photos"
+                hint="The first one leads the listing card and the gallery."
+                as="group"
+              >
+                <ImagePicker
+                  value={draft.images}
+                  onChange={(images) => set("images", images)}
+                  coverLabel="Main photo"
+                />
+              </Field>
+            )}
           </Card>
-        </div>
+        </fieldset>
 
         <div className="order-1 min-w-0 space-y-6 lg:order-none">
           <Card className="space-y-3">
@@ -818,25 +1117,30 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 there up. These are the moves that decide what the public site
                 shows, and two of them take a live listing off the market: at
                 32px with 8px between them, on a surface the reader is also
-                scrolling, Unpublish and Archive are one thumb apart. */}
-            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-              {LIFECYCLE.filter((l) => l.when(property)).map((l) => (
-                <Button
-                  key={l.op}
-                  variant="ghost"
-                  className="w-full sm:w-auto"
-                  disabled={busy || (l.op === "publish" && publishBlockers.length > 0)}
-                  onClick={() => transition(l.op)}
-                >
-                  {l.label}
-                </Button>
-              ))}
-            </div>
+                scrolling, Unpublish and Archive are one thumb apart.
+
+                None in the trash, where the banner's Restore is the only move. */}
+            {!trashed && (
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                {LIFECYCLE.filter((l) => l.when(property)).map((l) => (
+                  <Button
+                    key={l.op}
+                    variant="ghost"
+                    className="w-full sm:w-auto"
+                    disabled={busy || (l.op === "publish" && publishBlockers.length > 0)}
+                    onClick={() => transition(l.op)}
+                  >
+                    {l.label}
+                  </Button>
+                ))}
+              </div>
+            )}
 
             {/* DISABLED AND EXPLAINED, never hidden. A Publish button that is
                 simply absent reads as a bug, and the reader is left guessing
                 which of a dozen fields the screen is unhappy about. */}
-            {publishBlockers.length > 0 &&
+            {!trashed &&
+              publishBlockers.length > 0 &&
               LIFECYCLE.some((l) => l.op === "publish" && l.when(property)) && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                   <p className="text-[12px] font-semibold text-amber-900">
@@ -858,22 +1162,38 @@ function PropertyEditor({ initial }: { initial: Property }) {
                   </ul>
                 </div>
               )}
-            {/* A real row below `sm`, not a 16px box beside a line of text: this
+            {/* ONLY WHERE IT CAN APPLY, read off the SAVED record. The server
+                refuses to feature anything that is not live or under offer, so
+                a switch on a draft or a sold house is a control that cannot do
+                anything. A draft gets one line saying when it will; closed,
+                archived and trashed listings get nothing.
+
+                A real row below `sm`, not a 16px box beside a line of text: this
                 is the control that decides what the landing page shows, and with
                 a thumb its whole target was the height of one line of 14px type.
                 The negative margin keeps that row optically flush with the card.
                 Everything about it is undone from `sm` up, because with a mouse
                 the dense line is right and a 44px block with its own margins
                 would sit in the aside disagreeing with every row around it. */}
-            <label className="-mx-2 flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm text-plum-950 active:bg-mist-100 sm:mx-0 sm:min-h-0 sm:gap-2 sm:px-0 sm:pt-2">
-              <input
-                type="checkbox"
-                className="h-5 w-5 shrink-0 accent-[var(--wine-600)] sm:h-auto sm:w-auto"
-                checked={draft.featured}
-                onChange={(e) => set("featured", e.target.checked)}
-              />
-              Feature on the landing page
-            </label>
+            {canFeature(property) ? (
+              <label className="-mx-2 flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm text-plum-950 active:bg-mist-100 sm:mx-0 sm:min-h-0 sm:gap-2 sm:px-0 sm:pt-2">
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 shrink-0 accent-[var(--wine-600)] sm:h-auto sm:w-auto"
+                  checked={draft.featured}
+                  onChange={(e) => set("featured", e.target.checked)}
+                />
+                Feature on the landing page
+              </label>
+            ) : !trashed && property.status === "draft" ? (
+              <p className="text-[12px] text-slate-600">Featuring becomes available once it is live.</p>
+            ) : (
+              canFeature({ status: property.status, deletedAt: property.deletedAt }) && (
+                <p className="text-[12px] text-slate-600">
+                  Every option is sold out, so it cannot be featured on the landing page.
+                </p>
+              )
+            )}
           </Card>
 
           <Card>
@@ -888,7 +1208,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
             </DefinitionList>
           </Card>
 
-          {property.deletedAt === null && (
+          {!trashed && (
             <Card>
               <p className="text-xs text-muted-foreground">
                 Moving a listing to the trash is reversible. There is no permanent delete, because an
@@ -934,70 +1254,5 @@ function PropertyEditor({ initial }: { initial: Property }) {
         </div>
       </div>
     </>
-  );
-}
-
-function splitLines(value: string): string[] {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line !== "");
-}
-
-/**
- * A number in the draft, and a STRING on screen.
- *
- * Rendering `value={value}` and writing back `Number(text) || 0` meant clearing
- * the box put a literal 0 in it under the caret, so every edit started by
- * deleting a zero somebody never typed. With a mouse that is hidden by
- * select-all; on a phone, where clearing means backspacing to empty and there is
- * no cheap select-all, it happened on all five spec fields every time.
- *
- * So the box holds the raw text and the draft holds the number. An empty box
- * stays empty and the draft carries 0, which is what the server would store for
- * a blank anyway.
- *
- * The parent still owns the value: a save response, a discard or "Load theirs"
- * all reset the draft, and this adopts that DURING RENDER, the way `useAsync`
- * resets for a changed input. The guard is what stops it fighting the typist:
- * a value that already agrees with the text on screen came FROM this box, and
- * rewriting it would turn "05" into "5" mid-keystroke.
- */
-function NumberField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  const [raw, setRaw] = useState(String(value));
-  const [seen, setSeen] = useState(value);
-
-  if (seen !== value) {
-    setSeen(value);
-    if (Number(raw) !== value) setRaw(String(value));
-  }
-
-  return (
-    <Field label={label}>
-      <input
-        className={inputClass}
-        type="number"
-        inputMode="numeric"
-        autoComplete="off"
-        value={raw}
-        /* A wheel over a focused number input scrolls the value instead of the
-           page, which rewrote a bedroom count on the way past it. Blurring on
-           the wheel stops that without taking the spinners away: they are a
-           mouse affordance and this console has always drawn them. */
-        onWheel={(e) => e.currentTarget.blur()}
-        onChange={(e) => {
-          setRaw(e.target.value);
-          onChange(e.target.value === "" ? 0 : Number(e.target.value) || 0);
-        }}
-      />
-    </Field>
   );
 }

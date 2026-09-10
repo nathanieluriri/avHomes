@@ -66,8 +66,74 @@ export const PROPERTY_TYPES = [
   "Bungalow",
   "Mansion",
   "Terrace",
+  "Estate Land",
 ] as const;
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
+
+/**
+ * A development sold as one listing with several options inside it (Kuje Estate:
+ * a 2 bed, a 3 bed, a 500 sqm plot). Always a sale. Its own price and bedroom
+ * count are DERIVED from its prototypes on save; see `estateSummary`.
+ */
+export const ESTATE_TYPE = "Estate Land" satisfies PropertyType;
+
+/** A prototype is a house design on a plot, or the bare plot. */
+export const PROTOTYPE_KINDS = ["house", "plot"] as const;
+export type PrototypeKind = (typeof PROTOTYPE_KINDS)[number];
+
+export const PROTOTYPES_MAX = 20;
+
+export interface EstatePrototype {
+  /** Stable across edits, so a React key and an enquiry can name one. `pt_` + random. */
+  id: string;
+  kind: PrototypeKind;
+  /** "2 bedroom semi-detached bungalow", "500 sqm plot". */
+  name: string;
+  /** Zero on a plot. */
+  bedrooms: number;
+  bathrooms: number;
+  /** Plot size for a plot, built-up area for a house. Square metres, not feet. */
+  sizeSqm: number;
+  priceMinor: number;
+  /** One render or photo. Null shows the estate's lead photo instead. */
+  image: string | null;
+  /** False is "sold out". The row stays on the page so buyers see what sold. */
+  available: boolean;
+}
+
+/** Deposit up front, the balance spread evenly across `months`. */
+export interface PaymentPlan {
+  /** Whole percent, 1 to 100. */
+  depositPercent: number;
+  /** Months the balance is spread over, 1 to 120. */
+  months: number;
+  /** "No interest", "Allocation after 50%". Optional. */
+  note: string;
+}
+
+export const BUILD_STAGES = ["off-plan", "under-construction", "completed"] as const;
+export type BuildStage = (typeof BUILD_STAGES)[number];
+
+/** What a buyer asks first in Nigeria: what paper backs this land. */
+export const TITLE_DOCUMENTS = [
+  "c-of-o",
+  "r-of-o",
+  "governors-consent",
+  "deed-of-assignment",
+  "excision",
+  "gazette",
+] as const;
+export type TitleDocument = (typeof TITLE_DOCUMENTS)[number];
+
+export const FURNISHINGS = ["furnished", "semi-furnished", "unfurnished"] as const;
+export type Furnishing = (typeof FURNISHINGS)[number];
+
+/**
+ * The statuses a listing may be featured in. Featuring a draft shows nothing,
+ * and featuring a sold house advertises something nobody can buy. Leaving these
+ * statuses clears the flag on the server.
+ */
+export const FEATURABLE_STATUSES: readonly PropertyStatus[] = ["live", "under-offer"];
 
 /** Only these reach the public site. Draft and archived are admin-only. */
 export const PUBLIC_PROPERTY_STATUSES: readonly PropertyStatus[] = ["live", "under-offer", "closed"];
@@ -145,6 +211,22 @@ export interface Property {
   featured: boolean;
   amenities: string[];
   images: string[];
+  /** Estate Land only; empty on every other type. See `fieldsFor`. */
+  prototypes: EstatePrototype[];
+  /** Estate Land only. */
+  paymentPlan: PaymentPlan | null;
+  /** Estate Land only. Replaces `yearBuilt`, which an off-plan estate does not have. */
+  buildStage: BuildStage | null;
+  /** Sales only, estates included. Null means not stated. */
+  titleDocument: TitleDocument | null;
+  /** Rent only. Null means not stated. */
+  furnishing: Furnishing | null;
+  /** Rent only. Cleaning, power and upkeep are in the service charge. */
+  serviced: boolean;
+  /** Rent only. Epoch ms at UTC midnight. Null means available now. */
+  availableFrom: number | null;
+  /** Rent only. Months on a yearly or monthly rent, nights on a shortlet. Null means no minimum. */
+  minStay: number | null;
   agent: Agent;
   /** The account that owns this listing, for per-record authorization. */
   agentUserId: string | null;

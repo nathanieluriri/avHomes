@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ChevronRight, Loader2, MessageSquare, Send, X } from "lucide-react";
 import type { EnquiryThread } from "@avhomes/contracts";
-import { useChat } from "@/lib/chat/provider";
+import { newThreadDraftKey, useChat } from "@/lib/chat/provider";
 import type { Identity, StoredThread } from "@/lib/chat/store";
 
 /**
@@ -225,7 +225,8 @@ function ThreadList() {
 
 function Conversation({ thread, live }: { thread: StoredThread; live: EnquiryThread | undefined }) {
   const chat = useChat();
-  const [draft, setDraft] = useState("");
+  // Held by the provider, which is how "Ask about this" lands in a thread that already exists.
+  const draft = chat.draftFor(thread.id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -254,11 +255,11 @@ function Conversation({ thread, live }: { thread: StoredThread; live: EnquiryThr
     if (body === "") return;
     setBusy(true);
     setError(null);
-    setDraft("");
+    chat.setDraft(thread.id, "");
     try {
       await chat.send(thread.id, body);
     } catch (err) {
-      setDraft(body);
+      chat.setDraft(thread.id, body);
       setError(err instanceof Error ? err.message : "That did not send.");
     } finally {
       setBusy(false);
@@ -311,7 +312,7 @@ function Conversation({ thread, live }: { thread: StoredThread; live: EnquiryThr
 
       <Composer
         value={draft}
-        onChange={setDraft}
+        onChange={(next) => chat.setDraft(thread.id, next)}
         onSubmit={submit}
         busy={busy}
         placeholder="Write a message"
@@ -329,6 +330,7 @@ function StartForm() {
   const target = chat.pending;
 
   if (!target) return null;
+  const draftKey = newThreadDraftKey(target.key);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -380,6 +382,8 @@ function StartForm() {
               name="message"
               required
               rows={3}
+              value={chat.draftFor(draftKey)}
+              onChange={(event) => chat.setDraft(draftKey, event.target.value)}
               placeholder={`I would like to know more about ${target.title}.`}
               className="mt-1 w-full resize-y rounded-xl border border-mist-200 px-3 py-2 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-500 focus:border-wine-600"
             />
@@ -482,7 +486,8 @@ function Composer({
         rows={1}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="max-h-28 min-h-[2.5rem] flex-1 resize-none rounded-2xl border border-mist-200 px-3.5 py-2.5 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-500 focus:border-wine-600"
+        // Grows with its content, so a prefilled question shows whole rather than its first line.
+        className="field-sizing-content max-h-28 min-h-[2.5rem] flex-1 resize-none rounded-2xl border border-mist-200 px-3.5 py-2.5 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-500 focus:border-wine-600"
       />
       <button
         type="button"

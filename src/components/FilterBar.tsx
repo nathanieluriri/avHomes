@@ -11,8 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ESTATE_TYPE } from "@/lib/types";
 
 const TYPES = [
+  ESTATE_TYPE,
   "Villa",
   "Apartment",
   "Duplex",
@@ -48,7 +50,9 @@ function statusLabel(value: string): string {
 }
 
 function typeLabel(value: string): string {
-  return value === ANY ? "Any type" : value;
+  if (value === ANY) return "Any type";
+  // The same word the category chips use for the group.
+  return value === ESTATE_TYPE ? "Estates" : value;
 }
 
 function bedsLabel(value: string): string {
@@ -207,7 +211,7 @@ export default function FilterBar() {
               <SelectItem value={ANY}>Any type</SelectItem>
               {TYPES.map((t) => (
                 <SelectItem key={t} value={t}>
-                  {t}
+                  {typeLabel(t)}
                 </SelectItem>
               ))}
             </SelectContent>

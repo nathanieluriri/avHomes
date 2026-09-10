@@ -48,6 +48,36 @@ export interface ChatTarget {
   path?: string;
   propertyId?: string;
   propertySlug?: string;
+  /**
+   * Written into the composer, whether this opens a new thread or resumes one.
+   * The thread is keyed on `key`, so this is the only part of a target that
+   * reaches the team when a conversation about `key` already exists.
+   */
+  message?: string;
+}
+
+/** What the visitor has typed but not sent, and the last line written for them. */
+interface Draft {
+  text: string;
+  /** The prefill last written by `openChat`. Equal to `text` while untouched. */
+  auto: string | null;
+}
+
+/** Drafts for a thread that does not exist yet are keyed on what it would be about. */
+export function newThreadDraftKey(key: string): string {
+  return `new:${key}`;
+}
+
+/**
+ * Adds a prefill to a draft without losing anything the visitor typed. An
+ * untouched earlier prefill is replaced (they asked about a different option);
+ * typed text is kept and the new line goes after it.
+ */
+function mergePrefill(current: Draft | undefined, message: string): Draft {
+  const text = current?.text ?? "";
+  if (text.trim() === "" || text === current?.auto) return { text: message, auto: message };
+  if (text.includes(message)) return current ?? { text, auto: null };
+  return { text: `${text.trimEnd()}\n\n${message}`, auto: null };
 }
 
 interface ChatValue {
@@ -62,6 +92,11 @@ interface ChatValue {
   totalUnread: number;
   unreadFor: (id: string) => number;
   openChat: (target?: ChatTarget) => void;
+  /** Takes back a prefill for `key` the visitor has not edited. */
+  withdraw: (key: string, message: string) => void;
+  /** Keyed by thread id, or `newThreadDraftKey(key)` for the start form. */
+  draftFor: (draftKey: string) => string;
+  setDraft: (draftKey: string, text: string) => void;
   close: () => void;
   show: (id: string) => void;
   back: () => void;
@@ -97,6 +132,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pending, setPending] = useState<ChatTarget | null>(null);
+  /* Here rather than in the composer, so a prefill can land in a thread that is
+     not on screen and closing the panel does not throw away a half-typed line. */
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   /* Read by the poller, which must not be rebuilt every time a message lands. */
   const threadsRef = useRef(threads);
@@ -117,6 +155,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         void _gone;
         return rest;
       });
+      setDrafts((all) => withoutKey(all, id));
       setActiveId((current) => (current === id ? null : current));
     },
     [persist],
@@ -218,6 +257,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return;
       }
       const existing = threadsRef.current.find((t) => t.key === target.key);
+      const { message } = target;
+      if (message) {
+        const draftKey = existing ? existing.id : newThreadDraftKey(target.key);
+        setDrafts((all) => ({ ...all, [draftKey]: mergePrefill(all[draftKey], message) }));
+      }
       if (existing) {
         show(existing.id);
         return;
@@ -228,6 +272,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     },
     [show],
   );
+
+  const withdraw = useCallback((key: string, message: string) => {
+    const existing = threadsRef.current.find((t) => t.key === key);
+    const draftKey = existing ? existing.id : newThreadDraftKey(key);
+    setDrafts((all) => {
+      const draft = all[draftKey];
+      return draft && draft.auto === message && draft.text === message ? withoutKey(all, draftKey) : all;
+    });
+  }, []);
+
+  const draftFor = useCallback((draftKey: string) => drafts[draftKey]?.text ?? "", [drafts]);
+
+  const setDraft = useCallback((draftKey: string, text: string) => {
+    setDrafts((all) => ({ ...all, [draftKey]: { text, auto: all[draftKey]?.auto ?? null } }));
+  }, []);
 
   const start = useCallback(
     async (target: ChatTarget, who: Identity, message: string, honeypot: string) => {
@@ -263,6 +322,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         },
       ]);
       setLive((all) => ({ ...all, [data.id]: data.thread }));
+      // The start form's message is the thread's first line now.
+      setDrafts((all) => withoutKey(all, newThreadDraftKey(target.key)));
       setActiveId(data.id);
       setPending(null);
     },
@@ -301,6 +362,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       totalUnread,
       unreadFor,
       openChat,
+      withdraw,
+      draftFor,
+      setDraft,
       close: () => setOpen(false),
       show,
       back: () => {
@@ -311,10 +375,34 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       send,
       forget,
     }),
-    [open, activeId, threads, live, identity, pending, totalUnread, unreadFor, openChat, show, start, send, forget],
+    [
+      open,
+      activeId,
+      threads,
+      live,
+      identity,
+      pending,
+      totalUnread,
+      unreadFor,
+      openChat,
+      withdraw,
+      draftFor,
+      setDraft,
+      show,
+      start,
+      send,
+      forget,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+function withoutKey<T>(all: Record<string, T>, key: string): Record<string, T> {
+  if (!(key in all)) return all;
+  const { [key]: _gone, ...rest } = all;
+  void _gone;
+  return rest;
 }
 
 /** The server's sentence when it has one, never a bare status code. */

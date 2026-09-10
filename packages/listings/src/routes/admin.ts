@@ -4,6 +4,7 @@ import {
   BadRequestError,
   NotFoundError,
   PreconditionFailedError,
+  StaleWriteError,
   assertCursorSort,
   auditBefore,
   auditEntityId,
@@ -18,25 +19,40 @@ import {
   type AppEnv,
 } from "@avhomes/core";
 import {
+  AMENITY_LENGTH_MAX,
+  AMENITY_MAX,
+  BUILD_STAGES,
   FEE_KINDS,
   FEE_KINDS_FOR,
+  FURNISHINGS,
   LISTING_TYPES,
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
+  PROTOTYPE_KINDS,
+  PROTOTYPES_MAX,
   RENT_PERIODS,
+  TITLE_DOCUMENTS,
   UNTITLED_LISTING,
+  canFeature,
+  derivedEstateColumns,
+  fieldsFor,
+  PUBLIC_PROPERTY_STATUSES,
+  isEstate,
   listingPublishBlockers,
+  minStayUnit,
   moneyRefusalMessage,
+  normalizeAmenities,
   normalizeFees,
   parseMajor,
   type ListingFee,
-  type PropertyStatus,
   type SiteStat,
   type Testimonial,
 } from "@avhomes/contracts";
 import { requireAdmin, requireAuth } from "@avhomes/identity";
 import { assertAuthorized } from "../authorize";
 import {
+  LISTING_KINDS,
+  TRANSITIONS,
   countProperties,
   createProperty,
   deleteSiteStat,
@@ -45,6 +61,7 @@ import {
   listProperties,
   listSiteStats,
   listTestimonials,
+  assertTransition,
   saveProperty,
   transitionProperty,
   trashProperty,
@@ -65,6 +82,29 @@ const FeeInput = z
     amount: str().max(30),
     /** Defaults to the patch's (or listing's) own currency; set only to disagree. */
     currency: str().length(3).toUpperCase().optional(),
+  })
+  .strict();
+
+/** One option inside an estate. Stored as sent; minor units, unlike a fee. */
+const PrototypeInput = z
+  .object({
+    id: str().regex(/^pt_[a-z0-9]{6,40}$/u),
+    kind: z.enum(PROTOTYPE_KINDS),
+    name: str().max(120),
+    bedrooms: z.number().int().min(0).max(20),
+    bathrooms: z.number().int().min(0).max(20),
+    sizeSqm: z.number().int().min(0).max(10_000_000),
+    priceMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    image: str().max(2000).nullable(),
+    available: z.boolean(),
+  })
+  .strict();
+
+const PaymentPlanInput = z
+  .object({
+    depositPercent: z.number().int().min(1).max(100),
+    months: z.number().int().min(1).max(120),
+    note: str().max(200).default(""),
   })
   .strict();
 
@@ -98,8 +138,19 @@ const PatchBody = z
     parkingSpaces: z.number().int().min(0).max(100),
     yearBuilt: z.number().int().min(1800).max(2200),
     featured: z.boolean(),
-    amenities: z.array(str().max(120)).max(60),
+    amenities: z.array(str().max(AMENITY_LENGTH_MAX)).max(AMENITY_MAX),
     images: z.array(str().max(2000)).max(40),
+    // Which of these apply is `fieldsFor`'s call, not the schema's. One that
+    // does not is cleared on save, the way a rent-only fee is on a sale.
+    prototypes: z.array(PrototypeInput).max(PROTOTYPES_MAX),
+    paymentPlan: PaymentPlanInput.nullable(),
+    buildStage: z.enum(BUILD_STAGES).nullable(),
+    titleDocument: z.enum(TITLE_DOCUMENTS).nullable(),
+    furnishing: z.enum(FURNISHINGS).nullable(),
+    serviced: z.boolean(),
+    // Epoch ms at UTC midnight. Null means available now.
+    availableFrom: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable(),
+    minStay: z.number().int().min(1).max(3650).nullable(),
     agent: z
       .object({
         id: str().max(120),
@@ -123,7 +174,12 @@ const SaveBody = z
   })
   .strict();
 
-const CreateBody = z.object({ title: str().min(1).max(300).default(UNTITLED_LISTING) }).strict();
+const CreateBody = z
+  .object({
+    title: str().min(1).max(300).default(UNTITLED_LISTING),
+    type: z.enum(PROPERTY_TYPES).optional(),
+  })
+  .strict();
 
 const AdminListQuery = z
   .object({
@@ -131,26 +187,14 @@ const AdminListQuery = z
     limit: str().optional(),
     cursor: str().max(600).optional(),
     status: z.enum(PROPERTY_STATUSES).optional(),
+    kind: z.enum(LISTING_KINDS).optional(),
+    type: z.enum(PROPERTY_TYPES).optional(),
     listingType: z.enum(LISTING_TYPES).optional(),
     mine: z.enum(["1", "0"]).optional(),
     q: str().max(200).optional(),
     withTotal: z.enum(["1", "0"]).optional(),
   })
   .strict();
-
-/** Which lifecycle ops carry a listing from one status to the next. */
-const TRANSITIONS: Record<LifecycleOp, PropertyStatus> = {
-  publish: "live", // from draft, archived
-  unpublish: "draft", // from live, under-offer
-  markOffer: "under-offer", // from live
-  // Not optional: under-offer and closed both need a way back to live, or a
-  // collapsed deal forces an agent to lie about the listing's state.
-  relist: "live", // from under-offer, closed
-  close: "closed", // from live, under-offer
-  archive: "archived",
-  unarchive: "draft",
-  restore: "draft",
-};
 
 const TestimonialBody = z
   .object({
@@ -188,6 +232,8 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       limit,
       cursor: q.cursor,
       status: q.status,
+      kind: q.kind,
+      type: q.type,
       listingType: q.listingType,
       q: q.q,
       agentUserId: q.mine === "1" ? user.id : undefined,
@@ -207,9 +253,10 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
   routes.post("/admin/properties", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const user = currentUser(c);
-    const { title } = await readJsonOrEmpty(c, CreateBody);
+    const { title, type } = await readJsonOrEmpty(c, CreateBody);
     const property = await createProperty(db, {
       title,
+      type,
       agentUserId: user.id,
       // Seeded from the creating account so a new listing is never agent-less on
       // screen. Every field stays editable afterwards.
@@ -245,7 +292,36 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, user, "write");
 
-    const listingType = body.patch.listingType ?? current.listingType;
+    // The rules below judge `current`, so the write must land on exactly that
+    // revision. Without this, a revision ahead of the read is checked against one
+    // row and written onto the next (a featured draft, a let estate).
+    if (body.baseRevision !== current.revision) {
+      throw new StaleWriteError("property", body.baseRevision, current.revision, current);
+    }
+
+    // Every rule below reads the shape the listing will HAVE, not the one it had,
+    // so a patch that switches type and fills the new fields in one save works.
+    const type = body.patch.type ?? current.type;
+    const estate = isEstate(type);
+
+    // Refused rather than coerced: a caller asking for a let estate has the
+    // wrong idea of what it is editing, and silently selling it would hide that.
+    if (estate && body.patch.listingType === "rent") {
+      throw new BadRequestError("listingType", [
+        { path: "listingType", message: "an estate is sold, not let" },
+      ]);
+    }
+    const listingType = estate ? "sale" : (body.patch.listingType ?? current.listingType);
+
+    const prototypeIds = new Set<string>();
+    for (const [index, prototype] of (body.patch.prototypes ?? []).entries()) {
+      if (prototypeIds.has(prototype.id)) {
+        throw new BadRequestError("prototypes", [
+          { path: `prototypes.${index}.id`, message: "two options share an id" },
+        ]);
+      }
+      prototypeIds.add(prototype.id);
+    }
 
     // Not a silent null: a stale rent period left on a sale is refused with a
     // named field rather than discarded, so the caller knows to clear it.
@@ -272,12 +348,81 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       });
     }
 
+    // Judged on the SAVED record: status and trash move only through their own
+    // routes, so nothing in this patch can make the listing featurable.
+    if (body.patch.featured === true && !canFeature(current)) {
+      throw new PreconditionFailedError("not_featurable", {
+        propertyId: id,
+        detail: canFeature({ status: current.status, deletedAt: current.deletedAt })
+          ? "An estate with every option sold out cannot be featured."
+          : "Only a live or under offer listing can be featured.",
+      });
+    }
+
     const { fees: feeInput, ...patchRest } = body.patch;
     const patch: PropertyPatch = { ...patchRest };
 
+    // Written on every sale save, so a home switched from rent to sale does not
+    // keep the period it was let by. A sale that sent a period was refused above.
+    if (listingType === "sale") patch.rentPeriod = null;
+
+    // A plot has no rooms, whatever the row held before its kind was switched.
+    if (patch.prototypes !== undefined) {
+      patch.prototypes = patch.prototypes.map((prototype) =>
+        prototype.kind === "plot" ? { ...prototype, bedrooms: 0, bathrooms: 0 } : prototype,
+      );
+    }
+
+    if (estate) {
+      patch.listingType = "sale";
+      // Recomputed on every estate save, whatever the client sent for these
+      // three, so the list's sort and filters never read a stale from-price.
+      Object.assign(patch, derivedEstateColumns(patch.prototypes ?? current.prototypes));
+    }
+
+    // Fields `fieldsFor` says do not apply are cleared rather than refused, the
+    // same call the fee rule below makes. Written only when this patch could
+    // have made one stale: it changed the shape, or it sent the field itself.
+    const fields = fieldsFor({ type, listingType });
+    const shapeChanged = body.patch.type !== undefined || body.patch.listingType !== undefined;
+    const touched = (...keys: (keyof typeof body.patch)[]) =>
+      shapeChanged || keys.some((key) => body.patch[key] !== undefined);
+    if (!fields.prototypes && touched("prototypes")) patch.prototypes = [];
+    if (!fields.paymentPlan && touched("paymentPlan")) patch.paymentPlan = null;
+    if (!fields.buildStage && touched("buildStage")) patch.buildStage = null;
+    if (!fields.titleDocument && touched("titleDocument")) patch.titleDocument = null;
+    if (!fields.rentTerms && touched("furnishing", "serviced", "availableFrom", "minStay")) {
+      patch.furnishing = null;
+      patch.serviced = false;
+      patch.availableFrom = null;
+      patch.minStay = null;
+    }
+
+    // Selling the last open option takes an estate off the home page in the same write.
+    if (
+      (current.featured || patch.featured === true) &&
+      !canFeature({ ...current, type, prototypes: patch.prototypes ?? current.prototypes })
+    ) {
+      patch.featured = false;
+    }
+
+    // A minimum stay counts nights on a shortlet and months otherwise, so a period
+    // change across that line would silently turn 12 months into 12 nights.
+    const nextPeriod = listingType === "rent" ? (patch.rentPeriod ?? current.rentPeriod ?? "year") : null;
+    if (
+      body.patch.minStay === undefined &&
+      current.minStay !== null &&
+      minStayUnit(nextPeriod) !== minStayUnit(current.rentPeriod)
+    ) {
+      patch.minStay = null;
+    }
+
+    if (patch.amenities !== undefined) patch.amenities = normalizeAmenities(patch.amenities);
+
     // Fees are resolved whenever they are sent, or whenever listingType changes
     // and might strand a fee kind the new type cannot carry: a caution fee left
-    // over from a rental is dropped on the switch to sale, not rejected.
+    // over from a rental is dropped on the switch to sale, not rejected. That
+    // includes the switch an estate forces, since `listingType` is the effective one.
     // TODO(test): a fee kind the new listingType cannot carry is dropped on
     // save, not rejected, whether or not fees itself rides the same patch.
     if (feeInput !== undefined || listingType !== current.listingType) {
@@ -297,6 +442,28 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       patch.fees = normalizeFees(source).filter((fee) => FEE_KINDS_FOR[listingType].includes(fee.kind));
     }
 
+    // A listing already on the site stays one Publish would accept. Only blockers
+    // this patch INTRODUCES are refused, so a legacy row missing an address can
+    // still have its title fixed.
+    if (current.deletedAt === null && PUBLIC_PROPERTY_STATUSES.includes(current.status)) {
+      const before = new Set(listingPublishBlockers(current).map((b) => b.message));
+      const introduced = listingPublishBlockers({
+        title: patch.title ?? current.title,
+        priceMinor: patch.priceMinor ?? current.priceMinor,
+        city: patch.city ?? current.city,
+        address: patch.address ?? current.address,
+        type,
+        prototypes: patch.prototypes ?? current.prototypes,
+      }).filter((b) => !before.has(b.message));
+      if (introduced.length > 0) {
+        throw new PreconditionFailedError("not_ready", {
+          propertyId: id,
+          blockers: introduced,
+          detail: `This listing is on the site, so it has to stay complete. ${introduced.map((b) => b.message).join(" ")}`,
+        });
+      }
+    }
+
     const property = await saveProperty(db, id, patch, body.baseRevision, {
       userId: user.id,
       name: user.displayName,
@@ -310,7 +477,8 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     const db = await currentDb(c);
     const id = pathParam(c, "id");
     const op = pathParam(c, "op");
-    if (!(op in TRANSITIONS)) {
+    // Own keys only: `in` would let "toString" through as an op.
+    if (!Object.hasOwn(TRANSITIONS, op)) {
       throw new BadRequestError("op", [
         { path: "op", message: `unknown operation, expected one of ${Object.keys(TRANSITIONS).join(", ")}` },
       ]);
@@ -322,20 +490,16 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, currentUser(c), "write");
 
-    // Refusals name the operation, so a screen can say what is wrong rather than
-    // printing a status code.
-    if (operation === "restore" && current.deletedAt === null) {
-      throw new PreconditionFailedError("not_in_trash", {
-        propertyId: id,
-        detail: "This listing is not in the trash.",
-      });
-    }
+    // Refusals name the operation and the status, so a screen can say what is
+    // wrong rather than printing a status code.
+    assertTransition(current, operation);
     /*
      * `publish` is the ONLY transition that carries a listing from a private
-     * status into a public one: it runs from draft or archived, and every other
-     * op either starts public already (markOffer, relist, close) or lands
-     * private (unpublish, archive, unarchive, restore). So this is the one gate
-     * a blank listing has to get past, and gating it is enough.
+     * status into a public one, because TRANSITIONS enforces where each op may
+     * start: publish runs from draft or archived, markOffer, relist and close
+     * only from a status that is public already, and every other op lands
+     * private. So this is the one gate a blank listing has to get past; the
+     * PATCH route keeps a listing that is already public from being emptied.
      */
     if (operation === "publish") {
       const blockers = listingPublishBlockers(current);
@@ -351,7 +515,9 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       }
     }
 
-    const property = await transitionProperty(db, id, operation, TRANSITIONS[operation]);
+    // Written against the revision just checked, so a listing edited since is a
+    // 409 rather than a move the checks above never saw.
+    const property = await transitionProperty(db, current, operation);
     return c.json({ property });
   });
 
@@ -368,6 +534,15 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     // listing, not just its id.
     auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, currentUser(c), "write");
+    if (base.baseRevision !== current.revision) {
+      throw new StaleWriteError("property", base.baseRevision, current.revision, current);
+    }
+    if (current.deletedAt !== null) {
+      throw new PreconditionFailedError("already_in_trash", {
+        propertyId: id,
+        detail: "This listing is already in the trash.",
+      });
+    }
 
     const property = await trashProperty(db, id, base.baseRevision);
     return c.json({ property });

@@ -8,6 +8,7 @@ import type {
   SiteStat,
   Testimonial,
 } from "@avhomes/contracts";
+import { canFeature, isEstate } from "@avhomes/contracts";
 import { apiBase, DETAIL_REVALIDATE, LIST_REVALIDATE } from "./api-config";
 import { demoProperties, demoStats, demoTestimonials } from "./demo-data";
 
@@ -93,10 +94,33 @@ export async function getProperties(): Promise<Property[]> {
   return page.items;
 }
 
+/** The API's default order and page size, so a fixture page holds what a real one would. */
+function newestPage(rows: Property[], limit: number): Property[] {
+  return [...rows].sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0)).slice(0, limit);
+}
+
 export async function getFeaturedProperties(): Promise<Property[]> {
   const page = await apiGet<Page<Property>>(
     "/properties?featured=1&limit=6",
-    { items: demoProperties.filter((p) => p.featured), nextCursor: null },
+    { items: newestPage(demoProperties.filter((p) => p.featured && canFeature(p)), 6), nextCursor: null },
+    { items: [], nextCursor: null },
+    { revalidate: LIST_REVALIDATE, tags: ["properties"] },
+  );
+  if (page.items.length > 0) return page.items;
+  // Closing or archiving clears featured, so an empty set is a normal state. The
+  // homepage then shows the newest live listings, as the admin storefront card says.
+  const newest = await getProperties();
+  return newest.filter(canFeature).slice(0, 6);
+}
+
+/**
+ * Estates on their own page of 48, so an estate older than the newest 48
+ * listings still reaches the Estates group on `/listings`.
+ */
+export async function getEstates(): Promise<Property[]> {
+  const page = await apiGet<Page<Property>>(
+    "/properties?kind=estate&limit=48",
+    { items: newestPage(demoProperties.filter((p) => isEstate(p.type)), 48), nextCursor: null },
     { items: [], nextCursor: null },
     { revalidate: LIST_REVALIDATE, tags: ["properties"] },
   );
@@ -232,10 +256,21 @@ export function whatsappHref(number: string, message: string): string | null {
 
 /** Re-exported so components import their formatting from one place. */
 export {
+  BUILD_STAGE_LABELS,
+  estateSummary,
   formatPrice,
   formatPriceShort,
+  formatSqm,
+  sqftToSqm,
+  FURNISHING_LABELS,
+  isEstate,
   listingLabel,
+  minStayLabel,
   moveInTotalMinor,
   normalizeFees,
+  paymentPlanFor,
+  prototypeLabel,
   statusLabel,
+  TITLE_DOCUMENT_LABELS,
+  TITLE_DOCUMENT_SHORT,
 } from "@avhomes/contracts";

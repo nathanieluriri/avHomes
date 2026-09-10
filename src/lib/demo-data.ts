@@ -1,5 +1,5 @@
 import type { Agent, ListingFee, PriceChange, Property, RentPeriod, SiteStat, Testimonial } from "@avhomes/contracts";
-import { normalizeFees, readRentPeriod } from "@avhomes/contracts";
+import { derivedEstateColumns, isEstate, normalizeFees, readRentPeriod } from "@avhomes/contracts";
 
 /**
  * Bundled fixtures.
@@ -19,6 +19,8 @@ import { normalizeFees, readRentPeriod } from "@avhomes/contracts";
 const L = "/images/library";
 const ext = (n: number) => `${L}/exterior-${String(n).padStart(2, "0")}.jpg`;
 const int = (n: number) => `${L}/interior-${String(n).padStart(2, "0")}.jpg`;
+/** Prototype prices are stored as written, so they convert here rather than in `toProperty`. */
+const naira = (n: number) => n * 100;
 
 const agents: Agent[] = [
   {
@@ -63,8 +65,25 @@ type PropertySeed = Omit<
   | "revision"
   | "agentUserId"
   | "featured"
-> & {
+  | "prototypes"
+  | "paymentPlan"
+  | "buildStage"
+  | "titleDocument"
+  | "furnishing"
+  | "serviced"
+  | "availableFrom"
+  | "minStay"
+> &
+  Partial<
+    Pick<
+      Property,
+      "prototypes" | "paymentPlan" | "buildStage" | "titleDocument" | "furnishing" | "serviced" | "minStay"
+    >
+  > & {
+  /** Naira. Ignored on an estate, whose price is derived from its prototypes. */
   price: number;
+  /** ISO date, rentals only. Omitted means available now. */
+  availableFrom?: string;
   status: "For Sale" | "For Rent" | "Sold" | "Under Offer" | "Let Agreed" | "Let";
   /** Rentals only. Omitted means "year", the same default `readRentPeriod` gives a legacy row. */
   rentPeriod?: RentPeriod;
@@ -99,6 +118,7 @@ const propertySeeds: PropertySeed[] = [
     parkingSpaces: 3,
     yearBuilt: 2022,
     featured: true,
+    titleDocument: "c-of-o",
     amenities: ["Private Pool", "Smart Home System", "24/7 Security", "Fitness Center", "Backup Power", "Landscaped Garden"],
     images: [`${L}/av-render-01.jpg`, `${L}/av-render-02.jpg`, int(1), int(7)],
     agent: agents[0],
@@ -325,6 +345,9 @@ const propertySeeds: PropertySeed[] = [
     areaSqft: 720,
     parkingSpaces: 1,
     yearBuilt: 2022,
+    furnishing: "furnished",
+    serviced: true,
+    minStay: 2,
     amenities: ["Sleeping Alcove", "Lift", "Concierge", "Backup Power"],
     images: [ext(8), int(4), int(12)],
     agent: agents[0],
@@ -373,6 +396,7 @@ const propertySeeds: PropertySeed[] = [
     parkingSpaces: 3,
     yearBuilt: 2025,
     featured: true,
+    titleDocument: "governors-consent",
     amenities: ["Solar with Battery", "Stone Worktops", "Fitted Wardrobes", "Gated Estate", "Borehole"],
     images: [ext(10), int(5), int(9), int(12)],
     agent: agents[1],
@@ -404,6 +428,9 @@ const propertySeeds: PropertySeed[] = [
     areaSqft: 1850,
     parkingSpaces: 2,
     yearBuilt: 2021,
+    furnishing: "semi-furnished",
+    serviced: true,
+    minStay: 6,
     amenities: ["Ocean View", "Shared Pool", "Gym", "Concierge", "Backup Power"],
     images: [ext(4), int(2), int(8)],
     agent: agents[1],
@@ -568,6 +595,9 @@ const propertySeeds: PropertySeed[] = [
     areaSqft: 3200,
     parkingSpaces: 3,
     yearBuilt: 2022,
+    furnishing: "furnished",
+    availableFrom: "2026-10-01",
+    minStay: 12,
     amenities: ["Private Lift Lobby", "Furnished", "Staff Quarters", "Concierge", "Backup Power"],
     images: [`${L}/av-render-04.jpg`, `${L}/av-render-05.jpg`, int(7)],
     agent: agents[1],
@@ -624,6 +654,90 @@ const propertySeeds: PropertySeed[] = [
     agent: agents[2],
     createdAt: "2026-08-27",
   },
+  {
+    id: "23",
+    slug: "kuje-garden-estate",
+    title: "Kuje Garden Estate",
+    tagline: "Off-plan homes and serviced plots, 30% down",
+    description:
+      "A gated development on dry, level land off the Kuje road, laid out with paved streets, drainage and street lights before the first house goes up. Choose a finished house type or a serviced plot to build on, and spread the balance over twelve months with no interest.",
+    // Price, bedrooms and bathrooms are derived from the prototypes in `toProperty`.
+    price: 0,
+    status: "For Sale",
+    type: "Estate Land",
+    location: "Kuje, Abuja",
+    city: "Abuja",
+    address: "Off Kuje Road, Kuje, Abuja",
+    bedrooms: 0,
+    bathrooms: 0,
+    areaSqft: 0,
+    parkingSpaces: 0,
+    yearBuilt: 0,
+    featured: true,
+    prototypes: [
+      {
+        id: "pt_kuje2bedsemi",
+        kind: "house",
+        name: "2 bedroom semi-detached bungalow",
+        bedrooms: 2,
+        bathrooms: 2,
+        sizeSqm: 120,
+        priceMinor: naira(28_500_000),
+        image: null,
+        available: true,
+      },
+      {
+        id: "pt_kuje3beddetached",
+        kind: "house",
+        name: "3 bedroom detached bungalow",
+        bedrooms: 3,
+        bathrooms: 3,
+        sizeSqm: 180,
+        priceMinor: naira(45_000_000),
+        image: `${L}/av-render-01.jpg`,
+        available: true,
+      },
+      {
+        id: "pt_kuje4bedduplex",
+        kind: "house",
+        name: "4 bedroom detached duplex",
+        bedrooms: 4,
+        bathrooms: 5,
+        sizeSqm: 260,
+        priceMinor: naira(72_000_000),
+        image: `${L}/av-render-02.jpg`,
+        available: false,
+      },
+      {
+        // Name left blank on purpose: it reads "500 sqm plot" through `prototypeLabel`.
+        id: "pt_kujeplot500",
+        kind: "plot",
+        name: "",
+        bedrooms: 0,
+        bathrooms: 0,
+        sizeSqm: 500,
+        priceMinor: naira(12_000_000),
+        image: null,
+        available: true,
+      },
+    ],
+    paymentPlan: { depositPercent: 30, months: 12, note: "No interest across the twelve months." },
+    buildStage: "off-plan",
+    titleDocument: "r-of-o",
+    amenities: [
+      "Perimeter Fence",
+      "Gatehouse",
+      "24/7 Security",
+      "Good Road Network",
+      "Drainage",
+      "Street Lights",
+      "Recreation Park",
+      "Dry Land",
+    ],
+    images: [`${L}/av-render-03.jpg`, `${L}/av-render-01.jpg`, `${L}/av-render-02.jpg`],
+    agent: agents[2],
+    createdAt: "2026-09-02",
+  },
 ];
 
 
@@ -640,14 +754,19 @@ const statusMap = {
 /** Readable fixture units into the stored contract. */
 function toProperty(seed: PropertySeed): Property {
   const published = Date.parse(`${seed.createdAt}T09:00:00Z`);
-  const { price, status, featured, rentPeriod, fees, priceHistory, ...rest } = seed;
+  const { price, status, featured, rentPeriod, fees, priceHistory, availableFrom, ...rest } = seed;
   const { listingType, status: lifecycle } = statusMap[status];
   const { createdAt: _isoDate, ...fields } = rest;
   void _isoDate;
+  const prototypes = seed.prototypes ?? [];
+  // The same derivation the server runs on every estate save.
+  const derived = isEstate(seed.type) ? derivedEstateColumns(prototypes) : null;
   return {
     ...fields,
     // 100 kobo per naira. The fixture writes naira; the contract stores minor units.
-    priceMinor: price * 100,
+    priceMinor: derived ? derived.priceMinor : price * 100,
+    bedrooms: derived ? derived.bedrooms : seed.bedrooms,
+    bathrooms: derived ? derived.bathrooms : seed.bathrooms,
     currency: "NGN",
     status: lifecycle,
     listingType,
@@ -655,6 +774,15 @@ function toProperty(seed: PropertySeed): Property {
     fees: normalizeFees(fees ?? []),
     priceHistory: priceHistory ?? [],
     featured: featured ?? false,
+    prototypes,
+    paymentPlan: seed.paymentPlan ?? null,
+    buildStage: seed.buildStage ?? null,
+    titleDocument: seed.titleDocument ?? null,
+    furnishing: seed.furnishing ?? null,
+    serviced: seed.serviced ?? false,
+    // UTC midnight, which is what the editor stores for a date.
+    availableFrom: availableFrom ? Date.parse(`${availableFrom}T00:00:00Z`) : null,
+    minStay: seed.minStay ?? null,
     agentUserId: null,
     createdAt: published,
     updatedAt: published,

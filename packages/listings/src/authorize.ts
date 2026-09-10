@@ -11,11 +11,11 @@ import { isAdminRole, type AuthUser } from "@avhomes/contracts";
  *
  * The three rules:
  *
- *  - **read** — every signed-in user reads everything, drafts included. This is
+ *  - **read**: every signed-in user reads everything, drafts included. This is
  *    one agency with an invite-only staff list, not a multi-tenant host.
- *  - **write** — the listing's own agent, or an admin. An agent owns their
+ *  - **write**: the listing's own agent, or an admin. An agent owns their
  *    listings; an owner can fix anything, which is what makes the role useful.
- *  - **destroy** — admin only. It is the one irreversible action here, and trash
+ *  - **destroy**: admin only. It is the one irreversible action here, and trash
  *    is the reversible door an agent already has.
  */
 export type Action = "read" | "write" | "destroy";

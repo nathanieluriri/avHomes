@@ -3,6 +3,7 @@ import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import {
   DuplicateError,
   NotFoundError,
+  PreconditionFailedError,
   StaleWriteError,
   disambiguateSlug,
   keysetFilter,
@@ -13,8 +14,12 @@ import {
 } from "@avhomes/core";
 import {
   DEFAULT_CURRENCY,
+  ESTATE_TYPE,
+  FEATURABLE_STATUSES,
   PRICE_HISTORY_MAX,
+  PROPERTY_STATUSES,
   PUBLIC_PROPERTY_STATUSES,
+  isEstate,
   type ListingType,
   type Page,
   type PriceChange,
@@ -39,12 +44,17 @@ function properties(db: Db) {
   return collection<PropertyDoc>(db, COLLECTIONS.properties);
 }
 
+export const LISTING_KINDS = ["estate", "home"] as const;
+export type ListingKind = (typeof LISTING_KINDS)[number];
+
 export interface ListQuery {
   sort: PropertySort;
   limit: number;
   cursor?: string | undefined;
   status?: PropertyStatus | undefined;
   type?: PropertyType | undefined;
+  /** Estates versus everything else. Composes with `type` rather than replacing it. */
+  kind?: ListingKind | undefined;
   /** The deal (sale/rent). Separate from `type`, which is PropertyType (Villa, Duplex). */
   listingType?: ListingType | undefined;
   city?: string | undefined;
@@ -91,10 +101,21 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
   }
 
   if (query.type) and.push({ type: query.type });
+  if (query.kind === "estate") and.push({ type: ESTATE_TYPE });
+  if (query.kind === "home") and.push({ type: { $ne: ESTATE_TYPE } });
   if (query.listingType) and.push({ listingType: query.listingType });
   if (query.city) and.push({ city: query.city });
   if (query.bedrooms !== undefined) and.push({ bedrooms: { $gte: query.bedrooms } });
   if (query.featured !== undefined) and.push({ featured: query.featured });
+  // Lifecycle moves clear the flag now, but a row featured before they did
+  // would otherwise still headline the home page after it sold.
+  if (query.featured === true) {
+    and.push({ status: { $in: [...FEATURABLE_STATUSES] }, deletedAt: null });
+    // A sold-out estate advertises something nobody can buy.
+    and.push({
+      $or: [{ type: { $ne: ESTATE_TYPE } }, { prototypes: { $elemMatch: { available: true } } }],
+    } as Filter<PropertyDoc>);
+  }
   if (query.agentUserId) and.push({ agentUserId: query.agentUserId });
 
   if (query.minPriceMinor !== undefined || query.maxPriceMinor !== undefined) {
@@ -116,12 +137,19 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
    * filter that narrows on every keystroke, respects the sort the operator
    * chose, and pages like every other view. `description` is left out on
    * purpose, or a common word in one long body drags an unrelated listing to
-   * the top of the operator's table.
+   * the top of the operator's table. Option names are in, so "3 bed" finds the
+   * estate that sells one.
    */
   if (query.q && query.substring) {
     const like = new RegExp(escapeRegex(query.q), "iu");
     and.push({
-      $or: [{ title: like }, { city: like }, { location: like }, { tagline: like }],
+      $or: [
+        { title: like },
+        { city: like },
+        { location: like },
+        { tagline: like },
+        { "prototypes.name": like },
+      ],
     } as Filter<PropertyDoc>);
   } else if (query.q) {
     and.push({ $text: { $search: query.q } } as Filter<PropertyDoc>);
@@ -210,6 +238,8 @@ export async function getSimilarProperties(
 
 export interface CreatePropertyArgs {
   title: string;
+  /** Chosen at the naming step, because it decides which form the editor shows. */
+  type?: PropertyType | undefined;
   agentUserId: string | null;
   agent: PropertyDoc["agent"];
 }
@@ -228,9 +258,10 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     currency: DEFAULT_CURRENCY,
     status: "draft",
     // Required by the validator: moderate validation checks every insert, and
-    // an insert with no listingType fails it outright.
+    // an insert with no listingType fails it outright. Also the only deal an
+    // estate can be, so a new estate needs nothing further here.
     listingType: "sale",
-    type: "Apartment",
+    type: args.type ?? "Apartment",
     location: "",
     city: "",
     address: "",
@@ -242,6 +273,14 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     featured: false,
     amenities: [],
     images: [],
+    prototypes: [],
+    paymentPlan: null,
+    buildStage: null,
+    titleDocument: null,
+    furnishing: null,
+    serviced: false,
+    availableFrom: null,
+    minStay: null,
     agent: args.agent,
     agentUserId: args.agentUserId,
     createdAt: now,
@@ -294,10 +333,21 @@ export async function saveProperty(
   // differs. createProperty seeds priceMinor 0, so a brand new listing's first
   // price is not a change: recording one would lie about a rise from nothing,
   // and it would trip the currency lock on a listing that never had a price.
+  // A drop to zero is not recorded either. Zero is no price at all, and the
+  // site would badge it as a cut.
+  // An estate, or a listing crossing into or out of being one, records nothing:
+  // its price is the cheapest option's, so adding a cheaper option is not an
+  // asking price being cut, and the site would badge it as one.
   // TODO(test): a price change appends exactly one priceHistory entry, capped
   // at PRICE_HISTORY_MAX; an unrelated field change appends none.
   const change: PriceChange | null =
-    before && patch.priceMinor !== undefined && before.priceMinor > 0 && patch.priceMinor !== before.priceMinor
+    before &&
+    !isEstate(before.type) &&
+    !isEstate(patch.type ?? before.type) &&
+    patch.priceMinor !== undefined &&
+    before.priceMinor > 0 &&
+    patch.priceMinor > 0 &&
+    patch.priceMinor !== before.priceMinor
       ? {
           at: now,
           fromMinor: before.priceMinor,
@@ -339,17 +389,88 @@ export type LifecycleOp =
   | "unarchive"
   | "restore";
 
+interface Transition {
+  to: PropertyStatus;
+  /** Statuses the op may start from. Matches the controls the editor offers. */
+  from: readonly PropertyStatus[];
+  /** Only `restore` runs on a trashed listing, and it runs on nothing else. */
+  trashed: boolean;
+}
+
+export const TRANSITIONS: Record<LifecycleOp, Transition> = {
+  publish: { to: "live", from: ["draft", "archived"], trashed: false },
+  unpublish: { to: "draft", from: ["live", "under-offer"], trashed: false },
+  markOffer: { to: "under-offer", from: ["live"], trashed: false },
+  // Under offer and closed both need a way back to live, or a collapsed deal
+  // forces an agent to lie about the listing's state.
+  relist: { to: "live", from: ["under-offer", "closed"], trashed: false },
+  close: { to: "closed", from: ["live", "under-offer"], trashed: false },
+  archive: { to: "archived", from: ["draft", "live", "under-offer", "closed"], trashed: false },
+  unarchive: { to: "draft", from: ["archived"], trashed: false },
+  // Whatever status a trashed row holds, being in the trash is the whole test.
+  restore: { to: "draft", from: PROPERTY_STATUSES, trashed: true },
+};
+
+const OP_PHRASES: Record<LifecycleOp, string> = {
+  publish: "published",
+  unpublish: "unpublished",
+  markOffer: "marked under offer",
+  relist: "put back on the market",
+  close: "marked closed",
+  archive: "archived",
+  unarchive: "unarchived",
+  restore: "restored",
+};
+
+const STATUS_PHRASES: Record<PropertyStatus, string> = {
+  draft: "A draft",
+  live: "A live listing",
+  "under-offer": "A listing under offer",
+  closed: "A closed listing",
+  archived: "An archived listing",
+};
+
+/** Refuses an op the listing's current status (or the trash) does not allow. */
+export function assertTransition(current: Property, op: LifecycleOp): void {
+  const rule = TRANSITIONS[op];
+  const trashed = current.deletedAt !== null;
+  // An estate sells option by option, so "under offer" and "closed" would contradict
+  // its options' own availability. It stays live until archived.
+  if (!trashed && isEstate(current.type) && (op === "markOffer" || op === "close")) {
+    throw new PreconditionFailedError("invalid_transition", {
+      propertyId: current.id,
+      detail: "An estate is sold option by option. Mark the options that have sold as sold out instead.",
+    });
+  }
+  if (trashed === rule.trashed && rule.from.includes(current.status)) return;
+
+  const detail = trashed
+    ? `A listing in the trash cannot be ${OP_PHRASES[op]}. Restore it first.`
+    : op === "restore"
+      ? "This listing is not in the trash."
+      : `${STATUS_PHRASES[current.status]} cannot be ${OP_PHRASES[op]}.`;
+  throw new PreconditionFailedError("invalid_transition", { propertyId: current.id, detail });
+}
+
+/**
+ * Writes the move against the revision `current` was read at, so the checks a
+ * caller ran on that read (the allowed-from table, the publish blockers) hold
+ * for the row actually written. A listing changed in between is a 409.
+ */
 export async function transitionProperty(
   db: Db,
-  id: string,
+  current: Property,
   op: LifecycleOp,
-  status: PropertyStatus,
 ): Promise<Property> {
+  assertTransition(current, op);
   const now = Date.now();
-  const current = await properties(db).findOne({ _id: id });
-  if (!current) throw new NotFoundError(id);
+  const id = current.id;
+  const status = TRANSITIONS[op].to;
 
   const set: Partial<PropertyDoc> = { status, updatedAt: now };
+  // A sold or unpublished listing on the home page advertises something nobody
+  // can act on, so leaving the featurable statuses takes the flag with it.
+  if (!FEATURABLE_STATUSES.includes(status)) set.featured = false;
 
   if (op === "publish") {
     set.publishedAt = current.publishedAt ?? now;
@@ -402,7 +523,7 @@ export async function trashProperty(db: Db, id: string, baseRevision: number): P
   const now = Date.now();
   const after = await properties(db).findOneAndUpdate(
     { _id: id, revision: baseRevision },
-    { $set: { deletedAt: now, status: "archived", updatedAt: now }, $inc: { revision: 1 } },
+    { $set: { deletedAt: now, status: "archived", featured: false, updatedAt: now }, $inc: { revision: 1 } },
     { returnDocument: "after" },
   );
   if (after) return toProperty(after);

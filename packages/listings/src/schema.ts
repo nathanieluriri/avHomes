@@ -2,8 +2,12 @@ import {
   normalizeFees,
   readRentPeriod,
   type Agent,
+  type BuildStage,
+  type EstatePrototype,
+  type Furnishing,
   type ListingFee,
   type ListingType,
+  type PaymentPlan,
   type PriceChange,
   type Property,
   type PropertyStatus,
@@ -11,6 +15,7 @@ import {
   type RentPeriod,
   type SiteStat,
   type Testimonial,
+  type TitleDocument,
 } from "@avhomes/contracts";
 
 /**
@@ -56,6 +61,19 @@ export interface PropertyDoc {
   featured: boolean;
   amenities: string[];
   images: string[];
+  /**
+   * Optional for the same reason as the three above: 0009 added them without
+   * rewriting a single row. Absence reads as "not an estate, nothing stated",
+   * which is exactly what a listing written before these fields existed means.
+   */
+  prototypes?: EstatePrototype[];
+  paymentPlan?: PaymentPlan | null;
+  buildStage?: BuildStage | null;
+  titleDocument?: TitleDocument | null;
+  furnishing?: Furnishing | null;
+  serviced?: boolean;
+  availableFrom?: number | null;
+  minStay?: number | null;
   agent: Agent;
   agentUserId: string | null;
   createdAt: number;
@@ -95,7 +113,8 @@ export interface SiteStatDoc {
  * migration backfilled, so Property.fees would be `undefined` at runtime and
  * the first `.map` over it in the UI would throw. This is the one file where
  * that optionality exists; the three lines below resolve it, and nothing past
- * this function ever sees an undefined in its place.
+ * this function ever sees an undefined in its place. 0009's estate and rent
+ * term fields are resolved the same way, below `images`.
  */
 export function toProperty(doc: PropertyDoc): Property {
   return {
@@ -123,6 +142,14 @@ export function toProperty(doc: PropertyDoc): Property {
     featured: doc.featured,
     amenities: doc.amenities,
     images: doc.images,
+    prototypes: doc.prototypes ?? [],
+    paymentPlan: doc.paymentPlan ?? null,
+    buildStage: doc.buildStage ?? null,
+    titleDocument: doc.titleDocument ?? null,
+    furnishing: doc.furnishing ?? null,
+    serviced: doc.serviced ?? false,
+    availableFrom: doc.availableFrom ?? null,
+    minStay: doc.minStay ?? null,
     agent: doc.agent,
     agentUserId: doc.agentUserId,
     createdAt: doc.createdAt,
