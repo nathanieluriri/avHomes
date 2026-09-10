@@ -512,9 +512,6 @@ export interface AuditEntry {
   status: number;
   /** Ties an entry to the error-table line and the server log for the same call. */
   requestId: string;
-  /** Written beside the real expiry solely so a TTL index can sweep the row.
-   *  Never read by the application. */
-  expiresAtDate: Date;
 }
 
 /* ───────────────────────────── shared paging ──────────────────────────── */

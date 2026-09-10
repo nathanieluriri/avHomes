@@ -7,9 +7,11 @@
  * mutating request that reaches an admin router, a repository over the `audit`
  * collection, and two read routes. Nothing writes an entry over HTTP.
  *
- * It imports `contracts`, `core` and `db` and no other feature package, and no
- * feature package imports it. The middleware is injected at the composition
- * root, which is the only place allowed to know both halves of a seam.
+ * It imports `contracts`, `core`, `db` and `identity` (the guard tier every
+ * feature package attaches to, not a peer of this one) and no other feature
+ * package, and no feature package imports it. The middleware is injected at
+ * the composition root, which is the only place allowed to know both halves
+ * of a seam.
  */
 
 export { auditTrail, derive } from "./middleware";
@@ -34,7 +36,7 @@ export {
   MAX_ARRAY,
   MAX_BYTES,
   MAX_STRING,
-  NO_BODY_PREFIXES,
+  NO_CAPTURE_PREFIXES,
   REDACTED,
   REDACT_KEYS,
   redact,

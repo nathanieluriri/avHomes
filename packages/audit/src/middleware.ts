@@ -8,7 +8,7 @@ import {
   type AppEnv,
   type AuditHandle,
 } from "@avhomes/core";
-import { NO_BODY_PREFIXES, redact, trim } from "./redact";
+import { NO_CAPTURE_PREFIXES, redact, trim } from "./redact";
 import { AUDIT_RETENTION_MS, insertEntry, type AuditEntryDoc } from "./repo";
 
 /**
@@ -169,7 +169,7 @@ export function derive(path: string, method: string): Derived {
  * consuming the stream ahead of the route that needs it.
  */
 async function readBody(c: Context<AppEnv>): Promise<unknown> {
-  if (NO_BODY_PREFIXES.some((prefix) => c.req.path.startsWith(prefix))) return null;
+  if (NO_CAPTURE_PREFIXES.some((prefix) => c.req.path.startsWith(prefix))) return null;
 
   const header = c.req.header("content-type") ?? "";
   const base = header.split(";")[0]?.trim().toLowerCase() ?? "";
@@ -207,8 +207,14 @@ function clean(value: unknown): Record<string, unknown> | null {
 /**
  * Query values are strings by construction, since `c.req.query()` returns them
  * that way. This keeps the type honest after the walk rather than casting.
+ *
+ * Checked against `NO_CAPTURE_PREFIXES` first, the same guard `readBody` opens
+ * with: a `?code=` or `?ticket=` on a future auth route is the query-string
+ * shape of the same problem the body exclusion exists for, and matching on the
+ * path is the control, not the `token` entry in `REDACT_KEYS`.
  */
-function cleanQuery(raw: Record<string, string>): Record<string, string> | null {
+function cleanQuery(path: string, raw: Record<string, string>): Record<string, string> | null {
+  if (NO_CAPTURE_PREFIXES.some((prefix) => path.startsWith(prefix))) return null;
   if (Object.keys(raw).length === 0) return null;
   const walked = clean(raw);
   if (!walked) return null;
@@ -305,7 +311,7 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
       before: clean(captured.before),
       method,
       path,
-      query: cleanQuery(c.req.query()),
+      query: cleanQuery(path, c.req.query()),
       status,
       requestId: requestId(c),
       expiresAtDate: new Date(now + AUDIT_RETENTION_MS),

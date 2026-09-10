@@ -33,10 +33,16 @@ other record this trail can name. An audit entry is a fact about an action, and
 an action's actor, target and request do not all live on one document even when
 a target exists: AUDIT_ENTITIES includes "auth" and "session", and a sign-in has
 no property or post to carry a field on in the first place. Where a target does
-exist, tying its history to its own document lifetime is the wrong coupling: a
-property's only memory of change today is \`deletedAt\`, a bare timestamp with no
-actor and no before-value, and that is the ceiling fields-on-the-record can
-reach even when nothing has gone wrong. Embedding a real history would reopen
+exist, tying its history to its own document lifetime is still the wrong
+coupling. 0007 already added \`priceHistory\` to properties, an embedded array
+carrying \`at\`, \`fromMinor\`/\`toMinor\` and \`byUserId\`/\`byName\`, a real actor and
+a real before-value living on the record today, so that is the best case
+fields-on-the-record has to offer, and it is still one field on one entity.
+\`auth\` and \`session\` have no record at all to carry such a field on, so the
+pattern cannot reach every entity this trail names, and reaching the rest would
+mean a separately capped array per entity rather than the one collection and
+one shared index a log spanning all of them needs. Embedding a real history
+would also reopen
 0005's \`messages\` problem in a worse shape. \`messages\` is capped at
 CHAT_MAX_MESSAGES because an uncapped array on a document anyone can grow is the
 16MB limit with a countdown on it; an audit trail has no such cap available,

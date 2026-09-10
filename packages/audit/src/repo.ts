@@ -57,6 +57,10 @@ function audit(db: Db) {
  * otherwise read back as `undefined` where the contract promises `null`. The
  * writer below always spells them out; this is the half that stays correct for
  * a row something else wrote.
+ *
+ * `expiresAtDate` stays on the doc and stops here. It exists solely so
+ * `audit_ttl` can sweep the row and `c.json` would serialise a `Date` to a
+ * string, which is not what the wire type promises, so the UI never sees it.
  */
 export function toAuditEntry(doc: AuditEntryDoc): AuditEntry {
   return {
@@ -75,7 +79,6 @@ export function toAuditEntry(doc: AuditEntryDoc): AuditEntry {
     query: doc.query ?? null,
     status: doc.status,
     requestId: doc.requestId,
-    expiresAtDate: doc.expiresAtDate,
   };
 }
 

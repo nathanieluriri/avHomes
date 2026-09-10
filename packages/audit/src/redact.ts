@@ -13,10 +13,9 @@ export const REDACTED = "[redacted]";
 export const DEEP = "[deep]";
 
 /**
- * Bodies under these prefixes are never read at all.
- *
- * THIS IS THE CONTROL. The key list below is defence in depth behind it, not
- * the thing keeping passwords out of the log.
+ * Neither the body nor the query string is captured for a path under one of
+ * these prefixes. THIS IS THE CONTROL. The key list below is defence in depth
+ * behind it, not the thing keeping credentials out of the log.
  *
  * The route that changes a password takes `{ current, next }`. Two innocuous
  * words, both carrying plaintext, and neither one a name any denylist would
@@ -26,9 +25,14 @@ export const DEEP = "[deep]";
  * Every route under this prefix exists to receive a credential, so there is
  * nothing here worth recording and no way to know which field is the secret.
  *
+ * The query string gets the same exclusion for the same reason: an OAuth-style
+ * `?code=` or `?ticket=` on a future auth route is exactly the "innocuous name,
+ * real secret" case above, and today's denylist catching `?token=` is luck, not
+ * a guarantee, the same luck this list exists to not rely on for the body.
+ *
  * Matched against `c.req.path`, which carries the `/api` prefix at runtime.
  */
-export const NO_BODY_PREFIXES = ["/api/auth/"];
+export const NO_CAPTURE_PREFIXES = ["/api/auth/"];
 
 export const REDACT_KEYS = ["password", "token", "secret", "passwordHash",
                             "threadKey", "sessionId", "apiKey"];

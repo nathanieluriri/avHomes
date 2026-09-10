@@ -1,9 +1,7 @@
 import { Hono } from "hono";
-import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { AUDIT_ENTITIES } from "@avhomes/contracts";
 import {
-  UnauthenticatedError,
   clampLimit,
   currentDb,
   pathParam,
@@ -11,6 +9,7 @@ import {
   str,
   type AppEnv,
 } from "@avhomes/core";
+import { requireAuth } from "@avhomes/identity";
 import { assertAuditCursor, listEntityHistory, listEntries } from "./repo";
 
 /**
@@ -28,19 +27,6 @@ import { assertAuditCursor, listEntityHistory, listEntries } from "./repo";
  *   `action`, asserted by walking the serialised body rather than by reading
  *   the projection constant.
  */
-
-/**
- * LOCAL, because this package may import `contracts`, `core` and `db` and
- * nothing else from `packages/`, and `requireAuth` lives in `@avhomes/identity`.
- * Identical behaviour: `currentUser` is core's own "there is a session or a
- * 401", so what counts as authenticated is still defined in exactly one place.
- */
-function requireAuth(): MiddlewareHandler<AppEnv> {
-  return async (c, next) => {
-    if (!c.get("user")) throw new UnauthenticatedError("route requires a session");
-    await next();
-  };
-}
 
 const ListQuery = z
   .object({
