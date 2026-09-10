@@ -5,6 +5,7 @@ import { migration0003 } from "./0003_visits_views_index";
 import { migration0004 } from "./0004_subscribers";
 import { migration0005 } from "./0005_enquiry_threads";
 import { migration0006 } from "./0006_design_notes";
+import { migration0007 } from "./0007_listing_truth";
 
 /**
  * The ordered list. Append only, and never renumber a tag that has shipped:
@@ -21,4 +22,5 @@ export const MIGRATIONS: readonly Migration[] = [
   migration0004,
   migration0005,
   migration0006,
+  migration0007,
 ];

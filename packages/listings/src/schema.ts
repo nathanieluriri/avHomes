@@ -1,4 +1,17 @@
-import type { Agent, Property, PropertyStatus, PropertyType, SiteStat, Testimonial } from "@avhomes/contracts";
+import {
+  normalizeFees,
+  readRentPeriod,
+  type Agent,
+  type ListingFee,
+  type ListingType,
+  type PriceChange,
+  type Property,
+  type PropertyStatus,
+  type PropertyType,
+  type RentPeriod,
+  type SiteStat,
+  type Testimonial,
+} from "@avhomes/contracts";
 
 /**
  * The stored shape.
@@ -21,6 +34,16 @@ export interface PropertyDoc {
   priceMinor: number;
   currency: string;
   status: PropertyStatus;
+  listingType: ListingType;
+  /**
+   * Optional, unlike Property's. Legacy rows carry none of these three: a row
+   * this migration touched has `listingType` but was never rewritten to add
+   * `rentPeriod`, `fees` or `priceHistory`, so the doc type says so and
+   * `toProperty` below is where that absence gets resolved, not up here.
+   */
+  rentPeriod?: RentPeriod | null;
+  fees?: ListingFee[];
+  priceHistory?: PriceChange[];
   type: PropertyType;
   location: string;
   city: string;
@@ -65,9 +88,49 @@ export interface SiteStatDoc {
   updatedAt: number;
 }
 
+/**
+ * Stops being a spread and becomes a field-by-field mapper, the same idiom
+ * `toEnquiry` in @avhomes/enquiries uses. A spread carries absence straight
+ * through: `rentPeriod`, `fees` and `priceHistory` do not exist on a row this
+ * migration backfilled, so Property.fees would be `undefined` at runtime and
+ * the first `.map` over it in the UI would throw. This is the one file where
+ * that optionality exists; the three lines below resolve it, and nothing past
+ * this function ever sees an undefined in its place.
+ */
 export function toProperty(doc: PropertyDoc): Property {
-  const { _id, ...rest } = doc;
-  return { id: _id, ...rest };
+  return {
+    id: doc._id,
+    slug: doc.slug,
+    title: doc.title,
+    tagline: doc.tagline,
+    description: doc.description,
+    priceMinor: doc.priceMinor,
+    currency: doc.currency,
+    status: doc.status,
+    listingType: doc.listingType,
+    rentPeriod: readRentPeriod(doc.rentPeriod, doc.listingType),
+    fees: normalizeFees(doc.fees ?? []),
+    priceHistory: doc.priceHistory ?? [],
+    type: doc.type,
+    location: doc.location,
+    city: doc.city,
+    address: doc.address,
+    bedrooms: doc.bedrooms,
+    bathrooms: doc.bathrooms,
+    areaSqft: doc.areaSqft,
+    parkingSpaces: doc.parkingSpaces,
+    yearBuilt: doc.yearBuilt,
+    featured: doc.featured,
+    amenities: doc.amenities,
+    images: doc.images,
+    agent: doc.agent,
+    agentUserId: doc.agentUserId,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    publishedAt: doc.publishedAt,
+    deletedAt: doc.deletedAt,
+    revision: doc.revision,
+  };
 }
 
 export function toTestimonial(doc: TestimonialDoc): Testimonial {
