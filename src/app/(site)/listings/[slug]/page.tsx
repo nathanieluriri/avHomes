@@ -42,6 +42,32 @@ export default async function PropertyPage({
   // One request: the detail route answers with its similar listings, so the
   // page does not pay a second round trip to render the strip at the bottom.
   const detail = await getPropertyDetail(slug);
+  /*
+   * DO NOT ADD A `loading.tsx` AT THIS SEGMENT OR AT `/listings`.
+   *
+   * Either one wraps this page in a Suspense boundary, and Next commits the
+   * HTTP status the moment it flushes that boundary's shell. The `notFound()`
+   * below then runs too late to be anything but streamed markup, and the
+   * response has already gone out as 200.
+   *
+   * Measured, with a slug that does not exist:
+   *
+   *   [slug]/loading.tsx   /listings/loading.tsx   status
+   *   present              present                 200
+   *   removed              present                 200
+   *   present              removed                 200
+   *   removed              removed                 404
+   *
+   * Both had to go. This is not only about unknown slugs: an archived or
+   * trashed listing takes the same path, because the public read excludes it
+   * and returns null, so every one of them answered 200 forever and stayed
+   * indexable after being taken down.
+   *
+   * The cost is that neither page has a skeleton any more. If that needs to
+   * come back, the boundary has to sit INSIDE this page around something that
+   * is not the existence check, or the two routes have to be split into
+   * separate route groups so `/listings`'s boundary no longer encloses this one.
+   */
   if (!detail) notFound();
   const { property, similar } = detail;
   const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
