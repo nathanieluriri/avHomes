@@ -1,0 +1,53 @@
+{
+  "footageDuration": 34.15,
+  "captions": [
+    {
+      "at": 0.9,
+      "until": 6.9,
+      "title": "Customize, from the menu",
+      "line": "It opens the live site, exactly as visitors see it.",
+      "start": 0.1,
+      "end": 6.1
+    },
+    {
+      "at": 7,
+      "until": 13.8,
+      "title": "Mark up, then scroll to it",
+      "line": "Find the part of the page you want changed.",
+      "start": 6.2,
+      "end": 13
+    },
+    {
+      "at": 13.9,
+      "until": 21.1,
+      "title": "Freeze this screen",
+      "line": "It takes a picture of exactly what you are looking at.",
+      "start": 13.09,
+      "end": 16.37
+    },
+    {
+      "at": 21.2,
+      "until": 26,
+      "title": "Frame what you mean",
+      "line": "Circle, arrow, box or pen. Use as many as you need.",
+      "start": 16.43,
+      "end": 20.61
+    },
+    {
+      "at": 26.1,
+      "until": 33.3,
+      "title": "Say what should be different",
+      "line": "One clear sentence saves the developer a guess.",
+      "start": 20.69,
+      "end": 26.96
+    },
+    {
+      "at": 33.4,
+      "until": 40.4,
+      "title": "Saved for the developer",
+      "line": "They can mark it In progress or Done, and reply in the thread.",
+      "start": 27.05,
+      "end": 34.05
+    }
+  ]
+}

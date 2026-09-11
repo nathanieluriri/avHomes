@@ -1,0 +1,53 @@
+{
+  "footageDuration": 30.78,
+  "captions": [
+    {
+      "at": 0.7,
+      "until": 5.3,
+      "title": "New enquiries come first",
+      "line": "The inbox opens on the ones nobody has answered.",
+      "start": 0.1,
+      "end": 4.7
+    },
+    {
+      "at": 5.4,
+      "until": 9.05,
+      "title": "Read what they asked",
+      "line": "Their message, their contact details and the listing they were on.",
+      "start": 4.8,
+      "end": 8.45
+    },
+    {
+      "at": 9.1,
+      "until": 22.1,
+      "title": "Answer, then offer a next step",
+      "line": "Shift+Enter adds a line. Enter sends.",
+      "start": 8.5,
+      "end": 18.5
+    },
+    {
+      "at": 22.3,
+      "until": 27.9,
+      "title": "They see it straight away",
+      "line": "In the chat on the site, and the whole thread by email.",
+      "start": 18.68,
+      "end": 24.28
+    },
+    {
+      "at": 28,
+      "until": 31.5,
+      "title": "Replying moves it to Open",
+      "line": "So the team can see it is being handled.",
+      "start": 24.38,
+      "end": 27.88
+    },
+    {
+      "at": 31.7,
+      "until": 34.35,
+      "title": "One fewer waiting",
+      "line": "Work down the New tab until it is empty.",
+      "start": 28.08,
+      "end": 30.73
+    }
+  ]
+}

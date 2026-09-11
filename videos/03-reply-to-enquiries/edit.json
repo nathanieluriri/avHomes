@@ -1,0 +1,57 @@
+{
+ "segments": [
+  [
+   0.6,
+   9.1,
+   1
+  ],
+  [
+   9.1,
+   22.2,
+   1.3
+  ],
+  [
+   22.2,
+   34.4,
+   1
+  ]
+ ],
+ "captions": [
+  {
+   "at": 0.7,
+   "until": 5.3,
+   "title": "New enquiries come first",
+   "line": "The inbox opens on the ones nobody has answered."
+  },
+  {
+   "at": 5.4,
+   "until": 9.05,
+   "title": "Read what they asked",
+   "line": "Their message, their contact details and the listing they were on."
+  },
+  {
+   "at": 9.1,
+   "until": 22.1,
+   "title": "Answer, then offer a next step",
+   "line": "Shift+Enter adds a line. Enter sends."
+  },
+  {
+   "at": 22.3,
+   "until": 27.9,
+   "title": "They see it straight away",
+   "line": "In the chat on the site, and the whole thread by email."
+  },
+  {
+   "at": 28.0,
+   "until": 31.5,
+   "title": "Replying moves it to Open",
+   "line": "So the team can see it is being handled."
+  },
+  {
+   "at": 31.7,
+   "until": 34.35,
+   "title": "One fewer waiting",
+   "line": "Work down the New tab until it is empty."
+  }
+ ]
+}

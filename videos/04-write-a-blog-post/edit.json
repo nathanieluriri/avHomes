@@ -1,0 +1,83 @@
+{
+ "segments": [
+  [
+   1.29,
+   8.54,
+   1
+  ],
+  [
+   8.54,
+   33.41,
+   1.4
+  ],
+  [
+   33.41,
+   33.82,
+   1.3
+  ],
+  [
+   33.82,
+   53.32,
+   1.7
+  ],
+  [
+   53.32,
+   61.26,
+   1.3
+  ],
+  [
+   61.26,
+   80.69,
+   1.2
+  ],
+  [
+   93.43,
+   103.72,
+   1
+  ]
+ ],
+ "captions": [
+  {
+   "at": 1.45,
+   "until": 8.47,
+   "title": "Journal, then New post",
+   "line": "A draft opens in the quick editor."
+  },
+  {
+   "at": 8.59,
+   "until": 33.34,
+   "title": "The details first",
+   "line": "Title, subtitle and a short excerpt. They show in search and on the card."
+  },
+  {
+   "at": 33.45,
+   "until": 53.1,
+   "title": "A cover photo, with alt text",
+   "line": "Describe the picture. Search engines and screen readers rely on it."
+  },
+  {
+   "at": 53.41,
+   "until": 61.18,
+   "title": "Save, then the advanced editor",
+   "line": "The full page writing studio, with your details carried over."
+  },
+  {
+   "at": 61.48,
+   "until": 74.99,
+   "title": "Write the body",
+   "line": "Type ## for a heading and 1. for a numbered list."
+  },
+  {
+   "at": 75.09,
+   "until": 80.62,
+   "title": "Publish",
+   "line": "It checks for anything missing first, then goes live."
+  },
+  {
+   "at": 93.53,
+   "until": 103.62,
+   "title": "Live on the site",
+   "line": "Under Insights, with your cover, subtitle and byline."
+  }
+ ]
+}

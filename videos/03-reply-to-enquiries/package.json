@@ -1,0 +1,9 @@
+{
+  "name": "avhomes-tutorial-03-reply-to-enquiries",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npx --yes hyperframes@0.8.33 check",
+    "render": "npx --yes hyperframes@0.8.33 render"
+  }
+}

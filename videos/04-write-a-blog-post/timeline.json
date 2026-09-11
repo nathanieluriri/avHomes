@@ -1,0 +1,61 @@
+{
+  "footageDuration": 68.94,
+  "captions": [
+    {
+      "at": 1.45,
+      "until": 8.47,
+      "title": "Journal, then New post",
+      "line": "A draft opens in the quick editor.",
+      "start": 0.16,
+      "end": 7.18
+    },
+    {
+      "at": 8.59,
+      "until": 33.34,
+      "title": "The details first",
+      "line": "Title, subtitle and a short excerpt. They show in search and on the card.",
+      "start": 7.29,
+      "end": 24.96
+    },
+    {
+      "at": 33.45,
+      "until": 53.1,
+      "title": "A cover photo, with alt text",
+      "line": "Describe the picture. Search engines and screen readers rely on it.",
+      "start": 25.05,
+      "end": 36.67
+    },
+    {
+      "at": 53.41,
+      "until": 61.18,
+      "title": "Save, then the advanced editor",
+      "line": "The full page writing studio, with your details carried over.",
+      "start": 36.87,
+      "end": 42.85
+    },
+    {
+      "at": 61.48,
+      "until": 74.99,
+      "title": "Write the body",
+      "line": "Type ## for a heading and 1. for a numbered list.",
+      "start": 43.09,
+      "end": 54.35
+    },
+    {
+      "at": 75.09,
+      "until": 80.62,
+      "title": "Publish",
+      "line": "It checks for anything missing first, then goes live.",
+      "start": 54.43,
+      "end": 59.04
+    },
+    {
+      "at": 93.53,
+      "until": 103.62,
+      "title": "Live on the site",
+      "line": "Under Insights, with your cover, subtitle and byline.",
+      "start": 58.75,
+      "end": 68.84
+    }
+  ]
+}
