@@ -570,8 +570,8 @@ function PropertiesScreen() {
            * sheet whose button only names the status, so an estates-only list
            * would look like the whole account.
            */
-          <div className="flex flex-col gap-2.5">
-            <Segmented
+          <div className="flex flex-col gap-3">
+            <ViewTabs
               label="Show homes or estates"
               value={kind}
               options={KINDS}
@@ -580,7 +580,6 @@ function PropertiesScreen() {
                   setParams(value === "estate" ? { kind: value, type: "" } : { kind: value }),
                 )
               }
-              className="h-11 flex-1 sm:h-9 sm:flex-none md:h-7"
             />
             <TableToolbar
               tabs={{
@@ -866,6 +865,45 @@ function Segmented<V extends string>({
               active
                 ? "bg-plum-950 text-white"
                 : "bg-mist-100 text-slate-600 hover:bg-mist-200/70 hover:text-plum-950"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The view switch above the status pills, drawn as underlined tabs so it reads
+ * as a level above them. Filled pills here out-shouted the filters below it.
+ */
+function ViewTabs<V extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: V;
+  options: readonly { value: V; label: string }[];
+  onChange: (value: V) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex gap-6 border-b border-mist-200">
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={`c-tap -mb-px h-11 border-b-2 text-[13px] font-semibold transition-colors sm:h-9 ${
+              active
+                ? "border-plum-950 text-plum-950"
+                : "border-transparent text-slate-600 hover:border-mist-300 hover:text-plum-950"
             }`}
           >
             {option.label}
