@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowUpRight } from "lucide-react";
 import type { SocialPlatform } from "@avhomes/contracts";
 
@@ -40,19 +40,70 @@ function activeLink(pathname: string, status: string | null): NavLabel | null {
   return null;
 }
 
+function subscribeHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  window.addEventListener("popstate", onChange);
+  return () => {
+    window.removeEventListener("hashchange", onChange);
+    window.removeEventListener("popstate", onChange);
+  };
+}
+
+/** The link that points at a section of a page rather than at a page. */
+const SECTION_LINK = links.find((l) => l.href.includes("#"));
+
 function ActiveDeskLinks() {
   const pathname = usePathname();
   const params = useSearchParams();
-  return <DeskLinks active={activeLink(pathname, params.get("status"))} />;
+  const hash = useSyncExternalStore(subscribeHash, () => window.location.hash, () => "");
+
+  /*
+   * THE LAST NAV CLICK, because the URL cannot say it. Next moves between "/"
+   * and "/#about" with pushState, which fires no event, so after that click the
+   * pathname still reads "/" and Home would stay lit. The click is dropped once
+   * the reader lands anywhere its link does not point, or goes Back or Forward,
+   * and then the hash read above decides.
+   */
+  const [choice, setChoice] = useState<{ label: NavLabel; path: string } | null>(null);
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (seenPath !== pathname) {
+    setSeenPath(pathname);
+    if (choice && choice.path !== pathname) setChoice(null);
+  }
+  useEffect(() => {
+    const forget = () => setChoice(null);
+    window.addEventListener("popstate", forget);
+    return () => window.removeEventListener("popstate", forget);
+  }, []);
+
+  const inSection = SECTION_LINK
+    ? choice
+      ? choice.label === SECTION_LINK.label && pathname === choice.path
+      : pathname === SECTION_LINK.href.split("#")[0] && hash === `#${SECTION_LINK.href.split("#")[1]}`
+    : false;
+
+  return (
+    <DeskLinks
+      active={inSection && SECTION_LINK ? SECTION_LINK.label : activeLink(pathname, params.get("status"))}
+      onPick={(l) => setChoice({ label: l.label, path: l.href.split(/[?#]/)[0] || "/" })}
+    />
+  );
 }
 
-function DeskLinks({ active }: { active: NavLabel | null }) {
+function DeskLinks({
+  active,
+  onPick,
+}: {
+  active: NavLabel | null;
+  onPick?: (link: (typeof links)[number]) => void;
+}) {
   return links.map((l) => {
     const current = l.label === active;
     return (
       <Link
         key={l.label}
         href={l.href}
+        onClick={() => onPick?.(l)}
         aria-current={current ? "page" : undefined}
         className={`relative py-1 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-wine-600 after:transition-transform after:duration-300 ${
           current
