@@ -50,6 +50,7 @@ import { useAsync } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { AmenityPicker } from "@/components/admin/listing/AmenityPicker";
 import { NumberField } from "@/components/admin/listing/NumberInput";
+import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import {
   PaymentPlanFields,
   toPaymentPlanDraft,
@@ -814,17 +815,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
             <div className="grid gap-4 sm:grid-cols-2">
               {fields.price ? (
                 <Field label="Price" hint={`In ${draft.currency}, major units. Stored as minor units.`}>
-                  {/* `decimal` rather than `numeric`: a price is the one field here
-                      that carries a separator, and the digits-only keypad has no key
-                      for it. Autocomplete off, because what a browser has saved for a
-                      bare text box is somebody's address, not a price. */}
-                  <input
-                    className={inputClass}
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={draft.price}
-                    onChange={(e) => set("price", e.target.value)}
-                  />
+                  <MoneyInput value={draft.price} onChange={(raw) => set("price", raw)} />
                 </Field>
               ) : (
                 <div>
@@ -918,14 +909,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 {FEE_KINDS_FOR[dealType].map((kind) => (
                   <Field key={kind} label={FEE_KIND_LABELS[kind]} hint="Leave blank if it doesn't apply.">
-                    <input
-                      className={inputClass}
-                      inputMode="decimal"
-                      autoComplete="off"
-                      placeholder="0"
-                      value={draft.fees[kind]}
-                      onChange={(e) => setFee(kind, e.target.value)}
-                    />
+                    <MoneyInput placeholder="0" value={draft.fees[kind]} onChange={(raw) => setFee(kind, raw)} />
                   </Field>
                 ))}
               </div>

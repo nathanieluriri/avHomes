@@ -18,6 +18,7 @@ import {
 import { BottomSheet } from "@/components/admin/BottomSheet";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { Button, ConfirmButton, IconButton } from "@/components/admin/ui";
+import { MoneyInput } from "./MoneyInput";
 import { NumberInput } from "./NumberInput";
 
 /** One option row as the form holds it: the price is the raw major-unit text. */
@@ -481,17 +482,14 @@ function PrototypeRow({
         <label htmlFor={priceId} className={CELL_LABEL}>
           Price ({currency})
         </label>
-        {/* `decimal` for the separator key, as on the listing price. */}
-        <input
+        <MoneyInput
           id={priceId}
           className={CELL}
-          inputMode="decimal"
-          autoComplete="off"
           placeholder="0"
           aria-invalid={priceError !== null}
           aria-describedby={priceError ? `${priceId}-error` : undefined}
           value={row.price}
-          onChange={(e) => onUpdate({ price: e.target.value })}
+          onChange={(raw) => onUpdate({ price: raw })}
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
             e.preventDefault();
