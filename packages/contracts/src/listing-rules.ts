@@ -1,3 +1,4 @@
+import { formatPrice, formatPriceShort, listingLabel } from "./money";
 import {
   ESTATE_TYPE,
   FEATURABLE_STATUSES,
@@ -6,6 +7,7 @@ import {
   type Furnishing,
   type ListingType,
   type PaymentPlan,
+  type Property,
   type PropertyStatus,
   type PropertyType,
   type PrototypeKind,
@@ -190,6 +192,63 @@ export function minStayUnit(period: RentPeriod | null): "nights" | "months" {
 export function minStayLabel(minStay: number, period: RentPeriod | null): string {
   const unit = minStayUnit(period);
   return `${minStay} ${minStay === 1 ? unit.slice(0, -1) : unit} minimum`;
+}
+
+/* ─────────────────────────────── search ─────────────────────────────── */
+
+/** What search engines show before they truncate. Longer is allowed, just cut. */
+export const SEO_TITLE_ADVISED = 70;
+export const SEO_DESCRIPTION_ADVISED = 160;
+export const SEO_TITLE_MAX = 200;
+export const SEO_DESCRIPTION_MAX = 400;
+export const PREVIOUS_SLUGS_MAX = 20;
+
+/** A web address from any text: "Kuje Garden Estate!" becomes "kuje-garden-estate". Null when nothing is left. */
+export function toHandle(input: string): string | null {
+  const handle = input
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 160)
+    .replace(/-+$/g, "");
+  return handle === "" ? null : handle;
+}
+
+/** "Banana Island, Ikoyi, Lagos" already ends with the city, so it is only added when absent. */
+function whereLine(p: Pick<Property, "location" | "city">): string {
+  return p.city && !p.location.includes(p.city)
+    ? [p.location, p.city].filter(Boolean).join(", ")
+    : p.location;
+}
+
+/** The description assembled from the facts, used whenever none was written. Price first. */
+export function listingMetaDescription(p: Property): string {
+  const where = whereLine(p);
+  if (isEstate(p.type)) {
+    const s = estateSummary(p.prototypes);
+    const from = s.fromMinor > 0 ? ` from ${formatPriceShort(s.fromMinor, p)}` : "";
+    const inWhere = where ? ` in ${where}` : "";
+    return [`Estate Land${inWhere}. ${s.count} ${s.count === 1 ? "option" : "options"}${from}.`, p.tagline]
+      .filter(Boolean)
+      .join(" ");
+  }
+  return [
+    `${listingLabel(p.listingType, p.status === "draft" || p.status === "archived" ? "live" : p.status)} at ${formatPrice(p.priceMinor, p)}.`,
+    `${p.bedrooms} bed, ${p.bathrooms} bath ${p.type.toLowerCase()}${where ? ` in ${where}` : ""}.`,
+    p.tagline,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function listingSeoTitle(p: Pick<Property, "seoTitle" | "title">): string {
+  return p.seoTitle.trim() || p.title;
+}
+
+export function listingSeoDescription(p: Property): string {
+  return p.seoDescription.trim() || listingMetaDescription(p);
 }
 
 /* ─────────────────────────────── labels ─────────────────────────────── */

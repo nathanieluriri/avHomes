@@ -261,6 +261,8 @@ export {
   formatPrice,
   formatPriceShort,
   formatSqm,
+  listingSeoDescription,
+  listingSeoTitle,
   sqftToSqm,
   FURNISHING_LABELS,
   isEstate,

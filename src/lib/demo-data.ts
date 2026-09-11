@@ -73,6 +73,9 @@ type PropertySeed = Omit<
   | "serviced"
   | "availableFrom"
   | "minStay"
+  | "seoTitle"
+  | "seoDescription"
+  | "previousSlugs"
 > &
   Partial<
     Pick<
@@ -783,6 +786,9 @@ function toProperty(seed: PropertySeed): Property {
     // UTC midnight, which is what the editor stores for a date.
     availableFrom: availableFrom ? Date.parse(`${availableFrom}T00:00:00Z`) : null,
     minStay: seed.minStay ?? null,
+    seoTitle: "",
+    seoDescription: "",
+    previousSlugs: [],
     agentUserId: null,
     createdAt: published,
     updatedAt: published,

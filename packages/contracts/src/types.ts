@@ -227,6 +227,12 @@ export interface Property {
   availableFrom: number | null;
   /** Rent only. Months on a yearly or monthly rent, nights on a shortlet. Null means no minimum. */
   minStay: number | null;
+  /** The search result's title. Empty means the listing title. */
+  seoTitle: string;
+  /** The search result's description. Empty means one assembled from the facts. */
+  seoDescription: string;
+  /** Web addresses this listing used to have. Each one redirects to `slug`. */
+  previousSlugs: string[];
   agent: Agent;
   /** The account that owns this listing, for per-record authorization. */
   agentUserId: string | null;

@@ -74,6 +74,10 @@ export interface PropertyDoc {
   serviced?: boolean;
   availableFrom?: number | null;
   minStay?: number | null;
+  /** Absent on every row written before the search listing card existed. */
+  seoTitle?: string;
+  seoDescription?: string;
+  previousSlugs?: string[];
   agent: Agent;
   agentUserId: string | null;
   createdAt: number;
@@ -139,6 +143,9 @@ export function toProperty(doc: PropertyDoc): Property {
     areaSqft: doc.areaSqft,
     parkingSpaces: doc.parkingSpaces,
     yearBuilt: doc.yearBuilt,
+    seoTitle: doc.seoTitle ?? "",
+    seoDescription: doc.seoDescription ?? "",
+    previousSlugs: doc.previousSlugs ?? [],
     featured: doc.featured,
     amenities: doc.amenities,
     images: doc.images,

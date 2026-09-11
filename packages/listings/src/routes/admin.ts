@@ -44,6 +44,10 @@ import {
   normalizeAmenities,
   normalizeFees,
   parseMajor,
+  PREVIOUS_SLUGS_MAX,
+  SEO_DESCRIPTION_MAX,
+  SEO_TITLE_MAX,
+  toHandle,
   type ListingFee,
   type SiteStat,
   type Testimonial,
@@ -58,6 +62,7 @@ import {
   deleteSiteStat,
   deleteTestimonial,
   getPropertyById,
+  isSlugTaken,
   listProperties,
   listSiteStats,
   listTestimonials,
@@ -109,12 +114,13 @@ const PaymentPlanInput = z
   .strict();
 
 /**
- * `slug`, `status`, `publishedAt` and `revision` are ABSENT on purpose.
+ * `status`, `publishedAt` and `revision` are ABSENT on purpose: status moves only
+ * through the lifecycle routes. The schema is `.strict()`, so a body carrying one
+ * is REFUSED rather than accepted and discarded.
  *
- * The slug is server-authoritative and derived at publish; status moves only
- * through the lifecycle routes. The schema is `.strict()`, so a body carrying
- * one is REFUSED rather than accepted and discarded, which would otherwise leave
- * the caller believing it had set something it had not.
+ * `slug` is accepted as the search listing's URL handle. The server normalises
+ * it, refuses one another listing holds, and keeps the old address as a
+ * redirect, so a published link never breaks when it changes.
  */
 const PatchBody = z
   .object({
@@ -151,6 +157,9 @@ const PatchBody = z
     // Epoch ms at UTC midnight. Null means available now.
     availableFrom: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable(),
     minStay: z.number().int().min(1).max(3650).nullable(),
+    seoTitle: str().max(SEO_TITLE_MAX),
+    seoDescription: str().max(SEO_DESCRIPTION_MAX),
+    slug: str().max(200),
     agent: z
       .object({
         id: str().max(120),
@@ -418,6 +427,31 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     }
 
     if (patch.amenities !== undefined) patch.amenities = normalizeAmenities(patch.amenities);
+
+    // A new web address keeps the old one as a redirect, so nothing already shared breaks.
+    if (body.patch.slug !== undefined) {
+      const handle = toHandle(body.patch.slug);
+      if (handle === null) {
+        throw new BadRequestError("slug", [
+          { path: "slug", message: "a web address needs at least one letter or number" },
+        ]);
+      }
+      if (handle === current.slug) {
+        delete patch.slug;
+      } else {
+        if (await isSlugTaken(db, handle, id)) {
+          throw new PreconditionFailedError("slug_taken", {
+            propertyId: id,
+            detail: `Another listing already uses /listings/${handle}.`,
+          });
+        }
+        patch.slug = handle;
+        const kept = current.previousSlugs.filter((s) => s !== handle);
+        // A draft's address was never public, so there is nothing to redirect from.
+        if (current.slug !== null && current.publishedAt !== null) kept.push(current.slug);
+        patch.previousSlugs = kept.slice(-PREVIOUS_SLUGS_MAX);
+      }
+    }
 
     // Fees are resolved whenever they are sent, or whenever listingType changes
     // and might strand a fee kind the new type cannot carry: a caution fee left

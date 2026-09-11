@@ -190,13 +190,23 @@ export async function countProperties(db: Db, query: ListQuery): Promise<number>
   return properties(db).countDocuments(buildFilter({ ...query, cursor: undefined }));
 }
 
+/**
+ * The public read by web address. Falls back to an address the listing USED to
+ * have, so a link shared before a rename still lands; the page redirects to the
+ * current one because the returned slug differs from the one asked for.
+ */
 export async function getPropertyBySlug(db: Db, slug: string): Promise<Property | null> {
-  const doc = await properties(db).findOne({
-    slug,
-    deletedAt: null,
-    status: { $in: [...PUBLIC_PROPERTY_STATUSES] },
-  });
+  const visible = { deletedAt: null, status: { $in: [...PUBLIC_PROPERTY_STATUSES] } };
+  const doc =
+    (await properties(db).findOne({ slug, ...visible })) ??
+    (await properties(db).findOne({ previousSlugs: slug, ...visible }, { sort: { updatedAt: -1 } }));
   return doc ? toProperty(doc) : null;
+}
+
+/** Another listing already answers at this address. */
+export async function isSlugTaken(db: Db, slug: string, exceptId: string): Promise<boolean> {
+  const hit = await properties(db).findOne({ slug, _id: { $ne: exceptId } }, { projection: { _id: 1 } });
+  return hit !== null;
 }
 
 /** The admin read. Sees drafts, archived and trash. */
@@ -281,6 +291,9 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     serviced: false,
     availableFrom: null,
     minStay: null,
+    seoTitle: "",
+    seoDescription: "",
+    previousSlugs: [],
     agent: args.agent,
     agentUserId: args.agentUserId,
     createdAt: now,
@@ -296,7 +309,7 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
 export type PropertyPatch = Partial<
   Omit<
     PropertyDoc,
-    "_id" | "slug" | "status" | "priceHistory" | "createdAt" | "updatedAt" | "publishedAt" | "deletedAt" | "revision"
+    "_id" | "status" | "priceHistory" | "createdAt" | "updatedAt" | "publishedAt" | "deletedAt" | "revision"
   >
 >;
 
