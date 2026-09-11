@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useState } from "react";
-import { Building2 } from "lucide-react";
+import { Building2, Eye } from "lucide-react";
 import {
   BUILD_STAGES,
   BUILD_STAGE_LABELS,
@@ -31,6 +31,7 @@ import {
   prototypeLabel,
   sqftToSqm,
   sqmToSqft,
+  toHandle,
   statusLabel,
   type BuildStage,
   type EstatePrototype,
@@ -52,7 +53,8 @@ import ImagePicker from "@/components/admin/ImagePicker";
 import { AmenityPicker } from "@/components/admin/listing/AmenityPicker";
 import { NumberField } from "@/components/admin/listing/NumberInput";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
-import { ListingPreview } from "@/components/admin/listing/ListingPreview";
+import { PreviewSheet } from "@/components/admin/listing/PreviewSheet";
+import { SearchListing } from "@/components/admin/listing/SearchListing";
 import {
   PaymentPlanFields,
   toPaymentPlanDraft,
@@ -156,6 +158,10 @@ type Draft = {
   buildStage: BuildStage | null;
   titleDocument: TitleDocument | null;
   rentTerms: RentTermsDraft;
+  seoTitle: string;
+  seoDescription: string;
+  /** The URL handle as typed. Blank on a listing that has never had one. */
+  handle: string;
 };
 
 /**
@@ -215,6 +221,9 @@ function toDraft(p: Property): Draft {
       availableFrom: availableFromToDate(p.availableFrom),
       minStay: p.minStay,
     },
+    seoTitle: p.seoTitle,
+    seoDescription: p.seoDescription,
+    handle: p.slug ?? "",
   };
 }
 
@@ -268,6 +277,10 @@ function draftToProperty(saved: Property, d: Draft): Property {
     serviced: fields.rentTerms ? d.rentTerms.serviced : false,
     availableFrom: fields.rentTerms ? dateToAvailableFrom(d.rentTerms.availableFrom) : null,
     minStay: fields.rentTerms ? d.rentTerms.minStay : null,
+    seoTitle: d.seoTitle,
+    seoDescription: d.seoDescription,
+    // The address the listing will have, so the preview's card opens its own page.
+    slug: toHandle(d.handle) ?? saved.slug ?? toHandle(d.title) ?? "preview",
   };
 }
 
@@ -417,8 +430,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
-  // The form stays mounted while previewing, so nothing typed is lost by looking.
-  const [previewing, setPreviewing] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // A failed load leaves `history.data` null, and the panel below stays
   // absent rather than showing an error box for what is a secondary,
@@ -567,6 +579,8 @@ function PropertyEditor({ initial }: { initial: Property }) {
     }
 
     const plan = draft.paymentPlan;
+    const nextHandle = toHandle(draft.handle);
+    const handleChanged = nextHandle !== null && nextHandle !== property.slug;
 
     try {
       const res = await api.patch<{ property: Property }>(`/admin/properties/${property.id}`, {
@@ -609,6 +623,10 @@ function PropertyEditor({ initial }: { initial: Property }) {
           serviced: fields.rentTerms ? draft.rentTerms.serviced : false,
           availableFrom: fields.rentTerms ? dateToAvailableFrom(draft.rentTerms.availableFrom) : null,
           minStay: fields.rentTerms ? draft.rentTerms.minStay : null,
+          seoTitle: draft.seoTitle.trim(),
+          seoDescription: draft.seoDescription.trim(),
+          // Only a real change. Blank keeps what is stored, or leaves publish to make one.
+          ...(handleChanged && { slug: toHandle(draft.handle) }),
         },
         baseRevision: property.revision,
       });
@@ -736,27 +754,14 @@ function PropertyEditor({ initial }: { initial: Property }) {
         }
         subtitle={
           property.slug
-            ? `/listings/${property.slug} · fixed at publish, so shared links keep working`
-            : "No web address yet. It is made from the title when you publish, and does not change afterwards."
+            ? `/listings/${property.slug} · change it under Search engine listing; old links keep working`
+            : "No web address yet. It is made from the title when you publish, unless you set one under Search engine listing."
         }
         actions={
-          <div role="group" aria-label="Edit or preview" className="inline-flex rounded-lg bg-mist-100 p-0.5">
-            {([false, true] as const).map((mode) => (
-              <button
-                key={String(mode)}
-                type="button"
-                aria-pressed={previewing === mode}
-                onClick={() => setPreviewing(mode)}
-                className={`c-tap h-10 rounded-md px-4 text-[13px] font-semibold transition-colors sm:h-8 ${
-                  previewing === mode
-                    ? "bg-white text-plum-950 shadow-card"
-                    : "text-slate-600 hover:text-plum-950"
-                }`}
-              >
-                {mode ? "Preview" : "Edit"}
-              </button>
-            ))}
-          </div>
+          <Button variant="ghost" size="lg" onClick={() => setPreviewOpen(true)}>
+            <Eye className="h-4 w-4" aria-hidden="true" />
+            Preview
+          </Button>
         }
         /* NO SAVE IN THE HEADER. Saving belongs to the bar, which appears the
            moment there is anything to save and follows the work down the page.
@@ -825,9 +830,11 @@ function PropertyEditor({ initial }: { initial: Property }) {
           location card, five number fields, the amenities box and a
           forty-photo gallery. Changing a listing's status is the most common
           thing done on this screen and it was the last thing on it. */}
-      {previewing && <ListingPreview property={draftToProperty(property, draft)} />}
+      {previewOpen && (
+        <PreviewSheet property={draftToProperty(property, draft)} onClose={() => setPreviewOpen(false)} />
+      )}
 
-      <div hidden={previewing} className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* READ-ONLY IN THE TRASH. A disabled fieldset disables its form
             controls and nothing else: the gallery's tile drag and file drop are
             div and li handlers it never reaches, and that drop really uploads.
@@ -1164,6 +1171,16 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 />
               </Field>
             )}
+          </Card>
+
+          <Card>
+            <SearchListing
+              preview={draftToProperty(property, draft)}
+              value={{ seoTitle: draft.seoTitle, seoDescription: draft.seoDescription, handle: draft.handle }}
+              onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+              savedSlug={property.slug}
+              published={property.publishedAt !== null}
+            />
           </Card>
         </fieldset>
 
