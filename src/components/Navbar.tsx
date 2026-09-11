@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import type { SocialPlatform } from "@avhomes/contracts";
 
@@ -23,6 +24,47 @@ const links = [
   { href: "/#about", label: "About Us" },
   { href: "/contact", label: "Contact" },
 ];
+
+type NavLabel = (typeof links)[number]["label"];
+
+/** Which link names the current page. Buy and Rent share a path and differ by query. */
+function activeLink(pathname: string, status: string | null): NavLabel | null {
+  if (pathname === "/") return "Home";
+  if (pathname === "/listings") {
+    if (status === "For Sale") return "Buy";
+    if (status === "For Rent") return "Rent";
+    return null;
+  }
+  if (pathname.startsWith("/posts") || pathname.startsWith("/blog")) return "Insights";
+  if (pathname.startsWith("/contact")) return "Contact";
+  return null;
+}
+
+function ActiveDeskLinks() {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  return <DeskLinks active={activeLink(pathname, params.get("status"))} />;
+}
+
+function DeskLinks({ active }: { active: NavLabel | null }) {
+  return links.map((l) => {
+    const current = l.label === active;
+    return (
+      <Link
+        key={l.label}
+        href={l.href}
+        aria-current={current ? "page" : undefined}
+        className={`relative py-1 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-wine-600 after:transition-transform after:duration-300 ${
+          current
+            ? "text-plum-950 after:scale-x-100"
+            : "text-slate-500 after:scale-x-0 hover:text-plum-950"
+        }`}
+      >
+        {l.label}
+      </Link>
+    );
+  });
+}
 
 const EXIT_MS = 420;
 const FOCUSABLE = "a[href], button:not([disabled])";
@@ -123,15 +165,11 @@ export default function Navbar({
           </Link>
 
           <div className="hidden items-center gap-8 lg:flex">
-            {links.map((l) => (
-              <Link
-                key={l.label}
-                href={l.href}
-                className="text-sm font-medium text-slate-500 transition-colors hover:text-plum-950"
-              >
-                {l.label}
-              </Link>
-            ))}
+            {/* The fallback draws the same links with nothing active, so the
+                prerendered header is complete and only the underline waits. */}
+            <Suspense fallback={<DeskLinks active={null} />}>
+              <ActiveDeskLinks />
+            </Suspense>
           </div>
 
           <div className="flex items-center gap-3">
