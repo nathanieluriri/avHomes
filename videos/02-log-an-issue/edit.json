@@ -1,0 +1,62 @@
+{
+ "segments": [
+  [
+   0.8,
+   13.89,
+   1
+  ],
+  [
+   13.89,
+   21.15,
+   2.2
+  ],
+  [
+   21.15,
+   33.37,
+   1.15
+  ],
+  [
+   33.37,
+   40.5,
+   1
+  ]
+ ],
+ "captions": [
+  {
+   "at": 0.9,
+   "until": 6.9,
+   "title": "Customize, from the menu",
+   "line": "It opens the live site, exactly as visitors see it."
+  },
+  {
+   "at": 7.0,
+   "until": 13.8,
+   "title": "Mark up, then scroll to it",
+   "line": "Find the part of the page you want changed."
+  },
+  {
+   "at": 13.9,
+   "until": 21.1,
+   "title": "Freeze this screen",
+   "line": "It takes a picture of exactly what you are looking at."
+  },
+  {
+   "at": 21.2,
+   "until": 26.0,
+   "title": "Frame what you mean",
+   "line": "Circle, arrow, box or pen. Use as many as you need."
+  },
+  {
+   "at": 26.1,
+   "until": 33.3,
+   "title": "Say what should be different",
+   "line": "One clear sentence saves the developer a guess."
+  },
+  {
+   "at": 33.4,
+   "until": 40.4,
+   "title": "Saved for the developer",
+   "line": "They can mark it In progress or Done, and reply in the thread."
+  }
+ ]
+}

@@ -1,0 +1,93 @@
+{
+  "footageDuration": 78.75,
+  "captions": [
+    {
+      "at": 0.9,
+      "until": 4.5,
+      "title": "Listings, then New listing",
+      "line": "Every property lives here, drafts included.",
+      "start": 0.1,
+      "end": 3.7
+    },
+    {
+      "at": 4.6,
+      "until": 11.3,
+      "title": "Name it first",
+      "line": "This title becomes the web address when you publish.",
+      "start": 3.8,
+      "end": 10.5
+    },
+    {
+      "at": 11.6,
+      "until": 22.2,
+      "title": "Write it like an advert",
+      "line": "The tagline shows on every card. The description sells the viewing.",
+      "start": 10.77,
+      "end": 19.25
+    },
+    {
+      "at": 24.2,
+      "until": 29.7,
+      "title": "Sale or rent, then the price",
+      "line": "Pick the type and set the asking price in naira.",
+      "start": 20.74,
+      "end": 24.81
+    },
+    {
+      "at": 29.8,
+      "until": 39.3,
+      "title": "Where it is",
+      "line": "City, area and street address. Buyers search by all three.",
+      "start": 24.89,
+      "end": 31.92
+    },
+    {
+      "at": 39.5,
+      "until": 49.3,
+      "title": "Rooms and amenities",
+      "line": "Tap a suggestion, or type your own and press Enter.",
+      "start": 32.07,
+      "end": 39.33
+    },
+    {
+      "at": 49.6,
+      "until": 62.2,
+      "title": "Photos from the library",
+      "line": "The first one leads the listing card and the gallery.",
+      "start": 39.57,
+      "end": 50.07
+    },
+    {
+      "at": 62.4,
+      "until": 66.2,
+      "title": "Save your changes",
+      "line": "Nothing is public while it is a draft.",
+      "start": 50.23,
+      "end": 53.4
+    },
+    {
+      "at": 66.4,
+      "until": 70.4,
+      "title": "Publish",
+      "line": "It goes live with a permanent web address.",
+      "start": 53.57,
+      "end": 56.9
+    },
+    {
+      "at": 84,
+      "until": 94.3,
+      "title": "Live on the site",
+      "line": "Exactly what you wrote, with your photos and your price.",
+      "start": 56.55,
+      "end": 66.85
+    },
+    {
+      "at": 94.5,
+      "until": 106.1,
+      "title": "Rent works the same way",
+      "line": "Choose Rent and set the period: per night, month or year.",
+      "start": 67.05,
+      "end": 78.65
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>AVHomes console tutorial: Writing a journal post</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <style>
+      /* Tokens from src/app/globals.css. */
+      :root {
+        --plum-950: #1c1214; --wine-700: #762d3f; --wine-600: #983c53; --wine-500: #b45069;
+        --wine-300: #e6a8b7; --wine-100: #f2dee3; --chrome-900: #321119; --chrome-800: #4d1a26;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--chrome-900);
+        font-family: "Geist", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--chrome-900); }
+      .clip { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+      video.clip { object-fit: cover; background: #faf4f6; }
+
+      .card { background: radial-gradient(120% 90% at 18% 20%, #5a2130 0%, var(--chrome-800) 38%, var(--chrome-900) 78%, #230b11 100%); }
+      .intro .inner { position: absolute; left: 180px; top: 50%; transform: translateY(-50%); max-width: 1300px; }
+      .intro .mark { width: 132px; height: auto; display: block; margin-bottom: 44px; }
+      .eyebrow { color: var(--wine-300); font-size: 22px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+      .intro h1 { margin-top: 18px; color: #fff; font-size: 116px; font-weight: 700; letter-spacing: -.035em; line-height: 1.02; }
+      h1 em, h2 em { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; color: var(--wine-300); letter-spacing: -.01em; }
+      .intro .sub { margin-top: 26px; color: var(--wine-100); font-size: 32px; font-weight: 400; line-height: 1.35; max-width: 1100px; }
+      .intro .rule { margin-top: 46px; width: 220px; height: 3px; border-radius: 3px; background: var(--wine-500); transform-origin: 0 50%; }
+
+      .cap { position: absolute; left: 48px; bottom: 48px; max-width: 600px; z-index: 20; opacity: 0;
+        background: rgb(28 18 20 / 0.95); border-radius: 16px; padding: 18px 26px 20px 32px;
+        box-shadow: 0 18px 44px rgb(28 18 20 / 0.36), 0 0 0 1px rgb(255 255 255 / 0.06); }
+      .cap .bar { position: absolute; left: 0; top: 16px; bottom: 16px; width: 5px; border-radius: 3px; background: var(--wine-500); }
+      .cap .step { color: var(--wine-300); font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+      .cap .h { margin-top: 6px; color: #fff; font-size: 27px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+      .cap .d { margin-top: 6px; color: var(--wine-100); font-size: 18px; font-weight: 400; line-height: 1.4; }
+
+      .progress { position: absolute; left: 0; bottom: 0; height: 5px; width: 1920px; background: var(--wine-500); transform-origin: 0 50%; z-index: 21; }
+
+      .outro .o-inner { position: absolute; left: 180px; top: 50%; transform: translateY(-50%); max-width: 1400px; }
+      .outro .o-center { left: 0; right: 0; max-width: none; text-align: center; }
+      .outro h2 { margin-top: 18px; color: #fff; font-size: 96px; font-weight: 700; letter-spacing: -.035em; line-height: 1.04; }
+      .o-list { margin-top: 44px; list-style: none; }
+      .o-list li { display: flex; align-items: center; gap: 22px; color: #fff; font-size: 34px; font-weight: 500; line-height: 1.3; letter-spacing: -.01em; }
+      .o-list li + li { margin-top: 22px; }
+      .o-list .n { flex: 0 0 auto; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 999px;
+        background: rgb(180 80 105 / 0.28); color: var(--wine-100); font-size: 22px; font-weight: 700; }
+      .o-close { margin-top: 44px; color: var(--wine-100); font-size: 30px; line-height: 1.45; max-width: 1260px; }
+      .o-center .o-close { margin: 34px auto 0; max-width: 1100px; }
+      .o-close b, .o-next b { color: #fff; font-weight: 600; }
+      .o-next { margin-top: 40px; color: var(--wine-300); font-size: 24px; font-weight: 500; }
+      .o-mark { width: 120px; height: auto; display: block; margin: 0 auto 30px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="76.94">
+      <video class="clip" id="footage" data-start="2.90" data-duration="69.04" data-media-start="0" src="assets/edited.mp4" muted playsinline></video>
+      <div class="progress" id="progress"></div>
+
+      <section class="clip card intro" id="intro" data-start="0" data-duration="3.40">
+        <div class="inner">
+          <img class="mark" id="i-mark" src="assets/logo-mark-reversed.png" alt="" />
+          <div class="eyebrow" id="i-eyebrow">AVHomes console &middot; Tutorial</div>
+          <h1 id="i-h">Writing a <em>journal post</em></h1>
+          <p class="sub" id="i-sub">From the quick editor to a published article on the site.</p>
+          <div class="rule" id="i-rule"></div>
+        </div>
+      </section>
+
+      <div class="cap" id="cap0" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 1 of 7</div>
+        <div class="h">Journal, then New post</div>
+        <div class="d">A draft opens in the quick editor.</div>
+      </div>
+      <div class="cap" id="cap1" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 2 of 7</div>
+        <div class="h">The details first</div>
+        <div class="d">Title, subtitle and a short excerpt. They show in search and on the card.</div>
+      </div>
+      <div class="cap" id="cap2" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 3 of 7</div>
+        <div class="h">A cover photo, with alt text</div>
+        <div class="d">Describe the picture. Search engines and screen readers rely on it.</div>
+      </div>
+      <div class="cap" id="cap3" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 4 of 7</div>
+        <div class="h">Save, then the advanced editor</div>
+        <div class="d">The full page writing studio, with your details carried over.</div>
+      </div>
+      <div class="cap" id="cap4" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 5 of 7</div>
+        <div class="h">Write the body</div>
+        <div class="d">Type ## for a heading and 1. for a numbered list.</div>
+      </div>
+      <div class="cap" id="cap5" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 6 of 7</div>
+        <div class="h">Publish</div>
+        <div class="d">It checks for anything missing first, then goes live.</div>
+      </div>
+      <div class="cap" id="cap6" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 7 of 7</div>
+        <div class="h">Live on the site</div>
+        <div class="d">Under Insights, with your cover, subtitle and byline.</div>
+      </div>
+
+      <section class="clip card outro" id="outro" data-start="71.94" data-duration="5.00">
+        <div class="o-inner o-center">
+          <img class="o-mark" src="assets/logo-mark-reversed.png" alt="" />
+          <h2 id="o-h">Now try it <em>yourself.</em></h2>
+          <p class="o-close" id="o-close">On a computer, press <b>Try it now</b>.<br />A walkthrough guides you on the real screen, step by step.</p>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+
+      tl.fromTo("#i-mark", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" }, 0.1);
+      tl.fromTo("#i-eyebrow", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.35);
+      tl.fromTo("#i-h", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.5);
+      tl.fromTo("#i-sub", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 0.85);
+      tl.fromTo("#i-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power2.inOut" }, 1.1);
+      tl.to("#intro", { opacity: 0, duration: 0.5, ease: "power1.in" }, 2.90);
+
+      tl.fromTo("#progress", { scaleX: 0 }, { scaleX: 1, duration: 68.94, ease: "none" }, 3.40);
+      tl.to("#progress", { opacity: 0, duration: 0.3 }, 72.04);
+
+      tl.fromTo("#cap0", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 3.56);
+      tl.to("#cap0", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 10.09);
+      tl.fromTo("#cap1", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 10.69);
+      tl.to("#cap1", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 27.85);
+      tl.fromTo("#cap2", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 28.45);
+      tl.to("#cap2", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 39.67);
+      tl.fromTo("#cap3", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 40.27);
+      tl.to("#cap3", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 45.89);
+      tl.fromTo("#cap4", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 46.49);
+      tl.to("#cap4", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 57.23);
+      tl.fromTo("#cap5", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 57.83);
+      tl.to("#cap5", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 61.55);
+      tl.fromTo("#cap6", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 62.15);
+      tl.to("#cap6", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 71.84);
+
+      tl.fromTo("#outro", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power1.out" }, 71.94);
+      tl.fromTo(".o-mark", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" }, 72.24);
+      tl.fromTo("#o-h", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 72.54);
+      tl.fromTo("#o-close", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 73.24);
+    </script>
+  </body>
+</html>
