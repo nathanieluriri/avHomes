@@ -267,11 +267,13 @@ export default async function PropertyPage({
     <>
       <JsonLd data={listingJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <nav
-        aria-label="Breadcrumb"
-        className="border-b border-mist-200 bg-white pb-3 pt-24"
-      >
-        <div className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto whitespace-nowrap px-6 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:px-10">
+      {/* The breadcrumb sits inside the hero, directly under the sticky navbar,
+          so the page opens on the listing rather than on a band of white. */}
+      <section className="border-b border-mist-200 bg-mist-50">
+        <nav
+          aria-label="Breadcrumb"
+          className="mx-auto flex max-w-7xl items-center gap-1.5 overflow-x-auto whitespace-nowrap px-6 pt-6 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 sm:pt-8 lg:px-10"
+        >
           <Link href="/" className="shrink-0 transition-colors hover:text-wine-600">
             Home
           </Link>
@@ -281,11 +283,9 @@ export default async function PropertyPage({
           </Link>
           <ChevronRight className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
           <span className="truncate text-plum-950">{property.title}</span>
-        </div>
-      </nav>
+        </nav>
 
-      <section className="border-b border-mist-200 bg-mist-50">
-        <div className="mx-auto max-w-7xl px-6 py-10 sm:py-14 lg:flex lg:items-end lg:justify-between lg:gap-10 lg:px-10">
+        <div className="mx-auto max-w-7xl px-6 pb-10 pt-6 sm:pb-14 sm:pt-8 lg:flex lg:items-end lg:justify-between lg:gap-10 lg:px-10">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-wine-50 px-3.5 py-1.5 text-xs font-semibold text-wine-700">
