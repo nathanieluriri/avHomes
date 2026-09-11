@@ -15,6 +15,7 @@ import {
   TITLE_DOCUMENTS,
   TITLE_DOCUMENT_LABELS,
   canFeature,
+  derivedEstateColumns,
   estateSummary,
   fieldsFor,
   formatPrice,
@@ -51,6 +52,7 @@ import ImagePicker from "@/components/admin/ImagePicker";
 import { AmenityPicker } from "@/components/admin/listing/AmenityPicker";
 import { NumberField } from "@/components/admin/listing/NumberInput";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
+import { ListingPreview } from "@/components/admin/listing/ListingPreview";
 import {
   PaymentPlanFields,
   toPaymentPlanDraft,
@@ -216,6 +218,59 @@ function toDraft(p: Property): Draft {
   };
 }
 
+/**
+ * The draft as the site would receive it, for the preview. Lenient where save is
+ * strict: an amount that does not parse reads as unpriced rather than blocking.
+ */
+function draftToProperty(saved: Property, d: Draft): Property {
+  const fields = fieldsFor({ type: d.type, listingType: d.listingType });
+  const listingType: ListingType = fields.dealChoice ? d.listingType : "sale";
+  const minor = (raw: string) => {
+    const parsed = parseMajor(raw, d.currency);
+    return parsed.ok ? parsed.minor : 0;
+  };
+  const prototypes = fields.prototypes
+    ? readPrototypes(withoutUntouched(d.prototypes), d.currency).prototypes
+    : [];
+  const derived = fields.prototypes ? derivedEstateColumns(prototypes) : null;
+  const plan = d.paymentPlan;
+  return {
+    ...saved,
+    title: d.title,
+    tagline: d.tagline,
+    description: d.description,
+    currency: d.currency,
+    priceMinor: derived ? derived.priceMinor : minor(d.price),
+    listingType,
+    rentPeriod: fields.rentPeriod ? d.rentPeriod : null,
+    fees: FEE_KINDS_FOR[listingType].flatMap((kind) =>
+      d.fees[kind].trim() === "" ? [] : [{ kind, amountMinor: minor(d.fees[kind]), currency: d.currency }],
+    ),
+    type: d.type,
+    location: d.location,
+    city: d.city,
+    address: d.address,
+    bedrooms: derived ? derived.bedrooms : d.bedrooms,
+    bathrooms: derived ? derived.bathrooms : d.bathrooms,
+    areaSqft: d.areaSqft,
+    parkingSpaces: d.parkingSpaces,
+    yearBuilt: d.yearBuilt,
+    amenities: d.amenities,
+    images: d.images,
+    prototypes,
+    paymentPlan:
+      fields.paymentPlan && plan.on
+        ? { depositPercent: plan.depositPercent, months: plan.months, note: plan.note.trim() }
+        : null,
+    buildStage: fields.buildStage ? d.buildStage : null,
+    titleDocument: fields.titleDocument ? d.titleDocument : null,
+    furnishing: fields.rentTerms ? d.rentTerms.furnishing : null,
+    serviced: fields.rentTerms ? d.rentTerms.serviced : false,
+    availableFrom: fields.rentTerms ? dateToAvailableFrom(d.rentTerms.availableFrom) : null,
+    minStay: fields.rentTerms ? d.rentTerms.minStay : null,
+  };
+}
+
 /** "From ₦25M · 3 options · 2 to 4 bed", the estate's price as its options decide it. */
 function estatePriceLine(s: EstateSummary, currency: string): string {
   if (s.count === 0) return "No options yet";
@@ -362,6 +417,8 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  // The form stays mounted while previewing, so nothing typed is lost by looking.
+  const [previewing, setPreviewing] = useState(false);
 
   // A failed load leaves `history.data` null, and the panel below stays
   // absent rather than showing an error box for what is a secondary,
@@ -682,6 +739,25 @@ function PropertyEditor({ initial }: { initial: Property }) {
             ? `/listings/${property.slug} · fixed at publish, so shared links keep working`
             : "No web address yet. It is made from the title when you publish, and does not change afterwards."
         }
+        actions={
+          <div role="group" aria-label="Edit or preview" className="inline-flex rounded-lg bg-mist-100 p-0.5">
+            {([false, true] as const).map((mode) => (
+              <button
+                key={String(mode)}
+                type="button"
+                aria-pressed={previewing === mode}
+                onClick={() => setPreviewing(mode)}
+                className={`c-tap h-10 rounded-md px-4 text-[13px] font-semibold transition-colors sm:h-8 ${
+                  previewing === mode
+                    ? "bg-white text-plum-950 shadow-card"
+                    : "text-slate-600 hover:text-plum-950"
+                }`}
+              >
+                {mode ? "Preview" : "Edit"}
+              </button>
+            ))}
+          </div>
+        }
         /* NO SAVE IN THE HEADER. Saving belongs to the bar, which appears the
            moment there is anything to save and follows the work down the page.
            A permanently greyed-out Save up here is a control that has never
@@ -749,7 +825,9 @@ function PropertyEditor({ initial }: { initial: Property }) {
           location card, five number fields, the amenities box and a
           forty-photo gallery. Changing a listing's status is the most common
           thing done on this screen and it was the last thing on it. */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {previewing && <ListingPreview property={draftToProperty(property, draft)} />}
+
+      <div hidden={previewing} className="grid gap-6 lg:grid-cols-3">
         {/* READ-ONLY IN THE TRASH. A disabled fieldset disables its form
             controls and nothing else: the gallery's tile drag and file drop are
             div and li handlers it never reaches, and that drop really uploads.
