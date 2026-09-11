@@ -42,6 +42,19 @@ import { AUDIT_RETENTION_MS, insertEntry, type AuditEntryDoc } from "./repo";
 
 /* ─────────────────────────── derivation ───────────────────────────────── */
 
+/**
+ * Admin paths whose writes are not operational changes, so they get no entry.
+ *
+ * Tutorial progress is one member marking their own checklist: it changes
+ * nothing on the site or for anybody else, and filing it would bury real edits
+ * under "unknown". Matched on a segment boundary, like the gate's subtree rule.
+ */
+const UNAUDITED = ["/api/admin/tutorials"];
+
+function isUnaudited(path: string): boolean {
+  return UNAUDITED.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 const ENTITY_BY_SEGMENT: Record<string, AuditEntity> = {
   properties: "property",
   posts: "post",
@@ -241,6 +254,7 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
      * orders of magnitude.
      */
     if (method === "GET" || method === "HEAD") return next();
+    if (isUnaudited(c.req.path)) return next();
 
     /*
      * A holder rather than three `let`s: the setters below run during `next()`,

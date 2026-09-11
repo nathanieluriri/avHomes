@@ -100,6 +100,12 @@ export default function EnquiriesPage() {
    */
   const filtered = tab !== "all" || needle !== "";
 
+  // The reply tutorial only ever points at a chat, the one kind with a reply box.
+  const tutorialRow =
+    rows.find((enquiry) => enquiry.status === "new" && enquiry.channel === "chat") ??
+    rows.find((enquiry) => enquiry.channel === "chat");
+  const noChatHere = !loading && !error && Boolean(data) && !tutorialRow;
+
   const columns: Column<Enquiry>[] = [
     {
       key: "from",
@@ -197,6 +203,8 @@ export default function EnquiriesPage() {
         rows={rows}
         rowKey={(enquiry) => enquiry.id}
         hrefFor={(enquiry) => `/admin/enquiries/${enquiry.id}`}
+        rowSpotlight={(enquiry) => (enquiry === tutorialRow ? "enquiry-row" : undefined)}
+        spotlight={noChatHere && tab === "all" && needle === "" ? "enquiry-none" : undefined}
         loading={loading}
         toolbar={
           <TableToolbar
@@ -204,6 +212,7 @@ export default function EnquiriesPage() {
               value: tab,
               options: TABS,
               onChange: (value) => refilter(() => setTab(value as "all" | EnquiryStatus)),
+              spotlight: noChatHere && tab !== "all" ? { value: "all", name: "enquiry-find-chat" } : undefined,
             }}
             search={{
               placeholder: "Filter this page",

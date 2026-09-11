@@ -29,6 +29,7 @@ import { NAV, canSeeNavItem, homeFor, isSectionActive } from "./nav";
 import { Palette } from "./Palette";
 import { ResponsiveMenu } from "./BottomSheet";
 import { ButtonLink, Spinner } from "./ui";
+import { SpotlightHost } from "./spotlight/Spotlight";
 import "@/app/admin/console.css";
 
 /**
@@ -231,11 +232,21 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
      has to stay behind the same redirect every other one is behind. The
      document scrolls here rather than an inner pane, so the studio's sticky bar
      and its slide-over panels anchor to the viewport with nothing in between. */
-  if (isStudio) return <div className="console min-h-[100dvh] bg-mist-50">{children}</div>;
+  /* The spotlight sits beside the frame at the same position in both branches
+     below, so a walkthrough that crosses into a studio keeps running rather
+     than remounting. */
+  if (isStudio) {
+    return (
+      <>
+        <div className="console min-h-[100dvh] bg-mist-50">{children}</div>
+        <SpotlightHost />
+      </>
+    );
+  }
 
   const { user } = session;
 
-  return (
+  const frame = (
     <div className="console fixed inset-0 z-40 flex flex-col bg-chrome-900">
       {/* First tab stop in the console. The rail is up to eight links before
           the content starts, and this is a tool somebody uses all day. */}
@@ -451,6 +462,13 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
       <Palette open={paletteOpen} onClose={() => setPaletteOpen(false)} user={user} />
     </div>
+  );
+
+  return (
+    <>
+      {frame}
+      <SpotlightHost />
+    </>
   );
 }
 

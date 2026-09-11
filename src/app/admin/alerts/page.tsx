@@ -3,9 +3,11 @@
 import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { ALERT_SEVERITIES, type AlertSeverity, type SiteAlert } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
-import { useAsync } from "@/lib/admin/hooks";
+import { useAsync, useIsPhone, useSession } from "@/lib/admin/hooks";
+import { homeFor } from "@/components/admin/nav";
 import { AlertRow } from "@/components/admin/Alerts";
 import { EmptyState, ErrorNote, PageHeader, Skeleton } from "@/components/admin/ui";
+import { TutorialsNudge } from "../tutorials/TutorialsNudge";
 
 /**
  * Everything the site is currently getting wrong, in one list.
@@ -46,9 +48,19 @@ export default function AlertsPage() {
   const alerts = data?.alerts ?? [];
   const blockers = alerts.filter((a) => a.severity === "blocker").length;
 
+  // For a role whose console opens here rather than on the dashboard: beside the title, or below the list on a phone.
+  const { session } = useSession();
+  const phone = useIsPhone();
+  const user = session.status === "signed-in" ? session.user : null;
+  const nudge = user && homeFor(user.role) === "/admin/alerts" ? user : null;
+
   return (
     <>
       <PageHeader
+        actions={
+          // The negative margin lets it overhang the header's own bottom gap rather than deepen the header.
+          nudge && !phone ? <TutorialsNudge user={nudge} reserve className="sm:-mb-2.5 sm:w-72" /> : undefined
+        }
         title="Alerts"
         icon={TriangleAlert}
         subtitle={
@@ -106,6 +118,8 @@ export default function AlertsPage() {
           })}
         </div>
       )}
+
+      {nudge && phone && (data || error) && <TutorialsNudge user={nudge} reserve={false} className="mt-8" />}
     </>
   );
 }

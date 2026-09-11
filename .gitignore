@@ -269,3 +269,16 @@ new file*
 # Local image uploads (IMAGE_STORAGE=local). Whatever somebody drags into the
 # admin lands here, so it must never be committable.
 .uploads/
+
+# Local demo database (seeded fixtures for video capture and visual QA)
+.demo-db/
+
+# Tutorial videos ship with the console. Approved exception to the media rule above:
+# about 10 MB for four silent screen recordings, re-encoded by videos/_tools.
+!public/tutorials/*.mp4
+
+# Video review artifacts: snapshots, frame captures and renders are reproducible
+videos/_captures/
+videos/*/snapshots/
+videos/*/renders/
+videos/*/assets/.frames/

@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
   // bundle or a route's module graph analysis.
   serverExternalPackages: ["mongodb", "@clerk/backend"],
   images: {
+    localPatterns: [
+      // Next's default: any local path, no query string.
+      { pathname: "**", search: "" },
+      // Tutorial posters carry a content hash (`?v=`) so a new poster is a new cache entry.
+      { pathname: "/tutorials/*.jpg" },
+    ],
     remotePatterns: [
       { protocol: "https", hostname: "placehold.co" },
       // Every uploaded image is served from Cloudinary's CDN.

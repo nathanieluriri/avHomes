@@ -204,7 +204,7 @@ export default function PostsPage() {
         title="Journal"
         subtitle="Everything served at /posts, drafts and trash included."
         actions={
-          <Button onClick={create} disabled={creating} size="lg">
+          <Button onClick={create} disabled={creating} size="lg" spotlight="new-post">
             <Plus className="h-4 w-4" aria-hidden="true" />
             {creating ? "Creating" : "New post"}
           </Button>

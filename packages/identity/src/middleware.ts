@@ -108,14 +108,21 @@ interface Rule {
    * `null` means this path gates ITSELF and the table must not gate it.
    *
    * Reserved for a route that answers every role a DIFFERENT thing rather than
-   * answering some roles nothing. There is exactly one, and the bar for a
-   * second is that its handler already filters its own output per role: a null
+   * answering some roles nothing. There are two, and the bar for a third is
+   * that its handler already filters its own output per caller: a null
    * here opts a path out of the catch-all below, so anything that merely wants
    * to be reachable by several roles wants a domain, not this.
    *
-   * Matched EXACTLY, unlike a domain rule, which is a prefix. See `domainFor`.
+   * Matched EXACTLY, unlike a domain rule, which is a prefix, unless the rule
+   * also sets `subtree`. See `domainFor`.
    */
   readonly domain: Domain | null;
+  /**
+   * A bypass that also covers every path below its own, on a segment boundary.
+   * Everything under it is open to every signed-in member, including routes
+   * added there later, so each one must gate itself.
+   */
+  readonly subtree?: true;
 }
 
 /**
@@ -137,6 +144,8 @@ const RULES: readonly Rule[] = [
   { prefix: "/api/admin/posts", domain: "content" },
   { prefix: "/api/admin/revisions", domain: "content" },
   { prefix: "/api/admin/categories", domain: "content" },
+  // The Customize studio's notes: saying what the site should say is the authority to write it.
+  { prefix: "/api/admin/notes", domain: "content" },
   { prefix: "/api/admin/images", domain: "media" },
   { prefix: "/api/admin/enquiries", domain: "enquiries" },
   { prefix: "/api/admin/dashboard", domain: "analytics" },
@@ -157,6 +166,12 @@ const RULES: readonly Rule[] = [
    * `requireAuth()`, so this is not open: it is signed-in, then filtered.
    */
   { prefix: "/api/admin/health", domain: null },
+  /* SELF-GATING, and the one SUBTREE bypass: every route under it reads and
+     writes only the caller's own progress, and every role has tutorials.
+     `requireAuth()` stays on each route. ANY route added under
+     /api/admin/tutorials is open to every signed-in member, so it must only
+     ever touch the caller's own rows. */
+  { prefix: "/api/admin/tutorials", domain: null, subtree: true },
   { prefix: "/api/admin/users", domain: "team" },
   { prefix: "/api/admin/invites", domain: "team" },
   { prefix: "/api/admin/", domain: "danger" },
@@ -177,8 +192,18 @@ export function domainFor(path: string): Domain | null {
      *
      * So a bypass has to name its path, and a new subpath under one has to be
      * exempted on purpose rather than by sharing a stem.
+     *
+     * The exception is a bypass marked `subtree`, which covers its path and
+     * everything below it on a segment boundary: `/api/admin/tutorials/x` is
+     * exempt, `/api/admin/tutorials-x` is not. A new route under a subtree is
+     * exempted the day it is written, without anybody deciding to, which is
+     * why there is exactly one and why its routes may only touch the caller's
+     * own rows.
      */
-    const matched = rule.domain === null ? path === rule.prefix : path.startsWith(rule.prefix);
+    const matched =
+      rule.domain === null
+        ? path === rule.prefix || (rule.subtree === true && path.startsWith(`${rule.prefix}/`))
+        : path.startsWith(rule.prefix);
     if (matched) return rule.domain;
   }
   return null;

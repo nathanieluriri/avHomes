@@ -316,7 +316,7 @@ function PostEditor({ initial }: { initial: Post }) {
              with a wide-screen interstitial. Offering the link on a phone would
              cost a tap, a page load and a screen that only says no. This screen
              is already the whole phone experience. */
-          <span className="hidden lg:inline-flex">
+          <span data-spotlight="post-advanced" className="hidden lg:inline-flex">
             <ButtonLink href={`/admin/posts/${post.id}/advanced`} variant="ghost" size="lg">
               Advanced editor
             </ButtonLink>
@@ -390,15 +390,16 @@ function PostEditor({ initial }: { initial: Post }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="order-2 min-w-0 space-y-6 lg:order-none lg:col-span-2">
           <Card className="space-y-4">
-            <Field label="Title">
+            <Field label="Title" spotlight="post-title">
               <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
             </Field>
-            <Field label="Subtitle">
+            <Field label="Subtitle" spotlight="post-subtitle">
               <input className={inputClass} value={subtitle} onChange={(e) => setSubtitle(e.target.value)} />
             </Field>
             <Field
               label="Excerpt"
               hint="Leave empty and the server derives it from the body on every save."
+              spotlight="post-excerpt"
             >
               <textarea
                 className={`${inputClass} min-h-20`}
@@ -432,7 +433,10 @@ function PostEditor({ initial }: { initial: Post }) {
         </div>
 
         <div className="order-1 min-w-0 space-y-6 lg:order-none">
-          <Card className="space-y-3">
+          <Card
+            className="space-y-3"
+            spotlight={post.status === "draft" && !post.deletedAt ? "post-draft" : "post-not-draft"}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
               <Badge tone={post.deletedAt ? "red" : POST_TONE[post.status]}>
@@ -496,6 +500,7 @@ function PostEditor({ initial }: { initial: Post }) {
             <Field
               label="Cover alt text"
               hint="What the image shows, for a reader who cannot see it."
+              spotlight="post-cover-alt"
             >
               <input
                 className={inputClass}

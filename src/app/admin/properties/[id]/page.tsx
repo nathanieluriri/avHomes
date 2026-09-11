@@ -678,6 +678,9 @@ function PropertyEditor({ initial }: { initial: Property }) {
        */
       const res = await api.post<{ property: Property }>(`/admin/properties/${property.id}/${op}`);
       setProperty(res.property);
+      // Publish mints the web address from the title. Adopt it unless the handle was
+      // mid-edit, or the form reads dirty (and asks "leave site?") the moment it goes live.
+      if (draft.handle === (property.slug ?? "")) set("handle", res.property.slug ?? "");
       // Leaving live or under offer clears `featured` on the server. Adopt that
       // one field, or its now hidden switch would hold the form dirty.
       if (!canFeature(res.property)) set("featured", res.property.featured);
@@ -848,10 +851,10 @@ function PropertyEditor({ initial }: { initial: Property }) {
             <Field label="Title">
               <input className={inputClass} value={draft.title} onChange={(e) => set("title", e.target.value)} />
             </Field>
-            <Field label="Tagline">
+            <Field label="Tagline" spotlight="listing-tagline">
               <input className={inputClass} value={draft.tagline} onChange={(e) => set("tagline", e.target.value)} />
             </Field>
-            <Field label="Description">
+            <Field label="Description" spotlight="listing-description">
               <textarea
                 className={`${inputClass} min-h-40`}
                 value={draft.description}
@@ -865,7 +868,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
               Needs a browser and a human eye. */}
           <Card className="space-y-4">
             {/* Type first, because it decides what the rest of the form asks. */}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div data-spotlight="listing-deal" className="grid gap-4 sm:grid-cols-2">
               <Field label="Type">
                 <select
                   className={inputClass}
@@ -899,7 +902,11 @@ function PropertyEditor({ initial }: { initial: Property }) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               {fields.price ? (
-                <Field label="Price" hint={`In ${draft.currency}, major units. Stored as minor units.`}>
+                <Field
+                  label="Price"
+                  hint={`In ${draft.currency}, major units. Stored as minor units.`}
+                  spotlight="listing-price"
+                >
                   <MoneyInput value={draft.price} onChange={(raw) => set("price", raw)} />
                 </Field>
               ) : (
@@ -1080,7 +1087,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
             </Card>
           )}
 
-          <Card className="grid gap-4 sm:grid-cols-2">
+          <Card className="grid gap-4 sm:grid-cols-2" spotlight="listing-location">
             <Field label="City">
               <input
                 className={inputClass}
@@ -1185,7 +1192,10 @@ function PropertyEditor({ initial }: { initial: Property }) {
         </fieldset>
 
         <div className="order-1 min-w-0 space-y-6 lg:order-none">
-          <Card className="space-y-3">
+          <Card
+            className="space-y-3"
+            spotlight={property.status === "draft" && !property.deletedAt ? "listing-draft" : "listing-not-draft"}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
               <Badge tone={property.deletedAt ? "red" : "wine"}>
@@ -1208,6 +1218,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
                     className="w-full sm:w-auto"
                     disabled={busy || (l.op === "publish" && publishBlockers.length > 0)}
                     onClick={() => transition(l.op)}
+                    spotlight={l.op === "publish" ? "listing-publish" : undefined}
                   >
                     {l.label}
                   </Button>
@@ -1221,7 +1232,10 @@ function PropertyEditor({ initial }: { initial: Property }) {
             {!trashed &&
               publishBlockers.length > 0 &&
               LIFECYCLE.some((l) => l.op === "publish" && l.when(property)) && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <div
+                  data-spotlight="listing-blockers"
+                  className="rounded-xl border border-amber-200 bg-amber-50 p-3"
+                >
                   <p className="text-[12px] font-semibold text-amber-900">
                     Not ready to publish
                   </p>

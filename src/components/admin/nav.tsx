@@ -1,6 +1,7 @@
 import {
   Building2,
   Gauge,
+  GraduationCap,
   History,
   Images,
   Inbox,
@@ -29,8 +30,8 @@ export interface NavItem {
   /** The one-line answer to "what is this screen for", used by the palette. */
   hint: string;
   icon: LucideIcon;
-  /** Null means every signed-in member. Alerts is the only row that needs it:
-   *  the list behind it is filtered per alert, so the row itself gates nothing. */
+  /** Null means every signed-in member. Alerts and Tutorials need it: each page
+   *  filters its own list per role, so the row itself gates nothing. */
   domain: Domain | null;
 }
 
@@ -134,6 +135,21 @@ export const NAV: readonly NavGroup[] = [
         domain: "team",
       },
       { href: "/admin/audit", label: "Audit trail", hint: "Who changed what, and when", icon: History, domain: "danger" },
+    ],
+  },
+  {
+    /* Last, under its own heading: found by somebody new, out of the way of the
+       rows everybody else uses all day. */
+    label: "Help",
+    items: [
+      {
+        href: "/admin/tutorials",
+        label: "Tutorials",
+        hint: "Short videos, then a guided try on the real screen",
+        icon: GraduationCap,
+        /* Null: the page lists only the tutorials whose screens this role can open. */
+        domain: null,
+      },
     ],
   },
 ];

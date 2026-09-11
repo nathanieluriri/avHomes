@@ -103,6 +103,8 @@ export function DataTable<T>({
   rowKey,
   hrefFor,
   rowAction,
+  rowSpotlight,
+  spotlight,
   loading = false,
   empty,
   toolbar,
@@ -127,6 +129,10 @@ export function DataTable<T>({
    * keeps it tappable at all. See the card below for how that is arranged.
    */
   rowAction?: (row: T) => ReactNode;
+  /** A tutorial anchor for a row, rendered as `data-spotlight` on both the table row and the card. */
+  rowSpotlight?: (row: T) => string | undefined;
+  /** A tutorial anchor for the whole table. */
+  spotlight?: string;
   loading?: boolean;
   empty?: ReactNode;
   toolbar?: ReactNode;
@@ -197,7 +203,7 @@ export function DataTable<T>({
      * but creates no scrollport, so the sticky cells resolve against `.c-main`,
      * which is the thing actually moving.
      */
-    <div className="overflow-clip rounded-2xl bg-white shadow-card">
+    <div data-spotlight={spotlight} className="overflow-clip rounded-2xl bg-white shadow-card">
       {toolbar && (
         /* Sticky from `sm` up only. On a 640px-tall phone the toolbar is two
            44px rows sitting under a 52px topbar, and pinning all of that leaves
@@ -281,6 +287,7 @@ export function DataTable<T>({
                  */
                 <tr
                   key={rowKey(row)}
+                  data-spotlight={rowSpotlight?.(row)}
                   onClick={
                     hrefFor
                       ? (event) => {
@@ -353,6 +360,7 @@ export function DataTable<T>({
                */
               <li
                 key={rowKey(row)}
+                data-spotlight={rowSpotlight?.(row)}
                 className="relative flex items-center gap-3 border-b border-mist-100 px-4 py-3 last:border-0 has-[a:active]:bg-wine-50/60"
               >
                 <div className="min-w-0 flex-1">
@@ -641,6 +649,8 @@ export function TableToolbar({
     value: string;
     options: readonly { value: string; label: string; count?: number }[];
     onChange: (value: string) => void;
+    /** A tutorial anchor on one option's pill, and on the phone's filter button that reaches it. */
+    spotlight?: { value: string; name: string };
   };
   search: { value: string; placeholder: string; onChange: (value: string) => void };
   /** A sort control or similar, kept beside the search from `sm` up and moved
@@ -665,6 +675,7 @@ export function TableToolbar({
       <button
         type="button"
         onClick={() => setFilterOpen(true)}
+        data-spotlight={tabs.spotlight?.name}
         className="c-bevel flex h-11 w-full items-center gap-1.5 rounded-lg bg-white px-3 text-[13px] text-plum-950 transition-colors hover:bg-mist-50 sm:hidden"
       >
         <Filter className="h-4 w-4 shrink-0 text-slate-550" aria-hidden="true" />
@@ -755,6 +766,7 @@ export function TableToolbar({
               type="button"
               aria-pressed={isActive}
               onClick={() => tabs.onChange(option.value)}
+              data-spotlight={tabs.spotlight?.value === option.value ? tabs.spotlight.name : undefined}
               /* 36px through the tablet band and the desk density from `md` up,
                  plus `.c-tap` at EVERY width. Width alone is the wrong question
                  here: an iPad in portrait is 768px and is all thumb, so keying

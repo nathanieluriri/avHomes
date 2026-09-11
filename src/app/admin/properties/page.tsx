@@ -490,6 +490,7 @@ function PropertiesScreen() {
                form the editor opens on. Its own row on a phone so the title box
                keeps the width to type in. */
             <form
+              data-spotlight="new-listing-form"
               className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
               onSubmit={(event) => {
                 event.preventDefault();
@@ -534,7 +535,7 @@ function PropertiesScreen() {
               </div>
             </form>
           ) : (
-            <Button onClick={() => startNew()} disabled={creating} size="lg">
+            <Button onClick={() => startNew()} disabled={creating} size="lg" spotlight="new-listing">
               <Plus className="h-4 w-4" aria-hidden="true" />
               New listing
             </Button>
