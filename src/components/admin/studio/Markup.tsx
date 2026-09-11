@@ -5,6 +5,7 @@ import { Link2, Paperclip, Trash2, Undo2, X } from "lucide-react";
 import type { DesignNote, ImageRecord, MarkKind, NoteAttachment, NoteMark } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { Button, ErrorNote } from "@/components/admin/ui";
+import { signalSpotlight } from "@/components/admin/spotlight/signal";
 import { DEFAULT_COLOR, MARK_COLORS, MarkLayer, TOOLS } from "./marks";
 
 /**
@@ -223,6 +224,7 @@ export function Markup({
         attachments,
       });
       onSaved(res.note);
+      signalSpotlight("note-saved");
     } catch (err) {
       setError(asApiError(err));
     } finally {
@@ -245,7 +247,12 @@ export function Markup({
                 the halos apart. The studio only renders at `lg` and up, which
                 is not the same as "a mouse": an iPad in landscape is a coarse
                 pointer at 1024px, and this is the surface it draws on. */}
-            <div role="group" aria-label="Tool" className="flex items-center gap-2">
+            <div
+              role="group"
+              aria-label="Tool"
+              data-spotlight="markup-tools"
+              className="flex items-center gap-2"
+            >
               {TOOLS.map((entry) => (
                 <button
                   key={entry.kind}
@@ -273,7 +280,12 @@ export function Markup({
                 a genuine 44px square on a coarse pointer instead and the dot
                 rides inside it, so with a mouse this draws the same 24px row it
                 always did. */}
-            <div role="group" aria-label="Colour" className="flex items-center gap-2 pl-1">
+            <div
+              role="group"
+              aria-label="Colour"
+              data-spotlight="markup-colours"
+              className="flex items-center gap-2 pl-1"
+            >
               {MARK_COLORS.map((entry) => (
                 <button
                   key={entry.value}
@@ -332,6 +344,7 @@ export function Markup({
         <div className="flex min-h-0 flex-1 items-start justify-center">
           <div
             ref={surface}
+            data-spotlight="markup-surface"
             onPointerDown={isCopy ? undefined : onDown}
             onPointerMove={isCopy ? undefined : onMove}
             onPointerUp={isCopy ? undefined : onUp}
@@ -375,7 +388,7 @@ export function Markup({
             </div>
           )}
 
-          <label className="block">
+          <label data-spotlight="markup-comment" className="block">
             <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600">
               What should be different
             </span>
@@ -481,7 +494,11 @@ export function Markup({
             )}
           </div>
 
-          {error && <ErrorNote error={error} />}
+          {error && (
+            <div data-spotlight="markup-save-error">
+              <ErrorNote error={error} />
+            </div>
+          )}
 
           <div className="mt-auto space-y-2 pt-2">
             <Button
@@ -489,6 +506,7 @@ export function Markup({
               className="w-full"
               disabled={busy || comment.trim() === ""}
               onClick={() => void save()}
+              spotlight="markup-save"
             >
               {busy ? "Saving" : "Save note"}
             </Button>

@@ -12,12 +12,13 @@ import {
 } from "lucide-react";
 import { hasDomain, type Domain, type SiteAlert, type SitePulse } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
-import { useAsync, useSession } from "@/lib/admin/hooks";
+import { useAsync, useIsNarrow, useSession } from "@/lib/admin/hooks";
 import { relative } from "@/lib/admin/format";
 import { Badge, Card, ErrorNote, Skeleton } from "@/components/admin/ui";
 import { AlertBanner } from "@/components/admin/Alerts";
 import { PulseStrip } from "@/components/admin/PulseStrip";
 import { StorefrontCard } from "@/components/admin/StorefrontCard";
+import { TutorialsNudge } from "./tutorials/TutorialsNudge";
 
 /**
  * The console's front door, and it holds no table.
@@ -135,6 +136,9 @@ export default function DashboardPage() {
     [],
   );
 
+  // Where the tutorials nudge can sit without pushing anything: beside the pulse from lg, under the destinations below it.
+  const narrow = useIsNarrow();
+
   const user = session.status === "signed-in" ? session.user : null;
   const firstName = user?.displayName.trim().split(/\s+/)[0] ?? "";
 
@@ -193,8 +197,19 @@ export default function DashboardPage() {
 
       {data && user && (
         <>
-          <div className="order-2 sm:order-1">
+          {/* From lg the nudge is pinned in the empty space right of the
+              centred pulse, out of the flow, so it arrives or leaves without
+              moving anything. 10.25rem is half the strip plus a gap. */}
+          <div className="relative order-2 sm:order-1">
             <PulseStrip pulse={data.pulse} />
+            {!narrow && (
+              <TutorialsNudge
+                user={user}
+                reserve={false}
+                tight
+                className="absolute right-0 top-0 max-w-[calc(50%_-_10.25rem)]"
+              />
+            )}
           </div>
 
           <div className="order-3 sm:order-2">
@@ -216,6 +231,10 @@ export default function DashboardPage() {
                 <DestinationCard key={item.href} item={item} data={data} />
               ))}
             </div>
+
+            {/* After the destinations, which stay the first thing a thumb
+                reaches, with its space held while progress loads. */}
+            {narrow && <TutorialsNudge user={user} reserve className="mt-3" />}
           </section>
 
           {/* `order-4` explicitly: the three above it carry orders 1 to 3, and

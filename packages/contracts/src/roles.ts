@@ -15,7 +15,7 @@ export type Role = "owner" | "developer" | "agent" | "editor" | "support";
  */
 export type Domain =
   | "listings" // properties, agents, testimonials, site stats
-  | "content" // blog posts, categories, featured
+  | "content" // blog posts, categories, featured, customize studio notes
   | "media" // image library
   | "enquiries" // the contact inbox
   | "analytics" // dashboard reads
@@ -54,7 +54,8 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
   editor: {
     label: "Editor",
     tagline: "The journal",
-    description: "Writes and publishes blog posts, and manages the image library they draw on.",
+    description:
+      "Writes and publishes blog posts, manages the image library they draw on, and logs change notes for the developer in the customize studio: creates, replies to, updates the status of and deletes them.",
     grants: ["content", "media"],
   },
   support: {

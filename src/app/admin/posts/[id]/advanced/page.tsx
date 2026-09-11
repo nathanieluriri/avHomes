@@ -411,6 +411,7 @@ function Studio({ initial }: { initial: Post }) {
         <button
           type="button"
           className="adv__primary"
+          data-spotlight={published ? "post-not-draft" : "post-publish"}
           disabled={busy}
           onClick={() => {
             if (published) {
@@ -522,7 +523,7 @@ function Studio({ initial }: { initial: Post }) {
           onEnter={() => editor?.commands.focus("start")}
         />
 
-        <div className="adv__surface">
+        <div data-spotlight="post-body" className="adv__surface">
           {locked ? (
             // TipTap refuses to set content it cannot represent, so the editor
             // is blank here. Rendering with the SITE's own renderer shows the

@@ -7,6 +7,7 @@ import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useMediaQuery } from "@/lib/admin/hooks";
 import { messageTime } from "@/lib/admin/format";
 import { Card, CardHead, ErrorNote } from "./ui";
+import { signalSpotlight } from "./spotlight/signal";
 
 /**
  * The thread, and the box that answers it.
@@ -129,6 +130,7 @@ export function Conversation({
         baseRevision: enquiry.revision,
       });
       onChange(res.enquiry);
+      signalSpotlight("enquiry-replied");
     } catch (err) {
       // The text comes back into the box. A 409 here is almost always a
       // colleague who answered first, and the reply is still worth sending
@@ -153,10 +155,16 @@ export function Conversation({
         {/* `break-words`, the same as the chat bubble. A contact form body is
             unvalidated text pasted by a stranger, so one tracking URL with no
             spaces in it puts the whole console into horizontal scroll. */}
-        <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-plum-950">
+        <p
+          data-spotlight="enquiry-thread"
+          className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-plum-950"
+        >
           {enquiry.message}
         </p>
-        <p className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600">
+        <p
+          data-spotlight="enquiry-no-reply"
+          className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600"
+        >
           This came from the contact form, so there is no thread to reply into.
           Answer it at{" "}
           <a
@@ -202,6 +210,7 @@ export function Conversation({
        */}
       <div
         ref={scroller}
+        data-spotlight="enquiry-thread"
         className="space-y-3 overflow-y-visible overscroll-contain px-4 py-4 sm:max-h-[26rem] sm:overflow-y-auto sm:px-5"
       >
         {enquiry.messages.map((message) => (
@@ -240,7 +249,7 @@ export function Conversation({
       </div>
 
       {error && (
-        <div className="px-4 pb-3 sm:px-5">
+        <div data-spotlight="enquiry-send-error" className="px-4 pb-3 sm:px-5">
           <ErrorNote error={error} />
         </div>
       )}
@@ -270,6 +279,7 @@ export function Conversation({
       <div className="sticky bottom-[var(--c-kb)] z-10 border-t border-mist-200 bg-white px-3 pt-3 pb-[calc(0.75rem+var(--safe-b))] [body:has(.c-savebar)_&]:bottom-[calc(5.5rem+var(--safe-b)+var(--c-kb))] sm:static">
         <div className="flex items-end gap-2">
           <textarea
+            data-spotlight="enquiry-reply"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -300,6 +310,7 @@ export function Conversation({
             onClick={() => void send()}
             disabled={busy || draft.trim() === ""}
             aria-label="Send reply"
+            data-spotlight="enquiry-send"
             className="c-bevel-primary grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-wine-600 text-white transition-colors hover:bg-wine-700 disabled:cursor-not-allowed sm:h-10 sm:w-10"
           >
             {busy ? (

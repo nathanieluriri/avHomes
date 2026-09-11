@@ -627,6 +627,37 @@ export interface AuditEntry {
   requestId: string;
 }
 
+/* ─────────────────────────────── tutorials ────────────────────────────── */
+
+/**
+ * The server's allowlist, checked by the progress route. The console's catalogue
+ * names the same four. Migration 0010 only bounds the stored subject's length, so
+ * adding an id here needs no migration.
+ */
+export const TUTORIAL_IDS = [
+  "add-a-listing",
+  "log-a-change",
+  "reply-to-an-enquiry",
+  "write-a-journal-post",
+] as const;
+export type TutorialId = (typeof TUTORIAL_IDS)[number];
+
+export function isTutorialId(value: string): value is TutorialId {
+  return (TUTORIAL_IDS as readonly string[]).includes(value);
+}
+
+/** One member's progress on one tutorial. Each timestamp is set once and kept. */
+export interface TutorialProgress {
+  tutorialId: string;
+  watchedAt: number | null;
+  completedAt: number | null;
+}
+
+export interface TutorialProgressList {
+  items: TutorialProgress[];
+  nudgeDismissedAt: number | null;
+}
+
 /* ───────────────────────────── shared paging ──────────────────────────── */
 
 export interface Page<T> {

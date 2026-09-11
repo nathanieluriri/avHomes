@@ -128,11 +128,14 @@ export function Card({
   children,
   className = "",
   padded = true,
+  spotlight,
 }: {
   children: ReactNode;
   className?: string;
   /** Off for cards whose content owns its own padding, such as a table. */
   padded?: boolean;
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
 }) {
   return (
     /* 16px of padding on a phone rather than 20px. On a 360px screen the sheet
@@ -140,6 +143,7 @@ export function Card({
        of content: the four pixels back are the difference between a two-column
        thumbnail grid fitting and not. */
     <div
+      data-spotlight={spotlight}
       className={`rounded-2xl bg-white shadow-card ${padded ? "p-4 sm:p-5" : ""} ${className}`}
     >
       {children}
@@ -405,6 +409,7 @@ export function Button({
   disabled = false,
   className = "",
   title,
+  spotlight,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -414,6 +419,8 @@ export function Button({
   disabled?: boolean;
   className?: string;
   title?: string;
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
 }) {
   return (
     <button
@@ -421,6 +428,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       title={title}
+      data-spotlight={spotlight}
       className={`${BUTTON_BASE} ${SIZE[size]} ${VARIANT[variant]} ${className}`}
     >
       {children}
@@ -603,12 +611,15 @@ export function Field({
   hint,
   children,
   as = "label",
+  spotlight,
 }: {
   label: string;
   hint?: string;
   children: ReactNode;
   /** "group" for a field that wraps its own buttons or a hidden file input. */
   as?: "label" | "group";
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
 }) {
   const id = useId();
   const title = (
@@ -623,7 +634,7 @@ export function Field({
 
   if (as === "group") {
     return (
-      <div role="group" aria-labelledby={id} className="block">
+      <div role="group" aria-labelledby={id} data-spotlight={spotlight} className="block">
         {title}
         {children}
         {note}
@@ -632,7 +643,7 @@ export function Field({
   }
 
   return (
-    <label className="block">
+    <label data-spotlight={spotlight} className="block">
       {title}
       {children}
       {note}

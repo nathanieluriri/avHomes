@@ -36,6 +36,7 @@ import { analyticsPublicRoutes } from "@avhomes/analytics";
 import { audiencePublicRoutes } from "@avhomes/audience";
 import { dashboardRoutes } from "./dashboard";
 import { healthRoutes } from "./health";
+import { tutorialsRoutes } from "./tutorials";
 
 /**
  * The composition root.
@@ -308,6 +309,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, enquiriesAdminRoutes({ mailer }));
   app.route(API_PREFIX, settingsRoutes());
   app.route(API_PREFIX, feedbackRoutes());
+  app.route(API_PREFIX, tutorialsRoutes());
 
   /*
    * LAST, and the position is not arbitrary. Hono resolves two routers claiming

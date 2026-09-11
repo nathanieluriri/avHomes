@@ -368,6 +368,7 @@ export default function CustomizePage() {
             icon={Pencil}
             label="Mark up"
             hint="Freeze the screen and circle something"
+            spotlight="customize-markup"
           />
           <ModeButton
             active={mode === "copy"}
@@ -383,6 +384,7 @@ export default function CustomizePage() {
             type="button"
             onClick={() => void takeShot()}
             disabled={capturing}
+            data-spotlight="customize-freeze"
             className="c-tap c-bevel-primary inline-flex h-8 items-center gap-1.5 rounded-lg bg-wine-600 px-3 text-[13px] font-semibold text-white transition-colors hover:bg-wine-700"
           >
             {capturing && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
@@ -413,7 +415,7 @@ export default function CustomizePage() {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-w-0 flex-1 bg-white">
+        <div data-spotlight="customize-frame" className="relative min-w-0 flex-1 bg-white">
           <iframe
             ref={frame}
             /* Keyed on the path so choosing a page is a fresh document rather
@@ -461,18 +463,21 @@ function ModeButton({
   icon: Icon,
   label,
   hint,
+  spotlight,
 }: {
   active: boolean;
   onClick: () => void;
   icon: typeof Pencil;
   label: string;
   hint: string;
+  spotlight?: string;
 }) {
   return (
     <button
       type="button"
       aria-pressed={active}
       title={hint}
+      data-spotlight={spotlight}
       onClick={onClick}
       /* `.c-tap` despite the `gap-1` beside its neighbours: the halo is
          `max(100%, 44px)` per axis, and these are drawn wider than 44px, so it

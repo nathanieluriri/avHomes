@@ -117,6 +117,7 @@ export function SaveBar({
             type="button"
             onClick={onSave}
             disabled={saving || disabled}
+            data-spotlight="savebar-save"
             className="c-tap c-bevel-primary inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-wine-600 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-wine-700 disabled:cursor-not-allowed disabled:bg-wine-600/50 sm:h-8 sm:flex-none sm:px-3.5"
           >
             {saving && <RotateCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}

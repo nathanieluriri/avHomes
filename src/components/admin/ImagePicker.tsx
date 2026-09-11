@@ -161,7 +161,7 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
               ? "Upload image"
               : "Upload images"}
         </Button>
-        <Button variant="ghost" onClick={() => setLibrary(true)} disabled={full}>
+        <Button variant="ghost" onClick={() => setLibrary(true)} disabled={full} spotlight="image-library">
           Choose from library
         </Button>
         <span className="text-xs text-muted-foreground">
