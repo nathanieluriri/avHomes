@@ -84,6 +84,32 @@ async function apiGet<T>(path: string, fallback: T, empty: T, options: FetchOpti
   }
 }
 
+/**
+ * A listing with every field this build reads, whatever the API sent.
+ *
+ * A production build prerenders against the LIVE site, which is still the
+ * previous deployment, so its API can lack fields added since. Reading one of
+ * those as a string threw during prerender and failed the whole deploy. Cached
+ * responses from before a release carry the same gap. Fields that exist are kept.
+ */
+function complete(p: Property): Property {
+  const partial = p as Partial<Property> & Property;
+  return {
+    ...p,
+    prototypes: partial.prototypes ?? [],
+    paymentPlan: partial.paymentPlan ?? null,
+    buildStage: partial.buildStage ?? null,
+    titleDocument: partial.titleDocument ?? null,
+    furnishing: partial.furnishing ?? null,
+    serviced: partial.serviced ?? false,
+    availableFrom: partial.availableFrom ?? null,
+    minStay: partial.minStay ?? null,
+    seoTitle: partial.seoTitle ?? "",
+    seoDescription: partial.seoDescription ?? "",
+    previousSlugs: partial.previousSlugs ?? [],
+  };
+}
+
 export async function getProperties(): Promise<Property[]> {
   const page = await apiGet<Page<Property>>(
     "/properties?limit=48",
@@ -91,7 +117,7 @@ export async function getProperties(): Promise<Property[]> {
     { items: [], nextCursor: null },
     { revalidate: LIST_REVALIDATE, tags: ["properties"] },
   );
-  return page.items;
+  return page.items.map(complete);
 }
 
 /** The API's default order and page size, so a fixture page holds what a real one would. */
@@ -106,7 +132,7 @@ export async function getFeaturedProperties(): Promise<Property[]> {
     { items: [], nextCursor: null },
     { revalidate: LIST_REVALIDATE, tags: ["properties"] },
   );
-  if (page.items.length > 0) return page.items;
+  if (page.items.length > 0) return page.items.map(complete);
   // Closing or archiving clears featured, so an empty set is a normal state. The
   // homepage then shows the newest live listings, as the admin storefront card says.
   const newest = await getProperties();
@@ -124,7 +150,7 @@ export async function getEstates(): Promise<Property[]> {
     { items: [], nextCursor: null },
     { revalidate: LIST_REVALIDATE, tags: ["properties"] },
   );
-  return page.items;
+  return page.items.map(complete);
 }
 
 export interface PropertyDetail {
@@ -157,7 +183,8 @@ export async function getPropertyDetail(slug: string): Promise<PropertyDetail | 
     // resurrect a listing the operator deliberately unpublished.
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`${res.status}`);
-    return (await res.json()) as PropertyDetail;
+    const detail = (await res.json()) as PropertyDetail;
+    return { property: complete(detail.property), similar: detail.similar.map(complete) };
   } catch (err) {
     const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     if (FIXTURES_ALLOWED) {
