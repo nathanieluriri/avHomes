@@ -83,16 +83,8 @@ export default async function ListingsPage({
     return true;
   });
 
-  /*
-   * With no type chosen the page reads as two sets, estates first, because an
-   * estate is a development with several homes inside it and a card for one
-   * does not compare like for like with a card for a single house. A chosen
-   * type is already one set, so it gets one grid.
-   */
-  const estates = filtered.filter((p) => isEstate(p.type));
-  const homes = filtered.filter((p) => !isEstate(p.type));
+  // One grid whatever is chosen. Estates are singled out by the Estates chip, not by splitting All.
   const estateOnly = sp.type === ESTATE_TYPE;
-  const grouped = !sp.type && estates.length > 0;
   const one = filtered.length === 1;
   const noun = estateOnly ? (one ? "estate" : "estates") : one ? "property" : "properties";
 
@@ -163,30 +155,6 @@ export default async function ListingsPage({
               Clear filters
             </Link>
           </div>
-        ) : grouped ? (
-          <>
-            <ListingGroup
-              id="estates"
-              title="Estates"
-              count={estates.length}
-              sub="Developments with several homes or plots inside, each priced on its own."
-              properties={estates}
-              priorityCount={3}
-              more={{ href: onlyEstatesHref(sp), label: "Estates only" }}
-              className="mt-10"
-            />
-            {homes.length > 0 && (
-              <ListingGroup
-                id="homes"
-                title="Homes"
-                count={homes.length}
-                sub="Houses and apartments, each a listing of its own."
-                properties={homes}
-                priorityCount={Math.max(0, 3 - estates.length)}
-                className="mt-16"
-              />
-            )}
-          </>
         ) : (
           <ListingGrid properties={filtered} priorityCount={3} className="mt-10" />
         )}
@@ -213,62 +181,4 @@ function ListingGrid({
       ))}
     </div>
   );
-}
-
-function ListingGroup({
-  id,
-  title,
-  count,
-  sub,
-  properties,
-  priorityCount,
-  more,
-  className,
-}: {
-  id: string;
-  title: string;
-  count: number;
-  sub: string;
-  properties: Property[];
-  priorityCount: number;
-  more?: { href: string; label: string };
-  className: string;
-}) {
-  return (
-    <section aria-labelledby={`group-${id}`} className={className}>
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-mist-200 pb-4">
-        <div className="min-w-0">
-          <h2
-            id={`group-${id}`}
-            className="flex items-center gap-3 text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl"
-          >
-            {title}
-            <span className="inline-flex items-center rounded-full bg-mist-100 px-3 py-1 text-xs font-semibold text-plum-950">
-              {count}
-            </span>
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">{sub}</p>
-        </div>
-        {more && (
-          <Link
-            href={more.href}
-            className="inline-flex shrink-0 items-center rounded-full border border-mist-200 px-5 py-2.5 text-sm font-semibold text-plum-950 transition-colors duration-200 hover:border-wine-600 hover:text-wine-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600"
-          >
-            {more.label}
-          </Link>
-        )}
-      </div>
-      <ListingGrid properties={properties} priorityCount={priorityCount} className="mt-8" />
-    </section>
-  );
-}
-
-/** The current search narrowed to estates, keeping whatever else was chosen. */
-function onlyEstatesHref(sp: Search): string {
-  const next = new URLSearchParams();
-  if (sp.q) next.set("q", sp.q);
-  if (sp.status) next.set("status", sp.status);
-  if (sp.beds) next.set("beds", sp.beds);
-  next.set("type", ESTATE_TYPE);
-  return `/listings?${next.toString()}`;
 }
