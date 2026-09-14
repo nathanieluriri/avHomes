@@ -1,4 +1,5 @@
 import { BadRequestError } from "@avhomes/core";
+import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, type MediaKind } from "@avhomes/contracts";
 
 /**
  * The content type from the BYTES, never from the declared header.
@@ -7,29 +8,68 @@ import { BadRequestError } from "@avhomes/core";
  * trusting it means an HTML file stored as `image/png` and served from our own
  * origin. That is a stored XSS with the upload button as its delivery mechanism.
  *
- * The allow-list is short on purpose: these are the formats a property gallery
- * and a blog cover actually use.
+ * The allow-list is short on purpose: formats every current browser renders
+ * natively. HEIC and MKV are left out because a phone uploads them happily and
+ * then half the visitors see a broken tile.
  */
 export interface SniffedImage {
+  kind: MediaKind;
   contentType: string;
   extension: string;
   width: number;
   height: number;
 }
 
-const MAX_BYTES = 12 * 1024 * 1024;
+function tooLarge(limit: number): never {
+  throw new BadRequestError("file", [
+    { path: "file", message: `larger than ${Math.floor(limit / 1024 / 1024)}MB` },
+  ]);
+}
 
 export function sniffImage(buffer: ArrayBuffer): SniffedImage {
   if (buffer.byteLength === 0) {
     throw new BadRequestError("file", [{ path: "file", message: "empty" }]);
   }
-  if (buffer.byteLength > MAX_BYTES) {
-    throw new BadRequestError("file", [
-      { path: "file", message: `larger than ${Math.floor(MAX_BYTES / 1024 / 1024)}MB` },
-    ]);
-  }
+  if (buffer.byteLength > MAX_VIDEO_BYTES) tooLarge(MAX_VIDEO_BYTES);
 
   const bytes = new Uint8Array(buffer);
+  const video = sniffVideo(bytes);
+  if (video) return video;
+
+  if (buffer.byteLength > MAX_IMAGE_BYTES) tooLarge(MAX_IMAGE_BYTES);
+  const image = sniffStill(bytes);
+  if (image) return { kind: "image", ...image };
+
+  throw new BadRequestError("file", [
+    {
+      path: "file",
+      message: "not a PNG, JPEG, GIF, WebP or AVIF image, or an MP4, MOV or WebM video (checked by magic bytes)",
+    },
+  ]);
+}
+
+/** ISO base media (MP4, MOV, AVIF) carries `ftyp` at offset 4; WebM opens with the EBML magic. */
+function sniffVideo(bytes: Uint8Array): SniffedImage | null {
+  if (matches(bytes, [0x1a, 0x45, 0xdf, 0xa3])) {
+    return { kind: "video", contentType: "video/webm", extension: "webm", width: 0, height: 0 };
+  }
+  if (!matches(bytes.subarray(4), [0x66, 0x74, 0x79, 0x70])) return null;
+  const brand = String.fromCharCode(...bytes.subarray(8, 12));
+  if (brand === "avif" || brand === "avis" || brand.startsWith("hei") || brand.startsWith("mif")) return null;
+  if (brand === "qt  ") {
+    return { kind: "video", contentType: "video/quicktime", extension: "mov", width: 0, height: 0 };
+  }
+  return { kind: "video", contentType: "video/mp4", extension: "mp4", width: 0, height: 0 };
+}
+
+function sniffStill(bytes: Uint8Array): Omit<SniffedImage, "kind"> | null {
+  if (matches(bytes.subarray(4), [0x66, 0x74, 0x79, 0x70])) {
+    const brand = String.fromCharCode(...bytes.subarray(8, 12));
+    if (brand === "avif" || brand === "avis") {
+      return { contentType: "image/avif", extension: "avif", width: 0, height: 0 };
+    }
+    return null;
+  }
 
   if (matches(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
     return { contentType: "image/png", extension: "png", ...pngSize(bytes) };
@@ -49,10 +89,7 @@ export function sniffImage(buffer: ArrayBuffer): SniffedImage {
   if (matches(bytes, [0x52, 0x49, 0x46, 0x46]) && matches(bytes.subarray(8), [0x57, 0x45, 0x42, 0x50])) {
     return { contentType: "image/webp", extension: "webp", ...webpSize(bytes) };
   }
-
-  throw new BadRequestError("file", [
-    { path: "file", message: "not a PNG, JPEG, GIF or WebP image (checked by magic bytes)" },
-  ]);
+  return null;
 }
 
 function matches(bytes: Uint8Array, signature: number[]): boolean {

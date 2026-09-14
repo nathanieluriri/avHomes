@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import type { ImageRecord } from "@avhomes/contracts";
+import { MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, isVideoUrl, videoPosterUrl, type ImageRecord } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useMediaQuery } from "@/lib/admin/hooks";
 import { BottomSheet } from "./BottomSheet";
@@ -31,8 +31,15 @@ import { Button, ConfirmButton, EmptyState, ErrorNote, IconButton, Spinner } fro
 
 /* The server's ceiling, checked here as well so an oversized camera original is
    refused in a millisecond instead of after a minute of cellular upload. */
-const MAX_MB = 12;
-const MAX_BYTES = MAX_MB * 1024 * 1024;
+const MAX_MB = MAX_IMAGE_BYTES / 1024 / 1024;
+const MAX_VIDEO_MB = MAX_VIDEO_BYTES / 1024 / 1024;
+/** Everything a browser previews natively. Checked again by magic bytes on the server. */
+export const MEDIA_ACCEPT =
+  "image/png,image/jpeg,image/gif,image/webp,image/avif,video/mp4,video/quicktime,video/webm,.mov,.m4v";
+
+function limitFor(file: File): number {
+  return file.type.startsWith("video/") || /\.(mov|mp4|m4v|webm)$/iu.test(file.name) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+}
 
 interface ImagePickerProps {
   value: string[];
@@ -72,14 +79,14 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
     // normal gesture here and a modern phone photo can clear 12MB, so without
     // this the failure is minutes of upload followed by a 413 that takes the
     // rest of the queue with it.
-    const tooBig = picked.filter((file) => file.size > MAX_BYTES);
-    const list = picked.filter((file) => file.size <= MAX_BYTES);
+    const tooBig = picked.filter((file) => file.size > limitFor(file));
+    const list = picked.filter((file) => file.size <= limitFor(file));
     setNotice(
       tooBig.length === 0
         ? null
         : `${tooBig.map((file) => `${file.name} (${megabytes(file.size)})`).join(", ")} ${
             tooBig.length === 1 ? "is" : "are"
-          } over the ${MAX_MB}MB limit, so ${tooBig.length === 1 ? "it was" : "they were"} skipped.`,
+          } over the size limit (${MAX_MB}MB for images, ${MAX_VIDEO_MB}MB for videos), so ${tooBig.length === 1 ? "it was" : "they were"} skipped.`,
     );
     if (list.length === 0) {
       if (input.current) input.current.value = "";
@@ -147,7 +154,7 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
         <input
           ref={input}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
+          accept={MEDIA_ACCEPT}
           multiple={!single}
           className="hidden"
           onChange={(e) => void upload(e.target.files)}
@@ -158,14 +165,14 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
               ? `Uploading ${Math.min(progress.done + 1, progress.total)} of ${progress.total}`
               : "Uploading"
             : single
-              ? "Upload image"
-              : "Upload images"}
+              ? "Upload file"
+              : "Upload photos or videos"}
         </Button>
         <Button variant="ghost" onClick={() => setLibrary(true)} disabled={full} spotlight="image-library">
           Choose from library
         </Button>
         <span className="text-xs text-muted-foreground">
-          {value.length}/{max} · PNG, JPEG, GIF or WebP up to {MAX_MB}MB
+          {value.length}/{max} · Photos and GIFs up to {MAX_MB}MB, videos (MP4, MOV, WebM) up to {MAX_VIDEO_MB}MB
         </span>
       </div>
 
@@ -206,7 +213,7 @@ export default function ImagePicker({ value, onChange, max = 40, coverLabel = "C
                 "Drop" and "click" and "file" are desktop words for somebody who
                 is about to pick a photo they took ten seconds ago. */}
             <span className="font-semibold text-plum-950">
-              {canDrag ? "Drop images here" : "Add photos"}
+              {canDrag ? "Drop photos or videos here" : "Add photos or videos"}
             </span>
             <span>{canDrag ? "or click to choose a file" : "Tap to pick from your camera roll"}</span>
           </button>
@@ -331,13 +338,32 @@ function megabytes(bytes: number) {
  * otherwise, which reads as "still uploading" and sends somebody to wait for
  * something that is never going to arrive.
  */
-function Thumb({ url }: { url: string }) {
+export function Thumb({ url }: { url: string }) {
   const [broken, setBroken] = useState(false);
 
   if (broken) {
     return (
       <div className="grid aspect-[4/3] w-full place-items-center bg-red-50 px-2 text-center text-xs text-red-700">
-        Image not found
+        File not found
+      </div>
+    );
+  }
+  if (isVideoUrl(url)) {
+    return (
+      <div className="relative">
+        <video
+          src={url}
+          poster={videoPosterUrl(url) ?? undefined}
+          className="aspect-[4/3] w-full bg-plum-950 object-cover"
+          muted
+          playsInline
+          preload="metadata"
+          controls
+          onError={() => setBroken(true)}
+        />
+        <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-full bg-plum-950/85 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          Video
+        </span>
       </div>
     );
   }
@@ -395,7 +421,7 @@ function LibraryModal({
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
-      title="Image library"
+      title="Media library"
       /* `widthClassName`, not `className`. The prop REPLACES the sheet's own
          `sm:w-*`; passing a second one through `className` would leave two
          arbitrary values of the same utility in the same variant, and Tailwind
@@ -433,16 +459,27 @@ function LibraryModal({
               {/* The intrinsic size is on the element so the browser can reserve
                   the box and decode off the main thread. These are full
                   resolution originals until the API grows a thumbnail. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.url}
-                alt={image.alt}
-                width={image.width}
-                height={image.height}
-                className="aspect-[4/3] w-full bg-mist-100 object-cover"
-                loading="lazy"
-                decoding="async"
-              />
+              {isVideoUrl(image.url) ? (
+                <video
+                  src={image.url}
+                  poster={videoPosterUrl(image.url) ?? undefined}
+                  className="pointer-events-none aspect-[4/3] w-full bg-plum-950 object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={image.url}
+                  alt={image.alt}
+                  width={image.width || undefined}
+                  height={image.height || undefined}
+                  className="aspect-[4/3] w-full bg-mist-100 object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              )}
               {/* Real content, not decoration: it is the only thing telling one
                   4/3 rectangle from another, and "Already added" is the reason a
                   tile will not respond. 11px is for the uppercase label ramp. */}

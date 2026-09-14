@@ -101,6 +101,13 @@ export default function CustomizePage() {
   if (!seeded && data) {
     setNotes(data.items);
     setSeeded(true);
+    // A notification links here with `?note=<id>`; open that note straight away.
+    const wanted = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("note");
+    const linked = wanted ? data.items.find((note) => note.id === wanted) : undefined;
+    if (linked) {
+      setSelected(linked);
+      setFilter("all");
+    }
   }
 
   /* The object URL for a capture is revoked when the capture is replaced or

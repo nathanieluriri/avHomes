@@ -35,6 +35,8 @@ export const ID_PREFIXES = {
   attempt: "att",
   subscriber: "sub",
   audit: "aud",
+  quotaRequest: "qreq",
+  notification: "ntf",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

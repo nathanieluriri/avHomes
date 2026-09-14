@@ -13,3 +13,4 @@ export * from "./money";
 export * from "./publish-check";
 export * from "./listing-rules";
 export * from "./site-health";
+export * from "./media";

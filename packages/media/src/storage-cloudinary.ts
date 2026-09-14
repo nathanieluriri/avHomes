@@ -62,6 +62,7 @@ export function cloudinaryStorage(): StoragePort {
        * makes an orphan findable by hand later.
        */
       const publicId = key.replace(/\.[^./]+$/, "");
+      const isVideo = contentType.startsWith("video/");
 
       try {
         const result = await new Promise<{
@@ -72,7 +73,7 @@ export function cloudinaryStorage(): StoragePort {
           const stream = cloudinary.uploader.upload_stream(
             {
               public_id: publicId,
-              resource_type: "image",
+              resource_type: isVideo ? "video" : "image",
               // The bytes are already sniffed and the id is already unique, so
               // neither a format guess nor a random suffix would add anything,
               // and a suffix would make the stored name differ from ours.
@@ -89,7 +90,8 @@ export function cloudinaryStorage(): StoragePort {
         });
 
         return {
-          url: result.secure_url,
+          // QuickTime does not play in every browser; Cloudinary transcodes on delivery when asked for .mp4.
+          url: isVideo ? result.secure_url.replace(/\.mov$/iu, ".mp4") : result.secure_url,
           // The public id, NOT a path. It is what `remove` needs, and this field
           // is the only thing carried into the document for that purpose.
           pathname: result.public_id,
@@ -109,6 +111,8 @@ export function cloudinaryStorage(): StoragePort {
         // minutes to hours, which on a listing that was taken down reads as the
         // delete having silently failed.
         await cloudinary.uploader.destroy(pathname, { invalidate: true });
+        // Destroy is scoped to one resource type, and the pathname does not say which.
+        await cloudinary.uploader.destroy(pathname, { invalidate: true, resource_type: "video" });
       } catch (err) {
         throw new UpstreamError("cloudinary", err instanceof Error ? err.message : String(err));
       }

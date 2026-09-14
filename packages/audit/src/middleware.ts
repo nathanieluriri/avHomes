@@ -49,7 +49,7 @@ import { AUDIT_RETENTION_MS, insertEntry, type AuditEntryDoc } from "./repo";
  * nothing on the site or for anybody else, and filing it would bury real edits
  * under "unknown". Matched on a segment boundary, like the gate's subtree rule.
  */
-const UNAUDITED = ["/api/admin/tutorials"];
+const UNAUDITED = ["/api/admin/tutorials", "/api/admin/notifications"];
 
 function isUnaudited(path: string): boolean {
   return UNAUDITED.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));

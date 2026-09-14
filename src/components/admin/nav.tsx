@@ -1,4 +1,5 @@
 import {
+  Bell,
   Building2,
   Gauge,
   GraduationCap,
@@ -33,6 +34,8 @@ export interface NavItem {
   /** Null means every signed-in member. Alerts and Tutorials need it: each page
    *  filters its own list per role, so the row itself gates nothing. */
   domain: Domain | null;
+  /** Narrows the row to these roles on top of the domain check. */
+  roles?: readonly Role[];
 }
 
 export interface NavGroup {
@@ -44,6 +47,7 @@ export interface NavGroup {
 
 /** The one filter every surface that renders a nav row must use. */
 export function canSeeNavItem(role: Role, item: NavItem): boolean {
+  if (item.roles && !item.roles.includes(role)) return false;
   return item.domain === null || hasDomain(role, item.domain);
 }
 
@@ -68,6 +72,14 @@ export const NAV: readonly NavGroup[] = [
            and nothing about listings. Gating the ROW by a domain would hide
            that from the one person who can fix it. */
         domain: null,
+      },
+      {
+        href: "/admin/notifications",
+        label: "Notifications",
+        hint: "Storage requests and customize notes",
+        icon: Bell,
+        domain: null,
+        roles: ["developer"],
       },
       {
         href: "/admin/properties",
@@ -97,8 +109,8 @@ export const NAV: readonly NavGroup[] = [
       },
       {
         href: "/admin/images",
-        label: "Images",
-        hint: "The shared photo library",
+        label: "Media",
+        hint: "Photos, GIFs and videos, and the storage allowance",
         icon: Images,
         domain: "media",
       },

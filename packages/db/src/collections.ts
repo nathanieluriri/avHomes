@@ -28,6 +28,8 @@ export const COLLECTIONS = {
   designNotes: "design_notes",
   audit: "audit",
   tutorialProgress: "tutorial_progress",
+  notifications: "notifications",
+  quotaRequests: "quota_requests",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

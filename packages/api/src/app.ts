@@ -37,6 +37,7 @@ import { audiencePublicRoutes } from "@avhomes/audience";
 import { dashboardRoutes } from "./dashboard";
 import { healthRoutes } from "./health";
 import { tutorialsRoutes } from "./tutorials";
+import { developerNotifier, notificationsRoutes } from "./notifications";
 
 /**
  * The composition root.
@@ -97,6 +98,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
         : async () => getDb(databaseConfig());
 
   const mailer = deps.mailer ?? resendMailer();
+  const notify = developerNotifier(mailer);
 
   /*
    * The image store, chosen by configuration rather than by which token happens
@@ -300,7 +302,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, auditRoutes());
   app.route(API_PREFIX, listingsAdminRoutes());
   app.route(API_PREFIX, contentAdminRoutes());
-  app.route(API_PREFIX, mediaRoutes({ storage }));
+  app.route(API_PREFIX, mediaRoutes({ storage, notify }));
   /*
    * The inbox takes the mailer because a reply is not only a row: it mails the
    * buyer the transcript, which is the only durable copy of a conversation that
@@ -308,8 +310,9 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    */
   app.route(API_PREFIX, enquiriesAdminRoutes({ mailer }));
   app.route(API_PREFIX, settingsRoutes());
-  app.route(API_PREFIX, feedbackRoutes());
+  app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
+  app.route(API_PREFIX, notificationsRoutes());
 
   /*
    * LAST, and the position is not arbitrary. Hono resolves two routers claiming

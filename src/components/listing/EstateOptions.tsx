@@ -1,4 +1,4 @@
-import Image from "next/image";
+import MediaFrame, { firstImage } from "@/components/MediaFrame";
 import { Bath, Bed, LandPlot, Maximize } from "lucide-react";
 import type { EstatePrototype, Property } from "@/lib/types";
 import { estateSummary, formatSqm, prototypeLabel } from "@/lib/data";
@@ -43,7 +43,7 @@ export default function EstateOptions({ property }: { property: Property }) {
 function OptionRow({ option, property }: { option: EstatePrototype; property: Property }) {
   const label = prototypeLabel(option);
   const sold = !option.available;
-  const src = option.image ?? property.images[0] ?? null;
+  const src = option.image ?? firstImage(property.images) ?? property.images[0] ?? null;
   const plot = option.kind === "plot";
 
   return (
@@ -54,10 +54,9 @@ function OptionRow({ option, property }: { option: EstatePrototype; property: Pr
     >
       <div className="relative aspect-[4/3] self-start overflow-hidden rounded-xl bg-mist-100 sm:self-center">
         {src && (
-          <Image
+          <MediaFrame
             src={src}
             alt={label}
-            fill
             sizes="(min-width:640px) 152px, 104px"
             className={`object-cover ${sold ? "opacity-60 grayscale" : ""}`}
           />
