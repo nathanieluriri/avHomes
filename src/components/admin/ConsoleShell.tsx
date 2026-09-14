@@ -56,6 +56,10 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const [railOpen, setRailOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const unread = useUnreadNotifications(
+    session.status === "signed-in" && session.user.role === "developer",
+    pathname,
+  );
   const mainRef = useRef<HTMLElement>(null);
   const railRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -423,6 +427,14 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                         aria-hidden="true"
                       />
                       <span className="truncate">{item.label}</span>
+                      {item.href === "/admin/notifications" && unread > 0 && (
+                        <span
+                          className="ml-auto rounded-full bg-wine-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white"
+                          aria-label={`${unread} unread`}
+                        >
+                          {unread > 99 ? "99+" : unread}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -632,4 +644,28 @@ function UserMenu({ user }: { user: AuthUser }) {
       )}
     />
   );
+}
+
+/** The developer's unread count, refreshed on every navigation and once a minute. */
+function useUnreadNotifications(enabled: boolean, pathname: string): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    const load = () =>
+      api
+        .get<{ unread: number }>("/admin/notifications", controller.signal)
+        .then((res) => setCount(res.unread))
+        .catch(() => {});
+    void load();
+    const timer = window.setInterval(() => void load(), 60_000);
+    // The notifications screen marks rows read; it announces that so the badge follows.
+    window.addEventListener("avhomes:notifications-read", load);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("avhomes:notifications-read", load);
+    };
+  }, [enabled, pathname]);
+  return enabled ? count : 0;
 }

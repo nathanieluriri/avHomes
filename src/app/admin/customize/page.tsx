@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, MousePointerClick, Pencil, RefreshCw, Type, X } from "lucide-react";
+import { Loader2, MessageSquare, MousePointerClick, PanelRightClose, Pencil, RefreshCw, Type, X } from "lucide-react";
 import type { DesignNote, NoteStatus } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync, useIsNarrow } from "@/lib/admin/hooks";
@@ -85,6 +85,8 @@ export default function CustomizePage() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [selected, setSelected] = useState<DesignNote | null>(null);
   const [filter, setFilter] = useState<NoteStatus | "all">("open");
+  // Closed by default so the site gets the full width; opening a note opens it.
+  const [notesOpen, setNotesOpen] = useState(false);
 
   const isNarrow = useIsNarrow();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -106,6 +108,7 @@ export default function CustomizePage() {
     const linked = wanted ? data.items.find((note) => note.id === wanted) : undefined;
     if (linked) {
       setSelected(linked);
+      setNotesOpen(true);
       setFilter("all");
     }
   }
@@ -403,9 +406,24 @@ export default function CustomizePage() {
             version of it: the panel holding those notes is on the same screen,
             one Close away at worst. Below `lg` the same fact is restated inside
             the gate, over the list a phone can actually open. */}
-        <span className="ml-auto text-[12px] text-slate-600">
-          {onThisPage > 0 ? `${onThisPage} open on this page` : "Nothing open here"}
-        </span>
+        <button
+          type="button"
+          onClick={() => setNotesOpen((open) => !open)}
+          aria-pressed={notesOpen}
+          className={`c-tap ml-auto flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium transition-colors ${
+            notesOpen ? "bg-plum-950 text-white" : "text-slate-600 hover:bg-mist-100 hover:text-plum-950"
+          }`}
+        >
+          {notesOpen ? <PanelRightClose className="h-3.5 w-3.5" aria-hidden="true" /> : <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />}
+          Notes
+          <span
+            className={`rounded-full px-1.5 text-[11px] font-semibold ${
+              onThisPage > 0 ? "bg-wine-600 text-white" : notesOpen ? "bg-white/20" : "bg-mist-100"
+            }`}
+          >
+            {onThisPage}
+          </span>
+        </button>
       </header>
 
       {mode !== "browse" && (
@@ -421,8 +439,11 @@ export default function CustomizePage() {
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        <div data-spotlight="customize-frame" className="relative min-w-0 flex-1 bg-white">
+      <div className="flex min-h-0 flex-1 gap-3 p-3">
+        <div
+          data-spotlight="customize-frame"
+          className="relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-mist-200 bg-white shadow-card"
+        >
           <iframe
             ref={frame}
             /* Keyed on the path so choosing a page is a fresh document rather
@@ -431,6 +452,7 @@ export default function CustomizePage() {
             key={path}
             src={path}
             title="The site"
+            onLoad={(event) => slimScrollbars(event.currentTarget)}
             className="h-full w-full border-0"
           />
           {/*
@@ -440,7 +462,11 @@ export default function CustomizePage() {
           */}
         </div>
 
-        <aside className="hidden w-80 shrink-0 flex-col border-l border-mist-200 bg-white lg:flex">
+        <aside
+          className={`c-slim-scroll w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-mist-200 bg-white shadow-card ${
+            notesOpen ? "hidden lg:flex" : "hidden"
+          }`}
+        >
           {/* The aside SWAPS between the list and the review, because at 320px
               there is no room for both. Below `lg` they stack instead: the
               review comes up as a sheet over the list. */}
@@ -457,6 +483,7 @@ export default function CustomizePage() {
             setCapture(null);
             setMode("browse");
             setSelected(note);
+            setNotesOpen(true);
           }}
         />
       )}
@@ -497,4 +524,27 @@ function ModeButton({
       {label}
     </button>
   );
+}
+
+const SLIM_SCROLLBAR_CSS = `
+html { scrollbar-width: thin; scrollbar-color: rgb(11 36 83 / 0.25) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgb(11 36 83 / 0.25); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(11 36 83 / 0.45); }
+::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+`;
+
+/** The framed site is same origin, so its own scrollbar is restyled from here without touching the public site. */
+function slimScrollbars(iframe: HTMLIFrameElement) {
+  try {
+    const doc = iframe.contentDocument;
+    if (!doc || doc.getElementById("studio-slim-scroll")) return;
+    const style = doc.createElement("style");
+    style.id = "studio-slim-scroll";
+    style.textContent = SLIM_SCROLLBAR_CSS;
+    doc.head.appendChild(style);
+  } catch {
+    // A cross-origin page cannot be styled; it keeps its own scrollbar.
+  }
 }

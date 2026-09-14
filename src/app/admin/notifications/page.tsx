@@ -39,6 +39,7 @@ export default function NotificationsPage() {
     try {
       await api.post("/admin/notifications/read-all", {});
       list.reload();
+      window.dispatchEvent(new Event("avhomes:notifications-read"));
     } catch (err) {
       setActionError(asApiError(err));
     }
@@ -49,6 +50,7 @@ export default function NotificationsPage() {
     try {
       await api.post(`/admin/notifications/${n.id}/read`, {});
       list.reload();
+      window.dispatchEvent(new Event("avhomes:notifications-read"));
     } catch {
       // Read state is a convenience; the link still opens.
     }

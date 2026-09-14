@@ -568,3 +568,15 @@ body:has(.c-savebar) .c-sheet {
     animation: none;
   }
 }
+
+/* The customize studio's notes panel: a 6px thumb with no track. */
+@media (hover: hover) and (pointer: fine) {
+  .console .c-slim-scroll *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .console .c-slim-scroll *::-webkit-scrollbar-thumb {
+    border: 0;
+    background: rgb(11 36 83 / 0.25);
+  }
+}
