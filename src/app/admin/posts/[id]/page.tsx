@@ -32,6 +32,7 @@ import {
   inputClass,
   type Tone,
 } from "@/components/admin/ui";
+import { StatusSelect } from "@/components/admin/StatusSelect";
 
 /*
  * Every move here requires the record to be OUT of the trash.
@@ -46,15 +47,35 @@ import {
  * Restoring an ARCHIVED post is a different move on the same op, and that one
  * has nowhere else to live.
  */
-const LIFECYCLE: readonly { op: string; label: string; when: (p: Post) => boolean }[] = [
-  { op: "publish", label: "Publish", when: (p) => p.deletedAt === null && p.status !== "published" },
+const LIFECYCLE: readonly { op: string; label: string; description: string; tone: Tone; when: (p: Post) => boolean }[] = [
+  {
+    op: "publish",
+    label: "Publish",
+    description: "Put it on the journal for readers",
+    tone: "green",
+    when: (p) => p.deletedAt === null && p.status !== "published",
+  },
   {
     op: "unpublish",
     label: "Back to draft",
+    description: "Take it off the journal to keep editing",
+    tone: "amber",
     when: (p) => p.deletedAt === null && p.status === "published",
   },
-  { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
-  { op: "restore", label: "Restore", when: (p) => p.deletedAt === null && p.status === "archived" },
+  {
+    op: "archive",
+    label: "Archive",
+    description: "Off the journal, kept on record",
+    tone: "neutral",
+    when: (p) => p.status !== "archived" && p.deletedAt === null,
+  },
+  {
+    op: "restore",
+    label: "Restore",
+    description: "Bring it back out of the archive as a draft",
+    tone: "amber",
+    when: (p) => p.deletedAt === null && p.status === "archived",
+  },
 ];
 
 /** Status to tone, in one place, so the header chip and the sidebar chip
@@ -447,19 +468,28 @@ function PostEditor({ initial }: { initial: Post }) {
                 there up. Publish takes the post live and Archive takes it
                 down, and at 32px with 8px between them they are one thumb
                 apart on a surface the reader is also scrolling. */}
-            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-              {LIFECYCLE.filter((l) => l.when(post)).map((l) => (
-                <Button
-                  key={l.op}
-                  variant="ghost"
-                  className="w-full sm:w-auto"
-                  disabled={busy}
-                  onClick={() => transition(l.op)}
-                >
-                  {l.label}
-                </Button>
-              ))}
-            </div>
+            <StatusSelect
+              label="Post status"
+              value="current"
+              busy={busy}
+              disabled={post.deletedAt !== null}
+              onChange={(op) => transition(op)}
+              options={[
+                {
+                  value: "current",
+                  label: post.deletedAt ? "In trash" : humanise(post.status),
+                  description: "Where it is now. Choose a move below.",
+                  tone: post.deletedAt ? "red" : POST_TONE[post.status],
+                  disabled: true,
+                },
+                ...LIFECYCLE.filter((l) => l.when(post)).map((l) => ({
+                  value: l.op,
+                  label: l.label,
+                  description: l.description,
+                  tone: l.tone,
+                })),
+              ]}
+            />
           </Card>
 
           <Card className="space-y-4">

@@ -88,6 +88,8 @@ import {
   Skeleton,
   inputClass,
 } from "@/components/admin/ui";
+import { StatusSelect } from "@/components/admin/StatusSelect";
+import type { Tone } from "@/components/admin/ui";
 
 /**
  * The listing editor.
@@ -341,16 +343,20 @@ function EditorSkeleton() {
   );
 }
 
-const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => boolean }[] = [
+const LIFECYCLE: readonly { op: string; label: string; description: string; tone: Tone; when: (p: Property) => boolean }[] = [
   {
     op: "publish",
     label: "Publish",
+    description: "Put it on the public site",
+    tone: "green",
     // Mirrors the server's allowed-from table, which refuses publish from the trash.
     when: (p) => p.deletedAt === null && (p.status === "draft" || p.status === "archived"),
   },
   {
     op: "markOffer",
     label: "Mark under offer",
+    description: "A buyer is committed; it stays visible",
+    tone: "amber",
     // An estate sells option by option; its options carry the sold out state.
     when: (p) => p.status === "live" && !isEstate(p.type),
   },
@@ -359,20 +365,38 @@ const LIFECYCLE: readonly { op: string; label: string; when: (p: Property) => bo
     // forces an agent to lie about the listing's state.
     op: "relist",
     label: "Back on the market",
+    description: "The deal fell through; live again",
+    tone: "green",
     when: (p) => p.status === "under-offer" || p.status === "closed",
   },
   {
     op: "close",
     label: "Mark closed",
+    description: "Sold or let; the deal is done",
+    tone: "neutral",
     when: (p) => (p.status === "live" || p.status === "under-offer") && !isEstate(p.type),
   },
   {
     op: "unpublish",
     label: "Unpublish",
+    description: "Take it off the site and back to draft",
+    tone: "amber",
     when: (p) => p.deletedAt === null && (p.status === "live" || p.status === "under-offer"),
   },
-  { op: "archive", label: "Archive", when: (p) => p.status !== "archived" && p.deletedAt === null },
-  { op: "unarchive", label: "Back to draft", when: (p) => p.status === "archived" && p.deletedAt === null },
+  {
+    op: "archive",
+    label: "Archive",
+    description: "Off the site, kept on record",
+    tone: "neutral",
+    when: (p) => p.status !== "archived" && p.deletedAt === null,
+  },
+  {
+    op: "unarchive",
+    label: "Back to draft",
+    description: "Bring it out of the archive to edit",
+    tone: "amber",
+    when: (p) => p.status === "archived" && p.deletedAt === null,
+  },
   /* No `restore` here. A listing can only be restored out of the trash, and
      while it is in the trash the banner at the top of the screen carries that
      button. Listing it here too drew the same control twice, once inside the
@@ -1202,20 +1226,30 @@ function PropertyEditor({ initial }: { initial: Property }) {
 
                 None in the trash, where the banner's Restore is the only move. */}
             {!trashed && (
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-                {LIFECYCLE.filter((l) => l.when(property)).map((l) => (
-                  <Button
-                    key={l.op}
-                    variant="ghost"
-                    className="w-full sm:w-auto"
-                    disabled={busy || (l.op === "publish" && publishBlockers.length > 0)}
-                    onClick={() => transition(l.op)}
-                    spotlight={l.op === "publish" ? "listing-publish" : undefined}
-                  >
-                    {l.label}
-                  </Button>
-                ))}
-              </div>
+              <StatusSelect
+                label="Listing status"
+                value="current"
+                busy={busy}
+                spotlight="listing-publish"
+                onChange={(op) => transition(op)}
+                options={[
+                  {
+                    value: "current",
+                    label: statusLabel(property.status),
+                    description: "Where it is now. Choose a move below.",
+                    tone: property.status === "live" ? "green" : property.status === "draft" ? "amber" : "neutral",
+                    disabled: true,
+                  },
+                  ...LIFECYCLE.filter((l) => l.when(property)).map((l) => ({
+                    value: l.op,
+                    label: l.label,
+                    description: l.description,
+                    tone: l.tone,
+                    disabled: l.op === "publish" && publishBlockers.length > 0,
+                    disabledReason: "Not ready yet. See what is missing below.",
+                  })),
+                ]}
+              />
             )}
 
             {/* DISABLED AND EXPLAINED, never hidden. A Publish button that is

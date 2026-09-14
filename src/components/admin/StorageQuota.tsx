@@ -22,6 +22,8 @@ export function StorageQuota({ refreshKey = 0 }: { refreshKey?: number }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<ApiError | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [limitGb, setLimitGb] = useState("");
 
   if (error) return <ErrorNote error={error} onRetry={reload} />;
   if (!data) return null;
@@ -51,6 +53,25 @@ export function StorageQuota({ refreshKey = 0 }: { refreshKey?: number }) {
     }
   }
 
+  async function saveLimit() {
+    const limitBytes = Math.round(Number(limitGb) * GB);
+    if (!Number.isFinite(limitBytes) || limitBytes <= 0) {
+      setActionError(new ApiError(400, { error: "bad_request", detail: "Enter a limit in GB above zero." }));
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    try {
+      await api.put("/admin/images/quota", { limitBytes });
+      setEditing(false);
+      reload();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Card className="mb-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -60,6 +81,17 @@ export function StorageQuota({ refreshKey = 0 }: { refreshKey?: number }) {
             {formatBytes(usage.usedBytes)} of {formatBytes(usage.limitBytes)} used · {usage.fileCount} files
           </p>
         </div>
+        {role === "developer" && !editing && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setLimitGb(String(Math.round((usage.limitBytes / GB) * 10) / 10));
+              setEditing(true);
+            }}
+          >
+            Change limit
+          </Button>
+        )}
         {role === "owner" && !usage.pendingRequest && !asking && (
           <Button variant="ghost" onClick={() => setAsking(true)}>
             Request more space
@@ -75,6 +107,33 @@ export function StorageQuota({ refreshKey = 0 }: { refreshKey?: number }) {
           {usage.pendingRequest.requestedByName} asked for {formatBytes(usage.pendingRequest.requestedBytes)}. Waiting
           for the developer.
         </p>
+      )}
+
+      {editing && (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="text-[13px] font-medium text-plum-950">
+            Limit in GB
+            <input
+              type="number"
+              min={0.1}
+              step={0.5}
+              value={limitGb}
+              onChange={(e) => setLimitGb(e.target.value)}
+              className={`${inputClass} mt-1 w-32`}
+            />
+          </label>
+          <Button onClick={() => void saveLimit()} disabled={busy || limitGb === ""}>
+            {busy ? "Saving" : "Save limit"}
+          </Button>
+          <Button variant="ghost" onClick={() => setEditing(false)} disabled={busy}>
+            Cancel
+          </Button>
+          {actionError && (
+            <div className="w-full">
+              <ErrorNote error={actionError} />
+            </div>
+          )}
+        </div>
       )}
 
       {asking && (

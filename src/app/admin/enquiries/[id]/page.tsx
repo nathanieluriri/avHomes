@@ -15,7 +15,6 @@ import { SaveBar } from "@/components/admin/SaveBar";
 import { Conversation } from "@/components/admin/Conversation";
 import {
   Badge,
-  Button,
   Card,
   CardHead,
   ErrorNote,
@@ -25,6 +24,7 @@ import {
   inputClass,
   type Tone,
 } from "@/components/admin/ui";
+import { StatusSelect } from "@/components/admin/StatusSelect";
 
 /**
  * One enquiry, and the two things anyone does with it: read it, and say what
@@ -42,10 +42,10 @@ const TONE: Record<EnquiryStatus, Tone> = {
   spam: "red",
 };
 
-/** What each move is FOR, in the words of somebody working the queue. */
+/** What each state MEANS, in the words of somebody working the queue. */
 const MOVES: Record<EnquiryStatus, string> = {
-  new: "Put it back in the unanswered pile",
-  open: "Working on it",
+  new: "Nobody has answered yet",
+  open: "Someone is working on it",
   closed: "Answered, or nothing more to do",
   spam: "Not a real enquiry",
 };
@@ -245,43 +245,18 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
 
             <Card>
               <CardHead title="Status" />
-              {/* Only the moves that are not where it already is. A button that
-                  sets the status it already has is a click that does nothing. */}
-              {/* Ghost buttons, the same control the listing and post editors use
-                  for the same class of action, with the sentence underneath
-                  rather than beside so the pill keeps its shape.
-
-                  A stacked full-width grid below `sm`. Three 32px pills 8px
-                  apart is where a tap meant for Closed lands on Spam, and Spam
-                  is the move nobody wants to make by accident. */}
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-                {ENQUIRY_STATUSES.filter((status) => status !== enquiry.status).map((status) => (
-                  <Button
-                    key={status}
-                    variant="ghost"
-                    className="w-full sm:w-auto"
-                    disabled={busy}
-                    onClick={() => void patch({ status })}
-                    title={MOVES[status]}
-                  >
-                    {humanise(status)}
-                  </Button>
-                ))}
-              </div>
-              {/* Each button carries its own meaning, so the sentence under them
-                  does not try to gloss a subset. Assembling one from two picked
-                  statuses produced copy that named Spam after Spam had been
-                  chosen and never mentioned Closed at all. */}
-              <dl className="mt-3 space-y-1 border-t border-mist-100 pt-3">
-                {ENQUIRY_STATUSES.filter((status) => status !== enquiry.status).map((status) => (
-                  <div key={status} className="flex gap-2 text-[12px]">
-                    <dt className="w-14 shrink-0 font-semibold text-slate-600">
-                      {humanise(status)}
-                    </dt>
-                    <dd className="min-w-0 flex-1 text-slate-600">{MOVES[status]}</dd>
-                  </div>
-                ))}
-              </dl>
+              <StatusSelect
+                label="Enquiry status"
+                value={enquiry.status}
+                busy={busy}
+                onChange={(status) => void patch({ status: status as EnquiryStatus })}
+                options={ENQUIRY_STATUSES.map((status) => ({
+                  value: status,
+                  label: humanise(status),
+                  description: MOVES[status],
+                  tone: TONE[status],
+                }))}
+              />
 
               {enquiry.handledByName && (
                 <p className="mt-3 border-t border-mist-100 pt-3 text-[12px] text-slate-600">

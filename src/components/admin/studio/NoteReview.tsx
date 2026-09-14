@@ -6,6 +6,7 @@ import { NOTE_STATUSES, type DesignNote, type NoteStatus } from "@avhomes/contra
 import { ApiError, api } from "@/lib/admin/client";
 import { dateTime } from "@/lib/admin/format";
 import { Badge, Button, ConfirmButton, ErrorNote, type Tone } from "@/components/admin/ui";
+import { StatusSelect } from "@/components/admin/StatusSelect";
 import { BottomSheet } from "@/components/admin/BottomSheet";
 import { MarkLayer } from "./marks";
 
@@ -49,7 +50,7 @@ const LABEL: Record<NoteStatus, string> = {
 
 /** What each move MEANS, in the words of somebody who is not a developer. */
 const MOVE_HINT: Record<NoteStatus, string> = {
-  open: "Put it back on the pile",
+  open: "Waiting for someone to pick it up",
   "in-progress": "Somebody is on it",
   done: "Changed on the site",
   declined: "Decided against, with a reason",
@@ -210,28 +211,18 @@ export function NoteReview({
 
   const actions = (
     <>
-      {/* A three-up grid of real targets in the sheet, the dense wrapping row in
-          the aside. There are always exactly three moves, because the status
-          the note already holds is not one of them.
-
-          `gap-2` rather than `gap-1.5` in both. These are `.c-tap` buttons, so
-          on a touch screen each one carries a 44px halo outside its 28px box,
-          and two of those at 6px apart steal each other's edges. */}
-      <div className={asSheet ? "grid grid-cols-3 gap-2" : "flex flex-wrap gap-2"}>
-        {NOTE_STATUSES.filter((status) => status !== note.status).map((status) => (
-          <Button
-            key={status}
-            variant="ghost"
-            size={asSheet ? "md" : "sm"}
-            className={asSheet ? "w-full" : ""}
-            disabled={busy}
-            title={MOVE_HINT[status]}
-            onClick={() => void patch({ status })}
-          >
-            {LABEL[status]}
-          </Button>
-        ))}
-      </div>
+      <StatusSelect
+        label="Note status"
+        value={note.status}
+        busy={busy}
+        onChange={(status) => void patch({ status: status as NoteStatus })}
+        options={NOTE_STATUSES.map((status) => ({
+          value: status,
+          label: LABEL[status],
+          description: MOVE_HINT[status],
+          tone: TONE[status],
+        }))}
+      />
 
       <div className="flex items-end gap-2">
         <textarea
