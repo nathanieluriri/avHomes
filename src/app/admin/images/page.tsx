@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { ImageRecord } from "@avhomes/contracts";
+import { formatBytes, type ImageRecord } from "@avhomes/contracts";
+import { MEDIA_ACCEPT, Thumb } from "@/components/admin/ImagePicker";
+import { StorageQuota } from "@/components/admin/StorageQuota";
 import { ApiError, api } from "@/lib/admin/client";
 import { absoluteUrl } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
@@ -113,6 +115,7 @@ export default function ImagesPage() {
   /* Everything past the first page, appended rather than swapped in. */
   const [more, setMore] = useState<ImagePage | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [quotaKey, setQuotaKey] = useState(0);
 
   const { data, error, loading, reload } = useAsync<ImagePage>(
     (signal) => api.get<ImagePage>(`/admin/images?limit=${PAGE_SIZE}`, signal),
@@ -131,6 +134,7 @@ export default function ImagesPage() {
      record would otherwise arrive twice, once from each. */
   function refresh() {
     setMore(null);
+    setQuotaKey((key) => key + 1);
     reload();
   }
 
@@ -222,19 +226,19 @@ export default function ImagesPage() {
     ? progress
       ? `Uploading ${Math.min(progress.done + 1, progress.total)} of ${progress.total}`
       : "Uploading"
-    : "Upload images";
+    : "Upload files";
 
   return (
     <>
       <PageHeader
-        title="Images"
-        subtitle="Upload once, paste the URL into a listing or a post."
+        title="Media"
+        subtitle="Photos, GIFs and videos. Upload once, use them in a listing or a post."
         actions={
           <>
             <input
               ref={input}
               type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
+              accept={MEDIA_ACCEPT}
               multiple
               className="hidden"
               onChange={(e) => void upload(e.target.files)}
@@ -246,6 +250,8 @@ export default function ImagesPage() {
         }
       />
 
+      <StorageQuota refreshKey={quotaKey} />
+
       {actionError && (
         <div className="mb-4">
           <ErrorNote error={actionError} />
@@ -256,8 +262,8 @@ export default function ImagesPage() {
       {error && <ErrorNote error={error} onRetry={refresh} />}
       {data && items.length === 0 && (
         <EmptyState
-          title="No images yet"
-          hint="PNG, JPEG, GIF and WebP, up to 12MB each."
+          title="Nothing uploaded yet"
+          hint="Photos and GIFs up to 12MB, videos (MP4, MOV, WebM) up to 95MB."
           action={
             /* The first run needs its own way in. Without it the only route is
                back up to the header, which on a phone is above the fold and
@@ -278,25 +284,9 @@ export default function ImagesPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {items.map((image) => (
             <Card key={image.id} padded={false} className="p-2 sm:p-3">
-              {/* A plain img: these are already-sized blob URLs on an arbitrary
-                  host, and next/image would need a remotePattern per store.
-
-                  The intrinsic size comes from the record, so the browser can
-                  reason about the download before it starts one and can decode
-                  off the main thread. The grid still asks for up to sixty
-                  full-resolution originals at a ~150px display width, which is
-                  the one thing on this screen that a phone on cellular cannot
-                  be argued out of: it needs a resized variant from the API. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.url}
-                alt={image.alt}
-                width={image.width}
-                height={image.height}
-                decoding="async"
-                loading="lazy"
-                className="aspect-[4/3] w-full rounded-lg bg-mist-100 object-cover"
-              />
+              <div className="overflow-hidden rounded-lg">
+                <Thumb url={image.url} />
+              </div>
               {/* These two lines are the only thing telling one grey rectangle
                   from another, so they are content and sit at the 12px floor
                   rather than under it. */}
@@ -304,7 +294,7 @@ export default function ImagesPage() {
                 {image.alt || image.id}
               </p>
               <p className="truncate text-[12px] text-slate-600">
-                {image.width}x{image.height} · {Math.round(image.bytes / 1024)}KB
+                {image.contentType.startsWith("video/") ? "Video" : `${image.width}x${image.height}`} · {formatBytes(image.bytes)}
               </p>
 
               {/* Stacked at every width, not a row that becomes a stack. The

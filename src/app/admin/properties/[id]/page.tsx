@@ -49,7 +49,7 @@ import { SaveBar } from "@/components/admin/SaveBar";
 import { historySentence } from "@/lib/admin/audit";
 import { fullDate, relative, shortDate } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
-import ImagePicker from "@/components/admin/ImagePicker";
+import ImagePicker, { Thumb } from "@/components/admin/ImagePicker";
 import { AmenityPicker } from "@/components/admin/listing/AmenityPicker";
 import { NumberField } from "@/components/admin/listing/NumberInput";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
@@ -1149,15 +1149,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
                   <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {draft.images.map((url, index) => (
                       <li key={`${url}-${index}`} className="overflow-hidden rounded-lg border border-mist-200 bg-white">
-                        {/* A plain img, as in ImagePicker. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={url}
-                          alt=""
-                          className="aspect-[4/3] w-full bg-mist-100 object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
+                        <Thumb url={url} />
                       </li>
                     ))}
                   </ul>
@@ -1167,8 +1159,8 @@ function PropertyEditor({ initial }: { initial: Property }) {
               </Field>
             ) : (
               <Field
-                label="Photos"
-                hint="The first one leads the listing card and the gallery."
+                label="Photos and videos"
+                hint="The first photo leads the listing card. Videos and GIFs play in the gallery."
                 as="group"
               >
                 <ImagePicker

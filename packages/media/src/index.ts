@@ -4,7 +4,7 @@
  * The image library and its storage port. It may not import any other feature
  * package; consumers store the resolved URL an upload returns.
  */
-export { mediaRoutes, mediaPublicRoutes } from "./routes";
+export { mediaRoutes, mediaPublicRoutes, mediaUsage, type Notifier } from "./routes";
 export {
   unconfiguredStorage,
   vercelBlobStorage,

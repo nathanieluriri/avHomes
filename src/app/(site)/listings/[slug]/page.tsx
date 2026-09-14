@@ -11,6 +11,8 @@ import {
   listingSeoTitle,
 } from "@/lib/data";
 import { SITE_DOMAIN, SITE_NAME } from "@/lib/api-config";
+import { firstImage } from "@/components/MediaFrame";
+import { isVideoUrl } from "@avhomes/contracts";
 import JsonLd from "@/components/JsonLd";
 import ListingDetail from "@/components/listing/ListingDetail";
 
@@ -67,7 +69,8 @@ export async function generateMetadata({
     `${[property.title, property.city].filter(Boolean).join(", ")}${estate ? `, from ${price}` : ` at ${price}`}`;
 
   const canonical = `/listings/${property.slug}`;
-  const hero = property.images[0] ? absolute(property.images[0]) : null;
+  const cover = firstImage(property.images);
+  const hero = cover ? absolute(cover) : null;
 
   return {
     title,
@@ -186,7 +189,7 @@ export default async function PropertyPage({
     description: property.description || property.tagline,
     url: canonical,
     datePosted: property.publishedAt ? new Date(property.publishedAt).toISOString() : undefined,
-    image: property.images.map(absolute),
+    image: property.images.filter((url) => !isVideoUrl(url)).map(absolute),
     address: {
       "@type": "PostalAddress",
       streetAddress: property.address,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import MediaFrame from "@/components/MediaFrame";
 import { X, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 
 interface GalleryProps {
@@ -74,10 +74,9 @@ export default function Gallery({ images, title }: GalleryProps) {
           aria-label={`Open photo 1 of ${count}`}
           className="group relative block h-[300px] w-full overflow-hidden rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600 md:h-[560px]"
         >
-          <Image
+          <MediaFrame
             src={images[0]}
             alt={`${title} photo 1 of ${count}`}
-            fill
             priority
             sizes="(min-width: 1024px) 66vw, 100vw"
             className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"
@@ -102,10 +101,9 @@ export default function Gallery({ images, title }: GalleryProps) {
               aria-label={`Open photo ${i + 2} of ${count}`}
               className="group relative block h-[220px] w-full overflow-hidden rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600 md:h-auto"
             >
-              <Image
+              <MediaFrame
                 src={src}
                 alt={`${title} photo ${i + 2} of ${count}`}
-                fill
                 sizes="(min-width: 1024px) 34vw, 100vw"
                 className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.06]"
               />
@@ -167,12 +165,13 @@ export default function Gallery({ images, title }: GalleryProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative h-full w-full max-w-5xl">
-              <Image
+              <MediaFrame
+                key={openIndex}
                 src={images[openIndex]}
                 alt={`${title} photo ${openIndex + 1} of ${count}`}
-                fill
                 sizes="100vw"
                 className="object-contain"
+                controls
               />
             </div>
           </div>

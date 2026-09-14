@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import MediaFrame, { firstImage } from "@/components/MediaFrame";
 import { Bed, Bath, Maximize, Layers, LandPlot, Sofa } from "lucide-react";
 import { Property } from "@/lib/types";
 import {
@@ -36,10 +36,9 @@ export default function PropertyCard({
       className="card-soft group flex h-full flex-col overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-600"
     >
       <div className="relative aspect-[4/3] overflow-hidden">
-        <Image
-          src={property.images[0]}
+        <MediaFrame
+          src={firstImage(property.images) ?? property.images[0]}
           alt={property.title}
-          fill
           priority={priority}
           sizes="(min-width:1280px) 30vw, (min-width:768px) 45vw, 92vw"
           className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.05]"

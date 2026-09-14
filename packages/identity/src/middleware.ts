@@ -172,6 +172,8 @@ const RULES: readonly Rule[] = [
      /api/admin/tutorials is open to every signed-in member, so it must only
      ever touch the caller's own rows. */
   { prefix: "/api/admin/tutorials", domain: null, subtree: true },
+  /* SELF-GATING like tutorials: every route reads or marks only the caller's own notifications. */
+  { prefix: "/api/admin/notifications", domain: null, subtree: true },
   { prefix: "/api/admin/users", domain: "team" },
   { prefix: "/api/admin/invites", domain: "team" },
   { prefix: "/api/admin/", domain: "danger" },

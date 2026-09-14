@@ -29,6 +29,7 @@ import {
   type NoteKind,
   type NoteMark,
   type NoteStatus,
+  type NotificationInput,
 } from "@avhomes/contracts";
 import { requireAuth } from "@avhomes/identity";
 
@@ -184,7 +185,9 @@ const UpdateBody = z
  * so there is deliberately no public read and no share link: adding one later is
  * a decision to make on purpose, not a default to inherit.
  */
-export function feedbackRoutes(): Hono<AppEnv> {
+export function feedbackRoutes(
+  deps: { notify?: (db: Db, input: NotificationInput) => Promise<void> } = {},
+): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.get("/admin/notes", requireAuth(), async (c) => {
@@ -241,6 +244,15 @@ export function feedbackRoutes(): Hono<AppEnv> {
     };
     await notes(db).insertOne(doc);
     auditEntityId(c, doc._id);
+    await deps.notify?.(db, {
+      kind: "note-created",
+      title: `${user.displayName} left a ${doc.kind} note on ${doc.path}`,
+      body: doc.comment,
+      href: `/admin/customize?note=${doc._id}`,
+      subjectId: doc._id,
+      actorId: user.id,
+      actorName: user.displayName,
+    });
     return c.json({ note: toNote(doc) }, 201);
   });
 
@@ -298,6 +310,18 @@ export function feedbackRoutes(): Hono<AppEnv> {
       if (!current) throw new NotFoundError(`note ${id}`);
       throw new StaleWriteError("note", body.baseRevision, current.revision, toNote(current));
     }
+    await deps.notify?.(db, {
+      kind: "note-updated",
+      title:
+        body.reply !== undefined
+          ? `${user.displayName} replied on a note for ${after.path}`
+          : `${user.displayName} moved a note for ${after.path} to ${body.status}`,
+      body: body.reply ?? `"${after.comment.slice(0, 200)}"`,
+      href: `/admin/customize?note=${after._id}`,
+      subjectId: after._id,
+      actorId: user.id,
+      actorName: user.displayName,
+    });
     return c.json({ note: toNote(after) });
   });
 
