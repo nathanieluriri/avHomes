@@ -312,7 +312,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    */
   app.route(API_PREFIX, enquiriesAdminRoutes({ mailer }));
   app.route(API_PREFIX, settingsRoutes());
-  app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin }));
+  app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin, notify }));
   app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());

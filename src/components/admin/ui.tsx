@@ -800,3 +800,64 @@ export function Spinner() {
     </div>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════ SWITCH ══ */
+
+/**
+ * An on/off switch with its label.
+ *
+ * The knob sits in normal flow inside a padded track and slides with a
+ * transform, so no console button rule can knock it out of place. The whole row
+ * is the target, and it is announced as a switch with its checked state.
+ */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  description,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}) {
+  const labelId = useId();
+  const descriptionId = useId();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-labelledby={labelId}
+      aria-describedby={description ? descriptionId : undefined}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className="group inline-flex items-center gap-3 rounded-lg py-1 text-left focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <span className="flex flex-col">
+        <span id={labelId} className="text-[13px] font-semibold text-plum-950">
+          {label}
+        </span>
+        {description && (
+          <span id={descriptionId} className="text-[12px] text-slate-600">
+            {description}
+          </span>
+        )}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 group-focus-visible:ring-2 group-focus-visible:ring-wine-500/40 group-focus-visible:ring-offset-2 ${
+          checked ? "bg-wine-600" : "bg-slate-300 group-hover:bg-slate-400"
+        }`}
+      >
+        <span
+          className={`block h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0/0.25)] transition-transform duration-200 ease-out ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </span>
+    </button>
+  );
+}

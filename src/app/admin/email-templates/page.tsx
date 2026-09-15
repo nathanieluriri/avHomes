@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, MailOpen } from "lucide-react";
+import { ChevronRight, MailOpen, MailPlus } from "lucide-react";
 import { EMAIL_TEMPLATES, type EmailTemplate } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
 import { MailNotConfiguredAlert } from "@/components/admin/MailStatus";
-import { Badge, ErrorNote, PageHeader, Skeleton } from "@/components/admin/ui";
+import { Badge, ButtonLink, ErrorNote, PageHeader, Skeleton } from "@/components/admin/ui";
 
 export default function EmailTemplatesPage() {
   const { data, error, loading, reload } = useAsync<{ items: EmailTemplate[] }>(
@@ -21,6 +21,12 @@ export default function EmailTemplatesPage() {
         title="Email templates"
         icon={MailOpen}
         subtitle="The wording of every email the site sends. Open one to edit it and preview the result."
+        actions={
+          <ButtonLink href="/admin/email-templates/requests" variant="ghost">
+            <MailPlus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            Request a new template
+          </ButtonLink>
+        }
       />
       <MailNotConfiguredAlert />
       {error && <ErrorNote error={error} onRetry={reload} />}

@@ -38,6 +38,7 @@ export const ID_PREFIXES = {
   quotaRequest: "qreq",
   notification: "ntf",
   newsletter: "nwsl",
+  templateRequest: "treq",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

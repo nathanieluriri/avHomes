@@ -134,3 +134,22 @@ export interface Newsletter {
   createdByName: string;
   revision: number;
 }
+
+/* ─────────────────────────── template requests ────────────────────────── */
+
+export const TEMPLATE_REQUEST_STATUSES = ["open", "in-progress", "done", "declined"] as const;
+export type TemplateRequestStatus = (typeof TEMPLATE_REQUEST_STATUSES)[number];
+
+/** Somebody asking the developer for a new kind of email. */
+export interface TemplateRequest {
+  id: string;
+  title: string;
+  description: string;
+  /** Uploaded examples: screenshots, GIFs or videos of an email they like. */
+  media: string[];
+  status: TemplateRequestStatus;
+  requestedByName: string;
+  createdAt: number;
+  updatedAt: number;
+  decidedByName: string | null;
+}

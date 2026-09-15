@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import {
+  ForbiddenError,
   NotFoundError,
+  newId,
   currentDb,
   currentUser,
   deploymentOrigin,
@@ -18,8 +20,12 @@ import {
   EMAIL_TEMPLATE_KEYS,
   docToText,
   type DocNode,
+  TEMPLATE_REQUEST_STATUSES,
   type EmailTemplate,
   type EmailTemplateKey,
+  type NotificationInput,
+  type TemplateRequest,
+  type TemplateRequestStatus,
 } from "@avhomes/contracts";
 import { requireAuth } from "@avhomes/identity";
 
@@ -284,8 +290,103 @@ function sampleVars(origin: string): EmailVars {
   };
 }
 
-export function emailTemplateRoutes(deps: { mailer: Mailer; origin: (req: { url: string }) => string }): Hono<AppEnv> {
+interface TemplateRequestDoc {
+  _id: string;
+  title: string;
+  description: string;
+  media: string[];
+  status: TemplateRequestStatus;
+  requestedBy: string;
+  requestedByName: string;
+  createdAt: number;
+  updatedAt: number;
+  decidedByName: string | null;
+}
+
+function templateRequests(db: Db) {
+  return collection<TemplateRequestDoc>(db, COLLECTIONS.templateRequests);
+}
+
+function toTemplateRequest(doc: TemplateRequestDoc): TemplateRequest {
+  return {
+    id: doc._id,
+    title: doc.title,
+    description: doc.description,
+    media: doc.media ?? [],
+    status: doc.status,
+    requestedByName: doc.requestedByName,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    decidedByName: doc.decidedByName ?? null,
+  };
+}
+
+const TemplateRequestBody = z
+  .object({
+    title: str().min(1).max(120).trim(),
+    description: str().min(1).max(4000).trim(),
+    // Stored URLs from the media library, so only https or our own upload path.
+    media: z.array(str().max(2000).regex(/^(https:\/\/|\/api\/public\/images\/)/u, "uploaded-url")).max(12).default([]),
+  })
+  .strict();
+
+const TemplateRequestUpdate = z.object({ status: z.enum(TEMPLATE_REQUEST_STATUSES) }).strict();
+
+export function emailTemplateRoutes(deps: {
+  mailer: Mailer;
+  origin: (req: { url: string }) => string;
+  notify?: (db: Db, input: NotificationInput) => Promise<void>;
+}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
+
+  /* Registered before `/:key`, which would otherwise read "requests" as a template key. */
+  routes.get("/admin/email-templates/requests", requireAuth(), async (c) => {
+    const docs = await templateRequests(await currentDb(c)).find({}, { sort: { createdAt: -1 }, limit: 100 }).toArray();
+    return c.json({ items: docs.map(toTemplateRequest) });
+  });
+
+  routes.post("/admin/email-templates/requests", requireAuth(), async (c) => {
+    const body = await readJson(c, TemplateRequestBody);
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const now = Date.now();
+    const doc: TemplateRequestDoc = {
+      _id: newId("treq", now),
+      title: body.title,
+      description: body.description,
+      media: body.media,
+      status: "open",
+      requestedBy: user.id,
+      requestedByName: user.displayName,
+      createdAt: now,
+      updatedAt: now,
+      decidedByName: null,
+    };
+    await templateRequests(db).insertOne(doc);
+    await deps.notify?.(db, {
+      kind: "template-request",
+      title: `${user.displayName} requested an email template: ${body.title}`,
+      body: `${body.description}${body.media.length ? `\n\n${body.media.length} example file${body.media.length === 1 ? "" : "s"} attached.` : ""}`,
+      href: `/admin/email-templates/requests#${doc._id}`,
+      subjectId: doc._id,
+      actorId: user.id,
+      actorName: user.displayName,
+    });
+    return c.json({ request: toTemplateRequest(doc) }, 201);
+  });
+
+  routes.patch("/admin/email-templates/requests/:id", requireAuth(), async (c) => {
+    const user = currentUser(c);
+    if (user.role !== "developer") throw new ForbiddenError("only a developer can move a template request");
+    const { status } = await readJson(c, TemplateRequestUpdate);
+    const after = await templateRequests(await currentDb(c)).findOneAndUpdate(
+      { _id: pathParam(c, "id") },
+      { $set: { status, updatedAt: Date.now(), decidedByName: user.displayName } },
+      { returnDocument: "after" },
+    );
+    if (!after) throw new NotFoundError(`template request ${pathParam(c, "id")}`);
+    return c.json({ request: toTemplateRequest(after) });
+  });
 
   // Any signed-in member: the inbox needs it to decide whether Email the buyer can send.
   routes.get("/admin/mail-status", requireAuth(), (c) => {

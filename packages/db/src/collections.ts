@@ -32,6 +32,7 @@ export const COLLECTIONS = {
   quotaRequests: "quota_requests",
   emailTemplates: "email_templates",
   newsletters: "newsletters",
+  templateRequests: "template_requests",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
