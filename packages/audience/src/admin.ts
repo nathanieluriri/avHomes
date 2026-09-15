@@ -177,6 +177,12 @@ const SendBody = z
   })
   .strict();
 
+/** RFC 4180 quoting, and a leading quote on anything a spreadsheet would run as a formula. */
+function csvCell(value: string): string {
+  const guarded = /^[=+\-@\t\r]/u.test(value) ? `'${value}` : value;
+  return `"${guarded.replace(/"/gu, '""')}"`;
+}
+
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const BATCH = 100;
 
@@ -232,7 +238,10 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
   routes.get("/admin/subscribers/export", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const docs = await subscribers(db).find({ unsubscribedAt: null }, { sort: { createdAt: 1 } }).toArray();
-    const rows = ["email,source,subscribed_at", ...docs.map((d) => `${d.email},${d.source ?? ""},${new Date(d.createdAt).toISOString()}`)];
+    const rows = [
+      "email,source,subscribed_at",
+      ...docs.map((d) => [d.email, d.source ?? "", new Date(d.createdAt).toISOString()].map(csvCell).join(",")),
+    ];
     return new Response(rows.join("\n"), {
       headers: {
         "content-type": "text/csv; charset=utf-8",
