@@ -177,6 +177,8 @@ const RULES: readonly Rule[] = [
   { prefix: "/api/admin/tutorials", domain: null, subtree: true },
   /* SELF-GATING like tutorials: every route reads or marks only the caller's own notifications. */
   { prefix: "/api/admin/notifications", domain: null, subtree: true },
+  /* SELF-GATING: a yes or no about mail configuration, for every signed-in member. */
+  { prefix: "/api/admin/mail-status", domain: null },
   { prefix: "/api/admin/users", domain: "team" },
   { prefix: "/api/admin/invites", domain: "team" },
   { prefix: "/api/admin/", domain: "danger" },

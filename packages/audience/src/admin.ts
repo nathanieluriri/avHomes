@@ -7,7 +7,6 @@ import {
   PreconditionFailedError,
   StaleWriteError,
   auditEntityId,
-  clampLimit,
   currentDb,
   currentUser,
   newId,
@@ -124,7 +123,7 @@ export async function unsubscribe(db: Db, subscriberId: string): Promise<boolean
 
 export async function welcomeEmail(db: Db, origin: string, subscriber: { _id: string; email: string }): Promise<MailMessage> {
   const template = await readTemplate(db, "subscribe-welcome");
-  const rendered = renderWith(template, { text: { unsubscribeLink: unsubscribeLink(origin, subscriber._id) } });
+  const rendered = renderWith(template, { text: { unsubscribeLink: unsubscribeLink(origin, subscriber._id) }, origin });
   return { to: subscriber.email, ...rendered, headers: oneClickHeaders(origin, subscriber._id) };
 }
 
@@ -141,6 +140,7 @@ async function newsletterEmail(
     {
       text: { subject: letter.subject, content: docToEmailText(letter.content), unsubscribeLink: link },
       html: { content: docToEmailHtml(letter.content) },
+      origin,
     },
     letter.preheader,
   );
@@ -199,7 +199,7 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     if (q.status === "unsubscribed") filter.unsubscribedAt = { $ne: null };
     if (q.q) filter.email = { $regex: q.q.toLowerCase().replace(/[.*+?^${}()|[\]\\]/gu, "\\$&") };
     const docs = await subscribers(db)
-      .find(filter, { sort: { createdAt: -1 }, limit: clampLimit(q.limit ?? "500"), projection: { _id: 1, email: 1, source: 1, createdAt: 1, unsubscribedAt: 1 } })
+      .find(filter, { sort: { createdAt: -1 }, limit: Math.min(Math.max(Number(q.limit) || 500, 1), 1000), projection: { _id: 1, email: 1, source: 1, createdAt: 1, unsubscribedAt: 1 } })
       .toArray();
     const [active, total] = await Promise.all([
       subscribers(db).countDocuments({ unsubscribedAt: null }),

@@ -8,6 +8,7 @@ import type { Newsletter, NewsletterStatus } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
+import { MailNotConfiguredAlert } from "@/components/admin/MailStatus";
 import { Badge, Button, EmptyState, ErrorNote, PageHeader, Skeleton, type Tone } from "@/components/admin/ui";
 
 const TONE: Record<NewsletterStatus, Tone> = { draft: "amber", sending: "wine", sent: "green" };
@@ -47,6 +48,7 @@ export default function NewslettersPage() {
           </Button>
         }
       />
+      <MailNotConfiguredAlert />
       {createError && (
         <div className="mb-3">
           <ErrorNote error={createError} />

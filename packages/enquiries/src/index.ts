@@ -312,6 +312,7 @@ async function conversationEmail(
         message: opts.message ?? "",
       },
       html: { conversation: conversationHtml(lines) },
+      origin: opts.origin,
     },
     opts.message ?? "",
   );

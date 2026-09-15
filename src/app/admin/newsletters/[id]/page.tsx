@@ -8,6 +8,7 @@ import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
 import RichText from "@/components/admin/RichText";
+import { MailGate, MailNotConfiguredAlert } from "@/components/admin/MailStatus";
 import {
   Badge,
   Button,
@@ -155,6 +156,7 @@ export default function NewsletterEditorPage() {
         }
       />
 
+      <MailNotConfiguredAlert />
       {notice && <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800" role="status">{notice}</p>}
       {actionError && (
         <div className="mb-3">
@@ -170,21 +172,29 @@ export default function NewsletterEditorPage() {
               <p className="text-[13px] text-slate-600">
                 {audience ? `${audience.active} people are subscribed.` : "Counting subscribers."} Send yourself a test first.
               </p>
-              <Button variant="ghost" className="w-full" onClick={() => void send("test")} disabled={busy !== null}>
-                {busy === "test" ? "Sending test" : "Send me a test"}
-              </Button>
+              <MailGate className="w-full">
+                {(mailOff) => (
+                  <Button variant="ghost" className="w-full" onClick={() => void send("test")} disabled={mailOff || busy !== null}>
+                    {busy === "test" ? "Sending test" : "Send me a test"}
+                  </Button>
+                )}
+              </MailGate>
               <Button variant="ghost" className="w-full" onClick={() => void preview()} disabled={busy !== null}>
                 {busy === "preview" ? "Rendering" : "Preview email"}
               </Button>
               {!sent && (
-                <ConfirmButton
-                  confirmLabel={`Yes, send to ${audience?.active ?? "all"}`}
-                  onConfirm={() => void send("all")}
-                  disabled={busy !== null || subject.trim() === "" || (audience?.active ?? 0) === 0}
-                  className="w-full"
-                >
-                  {busy === "send" ? "Sending" : "Send to all subscribers"}
-                </ConfirmButton>
+                <MailGate className="w-full">
+                  {(mailOff) => (
+                    <ConfirmButton
+                      confirmLabel={`Yes, send to ${audience?.active ?? "all"}`}
+                      onConfirm={() => void send("all")}
+                      disabled={mailOff || busy !== null || subject.trim() === "" || (audience?.active ?? 0) === 0}
+                      className="w-full"
+                    >
+                      {busy === "send" ? "Sending" : "Send to all subscribers"}
+                    </ConfirmButton>
+                  )}
+                </MailGate>
               )}
             </Card>
             {!sent && (

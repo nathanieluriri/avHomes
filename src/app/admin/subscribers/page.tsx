@@ -6,6 +6,7 @@ import type { Subscriber } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useDebounced } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
+import { MailNotConfiguredAlert } from "@/components/admin/MailStatus";
 import {
   Badge,
   Button,
@@ -110,6 +111,8 @@ export default function SubscribersPage() {
           </>
         }
       />
+
+      <MailNotConfiguredAlert />
 
       {adding && (
         <Card className="mb-4 space-y-2">

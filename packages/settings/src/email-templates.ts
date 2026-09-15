@@ -5,6 +5,7 @@ import {
   NotFoundError,
   currentDb,
   currentUser,
+  deploymentOrigin,
   pathParam,
   readJson,
   str,
@@ -73,6 +74,8 @@ export interface ConversationLine {
 export interface EmailVars {
   text: Record<string, string>;
   html?: Record<string, string>;
+  /** Where the logo is loaded from. Defaults to the deployment's own origin. */
+  origin?: string;
 }
 
 export interface RenderedEmail {
@@ -140,7 +143,8 @@ function fillHtml(template: string, vars: EmailVars): string {
     .join("\n");
 }
 
-export function emailLayout(inner: string, preheader = ""): string {
+export function emailLayout(inner: string, preheader = "", origin = deploymentOrigin({ url: "" })): string {
+  const logo = `${origin}/brand/logo-h.png`;
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f6f3f5;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
@@ -148,10 +152,10 @@ export function emailLayout(inner: string, preheader = ""): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f3f5;padding:24px 12px">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden">
-<tr><td style="background:#3b0d1f;padding:18px 28px;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.3px">AVHomes</td></tr>
+<tr><td style="padding:22px 28px 18px;border-bottom:3px solid #8f2d4a"><a href="${escapeHtml(origin)}" style="text-decoration:none"><img src="${escapeHtml(logo)}" width="180" height="39" alt="AV Homes Ltd" style="display:block;border:0;width:180px;height:auto;max-width:100%;color:#8f2d4a;font-size:18px;font-weight:700"></a></td></tr>
 <tr><td style="padding:28px">${inner}</td></tr>
 </table>
-<p style="font-size:12px;color:#94a3b8;margin:16px 0 0">AVHomes · Lagos and Abuja</p>
+<p style="font-size:12px;color:#94a3b8;margin:16px 0 0">AV Homes Ltd · Future-Ready Prime Living. Today</p>
 </td></tr></table>
 </body></html>`;
 }
@@ -160,7 +164,7 @@ export function renderWith(template: { subject: string; body: string }, vars: Em
   return {
     subject: fillText(template.subject, vars).replace(/\s+/gu, " ").trim() || "AVHomes",
     text: fillText(template.body, vars),
-    html: emailLayout(fillHtml(template.body, vars), preheader),
+    html: emailLayout(fillHtml(template.body, vars), preheader, vars.origin || undefined),
   };
 }
 
@@ -276,11 +280,29 @@ function sampleVars(origin: string): EmailVars {
       conversation: conversationHtml(lines),
       content: `<p style="${P}">The newsletter you write appears here.</p>`,
     },
+    origin,
   };
 }
 
 export function emailTemplateRoutes(deps: { mailer: Mailer; origin: (req: { url: string }) => string }): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
+
+  // Any signed-in member: the inbox needs it to decide whether Email the buyer can send.
+  routes.get("/admin/mail-status", requireAuth(), (c) => {
+    let configured = true;
+    try {
+      deps.mailer.assertConfigured();
+    } catch {
+      configured = false;
+    }
+    return c.json({ configured, hint: configured ? null : "Set RESEND_API_KEY and MAIL_FROM in the deployment's environment variables." });
+  });
+
+  routes.get("/admin/email-templates/:key", requireAuth(), async (c) => {
+    const key = pathParam(c, "key");
+    if (!isTemplateKey(key)) throw new NotFoundError(`template ${key}`);
+    return c.json({ template: await readTemplate(await currentDb(c), key) });
+  });
 
   routes.get("/admin/email-templates", requireAuth(), async (c) => {
     const db = await currentDb(c);

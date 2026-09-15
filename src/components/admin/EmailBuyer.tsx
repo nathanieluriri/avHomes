@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { Send } from "lucide-react";
 import { ApiError, api } from "@/lib/admin/client";
+import { MAIL_OFF_REASON, MailGate, useMailConfigured } from "./MailStatus";
 import { Button, Card, CardHead, ErrorNote, inputClass } from "./ui";
 
 /**
@@ -19,6 +20,7 @@ export function EmailBuyer({ enquiryId, name, email }: { enquiryId: string; name
   const [error, setError] = useState<ApiError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const mail = useMailConfigured();
 
   async function run(preview: boolean) {
     setBusy(preview ? "preview" : "send");
@@ -52,6 +54,9 @@ export function EmailBuyer({ enquiryId, name, email }: { enquiryId: string; name
           <p className="text-[12px] text-slate-600">
             Send {name || "them"} a follow-up with the conversation so far and a private link to reply in the chat.
           </p>
+          {mail && !mail.configured && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[12px] text-amber-900">{MAIL_OFF_REASON}</p>
+          )}
           <Button variant="ghost" className="mt-3 w-full" onClick={() => setOpen(true)}>
             <Send className="mr-1.5 h-4 w-4" aria-hidden="true" />
             Write an email
@@ -80,9 +85,13 @@ export function EmailBuyer({ enquiryId, name, email }: { enquiryId: string; name
           </p>
           {error && <ErrorNote error={error} />}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void run(false)} disabled={busy !== null || message.trim() === ""}>
-              {busy === "send" ? "Sending" : "Send email"}
-            </Button>
+            <MailGate>
+              {(mailOff) => (
+                <Button onClick={() => void run(false)} disabled={mailOff || busy !== null || message.trim() === ""}>
+                  {busy === "send" ? "Sending" : "Send email"}
+                </Button>
+              )}
+            </MailGate>
             <Button variant="ghost" onClick={() => void run(true)} disabled={busy !== null || message.trim() === ""}>
               {busy === "preview" ? "Rendering" : "Preview"}
             </Button>
