@@ -470,16 +470,22 @@ export function emailTemplateRoutes(deps: {
 export function sanitizeEmailHtml(input: string): string {
   let html = input;
   html = html.replace(/<!--[\s\S]*?-->/gu, (c) => (/\[if |<!\[endif/iu.test(c) ? c : ""));
-  for (const tag of ["script", "iframe", "object", "embed", "form", "noscript", "template", "svg", "math"]) {
-    html = html.replace(new RegExp(`<${tag}\b[\s\S]*?<\/${tag}\s*>`, "giu"), "");
-    html = html.replace(new RegExp(`<\/?${tag}\b[^>]*>`, "giu"), "");
+  // Not `style`: email designs keep their CSS in a <style> block.
+  const blocked = "script|iframe|object|embed|form|noscript|template|svg|math";
+  const pair = new RegExp(String.raw`<(${blocked})\b[\s\S]*?<\/\1\s*>`, "giu");
+  const lone = new RegExp(String.raw`<\/?(${blocked})\b[^>]*>`, "giu");
+  // Repeated until nothing changes, so `<scr<script></script>ipt>` cannot reassemble a tag.
+  for (let previous = ""; previous !== html; ) {
+    previous = html;
+    html = html.replace(pair, "").replace(lone, "");
   }
   html = html.replace(/<(input|button|select|textarea|link|base|frame|frameset|applet)\b[^>]*>/giu, "");
   html = html.replace(/<\/(button|select|textarea|frameset|applet)\s*>/giu, "");
   html = html.replace(/<meta\b[^>]*http-equiv[^>]*>/giu, "");
-  html = html.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/giu, "");
+  // `/` counts as a separator too: `<img/onerror=...>` is valid HTML.
+  html = html.replace(/[\s/]+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/giu, " ");
   html = html.replace(
-    /\s(href|src|action|formaction|background|poster)\s*=\s*("|')\s*(javascript|vbscript|data:text\/html)[^"']*\2/giu,
+    /\s(href|src|action|formaction|background|poster)\s*=\s*(?:"\s*(?:javascript|vbscript|data:text\/html)[^"]*"|'\s*(?:javascript|vbscript|data:text\/html)[^']*'|(?:javascript|vbscript|data:text\/html)[^\s>]*)/giu,
     ' $1="#"',
   );
   html = html.replace(/expression\s*\(/giu, "(");
