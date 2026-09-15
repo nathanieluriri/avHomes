@@ -46,7 +46,14 @@ import {
   requireAuth,
   tokenId,
 } from "@avhomes/identity";
-import { readSettings, replySignature } from "@avhomes/settings";
+import {
+  conversationHtml,
+  conversationText,
+  readSettings,
+  renderEmail,
+  replySignature,
+  type ConversationLine,
+} from "@avhomes/settings";
 
 /**
  * @avhomes/enquiries
@@ -99,6 +106,12 @@ interface EnquiryDoc {
    * enquiry, which has no thread to resume. NEVER returned on the wire.
    */
   threadKey: string | null;
+  /**
+   * HMACs of the tokens mailed in "continue the chat" links, newest last and
+   * capped. Each opens the same thread as the browser's own token. NEVER on the wire.
+   */
+  replyKeys?: string[];
+  lastEmailedAt?: number | null;
   propertyId: string | null;
   propertySlug: string | null;
   propertyTitle: string | null;
@@ -240,12 +253,69 @@ async function toThread(db: Db, doc: EnquiryDoc): Promise<EnquiryThread> {
  */
 async function loadOwnedThread(db: Db, id: string, token: string): Promise<EnquiryDoc> {
   if (token.trim() === "") throw new NotFoundError(`thread ${id}`);
-  const doc = await enquiries(db).findOne({ _id: id, threadKey: tokenId(token) });
+  const key = tokenId(token);
+  const doc = await enquiries(db).findOne({ _id: id, $or: [{ threadKey: key }, { replyKeys: key }] });
   if (!doc) throw new NotFoundError(`thread ${id}`);
   return doc;
 }
 
 /* ──────────────────────────────── mail ────────────────────────────────── */
+
+const REPLY_LINKS_KEPT = 10;
+
+/**
+ * A private link to the public conversation page.
+ *
+ * The token rides in the URL FRAGMENT, which a browser never sends to a server,
+ * so it stays out of access logs and Referer headers the way the header token does.
+ */
+async function mintReplyLink(db: Db, doc: EnquiryDoc, origin: string): Promise<string> {
+  const token = mintSessionToken();
+  await enquiries(db).updateOne(
+    { _id: doc._id },
+    { $push: { replyKeys: { $each: [tokenId(token)], $slice: -REPLY_LINKS_KEPT } } },
+  );
+  return `${origin}/conversation/${doc._id}#t=${token}`;
+}
+
+function conversationLines(doc: EnquiryDoc): ConversationLine[] {
+  return (doc.messages ?? []).map((m) => ({
+    who: m.from === "visitor" ? doc.name || "You" : m.authorName,
+    at: m.createdAt,
+    body: m.body,
+    fromTeam: m.from === "agent",
+  }));
+}
+
+async function conversationEmail(
+  db: Db,
+  doc: EnquiryDoc,
+  key: "enquiry-reply" | "enquiry-follow-up",
+  opts: { origin: string; agentName: string; message?: string; preview?: boolean },
+) {
+  const lines = conversationLines(doc);
+  // A preview must not spend one of the capped reply links.
+  const replyLink = opts.preview
+    ? `${opts.origin}/conversation/${doc._id}`
+    : await mintReplyLink(db, doc, opts.origin);
+  return renderEmail(
+    db,
+    key,
+    {
+      text: {
+        name: doc.name || "there",
+        property: doc.propertyTitle ?? "your enquiry",
+        propertyLink: doc.propertySlug ? `${opts.origin}/listings/${doc.propertySlug}` : "",
+        agentName: opts.agentName,
+        conversation: conversationText(lines),
+        replyLink,
+        message: opts.message ?? "",
+      },
+      html: { conversation: conversationHtml(lines) },
+    },
+    opts.message ?? "",
+  );
+}
 
 function transcript(doc: EnquiryDoc): string {
   return (doc.messages ?? [])
@@ -279,6 +349,7 @@ async function mailTranscript(
   mailer: Mailer,
   doc: EnquiryDoc,
   ctx: { requestId: string; route: string; origin: string; adminOrigin: string },
+  replyLink: string,
 ): Promise<void> {
   const subject = doc.propertyTitle
     ? `Your conversation about ${doc.propertyTitle}`
@@ -298,7 +369,7 @@ async function mailTranscript(
         transcript(doc),
         "------------------------",
         "",
-        "Reply to this email and it reaches the same person.",
+        `Continue the chat from any device: ${replyLink}`,
       ].join("\n"),
     },
     ctx,
@@ -547,7 +618,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     await notifyTeam(deps.mailer, doc, `New chat from ${doc.name}`, ctx);
     // The buyer's own copy, from the first message: it is the receipt that says
     // the thread exists and how to get back to it if the tab is gone.
-    await mailTranscript(deps.mailer, doc, ctx);
+    await mailTranscript(deps.mailer, doc, ctx, await mintReplyLink(db, doc, ctx.origin));
 
     return c.json({ id: doc._id, token, thread: await toThread(db, doc) }, 201);
   });
@@ -578,7 +649,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     };
 
     const after = await enquiries(db).findOneAndUpdate(
-      { _id: id, threadKey: doc.threadKey },
+      { _id: id },
       {
         $push: { messages: message },
         /*
@@ -642,6 +713,14 @@ const UpdateBody = z
     status: z.enum(ENQUIRY_STATUSES).optional(),
     note: str().max(4000).nullable().optional(),
     baseRevision: z.number().int().min(0),
+  })
+  .strict();
+
+const FollowUpBody = z
+  .object({
+    message: str().min(1).max(5000).trim(),
+    subject: str().max(200).optional(),
+    preview: z.boolean().optional(),
   })
   .strict();
 
@@ -760,17 +839,51 @@ export function enquiriesAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
 
     // The buyer's durable copy. A chat thread lives in one browser; the mail is
     // what survives a closed tab.
-    await mailTranscript(deps.mailer, after, {
-      requestId: c.get("requestId"),
-      route: "POST /admin/enquiries/:id/reply",
+    const replyEmail = await conversationEmail(db, after, "enquiry-reply", {
       origin: requestOrigin(c.req),
-      adminOrigin: deploymentOrigin(c.req),
+      agentName: signature.name,
     });
+    await trySend(
+      deps.mailer,
+      { to: after.email, ...replyEmail, replyTo: user.email },
+      { requestId: c.get("requestId"), route: "POST /admin/enquiries/:id/reply" },
+    );
 
     const names = await handlerNames(db, [after.handledBy]);
     return c.json({
       enquiry: toEnquiry(after, after.handledBy ? (names.get(after.handledBy) ?? null) : null),
     });
+  });
+
+  /** Emails the buyer a written follow-up with the conversation and a link back into it. */
+  routes.post("/admin/enquiries/:id/email", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const id = pathParam(c, "id");
+    const body = await readJson(c, FollowUpBody);
+    const user = currentUser(c);
+    const doc = await enquiries(db).findOne({ _id: id });
+    if (!doc) throw new NotFoundError(`enquiry ${id}`);
+
+    const site = await readSettings(db);
+    const signature = replySignature(site, { displayName: user.displayName, avatarUrl: user.avatarUrl });
+    const rendered = await conversationEmail(db, doc, "enquiry-follow-up", {
+      origin: requestOrigin(c.req),
+      agentName: signature.name,
+      message: body.message,
+      preview: body.preview,
+    });
+    if (body.preview) return c.json({ email: rendered, sent: false });
+
+    const sent = await trySend(
+      deps.mailer,
+      { to: doc.email, ...rendered, subject: body.subject?.trim() || rendered.subject, replyTo: user.email },
+      { requestId: c.get("requestId"), route: "POST /admin/enquiries/:id/email" },
+    );
+    if (!sent) {
+      throw new BadRequestError("The email could not be sent. Check that mail is configured (RESEND_API_KEY and MAIL_FROM).");
+    }
+    await enquiries(db).updateOne({ _id: id }, { $set: { lastEmailedAt: Date.now() } });
+    return c.json({ sent: true, to: doc.email });
   });
 
   routes.patch("/admin/enquiries/:id", requireAuth(), async (c) => {

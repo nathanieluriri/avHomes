@@ -6,10 +6,13 @@ import {
   History,
   Images,
   Inbox,
+  Mail,
+  MailOpen,
   Newspaper,
   PencilRuler,
   SlidersHorizontal,
   TriangleAlert,
+  UserRoundCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -122,6 +125,32 @@ export const NAV: readonly NavGroup[] = [
            same authority as writing the words on it. */
         hint: "Circle anything on the site and leave a note",
         icon: PencilRuler,
+        domain: "content",
+      },
+    ],
+  },
+  {
+    label: "Audience",
+    items: [
+      {
+        href: "/admin/subscribers",
+        label: "Subscribers",
+        hint: "Everyone on the newsletter list",
+        icon: UserRoundCheck,
+        domain: "content",
+      },
+      {
+        href: "/admin/newsletters",
+        label: "Newsletters",
+        hint: "Write and send an email to subscribers",
+        icon: Mail,
+        domain: "content",
+      },
+      {
+        href: "/admin/email-templates",
+        label: "Email templates",
+        hint: "The wording of every email the site sends",
+        icon: MailOpen,
         domain: "content",
       },
     ],

@@ -18,11 +18,15 @@ export interface MailMessage {
   text: string;
   html?: string;
   replyTo?: string;
+  /** Extra MIME headers, e.g. List-Unsubscribe on a newsletter. */
+  headers?: Record<string, string>;
 }
 
 export interface Mailer {
   assertConfigured(): void;
   send(message: MailMessage): Promise<void>;
+  /** Up to 100 messages in one request. Optional; callers fall back to `send`. */
+  sendBatch?(messages: MailMessage[]): Promise<void>;
 }
 
 /**
@@ -82,6 +86,7 @@ export function resendMailer(): Mailer {
             text: message.text,
             ...(message.html ? { html: message.html } : {}),
             ...(message.replyTo ? { reply_to: [message.replyTo] } : {}),
+            ...(message.headers ? { headers: message.headers } : {}),
           }),
         });
       } catch (err) {
@@ -90,6 +95,33 @@ export function resendMailer(): Mailer {
       if (!res.ok) {
         // The body carries Resend's own reason, which is the difference between
         // "your domain is not verified" and an unexplained 4xx.
+        const detail = await res.text().catch(() => "");
+        throw new UpstreamError("resend", `${res.status} ${detail.slice(0, 300)}`);
+      }
+    },
+    async sendBatch(messages) {
+      const { key, from } = config();
+      let res: Response;
+      try {
+        res = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+          body: JSON.stringify(
+            messages.map((message) => ({
+              from,
+              to: [message.to],
+              subject: message.subject,
+              text: message.text,
+              ...(message.html ? { html: message.html } : {}),
+              ...(message.replyTo ? { reply_to: [message.replyTo] } : {}),
+              ...(message.headers ? { headers: message.headers } : {}),
+            })),
+          ),
+        });
+      } catch (err) {
+        throw new UpstreamError("resend", err instanceof Error ? err.message : "network failure");
+      }
+      if (!res.ok) {
         const detail = await res.text().catch(() => "");
         throw new UpstreamError("resend", `${res.status} ${detail.slice(0, 300)}`);
       }

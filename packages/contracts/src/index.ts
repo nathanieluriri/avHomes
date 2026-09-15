@@ -14,3 +14,4 @@ export * from "./publish-check";
 export * from "./listing-rules";
 export * from "./site-health";
 export * from "./media";
+export * from "./email";

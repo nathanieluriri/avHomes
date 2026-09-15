@@ -147,6 +147,9 @@ const RULES: readonly Rule[] = [
   // The Customize studio's notes: saying what the site should say is the authority to write it.
   { prefix: "/api/admin/notes", domain: "content" },
   { prefix: "/api/admin/images", domain: "media" },
+  { prefix: "/api/admin/subscribers", domain: "content" },
+  { prefix: "/api/admin/newsletters", domain: "content" },
+  { prefix: "/api/admin/email-templates", domain: "content" },
   { prefix: "/api/admin/enquiries", domain: "enquiries" },
   { prefix: "/api/admin/dashboard", domain: "analytics" },
   /*

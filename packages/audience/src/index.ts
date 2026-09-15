@@ -8,9 +8,15 @@ import {
   newId,
   readJson,
   slugString,
+  requestOrigin,
   str,
+  trySend,
   type AppEnv,
+  type Mailer,
 } from "@avhomes/core";
+import { welcomeEmail } from "./admin";
+
+export { audienceAdminRoutes, unsubscribePublicRoutes, unsubscribe, unsubscribeLink } from "./admin";
 import { SUBSCRIBE_IP_LIMIT, SUBSCRIBE_WINDOW_MS, limit } from "@avhomes/identity";
 
 /**
@@ -83,7 +89,7 @@ function isDuplicateKey(error: unknown): boolean {
  * intake is not: that router's safety property is that a shared cache may store
  * its responses, and a response to a write must never be stored.
  */
-export function audiencePublicRoutes(): Hono<AppEnv> {
+export function audiencePublicRoutes(deps: { mailer?: Mailer } = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.post("/public/subscribe", async (c) => {
@@ -115,7 +121,7 @@ export function audiencePublicRoutes(): Hono<AppEnv> {
      * the address was offered again is worth having.
      */
     try {
-      await subscribers(db).updateOne(
+      const res = await subscribers(db).updateOne(
         { email: body.email },
         {
           $setOnInsert: {
@@ -136,6 +142,11 @@ export function audiencePublicRoutes(): Hono<AppEnv> {
         },
         { upsert: true },
       );
+      // Welcomed once, on the first yes; a repeat submission sends nothing.
+      if (res.upsertedCount > 0 && res.upsertedId && deps.mailer) {
+        const message = await welcomeEmail(db, requestOrigin(c.req), { _id: String(res.upsertedId), email: body.email });
+        await trySend(deps.mailer, message, { requestId: c.get("requestId"), route: "POST /public/subscribe" });
+      }
     } catch (error) {
       /*
        * Two upserts for one unseen address race, both miss, and the loser hits

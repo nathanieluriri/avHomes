@@ -30,6 +30,8 @@ export const COLLECTIONS = {
   tutorialProgress: "tutorial_progress",
   notifications: "notifications",
   quotaRequests: "quota_requests",
+  emailTemplates: "email_templates",
+  newsletters: "newsletters",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

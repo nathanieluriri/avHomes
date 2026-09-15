@@ -4,6 +4,7 @@ import {
   NotFoundError,
   databaseConfig,
   getEnv,
+  requestOrigin,
   resendMailer,
   toResponse,
   type AppEnv,
@@ -30,10 +31,10 @@ import {
   type StoragePort,
 } from "@avhomes/media";
 import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
-import { settingsPublicRoutes, settingsRoutes } from "@avhomes/settings";
+import { emailTemplateRoutes, settingsPublicRoutes, settingsRoutes } from "@avhomes/settings";
 import { feedbackRoutes } from "@avhomes/feedback";
 import { analyticsPublicRoutes } from "@avhomes/analytics";
-import { audiencePublicRoutes } from "@avhomes/audience";
+import { audienceAdminRoutes, audiencePublicRoutes, unsubscribePublicRoutes } from "@avhomes/audience";
 import { dashboardRoutes } from "./dashboard";
 import { healthRoutes } from "./health";
 import { tutorialsRoutes } from "./tutorials";
@@ -260,7 +261,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * sessionMiddleware, where being cookieless is structural rather than a thing
    * the handler remembered.
    */
-  app.route(API_PREFIX, audiencePublicRoutes());
+  app.route(API_PREFIX, audiencePublicRoutes({ mailer }));
+  app.route(API_PREFIX, unsubscribePublicRoutes());
   app.route(API_PREFIX, settingsPublicRoutes());
 
   /* ═════════════════ 9. session, the domain gate, then the audit trail ═════════ */
@@ -310,6 +312,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    */
   app.route(API_PREFIX, enquiriesAdminRoutes({ mailer }));
   app.route(API_PREFIX, settingsRoutes());
+  app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin }));
+  app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
   app.route(API_PREFIX, notificationsRoutes());

@@ -25,6 +25,7 @@ import {
   type Tone,
 } from "@/components/admin/ui";
 import { StatusSelect } from "@/components/admin/StatusSelect";
+import { EmailBuyer } from "@/components/admin/EmailBuyer";
 
 /**
  * One enquiry, and the two things anyone does with it: read it, and say what
@@ -221,6 +222,8 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
                 )}
               </div>
             </Card>
+
+            <EmailBuyer enquiryId={enquiry.id} name={enquiry.name} email={enquiry.email} />
 
             {enquiry.propertySlug && (
               <Card>
