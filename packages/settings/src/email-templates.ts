@@ -456,3 +456,71 @@ export function emailTemplateRoutes(deps: {
 
   return routes;
 }
+
+/* ───────────────────────────── pasted HTML ────────────────────────────── */
+
+/**
+ * Makes a pasted email design safe to store and send while keeping its look.
+ *
+ * Tables, inline styles, images and links survive. Anything that runs code or
+ * collects input does not: scripts, frames, forms, event handler attributes and
+ * `javascript:` URLs. Mail clients strip most of these anyway; removing them here
+ * means the preview shows exactly what is sent.
+ */
+export function sanitizeEmailHtml(input: string): string {
+  let html = input;
+  html = html.replace(/<!--[\s\S]*?-->/gu, (c) => (/\[if |<!\[endif/iu.test(c) ? c : ""));
+  for (const tag of ["script", "iframe", "object", "embed", "form", "noscript", "template", "svg", "math"]) {
+    html = html.replace(new RegExp(`<${tag}\b[\s\S]*?<\/${tag}\s*>`, "giu"), "");
+    html = html.replace(new RegExp(`<\/?${tag}\b[^>]*>`, "giu"), "");
+  }
+  html = html.replace(/<(input|button|select|textarea|link|base|frame|frameset|applet)\b[^>]*>/giu, "");
+  html = html.replace(/<\/(button|select|textarea|frameset|applet)\s*>/giu, "");
+  html = html.replace(/<meta\b[^>]*http-equiv[^>]*>/giu, "");
+  html = html.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/giu, "");
+  html = html.replace(
+    /\s(href|src|action|formaction|background|poster)\s*=\s*("|')\s*(javascript|vbscript|data:text\/html)[^"']*\2/giu,
+    ' $1="#"',
+  );
+  html = html.replace(/expression\s*\(/giu, "(");
+  return html.trim();
+}
+
+/** A readable plain text copy of an HTML email, for the text/plain part. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<(style|head|title)\b[\s\S]*?<\/\1\s*>/giu, "")
+    .replace(/<a\b[^>]*href=("|')(.*?)\1[^>]*>([\s\S]*?)<\/a>/giu, (_, __, href: string, label: string) => `${label.replace(/<[^>]+>/gu, "").trim()} (${href})`)
+    .replace(/<(br|\/p|\/div|\/tr|\/h[1-6]|\/li)\b[^>]*>/giu, "\n")
+    .replace(/<[^>]+>/gu, "")
+    .replace(/&nbsp;/gu, " ")
+    .replace(/&amp;/gu, "&")
+    .replace(/&lt;/gu, "<")
+    .replace(/&gt;/gu, ">")
+    .replace(/&quot;/gu, '"')
+    .replace(/&#39;/gu, "'")
+    .replace(/[ \t]+/gu, " ")
+    .replace(/\n\s*\n\s*\n+/gu, "\n\n")
+    .trim();
+}
+
+/**
+ * A pasted design sent as its own document, with the unsubscribe link filled in
+ * where it asked for `{{unsubscribeLink}}`, or added as a footer when it did not:
+ * every newsletter must carry one.
+ */
+export function pastedNewsletterHtml(html: string, vars: { unsubscribeLink: string; preheader: string }): string {
+  const safe = sanitizeEmailHtml(html);
+  const link = escapeHtml(vars.unsubscribeLink);
+  const hasPlaceholder = /\{\{\s*unsubscribeLink\s*\}\}/u.test(safe);
+  let out = safe.replace(/\{\{\s*unsubscribeLink\s*\}\}/gu, link);
+  const footer = `<div style="text-align:center;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;color:#94a3b8;padding:16px">You are receiving this because you subscribed on the AV Homes site. <a href="${link}" style="color:#64748b">Unsubscribe</a></div>`;
+  const hidden = vars.preheader
+    ? `<span style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(vars.preheader)}</span>`
+    : "";
+  if (!/<body\b/iu.test(out)) {
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">${hidden}${out}${hasPlaceholder ? "" : footer}</body></html>`;
+  }
+  out = out.replace(/<body\b([^>]*)>/iu, `<body$1>${hidden}`);
+  return hasPlaceholder ? out : out.replace(/<\/body\s*>/iu, `${footer}</body>`);
+}

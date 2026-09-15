@@ -23,13 +23,23 @@ import {
 import {
   emptyDoc,
   validateDoc,
+  NEWSLETTER_FORMATS,
   type DocNode,
   type Newsletter,
+  type NewsletterFormat,
   type NewsletterStatus,
   type Subscriber,
 } from "@avhomes/contracts";
 import { requireAuth, tokenId } from "@avhomes/identity";
-import { docToEmailHtml, docToEmailText, readTemplate, renderWith } from "@avhomes/settings";
+import {
+  docToEmailHtml,
+  docToEmailText,
+  htmlToText,
+  pastedNewsletterHtml,
+  readTemplate,
+  renderWith,
+  sanitizeEmailHtml,
+} from "@avhomes/settings";
 
 /**
  * The subscriber list, one-click unsubscribe, and newsletters sent to it.
@@ -51,6 +61,8 @@ interface NewsletterDoc {
   subject: string;
   preheader: string;
   content: DocNode;
+  format?: NewsletterFormat;
+  html?: string;
   status: NewsletterStatus;
   sentAt: number | null;
   sentCount: number;
@@ -86,6 +98,8 @@ function toNewsletter(doc: NewsletterDoc): Newsletter {
     subject: doc.subject,
     preheader: doc.preheader,
     content: doc.content,
+    format: doc.format ?? "doc",
+    html: doc.html ?? "",
     status: doc.status,
     sentAt: doc.sentAt,
     sentCount: doc.sentCount,
@@ -130,9 +144,20 @@ export async function welcomeEmail(db: Db, origin: string, subscriber: { _id: st
 async function newsletterEmail(
   db: Db,
   origin: string,
-  letter: Pick<NewsletterDoc, "subject" | "preheader" | "content">,
+  letter: Pick<NewsletterDoc, "subject" | "preheader" | "content" | "format" | "html">,
   to: { id: string; email: string },
 ): Promise<MailMessage> {
+  if (letter.format === "html") {
+    const link = unsubscribeLink(origin, to.id);
+    const html = pastedNewsletterHtml(letter.html ?? "", { unsubscribeLink: link, preheader: letter.preheader });
+    return {
+      to: to.email,
+      subject: letter.subject.trim() || "AV Homes",
+      html,
+      text: `${htmlToText(html)}\n\nUnsubscribe: ${link}`,
+      headers: oneClickHeaders(origin, to.id),
+    };
+  }
   const wrapper = await readTemplate(db, "newsletter");
   const link = unsubscribeLink(origin, to.id);
   const rendered = renderWith(
@@ -166,7 +191,20 @@ const NewsletterBody = z
     subject: str().max(200).trim(),
     preheader: str().max(200).trim().default(""),
     content: z.unknown(),
+    format: z.enum(NEWSLETTER_FORMATS).default("doc"),
+    html: z.string().max(500_000).default(""),
     baseRevision: z.number().int().min(0),
+  })
+  .strict();
+
+/** A draft to render without saving it, so a preview can follow typing. */
+const PreviewBody = z
+  .object({
+    subject: str().max(200).default(""),
+    preheader: str().max(200).default(""),
+    content: z.unknown().optional(),
+    format: z.enum(NEWSLETTER_FORMATS).default("doc"),
+    html: z.string().max(500_000).default(""),
   })
   .strict();
 
@@ -267,6 +305,8 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       subject: "",
       preheader: "",
       content: emptyDoc(),
+      format: "doc",
+      html: "",
       status: "draft",
       sentAt: null,
       sentCount: 0,
@@ -296,7 +336,17 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const db = await currentDb(c);
     const after = await newsletters(db).findOneAndUpdate(
       { _id: id, revision: body.baseRevision, status: "draft" },
-      { $set: { subject: body.subject, preheader: body.preheader, content, updatedAt: Date.now() }, $inc: { revision: 1 } },
+      {
+        $set: {
+          subject: body.subject,
+          preheader: body.preheader,
+          content,
+          format: body.format,
+          html: sanitizeEmailHtml(body.html),
+          updatedAt: Date.now(),
+        },
+        $inc: { revision: 1 },
+      },
       { returnDocument: "after" },
     );
     if (!after) {
@@ -322,9 +372,10 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
   routes.post("/admin/newsletters/:id/preview", requireAuth(), async (c) => {
     const id = pathParam(c, "id");
     const db = await currentDb(c);
-    const doc = await newsletters(db).findOne({ _id: id });
-    if (!doc) throw new NotFoundError(`newsletter ${id}`);
-    const email = await newsletterEmail(db, requestOrigin(c.req), doc, { id: "preview", email: "" });
+    if (!(await newsletters(db).findOne({ _id: id }, { projection: { _id: 1 } }))) throw new NotFoundError(`newsletter ${id}`);
+    const draft = await readJson(c, PreviewBody);
+    const content = draft.content === undefined ? emptyDoc() : validateDoc(draft.content);
+    const email = await newsletterEmail(db, requestOrigin(c.req), { ...draft, content }, { id: "preview", email: "" });
     return c.json({ email: { subject: email.subject, html: email.html, text: email.text } });
   });
 
@@ -344,6 +395,9 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const doc = await newsletters(db).findOne({ _id: id });
     if (!doc) throw new NotFoundError(`newsletter ${id}`);
     if (doc.subject.trim() === "") throw new BadRequestError("Give the newsletter a subject before sending it.");
+    if ((doc.format ?? "doc") === "html" && (doc.html ?? "").trim() === "") {
+      throw new BadRequestError("Paste the HTML design before sending it.");
+    }
 
     if (body.mode === "test") {
       const message = await newsletterEmail(db, origin, doc, { id: "test", email: user.email });

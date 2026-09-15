@@ -116,6 +116,10 @@ export interface Subscriber {
   unsubscribedAt: number | null;
 }
 
+export const NEWSLETTER_FORMATS = ["doc", "html"] as const;
+/** `doc` is written in the console editor; `html` is a pasted design sent as-is (after cleaning). */
+export type NewsletterFormat = (typeof NEWSLETTER_FORMATS)[number];
+
 export const NEWSLETTER_STATUSES = ["draft", "sending", "sent"] as const;
 export type NewsletterStatus = (typeof NEWSLETTER_STATUSES)[number];
 
@@ -125,6 +129,9 @@ export interface Newsletter {
   /** The inbox preview line under the subject. */
   preheader: string;
   content: DocNode;
+  format: NewsletterFormat;
+  /** The pasted design, cleaned. Empty for an editor newsletter. */
+  html: string;
   status: NewsletterStatus;
   sentAt: number | null;
   sentCount: number;

@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useEffectEvent, useState } from "react";
-import { Building2, Eye } from "lucide-react";
+import { Building2 } from "lucide-react";
 import {
   BUILD_STAGES,
   BUILD_STAGE_LABELS,
@@ -89,7 +89,7 @@ import {
   inputClass,
 } from "@/components/admin/ui";
 import { StatusSelect } from "@/components/admin/StatusSelect";
-import type { Tone } from "@/components/admin/ui";
+import { Switch, type Tone } from "@/components/admin/ui";
 
 /**
  * The listing editor.
@@ -785,10 +785,12 @@ function PropertyEditor({ initial }: { initial: Property }) {
             : "No web address yet. It is made from the title when you publish, unless you set one under Search engine listing."
         }
         actions={
-          <Button variant="ghost" size="lg" onClick={() => setPreviewOpen(true)}>
-            <Eye className="h-4 w-4" aria-hidden="true" />
-            Preview
-          </Button>
+          <Switch
+            checked={previewOpen}
+            onChange={setPreviewOpen}
+            label="Preview"
+            description="See it as the site shows it"
+          />
         }
         /* NO SAVE IN THE HEADER. Saving belongs to the bar, which appears the
            moment there is anything to save and follows the work down the page.
