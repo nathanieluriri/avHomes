@@ -189,7 +189,7 @@ function HeroReady({ me }: { me: MeResponse }) {
       <div className="mt-3 flex items-center gap-3">
         <Avatar text={initials(marketer.displayName, marketer.code)} className="h-11 w-11" />
         <div className="min-w-0">
-          <p className="text-[13px] leading-tight text-white/75">{greeting()}</p>
+          <p className="text-[13px] leading-tight text-white/88">{greeting()}</p>
           <p className="mt-0.5 truncate text-[19px] font-bold leading-tight tracking-[-0.015em]">
             {first}
           </p>

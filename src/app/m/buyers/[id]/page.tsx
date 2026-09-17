@@ -22,6 +22,7 @@ import { LeadTimeline } from "@/components/marketer/buyers/LeadBits";
 import { IconHandshake } from "@/components/marketer/icons3d";
 import {
   Button,
+  ButtonLink,
   Card,
   ErrorNote,
   Field,
@@ -77,13 +78,15 @@ export default function BuyerPage() {
             {data.state === "won" && data.myShareMinor > 0 && <Paid lead={data} />}
 
             <div className="mb-4 flex gap-2">
-              <a
+              <ButtonLink
                 href={`tel:${data.buyerPhone}`}
-                className="m-btn m-btn--secondary m-tap flex-1 px-4 py-3 text-[15px]"
+                external
+                variant="secondary"
+                className="flex-1"
               >
                 <Phone className="h-4 w-4" aria-hidden />
                 Call them
-              </a>
+              </ButtonLink>
               {open && (
                 <Button variant="secondary" className="flex-1" onClick={() => setNoting(true)}>
                   <MessageSquarePlus className="h-4 w-4" aria-hidden />
@@ -133,7 +136,7 @@ function HeroState({ lead }: { lead: LeadRow }) {
       <span className="m-glass inline-flex rounded-full px-3.5 py-1.5 text-[13px] font-semibold">
         {LEAD_STATE_LABEL[lead.state]}
       </span>
-      <p className="mt-2.5 max-w-[20rem] text-[13.5px] leading-relaxed text-white/75">
+      <p className="mt-2.5 max-w-[20rem] text-[13.5px] leading-relaxed text-white/88">
         {LEAD_STATE_HINT[lead.state]}
       </p>
     </div>
@@ -165,10 +168,9 @@ function LoggedBurst({ name }: { name: string }) {
   if (!shown) return null;
 
   return (
-    <Sheet open onClose={() => setShown(false)} title="" >
+    <Sheet open onClose={() => setShown(false)} title={`${name} is with us`}>
       <div className="px-6 pb-4 text-center">
         <SuccessBurst label="Buyer sent to AV Homes" />
-        <p className="-mt-4 text-[20px] font-bold text-m-text">{name} is with us</p>
         <p className="mx-auto mt-2 max-w-[18rem] text-[14px] leading-relaxed text-m-muted">
           We will call them and you will see every step on this screen, with the reason for it.
         </p>

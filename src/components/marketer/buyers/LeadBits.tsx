@@ -52,21 +52,26 @@ export function LeadState({ state, showTrack = true }: { state: LeadState; showT
 
   return (
     <div className="flex items-center gap-2">
+      {/* The track comes FIRST and every pip is the same width, so the tracks
+          line up down the list. Sitting after a variable-width chip they
+          started at four different x positions, which is fatal for the one
+          thing a marketer scans this list for. */}
+      {showTrack && (
+        <span aria-hidden className="flex w-[3.25rem] shrink-0 items-center gap-1">
+          {open &&
+            [1, 2, 3, 4, 5].map((step) => (
+              <span
+                key={step}
+                className={`h-1 flex-1 rounded-full ${
+                  step <= STEP[state] ? "bg-(color:--m-link)" : "bg-m-line"
+                }`}
+              />
+            ))}
+        </span>
+      )}
       <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${tone}`}>
         {LEAD_STATE_LABEL[state]}
       </span>
-      {showTrack && open && (
-        <span aria-hidden className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((step) => (
-            <span
-              key={step}
-              className={`h-1 rounded-full transition-all ${
-                step <= STEP[state] ? "w-4 bg-(color:--m-link)" : "w-2 bg-m-line"
-              }`}
-            />
-          ))}
-        </span>
-      )}
     </div>
   );
 }
@@ -77,7 +82,10 @@ export function LeadRowLink({ lead }: { lead: LeadRow }) {
       href={`/m/buyers/${lead.id}`}
       className="m-press-light flex items-start gap-3 px-4 py-3.5 text-left"
     >
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-m-raised text-[15px] font-bold text-m-text">
+      <span
+        aria-hidden
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-m-raised text-[15px] font-bold text-m-text"
+      >
         {lead.buyerName.trim().charAt(0).toUpperCase() || "?"}
       </span>
 

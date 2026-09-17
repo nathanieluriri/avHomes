@@ -903,7 +903,11 @@ function marketingApi(S) {
 
   /** Ledger lines and real payouts merged, newest first, as `statementFor` does. */
   function statementOf(id) {
-    const word = { earned: "Waiting", scheduled: "On the way", paid: "Paid", void: "Cancelled" };
+    const state = { earned: "waiting", scheduled: "sending", paid: "settled", void: "cancelled" };
+    const word = { waiting: "Waiting", sending: "On the way", settled: "Paid", cancelled: "Cancelled" };
+    const pays = payHistoryOf(id);
+    const monthOfRun = new Map(pays.map((p) => [p.payRunId, payMonthLabel(p.month)]));
+    const paidRuns = new Set(pays.filter((p) => p.status === "paid").map((p) => p.payRunId));
     const rows = ledgerOf(id, 400).map((l) => ({
       id: l.id,
       at: l.createdAt,
@@ -911,14 +915,16 @@ function marketingApi(S) {
       currency: l.currency,
       kind: l.kind === "clawback" ? "clawback" : l.kind === "adjust" ? "adjustment" : "earning",
       title: l.dealTitle || (l.kind === "adjust" ? "Adjustment" : "Commission"),
-      status: word[l.status] || l.status,
+      state: state[l.status],
+      status: word[state[l.status]],
       reference: l.id,
       dealId: l.dealId || null,
       payRunId: l.payRunId || null,
       bankLabel: "",
+      carriedBy: l.payRunId && paidRuns.has(l.payRunId) ? (monthOfRun.get(l.payRunId) || "") : "",
       note: l.note || "",
     }));
-    for (const pay of payHistoryOf(id)) {
+    for (const pay of pays) {
       if (pay.status !== "paid" || !pay.paidAt) continue;
       rows.push({
         id: `${pay.payRunId}:${id}`,
@@ -927,11 +933,13 @@ function marketingApi(S) {
         currency: pay.currency,
         kind: "payout",
         title: `${payMonthLabel(pay.month)} payout`,
+        state: "settled",
         status: "Paid",
         reference: pay.reference,
         dealId: null,
         payRunId: pay.payRunId,
         bankLabel: pay.bankLabel,
+        carriedBy: "",
         note: "",
       });
     }

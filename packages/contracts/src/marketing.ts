@@ -784,11 +784,31 @@ export function leadWantLine(lead: Lead): string {
 export const TX_KINDS = ["earning", "payout", "clawback", "adjustment"] as const;
 export type TxKind = (typeof TX_KINDS)[number];
 
+/* Short on purpose. The row already says Money In or Money Out beside this and
+   carries a settlement chip under it, and at 360px the longer wording truncated
+   mid-word on most rows. */
 export const TX_KIND_LABEL: Record<TxKind, string> = {
-  earning: "Commission earned",
+  earning: "Commission",
   payout: "Paid to your bank",
   clawback: "Taken back",
   adjustment: "Adjustment",
+};
+
+/**
+ * Whether the money in a row is real yet.
+ *
+ * Machine readable, because three of these rows look identical if only the
+ * amount is drawn, and one of them is money the marketer will never receive.
+ * The words shown come from TX_STATE_LABEL; a screen must not switch on them.
+ */
+export const TX_STATES = ["waiting", "sending", "settled", "cancelled"] as const;
+export type TxState = (typeof TX_STATES)[number];
+
+export const TX_STATE_LABEL: Record<TxState, string> = {
+  waiting: "Waiting",
+  sending: "On the way",
+  settled: "Paid",
+  cancelled: "Cancelled",
 };
 
 export interface Transaction {
@@ -800,19 +820,37 @@ export interface Transaction {
   kind: TxKind;
   /** The deal, or the month of the pay run. */
   title: string;
-  /** Plain words: "Waiting", "On the way", "Paid", "Held". */
+  /** Has this money actually arrived, or is it a promise, or is it off? */
+  state: TxState;
+  /** Plain words for `state`. Never switched on. */
   status: string;
   reference: string;
   dealId: string | null;
   payRunId: string | null;
   /** "Wema Bank 4493", for a payout. Empty otherwise. */
   bankLabel: string;
+  /**
+   * For an earning already carried by a payout: that payout in words, such as
+   * "August 2026". This is the line that stops a statement reading as being
+   * paid twice, so it is data rather than something a screen infers.
+   */
+  carriedBy: string;
   note: string;
 }
 
 /** Money In is everything arriving; Money Out is what was taken back. */
 export type TxDirection = "in" | "out";
 
-export function txDirection(tx: { amountMinor: number }): TxDirection {
+/**
+ * Which way a row points, or null when it points nowhere.
+ *
+ * A cancelled line is the null case and that is the whole reason this function
+ * exists. It still carries a positive amount, because it is the record of a
+ * commission that WAS awarded, so reading the sign alone puts it under Money In
+ * beside real earnings and tells the marketer they have money they do not have.
+ * Nothing was taken back either, so it is not Money Out. It is neither.
+ */
+export function txDirection(tx: { amountMinor: number; state: TxState }): TxDirection | null {
+  if (tx.state === "cancelled") return null;
   return tx.amountMinor < 0 ? "out" : "in";
 }

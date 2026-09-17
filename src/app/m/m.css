@@ -53,7 +53,11 @@
 
   --m-sheet: #1f1216;
   --m-track: #0e0709;
-  --m-thumb: #36232a;
+  /* The selected segment has to be visible as a shape, not only as slightly
+     brighter text. At #36232a it cleared 1.36:1 against the track, which reads
+     as "nothing is selected"; this clears 3.06:1, the bar for a UI component's
+     boundary, and still takes white at 6.5:1. */
+  --m-thumb: #7d5161;
   --m-press: #2e1c22;
   --m-skel: rgb(255 255 255 / 0.06);
   --m-skel-hi: rgb(255 255 255 / 0.07);
@@ -165,8 +169,20 @@ html:has(.m-app) > body {
     --m-lift: var(--m-tab-h);
   }
 
+  /* The orb stands 1.63rem out of the bar (31% of 5.25rem) and carries a 5px
+     socket ring on top of that, so 2rem left about five device pixels between
+     it and the last card. Descenders on the final line of text were touching
+     the glass. */
   .m-shell--nav {
-    --m-reserve: calc(var(--m-bar-h) + var(--safe-b) + 2rem);
+    --m-reserve: calc(var(--m-bar-h) + var(--safe-b) + 3.25rem);
+  }
+
+  /* A form's pinned controls cover the foot of the body exactly like the nav
+     does, and nothing was reserving for them: the last card on a long form was
+     sliced in half and could not be scrolled into view at all. The bar is
+     0.75rem + a 44px control + 0.75rem, plus a gap. */
+  .m-shell--bar {
+    --m-reserve: calc(5.5rem + var(--safe-b));
   }
 
   /* ═══ HERO ═══════════════════════════════════════════════════════════════

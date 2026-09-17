@@ -297,7 +297,9 @@ export function AppShell({
   };
 
   const hasTab = tab !== undefined && tab !== null && tab !== false;
-  const shell = `m-shell ${hasTab ? "m-shell--tab" : ""} ${nav ? "m-shell--nav" : ""}`;
+  const shell = `m-shell ${hasTab ? "m-shell--tab" : ""} ${nav ? "m-shell--nav" : ""} ${
+    bottomBar ? "m-shell--bar" : ""
+  }`;
   const home = variant === "home";
   const toDo = alertCount ?? me.data?.alertCount ?? 0;
 
@@ -342,7 +344,7 @@ export function AppShell({
                   {title}
                 </h1>
                 {hint && (
-                  <p className="mt-1.5 max-w-[24rem] text-[14px] leading-relaxed text-white/75">
+                  <p className="mt-1.5 max-w-[24rem] text-[14px] leading-relaxed text-white/88">
                     {hint}
                   </p>
                 )}
@@ -432,7 +434,7 @@ export function AuthShell({
           <Lockup size="tall" />
           <h1 className="mt-7 text-[28px] font-bold leading-tight tracking-[-0.02em]">{title}</h1>
           {hint && (
-            <p className="mt-2 max-w-[22rem] text-[14px] leading-relaxed text-white/75">{hint}</p>
+            <p className="mt-2 max-w-[22rem] text-[14px] leading-relaxed text-white/88">{hint}</p>
           )}
         </header>
         <main className="m-body m-paper px-4 pt-6">{children}</main>

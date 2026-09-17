@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { CalendarRange, Search, X } from "lucide-react";
-import { formatMoney, type Transaction } from "@avhomes/contracts";
+import { formatMoney, txDirection, type Transaction } from "@avhomes/contracts";
 import { AppShell } from "@/components/marketer/AppShell";
+import { EyeButton } from "@/components/marketer/money/Amount";
 import { DateRangeSheet, NO_RANGE, rangeLabel, type DateRange } from "@/components/marketer/DateRangeSheet";
 import { IconMoney } from "@/components/marketer/icons3d";
 import { ReceiptSheet } from "@/components/marketer/money/ReceiptSheet";
@@ -17,7 +18,7 @@ import {
 } from "@/components/marketer/ui";
 import { api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
-import type { StatementResponse } from "@/lib/marketer/api";
+import { nowMs, type StatementResponse } from "@/lib/marketer/api";
 
 /**
  * Every naira that moved, in one list.
@@ -47,6 +48,7 @@ export default function HistoryPage() {
     [],
   );
 
+  const [today] = useState(() => nowMs());
   const [term, setTerm] = useState("");
   const [direction, setDirection] = useState<Direction>("all");
   const [range, setRange] = useState<DateRange>(NO_RANGE);
@@ -58,8 +60,12 @@ export default function HistoryPage() {
   const shown = useMemo(() => {
     const needle = term.trim().toLowerCase();
     return all.filter((tx) => {
-      if (direction === "in" && tx.amountMinor < 0) return false;
-      if (direction === "out" && tx.amountMinor >= 0) return false;
+      /* A cancelled line still carries a positive amount, because it records a
+         commission that WAS awarded. Filtering on the sign alone files it under
+         Money In beside real earnings, which is the lie this screen must not
+         tell. It belongs to neither direction. */
+      const way = txDirection(tx);
+      if (direction !== "all" && way !== direction) return false;
       if (range.from !== null && tx.at < range.from) return false;
       if (range.to !== null && tx.at > range.to) return false;
       if (needle === "") return true;
@@ -79,7 +85,16 @@ export default function HistoryPage() {
   const filtered = term.trim() !== "" || direction !== "all" || range.from !== null || range.to !== null;
 
   return (
-    <AppShell title="Transaction history" hint="Every naira that moved." back="/m/money" tab="Your statement">
+    <AppShell
+      title="Transaction history"
+      hint="Every naira that moved."
+      back="/m/money"
+      tab="Your statement"
+      /* The eye belongs on every screen that draws money. Without it, a reader
+         who hid their amounts elsewhere has to leave, toggle, and come back
+         just to read their own receipt. */
+      action={<EyeButton onWine />}
+    >
       <div className="px-4">
         <div className="flex gap-2">
           <div className="relative min-w-0 flex-1">
@@ -185,7 +200,7 @@ export default function HistoryPage() {
             <div className="space-y-5">
               {days.map(([day, rows]) => (
                 <div key={day}>
-                  <SectionLabel>{dayHeading(rows[0]!.at)}</SectionLabel>
+                  <SectionLabel>{dayHeading(rows[0]!.at, today)}</SectionLabel>
                   <RowGroup className="mt-2">
                     {rows.map((tx) => (
                       <TxRow key={tx.id} tx={tx} onOpen={setOpen} />

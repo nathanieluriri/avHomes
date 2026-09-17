@@ -142,24 +142,34 @@ function Timeline({ lead }: { lead: Lead }) {
 }
 
 function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
-  const [to, setTo] = useState<LeadState>(nextFor(lead.state));
+  /* "" is "no move picked". A finished lead opens on it deliberately: seeding
+     the select from the pipeline order would leave a completed sale showing
+     "Move to: We called them" with the clawback warning already up, one tap
+     from reversing a deal nobody asked to reverse. */
+  const [to, setTo] = useState<LeadState | "">(lead.state === "won" ? "" : nextFor(lead.state));
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [amount, setAmount] = useState("");
+  /* Which rate table pays out. Seeded from what the marketer said the buyer
+     wanted, but shown and changeable, because that value arrived from a phone
+     and nothing has checked it against the real listing. */
+  const [kind, setKind] = useState<DealKind>(lead.wantKind ?? "sale");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
   const winning = to === "won";
+  const picked = to !== "";
   const parsed = winning && amount.trim() !== "" ? parseMajor(amount, lead.currency) : null;
   const amountMinor = parsed?.ok ? parsed.minor : 0;
   const moneyBad = parsed && !parsed.ok ? moneyRefusalMessage(parsed.reason, lead.currency) : null;
-  const ready =
+  const ready: boolean =
+    picked &&
     reason !== "" &&
     note.trim().length >= LEAD_NOTE_MIN &&
     (!winning || (amountMinor > 0 && lead.listingId !== null));
 
   async function move() {
-    if (!ready) return;
+    if (to === "" || !ready) return;
     setBusy(true);
     setError(null);
     try {
@@ -167,7 +177,7 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
         await api.post(`/admin/marketing/leads/${lead.id}/convert`, {
           listingId: lead.listingId,
           listingTitle: lead.listingTitle,
-          listingType: (lead.wantKind ?? "sale") as DealKind,
+          listingType: kind,
           amountMinor,
           reason,
           note: note.trim(),
@@ -230,11 +240,12 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
             <select
               value={to}
               onChange={(event) => {
-                setTo(event.target.value as LeadState);
+                setTo(event.target.value as LeadState | "");
                 setReason("");
               }}
               className={inputClass}
             >
+              <option value="">Pick a move</option>
               {LEAD_STATES.filter((state) => state !== lead.state).map((state) => (
                 <option key={state} value={state}>
                   {LEAD_STATE_LABEL[state]}
@@ -243,10 +254,29 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
             </select>
           </Field>
 
-          <p className="text-[12px] text-slate-600">{LEAD_STATE_HINT[to]}</p>
+          {picked && <p className="text-[12px] text-slate-600">{LEAD_STATE_HINT[to]}</p>}
 
           {winning && (
             <>
+              <Field label="Sale or rent" as="group">
+                <div className="flex gap-1.5">
+                  {(["sale", "rent"] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setKind(option)}
+                      aria-pressed={kind === option}
+                      className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition ${
+                        kind === option
+                          ? "bg-wine-700 text-white"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      {option === "sale" ? "Sale" : "Rent"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
               <Field
                 label="What did it sell for?"
                 hint={
@@ -278,9 +308,9 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
             </p>
           )}
 
-          <Field label="Why">
+          <Field label="Why" as="group">
             <div className="flex flex-wrap gap-1.5">
-              {(LEAD_REASONS[to] ?? []).map((option) => (
+              {(to === "" ? [] : (LEAD_REASONS[to] ?? [])).map((option: string) => (
                 <button
                   key={option}
                   type="button"
@@ -316,7 +346,9 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
               ? "Saving..."
               : winning
                 ? "Mark as bought, and pay the marketer"
-                : `Move to ${LEAD_STATE_LABEL[to]}`}
+                : picked
+                  ? `Move to ${LEAD_STATE_LABEL[to]}`
+                  : "Pick a move first"}
           </Button>
         </div>
       </Card>

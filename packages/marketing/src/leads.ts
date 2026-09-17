@@ -273,6 +273,17 @@ export async function winLead(
       detail: "What did it sell for? The commission is worked out from it.",
     });
   }
+  /* A lead with no property attached has nothing to sell, and the money side
+     needs a real listing id: an empty one would take the single ("", "") slot
+     in the deals uniqueness index and refuse the next listing-less deal on the
+     site with a message about somebody else's claim. The console already
+     refuses this; so does the server, because the console is not the only
+     caller a route has. */
+  if (input.listingId.trim() === "") {
+    throw new PreconditionFailedError("listing_required", {
+      detail: "Attach the property that was sold before marking this bought.",
+    });
+  }
 
   const deal = await createDeal(
     db,
@@ -296,21 +307,36 @@ export async function winLead(
     settings,
   );
 
-  /* Approve it straight away. If the listing is already settled by somebody
-     else the unique index refuses here, and the lead is left exactly where it
-     was: no half-won state, and the admin sees which claim already won. */
-  await reviewDeal(
-    db,
-    deal.id,
-    {
-      status: "approved",
-      reason: input.reason,
-      amountMinor: input.amountMinor,
-      actorId: actor.id,
-      actorName: actor.name,
-    },
-    settings,
-  );
+  /*
+   * Approve it straight away, and CLEAN UP IF THAT FAILS.
+   *
+   * The commonest failure here is the deals uniqueness index refusing because
+   * another marketer is already approved on this listing, which is exactly the
+   * rule we want. But `createDeal` has already inserted a `pending` row by this
+   * point, and a pending row is not inert: it sits in the console's review
+   * queue forever, it adds the whole sale price to the reporter's "pending"
+   * figure on their phone, and an admin can approve it by hand later, minting
+   * commission for a lead that was never won and that no reversal can reach.
+   *
+   * So the deal only outlives this function if it was actually approved.
+   */
+  try {
+    await reviewDeal(
+      db,
+      deal.id,
+      {
+        status: "approved",
+        reason: input.reason,
+        amountMinor: input.amountMinor,
+        actorId: actor.id,
+        actorName: actor.name,
+      },
+      settings,
+    );
+  } catch (err) {
+    await dropUnapprovedDeal(db, deal.id);
+    throw err;
+  }
 
   const lead = await append(
     db,
@@ -321,6 +347,28 @@ export async function winLead(
     { dealId: deal.id },
   );
   return { lead, dealId: deal.id };
+}
+
+/**
+ * Remove a deal this function minted and could not approve.
+ *
+ * Narrow on purpose: it only ever deletes a row that is still `pending` and
+ * still carries no shares, which is the exact state `createDeal` leaves behind
+ * and nothing else in the system produces at this point. A deal that somehow
+ * reached any other state is left alone and reported, because deleting money
+ * somebody may have acted on is worse than an orphan.
+ */
+async function dropUnapprovedDeal(db: Db, dealId: string): Promise<void> {
+  try {
+    await collection<DealDoc>(db, COLLECTIONS.marketingDeals).deleteOne({
+      _id: dealId,
+      status: "pending",
+      shares: { $size: 0 },
+    });
+  } catch {
+    // The original failure is the one worth reporting; losing it to a cleanup
+    // error would hide why the conversion was refused.
+  }
 }
 
 /**
@@ -348,12 +396,31 @@ async function append(
     note: detail.note.trim(),
   };
 
+  /*
+   * COMPARE AND SET on the state we read, not a blind write.
+   *
+   * Every caller reads the lead, decides, then lands here, and two admins
+   * working the same queue will do that at the same time sooner or later. A
+   * filter of `{_id}` alone lets both writes through, and the timeline ends up
+   * claiming the lead went `new -> viewed` while it was already `contacted`:
+   * one admin's decision is silently gone and the chain of events no longer
+   * joins up, which is the one thing both surfaces read it for.
+   *
+   * `resubmitDeal` already settles this the same way, so this is the house
+   * rule rather than a new idea.
+   */
   const after = await leads(db).findOneAndUpdate(
-    { _id: doc._id },
+    { _id: doc._id, state: doc.state },
     { $set: { state: to, updatedAt: now, ...extra }, $push: { events: event } },
     { returnDocument: "after" },
   );
-  return toLead(after as LeadDoc);
+
+  if (!after) {
+    throw new PreconditionFailedError("lead_moved", {
+      detail: "Somebody else moved this buyer while you were writing. Open it again.",
+    });
+  }
+  return toLead(after);
 }
 
 /**

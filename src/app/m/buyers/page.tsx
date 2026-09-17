@@ -31,9 +31,9 @@ import type { LeadsResponse } from "@/lib/marketer/api";
 type Scope = "open" | "bought" | "closed";
 
 const SCOPES = [
-  { value: "open" as const, label: "Open" },
-  { value: "bought" as const, label: "Bought" },
-  { value: "closed" as const, label: "Closed" },
+  { value: "open" as const, label: "Open", tab: "Still going" },
+  { value: "bought" as const, label: "Bought", tab: "They bought" },
+  { value: "closed" as const, label: "Closed", tab: "Closed" },
 ];
 
 export default function BuyersPage() {
@@ -49,9 +49,12 @@ export default function BuyersPage() {
       hint="People you sent us. Tap one to see where it has got to."
       back="/m"
       action={<LogAction />}
+      /* The noun follows the segment. "Potential buyers 1" over a list filtered
+         to Bought said two different things at once, and the number moved
+         silently as the reader switched. */
       tab={
         <>
-          Potential buyers
+          {SCOPES.find((option) => option.value === scope)?.tab}
           {items.length > 0 && (
             <Chip tone="neutral" className="m-num">
               {items.length}

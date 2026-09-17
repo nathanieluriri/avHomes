@@ -4,9 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { Check, ChevronDown, Copy } from "lucide-react";
 import { TX_KIND_LABEL, type Transaction } from "@avhomes/contracts";
+import { nowMs } from "@/lib/marketer/api";
+import { EyeButton } from "./Amount";
 import { Sheet } from "../Sheet";
 import { SuccessBurst } from "../SuccessBurst";
 import { DirectedAmount } from "./Amount";
+
+/** How recently a payout has to have landed for the burst to still mean something. */
+const FRESH_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
  * The receipt for one money event.
@@ -28,7 +33,13 @@ export function ReceiptSheet({
   onClose: () => void;
 }) {
   const [more, setMore] = useState(false);
-  const landed = tx !== null && tx.kind === "payout" && tx.status === "Paid";
+  const [opened] = useState(() => nowMs());
+  /* The burst is for the moment money lands, not for looking one up. Firing it
+     every time somebody opens July's receipt in November to check a figure
+     turns a celebration into wallpaper, so it only runs for a payout that
+     arrived in the last few days. */
+  const landed =
+    tx !== null && tx.kind === "payout" && tx.state === "settled" && opened - tx.at < FRESH_MS;
 
   return (
     <Sheet open={tx !== null} onClose={onClose} title={tx ? "Receipt" : ""}>
@@ -43,10 +54,30 @@ export function ReceiptSheet({
             <p className={landed ? "-mt-6 text-[13px] text-m-muted" : "text-[13px] text-m-muted"}>
               {TX_KIND_LABEL[tx.kind]}
             </p>
-            <p className="mt-1 text-[30px] font-bold leading-tight">
-              <DirectedAmount minor={tx.amountMinor} currency={tx.currency} size="lg" />
+            {/* Kobo, unrounded. The list rounds to the naira so it scans; a
+                receipt that prints a number which is not the amount is not a
+                receipt, and commission lands on odd kobo routinely. */}
+            <p className="mt-1 flex items-center justify-center gap-1 text-[30px] font-bold leading-tight">
+              <DirectedAmount
+                minor={tx.amountMinor}
+                currency={tx.currency}
+                size="lg"
+                kobo
+                plain={tx.state === "cancelled"}
+              />
+              <EyeButton />
             </p>
             <p className="mt-1 text-[15px] text-m-text">{tx.title}</p>
+            {tx.state === "cancelled" && (
+              <p className="mx-auto mt-2 max-w-[18rem] text-[13.5px] leading-relaxed text-m-muted">
+                This deal was cancelled, so the commission was never paid.
+              </p>
+            )}
+            {tx.carriedBy !== "" && (
+              <p className="mt-2 text-[13.5px] text-m-muted">
+                Paid to you in the {tx.carriedBy} payout
+              </p>
+            )}
           </div>
 
           <dl className="mt-6 space-y-0 rounded-[18px] bg-m-raised px-4">
@@ -58,8 +89,9 @@ export function ReceiptSheet({
                 day: "numeric",
                 month: "long",
                 year: "numeric",
-                hour: "numeric",
+                hour: "2-digit",
                 minute: "2-digit",
+                hour12: false,
               })}
             />
             {tx.bankLabel !== "" && <Line label="Sent to" value={tx.bankLabel} />}
@@ -81,8 +113,10 @@ export function ReceiptSheet({
 
           {more && (
             <dl className="mt-1 space-y-0 rounded-[18px] bg-m-raised px-4">
-              {tx.reference !== "" && <Copyable label="Reference" value={tx.reference} />}
-              <Copyable label="Transaction ID" value={tx.id} />
+              {/* One id, not three. On an earning the reference IS the line id,
+                  and showing it twice under two names leaves a reader on a
+                  support call guessing which one was asked for. */}
+              <Copyable label="Reference" value={tx.reference || tx.id} />
               {tx.payRunId && <Copyable label="Pay run" value={tx.payRunId} />}
               {tx.dealId && <Copyable label="Deal" value={tx.dealId} />}
             </dl>
@@ -97,12 +131,12 @@ export function ReceiptSheet({
                 Open the deal
               </Link>
             )}
-            {tx.payRunId && tx.kind === "payout" && (
+            {tx.payRunId && (
               <Link
                 href={`/m/money/${tx.payRunId}`}
                 className="m-btn m-btn--secondary m-tap flex-1 px-4 py-3 text-[15px]"
               >
-                Payment details
+                {tx.kind === "payout" ? "Payment details" : "See the payout"}
               </Link>
             )}
           </div>

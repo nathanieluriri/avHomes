@@ -21,6 +21,7 @@ import {
   newId,
 } from "@avhomes/core";
 import {
+  TX_STATE_LABEL,
   formatMoney,
   marketerCode,
   payMonth,
@@ -47,6 +48,7 @@ import {
   type PayRun,
   type TeamMember,
   type Transaction,
+  type TxState,
 } from "@avhomes/contracts";
 import {
   toDeal,
@@ -721,12 +723,56 @@ export async function cancelDeal(
   actor: { id: string; name: string },
 ): Promise<Deal> {
   const now = Date.now();
-  const doc = await deals(db).findOne({ _id: id });
+
+  /*
+   * CANCELLING TWICE MUST NOT CHARGE TWICE.
+   *
+   * The paid branch below writes a NEW negative line and leaves the paid line
+   * exactly as it was, which is correct: a paid line is history. But it means
+   * running this function again finds the same paid line and writes a second
+   * clawback, so a marketer is docked twice for one commission. There are three
+   * real ways to arrive here twice, and none of them is exotic: an admin
+   * cancels a deal and then reverses the lead that minted it, two admins
+   * reverse the same won lead at once, or somebody retries after a timeout.
+   *
+   * The claim on the deal row is what makes this safe. Only the caller that
+   * moves it out of `cancelled` does the work; anybody else gets the already
+   * cancelled deal back and writes nothing.
+   */
+  const claimed = await deals(db).findOneAndUpdate(
+    { _id: id, status: { $ne: "cancelled" } },
+    {
+      $set: {
+        status: "cancelled",
+        reason,
+        reviewedBy: actor.id,
+        reviewedByName: actor.name,
+        reviewedAt: now,
+        updatedAt: now,
+      },
+    },
+    { returnDocument: "after" },
+  );
+
+  /*
+   * A caller that did NOT win the claim still walks the ledger below.
+   *
+   * Returning early here would be the other half of the same bug: if the first
+   * caller marked the deal cancelled and then died before finishing the ledger,
+   * the money would never come back and every retry would no-op. The loop is
+   * safe to repeat because each branch checks its own work first, so re-running
+   * it is how a half-finished cancel completes.
+   */
+  const doc = claimed ?? (await deals(db).findOne({ _id: id }));
   if (!doc) throw new NotFoundError(`deal ${id}`);
 
   const lines = await ledger(db).find({ dealId: id, kind: "earn" }).toArray();
   for (const line of lines) {
     if (line.status === "paid") {
+      /* Belt and braces behind the claim: if a clawback already points at this
+         line, the money has been taken back and must not be taken again. */
+      const reversed = await ledger(db).findOne({ reversesId: line._id, kind: "clawback" });
+      if (reversed) continue;
       await ledger(db).insertOne({
         _id: newId("ledg", now),
         marketerId: line.marketerId,
@@ -751,19 +797,6 @@ export async function cancelDeal(
     }
   }
 
-  await deals(db).updateOne(
-    { _id: id },
-    {
-      $set: {
-        status: "cancelled",
-        reason,
-        reviewedBy: actor.id,
-        reviewedByName: actor.name,
-        reviewedAt: now,
-        updatedAt: now,
-      },
-    },
-  );
   const after = await deals(db).findOne({ _id: id });
   return toDeal(after as DealDoc);
 }
@@ -1070,20 +1103,34 @@ export async function statementFor(
     payHistoryFor(db, marketerId, 48),
   ]);
 
-  const rows: Transaction[] = lines.map((line) => ({
-    id: line.id,
-    at: line.createdAt,
-    amountMinor: line.amountMinor,
-    currency: line.currency,
-    kind: line.kind === "clawback" ? "clawback" : line.kind === "adjust" ? "adjustment" : "earning",
-    title: line.dealTitle || (line.kind === "adjust" ? "Adjustment" : "Commission"),
-    status: LEDGER_WORD[line.status],
-    reference: line.id,
-    dealId: line.dealId,
-    payRunId: line.payRunId,
-    bankLabel: "",
-    note: line.note,
-  }));
+  /* Which pay run carried each commission, so an earning row can say so in
+     words. Without it the statement shows the same naira twice, both green and
+     both positive, and the only defence is a 12px label the reader has to
+     interpret. */
+  const monthOfRun = new Map(payments.map((pay) => [pay.payRunId, payMonthLabel(pay.month)]));
+  const paidRuns = new Set(payments.filter((pay) => pay.status === "paid").map((p) => p.payRunId));
+
+  const rows: Transaction[] = lines.map((line) => {
+    const state = LEDGER_STATE[line.status];
+    const run = line.payRunId;
+    return {
+      id: line.id,
+      at: line.createdAt,
+      amountMinor: line.amountMinor,
+      currency: line.currency,
+      kind:
+        line.kind === "clawback" ? "clawback" : line.kind === "adjust" ? "adjustment" : "earning",
+      title: line.dealTitle || (line.kind === "adjust" ? "Adjustment" : "Commission"),
+      state,
+      status: TX_STATE_LABEL[state],
+      reference: line.id,
+      dealId: line.dealId,
+      payRunId: run,
+      bankLabel: "",
+      carriedBy: run && paidRuns.has(run) ? (monthOfRun.get(run) ?? "") : "",
+      note: line.note,
+    };
+  });
 
   for (const pay of payments) {
     // Only a transfer that actually went out. A pending row is a promise, and
@@ -1096,11 +1143,13 @@ export async function statementFor(
       currency: pay.currency,
       kind: "payout",
       title: `${payMonthLabel(pay.month)} payout`,
-      status: "Paid",
+      state: "settled",
+      status: TX_STATE_LABEL.settled,
       reference: pay.reference,
       dealId: null,
       payRunId: pay.payRunId,
       bankLabel: pay.bankLabel,
+      carriedBy: "",
       note: "",
     });
   }
@@ -1109,12 +1158,12 @@ export async function statementFor(
   return rows;
 }
 
-/** The ledger's own states, as the marketer reads them. */
-const LEDGER_WORD: Record<LedgerStatus, string> = {
-  earned: "Waiting",
-  scheduled: "On the way",
-  paid: "Paid",
-  void: "Cancelled",
+/** The ledger's own states, as the statement's own states. */
+const LEDGER_STATE: Record<LedgerStatus, TxState> = {
+  earned: "waiting",
+  scheduled: "sending",
+  paid: "settled",
+  void: "cancelled",
 };
 
 /* ═══════════════════════════════════════════════════════ PAYMENT PROBLEMS ══ */

@@ -41,31 +41,19 @@ interface Picked {
 }
 
 /**
- * The shell is the page, and the form is its child.
+ * The state lives here; both the fields and the pinned bar are the shell's.
  *
- * `useMarketer` and `useReportBlock` read a context AppShell provides, so they
- * cannot be called by the component that renders AppShell: at that point the
- * provider does not exist yet. Every screen in this app that needs the signed
- * in marketer does it this way.
+ * Two constraints meet awkwardly and this is the shape that satisfies both.
+ * `useMarketer` and `useReportBlock` read a context AppShell provides, so
+ * nothing above AppShell may call them. And `BottomBar` is `position: fixed`,
+ * so it must not sit inside `.m-body`, which sets `overflow-x: clip` and
+ * therefore becomes its containing block and clips it.
+ *
+ * So the page owns the form state and passes it down, AppShell renders both
+ * slots inside its provider, and the two children do their own hook reads.
  */
 export default function LogBuyerPage() {
-  return (
-    <AppShell
-      title="Log a buyer"
-      hint="Give us their name and number. We take it from there."
-      back="/m/buyers"
-      nav={null}
-      tab="Who are they?"
-    >
-      <Form />
-    </AppShell>
-  );
-}
-
-function Form() {
   const router = useRouter();
-  const { me } = useMarketer();
-  const block = useReportBlock();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -115,6 +103,95 @@ function Form() {
     }
   }
 
+  return (
+    <AppShell
+      title="Log a buyer"
+      hint="Give us their name and number. We take it from there."
+      back="/m/buyers"
+      nav={null}
+      tab="Who are they?"
+      bottomBar={<Submit busy={busy} onSend={() => void send()} />}
+    >
+      <Fields
+        name={name}
+        setName={setName}
+        phone={phone}
+        setPhone={setPhone}
+        listing={listing}
+        setListing={setListing}
+        kind={kind}
+        setKind={setKind}
+        area={area}
+        setArea={setArea}
+        budget={budget}
+        setBudget={setBudget}
+        brief={brief}
+        setBrief={setBrief}
+        touched={touched}
+        refusal={refusal}
+        error={error}
+        onRetry={() => void send()}
+      />
+    </AppShell>
+  );
+}
+
+/** Hidden entirely for an account that may not report, the same rule the orb follows. */
+function Submit({ busy, onSend }: { busy: boolean; onSend: () => void }) {
+  if (useReportBlock()) return null;
+  return (
+    <BottomBar>
+      <PrimaryButton busy={busy} onClick={onSend}>
+        Send to AV Homes
+      </PrimaryButton>
+    </BottomBar>
+  );
+}
+
+interface FieldsProps {
+  name: string;
+  setName: (v: string) => void;
+  phone: string;
+  setPhone: (v: string) => void;
+  listing: Picked | null;
+  setListing: (v: Picked | null) => void;
+  kind: DealKind;
+  setKind: (v: DealKind) => void;
+  area: string;
+  setArea: (v: string) => void;
+  budget: number;
+  setBudget: (v: number) => void;
+  brief: string;
+  setBrief: (v: string) => void;
+  touched: boolean;
+  refusal: { path: string; message: string } | null;
+  error: ApiError | null;
+  onRetry: () => void;
+}
+
+function Fields({
+  name,
+  setName,
+  phone,
+  setPhone,
+  listing,
+  setListing,
+  kind,
+  setKind,
+  area,
+  setArea,
+  budget,
+  setBudget,
+  brief,
+  setBrief,
+  touched,
+  refusal,
+  error,
+  onRetry,
+}: FieldsProps) {
+  const { me } = useMarketer();
+  const block = useReportBlock();
+
   if (block) {
     return (
       <div className="px-4">
@@ -124,31 +201,33 @@ function Form() {
   }
 
   const rate = me?.rates.sale[0] ?? 0;
+  const bad = (path: string) => touched && refusal?.path === path;
 
   return (
     <>
-      <BottomBar>
-        <PrimaryButton busy={busy} onClick={() => void send()} disabled={touched && !!refusal}>
-          Send to AV Homes
-        </PrimaryButton>
-      </BottomBar>
+      {/* Said out loud, not only shown. A tap on Send that silently does
+          nothing is the form failing without telling anybody. */}
+      <p role="alert" className="sr-only">
+        {touched && refusal ? refusal.message : ""}
+      </p>
 
       <div className="space-y-5 px-4 pb-6">
-        <Field label="Their name" error={touched && refusal?.path === "buyerName" ? refusal.message : ""}>
+        <Field label="Their name" error={bad("buyerName") ? refusal!.message : ""}>
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Chidi Okonkwo"
             autoComplete="off"
             autoCapitalize="words"
-            className={inputCls}
+            aria-invalid={bad("buyerName") || undefined}
+            className={`${inputCls} ${bad("buyerName") ? "m-bad" : ""}`}
           />
         </Field>
 
         <Field
           label="Their phone number"
           hint="We call this number. Make sure they are expecting us."
-          error={touched && refusal?.path === "buyerPhone" ? refusal.message : ""}
+          error={bad("buyerPhone") ? refusal!.message : ""}
         >
           <input
             value={phone}
@@ -157,12 +236,15 @@ function Form() {
             inputMode="tel"
             placeholder="0803 000 0000"
             autoComplete="off"
-            className={inputCls}
+            aria-invalid={bad("buyerPhone") || undefined}
+            className={`${inputCls} ${bad("buyerPhone") ? "m-bad" : ""}`}
           />
         </Field>
 
-        <div>
-          <p className="mb-2 text-[13px] font-semibold text-m-muted">What do they want?</p>
+        <div role="group" aria-labelledby="want-heading">
+          <h2 id="want-heading" className="mb-2 text-[14px] font-bold text-m-text">
+            What do they want?
+          </h2>
           {listing ? (
             <div className="m-card flex items-center gap-3 px-3.5 py-3">
               <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-m-text">
@@ -195,14 +277,15 @@ function Form() {
                 />
                 <Field
                   label="Where"
-                  error={touched && refusal?.path === "wantArea" ? refusal.message : ""}
+                  error={bad("wantArea") ? refusal!.message : ""}
                 >
                   <input
                     value={area}
                     onChange={(event) => setArea(event.target.value)}
                     placeholder="Lekki Phase 1"
                     autoCapitalize="words"
-                    className={inputCls}
+                    aria-invalid={bad("wantArea") || undefined}
+                    className={`${inputCls} ${bad("wantArea") ? "m-bad" : ""}`}
                   />
                 </Field>
                 <Field label="Roughly their budget" hint="A guess is fine. It helps us show the right homes.">
@@ -224,7 +307,7 @@ function Form() {
           />
         </Field>
 
-        {error && <ErrorNote error={error} onRetry={() => void send()} />}
+        {error && <ErrorNote error={error} onRetry={onRetry} />}
 
         <div className="m-card flex items-start gap-3 px-4 py-4">
           <IconHandshake size={44} />
