@@ -390,6 +390,162 @@ body:has(.c-savebar) .c-sheet {
   padding-bottom: calc(5.5rem + var(--safe-b) + var(--c-kb));
 }
 
+/* ═══ THE RAIL'S ROWS ═════════════════════════════════════════
+   The rail is not a darker column and not a card. It is the same haze as the
+   panel beside it with a hairline between them, so the only thing painted in
+   the whole column is the row you are on. That is what makes one white pill
+   read as a position rather than as a button.
+
+   EVERY STATE OF A ROW IS IN THIS FILE, including the ones a utility could
+   express. Not tidiness: this stylesheet is unlayered and Tailwind's utilities
+   sit in `@layer utilities`, so an unlayered `.c-row { font-weight }` beats a
+   `font-semibold` in the markup whatever its specificity. Half the states here
+   and half at the call site would have shipped a pill that never went bold.
+
+   The geometry, in column coordinates, with the rail's own 12px padding:
+   icon 20 → 36, top label at 48. `--c-tick-x` puts the tick's stem on 27 and
+   the hairline reads the same number, because the two have to agree to the
+   half pixel and two utility strings cannot be kept honest against each other.
+   The sub label lands at 42, so a sub-page hangs under its parent rather than
+   starting a second column. */
+.console {
+  --c-tick-x: 15px;
+  --c-trail: color-mix(in srgb, var(--wine-600) 22%, transparent);
+}
+
+.c-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 2.75rem;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  /* 550, not 500 or 600. At 13px on this ground a medium row reads as a
+     caption and a semibold one competes with the pill for the eye. */
+  font-weight: 550;
+  color: var(--plum-900);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.c-row > svg {
+  color: var(--slate-550);
+}
+
+/* 32px where a mouse is doing the pointing. 44px stands below it, because
+   under `lg` this rail is a drawer and the ONLY route between sections, so
+   these are the most tapped controls in the phone build and a mis-tap
+   navigates away from unsaved work. */
+@media (min-width: 64rem) {
+  .c-row {
+    height: 2rem;
+  }
+}
+
+/* A flat wash, never a pill. Hover says "this is a target"; the white plate
+   says "this is where you are", and only one row is ever allowed to say it. */
+.c-row:hover {
+  background: color-mix(in srgb, var(--mist-200) 60%, transparent);
+  color: var(--plum-950);
+}
+
+/* Lifted by a hairline ring and a 1px throw rather than outlined by a border:
+   a border would draw a box in a column that has no other boxes in it. */
+.c-row[aria-current="page"] {
+  background: #ffffff;
+  color: var(--plum-950);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+.c-row[aria-current="page"] > svg {
+  color: var(--wine-600);
+}
+
+/* The sub-row: shorter, lighter, no icon, indented to the tick.
+
+   No icons, and that is a reading decision. Sub-pages are a list under a
+   heading that already carries one, and a second column of 16px glyphs at this
+   size is decoration that makes the group harder to scan, not easier. */
+.c-sub {
+  position: relative;
+  padding-left: 30px;
+  font-weight: 500;
+  color: var(--slate-550);
+}
+
+@media (min-width: 64rem) {
+  .c-sub {
+    height: 1.75rem;
+  }
+}
+
+.c-sub[aria-current="page"] {
+  color: var(--plum-950);
+  font-weight: 600;
+}
+
+/* The trail: one segment per row, drawn only from the top of the group down to
+   the row you are on. Per row rather than one line over the group, because the
+   line has to STOP at the current row and a single element would have to be
+   measured to know where that is. `end` is the segment that arrives, and it
+   stops 7px short so the tick's own corner finishes it. */
+.c-sub[data-trail]::before {
+  content: "";
+  position: absolute;
+  left: var(--c-tick-x);
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--c-trail);
+}
+
+.c-sub[data-trail="end"]::before {
+  bottom: calc(50% + 7px);
+}
+
+/* The ↳ itself, built from a corner rather than set as the character: a
+   glyph's stem sits where its font decides, and this one has to sit on the
+   trail. Invisible at rest, faint under the pointer, full strength on the row
+   you are on, so the mark never competes with the label beside it. */
+.c-tick {
+  position: absolute;
+  left: var(--c-tick-x);
+  top: calc(50% - 7px);
+  width: 7px;
+  height: 7px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  border-bottom-left-radius: 3px;
+  color: var(--slate-550);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+/* The arrowhead, on the end of the corner's foot. */
+.c-tick::after {
+  content: "";
+  position: absolute;
+  right: -1.5px;
+  bottom: -2.75px;
+  width: 4px;
+  height: 4px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.c-sub:hover .c-tick {
+  opacity: 0.45;
+}
+
+.c-sub[aria-current="page"] .c-tick {
+  color: var(--wine-600);
+  opacity: 1;
+}
+
 /* ═══ THE DRAWER ══════════════════════════════════════════════════════════
    Below the breakpoint the rail becomes an off-canvas drawer. `visibility`
    plus `transform` rather than `display`, because display cannot animate and a

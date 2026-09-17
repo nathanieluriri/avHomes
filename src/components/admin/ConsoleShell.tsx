@@ -26,7 +26,7 @@ import { api } from "@/lib/admin/client";
 import { useIsNarrow, useKeyboardInset, useSession } from "@/lib/admin/hooks";
 import { initials } from "@/lib/admin/format";
 import type { MarketingCounts } from "@/lib/admin/marketing";
-import { NAV, canSeeNavItem, homeFor, sectionFor } from "./nav";
+import { NAV_BOTTOM, homeFor, hrefOf, locate, visibleNav, type NavItem } from "./nav";
 import { Palette } from "./Palette";
 import { ResponsiveMenu } from "./BottomSheet";
 import { ButtonLink, Spinner } from "./ui";
@@ -283,8 +283,22 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
   const { user } = session;
 
-  /* One lookup for the whole rail rather than one per row. */
-  const currentSection = sectionFor(pathname);
+  /* One pass over the tree for the whole rail rather than one per row: which
+     rows this role may see, which section is open, and which single row takes
+     the pill. Both lists are searched, so Settings highlights like anything
+     else even though it is drawn in the foot. */
+  const rows = visibleNav(user.role);
+  const bottom = visibleNav(user.role, NAV_BOTTOM);
+  const { section, current } = locate([...rows, ...bottom], pathname);
+
+  /* Keyed by href rather than read per row, because a count on a hidden child
+     has to roll up to its section: Deals is only drawn while somebody is
+     already inside Marketers, and a queue you can only see once you have found
+     it is not a queue. `RailRow` sums its children's when it is closed. */
+  const badges: Record<string, number> = {
+    "/admin/notifications": unread,
+    "/admin/marketers/deals": dealsWaiting,
+  };
 
   const frame = (
     <div className="console fixed inset-0 z-40 flex flex-col bg-chrome-900">
@@ -428,76 +442,29 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           }}
           className="c-rail flex flex-col gap-1 overflow-y-auto border-r border-mist-200 px-3 py-3 lg:gap-0.5"
         >
-          {NAV.map((group) => {
-            const visible = group.items.filter((item) => canSeeNavItem(user.role, item));
-            if (visible.length === 0) return null;
-            return (
-              <div key={group.label ?? "root"} className="contents">
-                {group.label && (
-                  <p className="mt-4 mb-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-550">
-                    {group.label}
-                  </p>
-                )}
-                {visible.map((item) => {
-                  /* `sectionFor`, not `isSectionActive` per row. Deals and Pay
-                     day live under Marketers in the URL tree, so the plain
-                     prefix test lights the parent row as well as the child and
-                     the rail claims you are in two places at once. One lookup
-                     against the whole list settles it the same way the
-                     breadcrumb already does. */
-                  const active = currentSection === item;
-                  const badge =
-                    item.href === "/admin/notifications"
-                      ? unread
-                      : item.href === "/admin/marketers/deals"
-                        ? dealsWaiting
-                        : 0;
-                  return (
-                    /* 44px below lg. Below that breakpoint this drawer is the
-                       ONLY route between sections, so these are the most
-                       tapped controls in the phone build, and a mis-tap here
-                       navigates away from unsaved work. The rail keeps its
-                       36px density where a mouse is doing the pointing. */
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex h-11 items-center gap-3 rounded-lg px-2 text-sm transition-colors lg:h-9 ${
-                        active
-                          ? "bg-white font-semibold text-plum-950 shadow-card"
-                          : "font-medium text-slate-600 hover:bg-mist-200/60 hover:text-plum-950"
-                      }`}
-                    >
-                      <item.icon
-                        className={`h-[18px] w-[18px] shrink-0 ${
-                          active ? "text-wine-600" : "text-slate-550"
-                        }`}
-                        aria-hidden="true"
-                      />
-                      <span className="truncate">{item.label}</span>
-                      {badge > 0 && (
-                        <span
-                          className="ml-auto rounded-full bg-wine-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white"
-                          aria-label={`${badge} waiting`}
-                        >
-                          {badge > 99 ? "99+" : badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            );
-          })}
+          {rows.map((row) => (
+            <RailRow
+              key={hrefOf(row)}
+              row={row}
+              open={row === section}
+              current={current}
+              badges={badges}
+            />
+          ))}
 
-          <div className="mt-auto pt-6">
+          {/* Pushed to the foot, and the gap is the point: these are not part
+              of the list of the job. */}
+          <div className="mt-auto flex flex-col gap-1 pt-6 lg:gap-0.5">
+            {bottom.map((row) => (
+              <RailRow key={hrefOf(row)} row={row} open={row === section} current={current} badges={badges} />
+            ))}
             <a
               href="/"
               target="_blank"
               rel="noreferrer"
-              className="flex h-11 items-center gap-3 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:bg-mist-200/60 hover:text-plum-950 lg:h-9"
+              className="c-row"
             >
-              <ExternalLink className="h-[18px] w-[18px] shrink-0 text-slate-550" aria-hidden="true" />
+              <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="truncate">View storefront</span>
             </a>
           </div>
@@ -528,6 +495,98 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     <>
       {frame}
       <SpotlightHost />
+    </>
+  );
+}
+
+/**
+ * One top-level row, plus its sub-pages while the reader is inside it.
+ *
+ * EXACTLY ONE ROW IS EVER HIGHLIGHTED. When the current screen is a sub-page
+ * the sub-page takes the white pill and its parent drops back to plain text,
+ * still showing its children. Two pills would say you are in two places at
+ * once, which is the bug the old rail had to special-case Deals and Pay day
+ * out of.
+ *
+ * The sub-pages carry no icons. They are read as a list under a heading that
+ * already has one, and a second column of glyphs at 13px is decoration that
+ * makes the group harder to scan, not easier. What marks them instead is the
+ * `↳` in the icon column, drawn in CSS so its stem lands exactly on the
+ * hairline that runs down from the top of the group to the row you are on.
+ */
+function RailRow({
+  row,
+  open,
+  current,
+  badges,
+}: {
+  row: NavItem;
+  open: boolean;
+  current: string | null;
+  badges: Record<string, number>;
+}) {
+  const children = row.children ?? [];
+  const active = row.href !== null && current === row.href;
+  /* Its own count, plus anything its hidden children are carrying. */
+  const rolled = children.reduce((sum, child) => sum + (badges[child.href] ?? 0), 0);
+  const badge = (row.href === null ? 0 : (badges[row.href] ?? 0)) + (open ? 0 : rolled);
+  /* Where the hairline stops. -1 while the reader is on the parent's own
+     screen, which draws no trail at all: the line exists to point at where you
+     are, and there is nothing below to point at. */
+  const activeIndex = children.findIndex((child) => child.href === current);
+
+  return (
+    <>
+      {/* 44px below lg. Below that breakpoint this drawer is the ONLY route
+          between sections, so these are the most tapped controls in the phone
+          build, and a mis-tap here navigates away from unsaved work. The rail
+          keeps its 32px density where a mouse is doing the pointing. */}
+      <Link href={hrefOf(row)} aria-current={active ? "page" : undefined} className="c-row">
+        <row.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="truncate">{row.label}</span>
+        {badge > 0 && (
+          <span
+            className="ml-auto rounded-full bg-wine-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white"
+            aria-label={`${badge} waiting`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </Link>
+
+      {open &&
+        children.map((child, index) => {
+          const here = current === child.href;
+          const count = badges[child.href] ?? 0;
+          return (
+            <Link
+              key={child.href}
+              href={child.href}
+              aria-current={here ? "page" : undefined}
+              /* Absent above the row you are on, so the line never runs past
+                 it. `end` is the one that stops at the elbow. */
+              data-trail={
+                activeIndex < 0 || index > activeIndex
+                  ? undefined
+                  : index === activeIndex
+                    ? "end"
+                    : "through"
+              }
+              className="c-row c-sub"
+            >
+              <span className="c-tick" aria-hidden="true" />
+              <span className="truncate">{child.label}</span>
+              {count > 0 && (
+                <span
+                  className="ml-auto rounded-full bg-wine-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white"
+                  aria-label={`${count} waiting`}
+                >
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
+            </Link>
+          );
+        })}
     </>
   );
 }

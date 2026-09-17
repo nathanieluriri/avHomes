@@ -6,7 +6,7 @@
 // jobs.json: [{ "name": "tutorials-desktop", "path": "/admin/tutorials",
 //               "viewport": "desktop" | "phone" | "phone-small",
 //               "role": "owner", "reducedMotion": false, "mock": { "GET /api/marketing/updates": { "items": [] } },
-//               "steps": [ {"click": "<selector>"}, {"type": "text"}, {"key": "Enter"},
+//               "steps": [ {"click": "<selector>"}, {"hover": "<selector>"}, {"type": "text"}, {"key": "Enter"},
 //               {"wait": 800}, {"waitFor": "<selector>"}, {"scroll": 600}, {"eval": "js expression"},
 //               {"shot": "label"} ] }]
 // Selectors are puppeteer selectors, so ::-p-text(New listing) and ::-p-xpath(...) work.
@@ -78,6 +78,7 @@ async function run() {
       let n = 0;
       for (const s of job.steps || []) {
         if (s.click) { await tab.waitForSelector(s.click, { timeout: 15000 }); await tab.click(s.click); }
+        if (s.hover) { await tab.waitForSelector(s.hover, { timeout: 15000 }); await tab.hover(s.hover); }
         if (s.type) await tab.keyboard.type(s.type, { delay: 12 });
         if (s.key) await tab.keyboard.press(s.key);
         if (s.waitFor) await tab.waitForSelector(s.waitFor, { timeout: 20000 });

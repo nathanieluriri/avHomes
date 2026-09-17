@@ -2,12 +2,14 @@ import {
   Banknote,
   Bell,
   Building2,
+  Contact,
   Gauge,
   GraduationCap,
   Handshake,
   History,
   Images,
   Inbox,
+  LibraryBig,
   Mail,
   Megaphone,
   MessageCircleWarning,
@@ -25,8 +27,16 @@ import { hasDomain, type Domain, type Role } from "@avhomes/contracts";
 
 /**
  * The rail's contents, in one place because three surfaces read them: the rail
- * itself, the command palette, and the breadcrumb, which needs a section's icon
- * to draw the parent chip.
+ * itself, the command palette, and Tutorials, which looks a screen's label up
+ * by href.
+ *
+ * TWO LEVELS, AND ONLY ONE OF THEM IS EVER FULLY DRAWN. The console has
+ * outgrown a flat list: seventeen rows under five headings is a directory, not
+ * a place you work. So the sections are real rows now, and a section's
+ * sub-pages appear only while the reader is inside it. There is no disclosure
+ * control to click, nothing to remember the state of, and nothing to leave
+ * open: the URL decides, so the column is never longer than the top-level rows
+ * plus one section's depth. Rows can keep arriving without the rail growing.
  *
  * `domain` is the SAME key the server's permission gate reads, so a row can
  * never appear for a screen whose API would answer 403. That is the reason the
@@ -34,7 +44,12 @@ import { hasDomain, type Domain, type Role } from "@avhomes/contracts";
  */
 
 export interface NavItem {
-  href: string;
+  /**
+   * Null on a SECTION row: it has no screen of its own and opens its first
+   * visible child instead. Content and Audience are the two, and neither has
+   * an index page worth building, so neither invents one.
+   */
+  href: string | null;
   label: string;
   /** The one-line answer to "what is this screen for", used by the palette. */
   hint: string;
@@ -44,14 +59,12 @@ export interface NavItem {
   domain: Domain | null;
   /** Narrows the row to these roles on top of the domain check. */
   roles?: readonly Role[];
+  /** Sub-pages, drawn only while the reader is somewhere inside this row. */
+  children?: readonly NavPage[];
 }
 
-export interface NavGroup {
-  /** Null renders the group with no heading. The first group is the app's
-   *  front door and a label over a single row is more chrome than navigation. */
-  label: string | null;
-  items: readonly NavItem[];
-}
+/** A row that is a real screen, which is every row the palette can offer. */
+export type NavPage = NavItem & { href: string };
 
 /** The one filter every surface that renders a nav row must use. */
 export function canSeeNavItem(role: Role, item: NavItem): boolean {
@@ -59,55 +72,57 @@ export function canSeeNavItem(role: Role, item: NavItem): boolean {
   return item.domain === null || hasDomain(role, item.domain);
 }
 
-export const NAV: readonly NavGroup[] = [
+export const NAV: readonly NavItem[] = [
   {
-    label: null,
-    items: [
-      {
-        href: "/admin",
-        label: "Dashboard",
-        hint: "Traffic, storefront and what is waiting",
-        icon: Gauge,
-        domain: "analytics",
-      },
-      {
-        href: "/admin/alerts",
-        label: "Alerts",
-        hint: "What the public site is getting wrong",
-        icon: TriangleAlert,
-        /* Null rather than a domain: the page filters each alert to what the
-           reader could actually act on, so an editor sees their empty journal
-           and nothing about listings. Gating the ROW by a domain would hide
-           that from the one person who can fix it. */
-        domain: null,
-      },
-      {
-        href: "/admin/notifications",
-        label: "Notifications",
-        hint: "Storage requests and customize notes",
-        icon: Bell,
-        domain: null,
-        roles: ["developer"],
-      },
-      {
-        href: "/admin/properties",
-        label: "Listings",
-        hint: "Every property, including drafts and the trash",
-        icon: Building2,
-        domain: "listings",
-      },
-      {
-        href: "/admin/enquiries",
-        label: "Enquiries",
-        hint: "The contact form's inbox",
-        icon: Inbox,
-        domain: "enquiries",
-      },
-    ],
+    href: "/admin",
+    label: "Dashboard",
+    hint: "Traffic, storefront and what is waiting",
+    icon: Gauge,
+    domain: "analytics",
   },
   {
+    href: "/admin/alerts",
+    label: "Alerts",
+    hint: "What the public site is getting wrong",
+    icon: TriangleAlert,
+    /* Null rather than a domain: the page filters each alert to what the
+       reader could actually act on, so an editor sees their empty journal and
+       nothing about listings. Gating the ROW by a domain would hide that from
+       the one person who can fix it. */
+    domain: null,
+  },
+  {
+    href: "/admin/notifications",
+    label: "Notifications",
+    hint: "Storage requests and customize notes",
+    icon: Bell,
+    domain: null,
+    roles: ["developer"],
+  },
+  {
+    href: "/admin/properties",
+    label: "Listings",
+    hint: "Every property, including drafts and the trash",
+    icon: Building2,
+    domain: "listings",
+  },
+  {
+    href: "/admin/enquiries",
+    label: "Enquiries",
+    hint: "The contact form's inbox",
+    icon: Inbox,
+    domain: "enquiries",
+  },
+  {
+    /* A section, not a screen. An agent holds `media` but not `content`, so
+       this collapses to a plain Media row for them rather than opening into a
+       list of one. `visibleNav` does that. */
+    href: null,
     label: "Content",
-    items: [
+    hint: "The journal, the photo library and the studio",
+    icon: LibraryBig,
+    domain: null,
+    children: [
       {
         href: "/admin/posts",
         label: "Journal",
@@ -135,8 +150,12 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
+    href: null,
     label: "Audience",
-    items: [
+    hint: "Subscribers, what gets sent to them and how it reads",
+    icon: Contact,
+    domain: null,
+    children: [
       {
         href: "/admin/subscribers",
         label: "Subscribers",
@@ -161,16 +180,20 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
-    /* Commission hangs off these screens instead of taking a rail row: it is a
-       settings page nobody visits twice a month. A rail that lists every route
-       stops being a list of what this person does all day.
+    /* A section WITH a screen of its own: the row opens the marketer list, and
+       the queues hanging off it are the children. Commission still takes no
+       row at all, because it is a settings page nobody visits twice a month
+       and it falls through to this row, which is where a reader would look.
 
-       Deals is first because it is the one with a queue behind it, and the only
-       row in this group that carries a badge. Updates sits above Marketers for
-       the reason `sectionFor` gives: its path is under `/admin/marketers`, and
-       the first match wins. */
+       The children are matched before the parent, which is what settles the
+       one place two rows overlap: Deals and Pay day sit UNDER /admin/marketers
+       in the URL tree, so a plain prefix test says yes to both. */
+    href: "/admin/marketers",
     label: "Marketers",
-    items: [
+    hint: "Everyone selling, their team and what they earned",
+    icon: UsersRound,
+    domain: "marketing",
+    children: [
       {
         href: "/admin/marketers/deals",
         label: "Deals",
@@ -199,61 +222,63 @@ export const NAV: readonly NavGroup[] = [
         icon: Megaphone,
         domain: "marketing",
       },
-      {
-        href: "/admin/marketers",
-        label: "Marketers",
-        hint: "Everyone selling, their team and what they earned",
-        icon: UsersRound,
-        domain: "marketing",
-      },
     ],
   },
   {
-    label: "Access",
-    items: [
+    href: "/admin/team",
+    label: "Team",
+    hint: "Who can sign in, and what they may touch",
+    icon: Users,
+    domain: "team",
+    children: [
       {
-        href: "/admin/team",
-        label: "Team",
-        hint: "Who can sign in, and what they may touch",
-        icon: Users,
-        domain: "team",
-      },
-      {
-        href: "/admin/settings",
-        label: "Settings",
-        /* `team` rather than a domain of its own. The only setting here decides
-           what a buyer is told about who works here, which is the same authority
-           as deciding who works here. */
-        hint: "Whose name answers an enquiry",
-        icon: SlidersHorizontal,
-        domain: "team",
-      },
-      { href: "/admin/audit", label: "Audit trail", hint: "Who changed what, and when", icon: History, domain: "danger" },
-    ],
-  },
-  {
-    /* Last, under its own heading: found by somebody new, out of the way of the
-       rows everybody else uses all day. */
-    label: "Help",
-    items: [
-      {
-        href: "/admin/tutorials",
-        label: "Tutorials",
-        hint: "Short videos, then a guided try on the real screen",
-        icon: GraduationCap,
-        /* Null: the page lists only the tutorials whose screens this role can open. */
-        domain: null,
+        href: "/admin/audit",
+        label: "Audit trail",
+        hint: "Who changed what, and when",
+        icon: History,
+        domain: "danger",
       },
     ],
   },
 ];
 
-/** Flattened, for the palette and for breadcrumb lookups. */
-export const NAV_ITEMS: readonly NavItem[] = NAV.flatMap((group) => group.items);
+/**
+ * The foot of the column, pushed away from the rest.
+ *
+ * Neither of these is a thing anybody does all day. Settings is read when
+ * something is wrong and Tutorials is found once by somebody new, and putting
+ * them down here is what keeps the nine rows above them a list of the job.
+ */
+export const NAV_BOTTOM: readonly NavItem[] = [
+  {
+    href: "/admin/tutorials",
+    label: "Tutorials",
+    hint: "Short videos, then a guided try on the real screen",
+    icon: GraduationCap,
+    /* Null: the page lists only the tutorials whose screens this role can open. */
+    domain: null,
+  },
+  {
+    href: "/admin/settings",
+    label: "Settings",
+    /* `team` rather than a domain of its own. The only setting here decides
+       what a buyer is told about who works here, which is the same authority
+       as deciding who works here. */
+    hint: "Whose name answers an enquiry",
+    icon: SlidersHorizontal,
+    domain: "team",
+  },
+];
+
+/** Flattened to real screens, for the palette and for Tutorials' href lookup. */
+export const NAV_ITEMS: readonly NavPage[] = [...NAV, ...NAV_BOTTOM].flatMap((row) => [
+  ...(row.href === null ? [] : [row as NavPage]),
+  ...(row.children ?? []),
+]);
 
 /**
- * A section is current when the URL is it or sits under it, compared on a
- * SEGMENT BOUNDARY. A bare `startsWith` lights `/admin/posts` up for a future
+ * A row is current when the URL is it or sits under it, compared on a SEGMENT
+ * BOUNDARY. A bare `startsWith` lights `/admin/posts` up for a future
  * `/admin/posts-archive`, and `/admin` would light up for everything.
  */
 export function isSectionActive(pathname: string, href: string): boolean {
@@ -261,20 +286,60 @@ export function isSectionActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** Where a section row points: its own screen, or its first child's. */
+export function hrefOf(item: NavItem): string {
+  return item.href ?? item.children?.[0]?.href ?? "/admin";
+}
+
 /**
- * The nav row a URL belongs to, or null. Feeds the breadcrumb's parent chip and
- * the rail's highlight.
+ * The rows this role may see, with each row's children already filtered.
  *
- * FIRST MATCH WINS, and that is what settles the one place two rows overlap:
- * Deals and Pay day sit UNDER Marketers in the URL tree, so `/admin/marketers`
- * is a prefix of both and `isSectionActive` says yes to two rows at once. Both
- * children are declared ahead of their parent in `NAV`, so the specific row is
- * the one found. Anything the group does not name, such as an open marketer or
- * the commission screen, falls through to Marketers, which is where a reader
- * would look for it.
+ * A SECTION OF ONE IS JUST THE PAGE. An agent holds `media` and nothing else
+ * under Content, and a "Content" row that opens into a single "Media" child is
+ * a folder drawn around one file. It is promoted to a top-level row instead,
+ * keeping its own icon, so that agent sees Media where everyone else sees
+ * Content.
  */
-export function sectionFor(pathname: string): NavItem | null {
-  return NAV_ITEMS.find((item) => isSectionActive(pathname, item.href)) ?? null;
+export function visibleNav(role: Role, rows: readonly NavItem[] = NAV): readonly NavItem[] {
+  const out: NavItem[] = [];
+  for (const row of rows) {
+    const children = (row.children ?? []).filter((child) => canSeeNavItem(role, child));
+    if (row.href === null) {
+      if (children.length === 0) continue;
+      if (children.length === 1) out.push(children[0]);
+      else out.push({ ...row, children });
+      continue;
+    }
+    if (!canSeeNavItem(role, row)) continue;
+    out.push({ ...row, children });
+  }
+  return out;
+}
+
+export interface RailPosition {
+  /** The top-level row the URL belongs to. Its children are the ones drawn. */
+  section: NavItem | null;
+  /** The href of the ONE row that takes the pill. Null off the map. */
+  current: string | null;
+}
+
+/**
+ * Where the reader is, in the two answers the rail needs.
+ *
+ * Children are tested before their parent, so the deepest row wins and exactly
+ * one row is ever highlighted. Anything a section does not name by href, such
+ * as an open marketer or the commission screen, falls through to the section
+ * row itself, which is where a reader would look for it.
+ */
+export function locate(rows: readonly NavItem[], pathname: string): RailPosition {
+  for (const row of rows) {
+    const child = (row.children ?? []).find((item) => isSectionActive(pathname, item.href));
+    if (child) return { section: row, current: child.href };
+    if (row.href !== null && isSectionActive(pathname, row.href)) {
+      return { section: row, current: row.href };
+    }
+  }
+  return { section: null, current: null };
 }
 
 /**
