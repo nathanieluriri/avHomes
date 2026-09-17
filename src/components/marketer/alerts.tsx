@@ -145,12 +145,10 @@ export function AlertRow({ alert }: { alert: MarketerAlert }) {
         )}
         <span className="mt-3 flex items-center justify-between gap-3">
           <span className="text-[12px] font-medium text-m-faint">{whenLabel(alert.at)}</span>
-          {/* The one thing to do is wine glass when it must be done; a quiet pill otherwise. */}
+          {/* The one thing to do is the wine key when it must be done; the white one otherwise. */}
           <span
-            className={`inline-flex h-8 shrink-0 items-center gap-0.5 rounded-full pl-3.5 pr-2.5 text-[13px] font-semibold ${
-              alert.tone === "act"
-                ? "m-btn--primary"
-                : "bg-m-raised text-m-text ring-1 ring-m-line"
+            className={`m-btn h-8 shrink-0 gap-0.5 rounded-full pl-3.5 pr-2.5 text-[13px] ${
+              alert.tone === "act" ? "m-btn--primary" : "m-btn--secondary"
             }`}
           >
             {alert.action.label}

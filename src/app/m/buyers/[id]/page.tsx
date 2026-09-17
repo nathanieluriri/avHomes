@@ -97,14 +97,10 @@ export default function BuyerPage() {
             </Card>
 
             {open && (
-              <button
-                type="button"
-                onClick={() => setClosing(true)}
-                className="m-tap m-press-light mt-5 flex w-full items-center justify-center gap-2 rounded-[16px] py-3 text-[14.5px] font-semibold text-(color:--m-bad-fg)"
-              >
+              <Button variant="danger" size="lg" full className="mt-5" onClick={() => setClosing(true)}>
                 <XCircle className="h-4 w-4" aria-hidden />
                 This one is over
-              </button>
+              </Button>
             )}
 
             <MoveSheet
