@@ -3,6 +3,7 @@ import Footer from "@/components/Footer";
 import CookieBanner from "@/components/CookieBanner";
 import SitePulse from "@/components/SitePulse";
 import ChatWidget from "@/components/chat/ChatWidget";
+import ReferralCapture from "@/components/ReferralCapture";
 import { ChatProvider } from "@/lib/chat/provider";
 import { getSiteSettings } from "@/lib/data";
 
@@ -40,6 +41,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <CookieBanner />
       {/* Counts storefront visits only, and only once the banner above is accepted. */}
       <SitePulse />
+      {/* A marketer's `?ref=`, held for the session so an enquiry can carry it. */}
+      <ReferralCapture />
       {/* Last, so it paints over everything, and portalled to the body from
           inside so a transformed section cannot become its containing block. */}
       <ChatWidget />

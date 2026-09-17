@@ -44,17 +44,21 @@ function entry(
   if (rail.domain !== null && !requires.includes(rail.domain)) {
     throw new Error(`tutorials: ${id} must require ${rail.domain}, the domain of ${tryHref}`);
   }
+  // Both tables are partial: an id may be in the allowlist before its video is rendered.
+  const media = TUTORIAL_MEDIA[id];
+  const steps = TUTORIAL_STEPS[id];
+  if (!media || !steps) throw new Error(`tutorials: ${id} has no rendered video yet`);
   return {
     id,
     title,
     problem,
     durationSeconds,
-    video: TUTORIAL_MEDIA[id].video,
-    poster: TUTORIAL_MEDIA[id].poster,
+    video: media.video,
+    poster: media.poster,
     requires,
     tryHref,
     desktopOnly,
-    steps: TUTORIAL_STEPS[id],
+    steps,
   };
 }
 

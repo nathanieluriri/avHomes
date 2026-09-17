@@ -69,6 +69,27 @@ const ENTITY_BY_SEGMENT: Record<string, AuditEntity> = {
   stats: "stat",
   notes: "note",
   settings: "settings",
+  marketing: "marketer",
+};
+
+/**
+ * Nouns one folder down, under a feature's own admin prefix.
+ *
+ * `/admin/marketing/deals/:id/review` names its record in the THIRD segment.
+ * Read by the flat table alone, `marketing` was the noun, the literal "deals"
+ * became the entity id and the review an operation on it, so every deal, pay
+ * run and update in the log read as a change to a marketer. A noun listed here
+ * is read from the segment after its folder. A path under the folder that
+ * names none of them, such as its settings or a payment problem, is derived
+ * exactly as it was before this table existed.
+ */
+const NESTED_ENTITY_BY_SEGMENT: Record<string, Record<string, AuditEntity>> = {
+  marketing: {
+    marketers: "marketer",
+    deals: "deal",
+    "pay-runs": "payrun",
+    updates: "update",
+  },
 };
 
 /**
@@ -128,9 +149,13 @@ function deriveAuth(segments: string[], method: string): Derived {
 }
 
 function deriveAdmin(segments: string[], method: string): Derived {
-  const entity = ENTITY_BY_SEGMENT[segments[1] ?? ""] ?? "unknown";
-  const rest = segments.slice(2);
+  const nested = NESTED_ENTITY_BY_SEGMENT[segments[1] ?? ""]?.[segments[2] ?? ""];
+  if (nested) return deriveRecord(nested, segments.slice(3), method);
+  return deriveRecord(ENTITY_BY_SEGMENT[segments[1] ?? ""] ?? "unknown", segments.slice(2), method);
+}
 
+/** `rest` is everything after the noun: nothing, an id, or an id and an operation. */
+function deriveRecord(entity: AuditEntity, rest: string[], method: string): Derived {
   // A singleton, such as settings. There is no id to record.
   if (rest.length === 0) return { entity, entityId: null, action: actionForMethod(method) };
 

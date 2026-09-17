@@ -11,6 +11,7 @@ import {
   type Mailer,
 } from "@avhomes/core";
 import { getDb, type Db } from "@avhomes/db";
+import { isVideoUrl } from "@avhomes/contracts";
 import {
   authRoutes,
   clerkRoutes,
@@ -20,13 +21,14 @@ import {
   teamRoutes,
 } from "@avhomes/identity";
 import { auditRoutes, auditTrail } from "@avhomes/audit";
-import { listingsAdminRoutes, listingsPublicRoutes } from "@avhomes/listings";
+import { listProperties, listingsAdminRoutes, listingsPublicRoutes } from "@avhomes/listings";
 import { contentAdminRoutes, contentPublicRoutes } from "@avhomes/content";
 import {
   cloudinaryStorage,
   localFileStorage,
   mediaPublicRoutes,
   mediaRoutes,
+  sniffImage,
   vercelBlobStorage,
   type StoragePort,
 } from "@avhomes/media";
@@ -35,6 +37,12 @@ import { emailTemplateRoutes, settingsPublicRoutes, settingsRoutes } from "@avho
 import { feedbackRoutes } from "@avhomes/feedback";
 import { analyticsPublicRoutes } from "@avhomes/analytics";
 import { audienceAdminRoutes, audiencePublicRoutes, unsubscribePublicRoutes } from "@avhomes/audience";
+import {
+  marketingAdminRoutes,
+  marketingAppRoutes,
+  marketingPublicRoutes,
+  type RecentListing,
+} from "@avhomes/marketing";
 import { dashboardRoutes } from "./dashboard";
 import { healthRoutes } from "./health";
 import { tutorialsRoutes } from "./tutorials";
@@ -87,6 +95,28 @@ export interface AppDeps {
  * production while every in-process test asking for `/api/posts` still passed.
  */
 export const API_PREFIX = "/api";
+
+/**
+ * New listings for the marketer app's Updates carousel, read through the listings
+ * package's own public query.
+ *
+ * A port, because @avhomes/marketing may not know the properties collection
+ * exists. `live` only, and sorted by when each went public: a card asking
+ * marketers to share a home already under offer spends their afternoon on a
+ * buyer who cannot have it.
+ */
+async function recentListings(db: Db, sinceMs: number, limit: number): Promise<RecentListing[]> {
+  const page = await listProperties(db, { sort: "newest", limit, status: "live" });
+  return page.items
+    .filter((property) => property.publishedAt !== null && property.publishedAt >= sinceMs)
+    .map((property) => ({
+      id: property.id,
+      title: property.title,
+      city: property.city,
+      imageUrl: property.images.find((url) => !isVideoUrl(url)) ?? "",
+      publishedAt: property.publishedAt ?? sinceMs,
+    }));
+}
 
 export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
@@ -265,6 +295,13 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, unsubscribePublicRoutes());
   app.route(API_PREFIX, settingsPublicRoutes());
 
+  /*
+   * The marketer's join page and its two doors, in this slot for the same
+   * reason as the subscribe intake: nothing here reads a cookie. Signing up
+   * WRITES one, which is a different thing and is safe above the gate.
+   */
+  app.route(API_PREFIX, marketingPublicRoutes());
+
   /* ═════════════════ 9. session, the domain gate, then the audit trail ═════════ */
 
   app.use(`${API_PREFIX}/*`, sessionMiddleware());
@@ -314,6 +351,11 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, settingsRoutes());
   app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin, notify }));
   app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
+  /* The marketer app first, then the console's side of the same feature. The
+     app's routes are the only admin-tier surface a marketer role can reach,
+     which is why they live under /api/marketing and not /api/admin. */
+  app.route(API_PREFIX, marketingAppRoutes({ storage, sniff: sniffImage, notify, recentListings }));
+  app.route(API_PREFIX, marketingAdminRoutes());
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
   app.route(API_PREFIX, notificationsRoutes());

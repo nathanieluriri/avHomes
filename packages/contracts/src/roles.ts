@@ -7,7 +7,7 @@
  * permissions page.
  */
 
-export type Role = "owner" | "developer" | "agent" | "editor" | "support";
+export type Role = "owner" | "developer" | "agent" | "editor" | "support" | "marketer";
 
 /**
  * A domain is a whole area of the admin, not a verb. Read/write splits are the
@@ -20,6 +20,7 @@ export type Domain =
   | "enquiries" // the contact inbox
   | "analytics" // dashboard reads
   | "team" // users and invites
+  | "marketing" // marketers, the deals they report, pay runs and commission rates
   | "danger"; // destroy, export, migrations
 
 export interface RoleInfo {
@@ -64,13 +65,26 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
     description: "Answers enquiries and reads the dashboard. Changes nothing on the public site.",
     grants: ["enquiries", "analytics"],
   },
+  marketer: {
+    label: "Marketer",
+    tagline: "Sells property, earns commission",
+    description:
+      "Works from the marketer app on their phone, not the console. Reports the deals they close, invites other marketers and watches what they have earned.",
+    /* Nothing. A marketer's app reads its own routes under /api/marketing,
+       which the domain gate leaves alone, and holds no admin surface at all. */
+    grants: [],
+  },
 };
 
-/** Every role an API caller may hand out. `owner` is never mintable. */
+/**
+ * Every role an API caller may hand out. `owner` is never mintable, and neither
+ * is `marketer`: that one is minted by signing up in the marketer app, and
+ * handing it to a console account would take that person's console away.
+ */
 export const ASSIGNABLE_ROLES = ["developer", "agent", "editor", "support"] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
-export const ALL_ROLES = ["owner", ...ASSIGNABLE_ROLES] as const;
+export const ALL_ROLES = ["owner", ...ASSIGNABLE_ROLES, "marketer"] as const;
 
 export function isRole(value: string): value is Role {
   return (ALL_ROLES as readonly string[]).includes(value);
@@ -80,6 +94,11 @@ export function hasDomain(role: Role, domain: Domain): boolean {
   const grants = ROLE_INFO[role]?.grants;
   if (grants === "all") return true;
   return Array.isArray(grants) ? grants.includes(domain) : false;
+}
+
+/** Does this role belong in the console at all? A marketer does not. */
+export function isConsoleRole(role: Role): boolean {
+  return role !== "marketer";
 }
 
 /** The full-access tier requireAdmin() reads. "Owner or developer", once. */

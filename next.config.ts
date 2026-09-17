@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     "@avhomes/enquiries",
     "@avhomes/analytics",
     "@avhomes/audience",
+    "@avhomes/marketing",
     "@avhomes/api",
   ],
   // The driver uses node:net/node:tls and must never be traced into a client

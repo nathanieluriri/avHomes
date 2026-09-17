@@ -47,6 +47,7 @@ export { teamRoutes } from "./routes/team";
 export { limit, clearLimit } from "./repo/ratelimit";
 export {
   createUser,
+  findCredentialByEmail,
   findUserByEmail,
   findUserById,
   listUsers,
@@ -59,4 +60,4 @@ export {
 } from "./repo/users";
 export { createSession, resolveSession, endAllSessions } from "./repo/sessions";
 export { createInvite, listInvites } from "./repo/invites";
-export { hashPassword, verifyPassword, mintSessionToken, tokenId } from "./crypto";
+export { hashPassword, verifyPassword, burnPasswordTime, mintSessionToken, tokenId } from "./crypto";

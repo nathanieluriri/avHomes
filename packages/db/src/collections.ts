@@ -33,6 +33,12 @@ export const COLLECTIONS = {
   emailTemplates: "email_templates",
   newsletters: "newsletters",
   templateRequests: "template_requests",
+  marketers: "marketers",
+  marketingDeals: "marketing_deals",
+  marketingLedger: "marketing_ledger",
+  marketingPayRuns: "marketing_pay_runs",
+  marketingIssues: "marketing_issues",
+  marketingUpdates: "marketing_updates",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

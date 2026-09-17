@@ -1,0 +1,1461 @@
+/* ---------------------------------------------------------------------------
+   The marketer app's own layer: Night plum.
+
+   The palette is a set of custom properties on `.m-app` and on `.m-float`, the
+   portal root, so a sheet rendered into document.body keeps it. `.m-paper`
+   maps the same names to the light palette, for a screen still drawn in it.
+   Tailwind reads them as `bg-m-card`, `text-m-muted` and so on (globals.css).
+
+   Component rules live in the `components` layer, BELOW Tailwind's utilities,
+   so a utility at a call site always wins. The unlayered rules are the few
+   that must beat a utility: the page ground, 16px field text, reduced motion.
+
+   `.m-app` and `.m-float` are also the hooks globals.css checks before it
+   strips box-shadow from the marketing site.
+--------------------------------------------------------------------------- */
+
+@layer theme, base, components, utilities;
+
+/* ═══ TOKENS ═══════════════════════════════════════════════════════════════ */
+
+.m-app,
+.m-float {
+  --m-ground: #140b0e;
+  --m-card: #221418;
+  --m-raised: #2c1b20;
+  --m-line: #3a262c;
+  --m-text: #f7eef1;
+  --m-muted: #b9a8ae;
+  /* The quietest text still clears 4.5:1 at 12px on a raised card, not only on the ground. */
+  --m-faint: #9a878d;
+  --m-link: #ff9db3;
+
+  --m-act-fg: #ff8fa3;
+  --m-act-bg: #3d1520;
+  --m-heads-fg: #f2dee3;
+  --m-heads-bg: #4a2530;
+  --m-good-fg: #7ee2b8;
+  --m-good-bg: #123026;
+  --m-warn-fg: #ffcf7d;
+  --m-warn-bg: #3a2912;
+  --m-bad-fg: #ff9a9a;
+  --m-bad-bg: #3f1519;
+
+  --m-sheet: #1f1216;
+  --m-track: #0e0709;
+  --m-thumb: #36232a;
+  --m-press: #2e1c22;
+  --m-skel: rgb(255 255 255 / 0.06);
+  --m-skel-hi: rgb(255 255 255 / 0.07);
+  /* A dark card's edge is light, not shadow: a hairline and a lit top lip. */
+  --m-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  --m-drop: 0 18px 36px -26px rgb(0 0 0 / 0.95);
+
+  --m-tab-h: 3rem;
+  --m-sheet-r: 1.75rem;
+  --m-bar-h: 4rem;
+  --m-orb: 5.25rem;
+
+  color-scheme: dark;
+}
+
+.m-paper {
+  --m-ground: #faf4f6;
+  --m-card: #ffffff;
+  --m-raised: #f1f5f9;
+  --m-line: #e2e8f0;
+  --m-text: #1c1214;
+  --m-muted: #55637a;
+  --m-faint: #64718a;
+  --m-link: #762d3f;
+
+  --m-act-fg: #762d3f;
+  --m-act-bg: #fbf4f6;
+  --m-heads-fg: #3f272d;
+  --m-heads-bg: #f2dee3;
+  --m-good-fg: #047857;
+  --m-good-bg: #ecfdf5;
+  --m-warn-fg: #92400e;
+  --m-warn-bg: #fffbeb;
+  --m-bad-fg: #991b1b;
+  --m-bad-bg: #fee2e2;
+
+  --m-sheet: #ffffff;
+  --m-track: #f1f5f9;
+  --m-thumb: #ffffff;
+  --m-press: #fbf4f6;
+  --m-skel: #f1f5f9;
+  --m-skel-hi: rgb(255 255 255 / 0.85);
+  --m-edge: 0 0 0 1px rgb(44 27 31 / 0.05), 0 1px 2px 0 rgb(44 27 31 / 0.05);
+  --m-drop: 0 8px 24px -20px rgb(44 27 31 / 0.5);
+
+  color-scheme: light;
+}
+
+/* ═══ GROUND ═══════════════════════════════════════════════════════════════
+   The root layout paints body white with a utility, which is exactly what
+   shows in a pull past the top or bottom and for a frame before hydration.
+   Unlayered so it beats that utility. */
+html:has(.m-app),
+html:has(.m-app) > body {
+  background-color: #140b0e;
+}
+
+/* 16px, unconditionally. Safari zooms the page on focus of anything smaller.
+   Unlayered so a `text-sm` on a field cannot undo it. */
+.m-app input,
+.m-app select,
+.m-app textarea,
+.m-float input,
+.m-float select,
+.m-float textarea {
+  font-size: 16px;
+}
+
+/* The deal amount, the one field allowed to be bigger. */
+.m-app input.m-input-lg,
+.m-float input.m-input-lg {
+  font-size: 24px;
+}
+
+@layer components {
+  .m-app {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: var(--m-ground);
+    color: var(--m-text);
+    /* Android's grey tap flash fights the pressed states below. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ═══ SHELL ══════════════════════════════════════════════════════════════
+     `--m-lift` is how far the body sheet climbs into the hero: the tab's
+     height when there is one, the corner radius when there is not.
+     `--m-reserve` clears the fixed bar and the home indicator under it. */
+  .m-shell {
+    --m-lift: var(--m-sheet-r);
+    --m-reserve: calc(1.5rem + var(--safe-b));
+
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .m-shell--tab {
+    --m-lift: var(--m-tab-h);
+  }
+
+  .m-shell--nav {
+    --m-reserve: calc(var(--m-bar-h) + var(--safe-b) + 2rem);
+  }
+
+  /* ═══ HERO ═══════════════════════════════════════════════════════════════
+     Runs under the status bar, so the top pad is an inset.
+
+     Saturated wine corner to corner. Every layer is a wine or a pink, never
+     white or black, because white washes wine out to dusty rose and black
+     turns it brown. Deep at the top left, where the pink and grey logo needs
+     a dark ground; brightest along the foot, where the near black sheet and
+     its tab have to cut a clean edge. */
+  .m-hero {
+    position: relative;
+    z-index: 10;
+    padding: calc(env(safe-area-inset-top, 0px) + 0.5rem) 1rem calc(1.75rem + var(--m-lift));
+    color: #ffffff;
+    background:
+      radial-gradient(62% 42% at 100% 0%, rgb(255 72 132 / 0.34) 0%, rgb(255 72 132 / 0.1) 52%, transparent 100%),
+      radial-gradient(75% 55% at 0% 0%, rgb(44 2 14 / 0.5) 0%, transparent 100%),
+      linear-gradient(118deg, transparent 36%, rgb(255 112 160 / 0.09) 50%, transparent 64%),
+      radial-gradient(135% 62% at 50% 100%, rgb(208 50 94 / 0.56) 0%, transparent 100%),
+      /* Sized in rem, not percent, so it lights the tab's corner on a short hero too. */
+      radial-gradient(20rem 9rem at 0% 100%, rgb(214 54 100 / 0.6) 0%, transparent 100%),
+      linear-gradient(172deg, #5a1024 0%, #851934 38%, #a92a4d 80%);
+  }
+
+  .m-hero--home {
+    padding-bottom: calc(1.25rem + var(--m-lift));
+  }
+
+  .m-hero--auth {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+    padding-inline: 1.5rem;
+    padding-bottom: calc(2.25rem + var(--m-lift));
+  }
+
+  .m-hero__title {
+    margin-top: 1.25rem;
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+    overflow-wrap: anywhere;
+  }
+
+  /* Translucent pink on the wine: icon buttons, the figure pill, hero buttons.
+     Pink rather than white, so the glass lifts the wine without greying it. */
+  .m-glass {
+    background-color: rgb(255 104 150 / 0.16);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 190 210 / 0.3),
+      inset 0 1px 0 0 rgb(255 235 241 / 0.18);
+    color: #ffffff;
+  }
+
+  .m-glass:active {
+    background-color: rgb(255 104 150 / 0.28);
+  }
+
+  /* The bell's count. The ring is the hero's own colour, so the badge reads as
+     cut out of the glass rather than stuck on it. */
+  .m-badge {
+    position: absolute;
+    top: -0.25rem;
+    right: -0.25rem;
+    display: grid;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    place-items: center;
+    padding: 0 0.3125rem;
+    border-radius: 999px;
+    background: #ff3d62;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 2px #8f2244;
+  }
+
+  /* The compact bar an inner screen shows once its title scrolls away, so the
+     way back never needs a scroll to the top. */
+  .m-pagebar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 35;
+    padding: calc(env(safe-area-inset-top, 0px) + 0.375rem) 0.75rem 0.375rem;
+    color: #ffffff;
+    /* The top of the hero it stands in for: deep wine, lit at the right. */
+    background:
+      radial-gradient(60% 140% at 100% 0%, rgb(255 72 132 / 0.26) 0%, transparent 70%),
+      linear-gradient(162deg, #5a1024 0%, #7a1631 100%);
+    box-shadow: 0 12px 26px -18px rgb(0 0 0 / 0.95);
+    opacity: 0;
+    transform: translateY(-100%);
+    visibility: hidden;
+    transition:
+      opacity 180ms ease,
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0s linear 220ms;
+  }
+
+  .m-pagebar[data-show="true"] {
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    transition:
+      opacity 180ms ease,
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0s;
+  }
+
+  /* ═══ BODY SHEET ═════════════════════════════════════════════════════════
+     The body climbs over the hero's foot. Its ground is a pseudo element that
+     starts below the tab, so the hero shows through beside the tab and behind
+     the rounded corner. The 1px overlap hides the seam a fractional device
+     pixel ratio would otherwise draw between the tab and the sheet. */
+  .m-body {
+    position: relative;
+    z-index: 20;
+    flex: 1;
+    margin-top: calc(-1 * var(--m-lift));
+    padding-bottom: var(--m-reserve);
+    /* Nothing in a phone app may scroll sideways. Sheets are portalled out. */
+    overflow-x: clip;
+    color: var(--m-text);
+  }
+
+  .m-body::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: calc(var(--m-tab-h) - 1px) 0 0 0;
+    border-top-right-radius: var(--m-sheet-r);
+    background: var(--m-ground);
+  }
+
+  .m-shell:not(.m-shell--tab) .m-body::before {
+    top: 0;
+    border-top-left-radius: var(--m-sheet-r);
+  }
+
+  /* ═══ SHEET TAB ══════════════════════════════════════════════════════════
+     The signature: the first section label on a tab that rises into the hero,
+     rounded top left, with a smooth sloped shoulder on the right. */
+  /* The margin is the gap before the first content, so nothing sits against
+     the wine edge beside the shoulder. */
+  .m-tab {
+    display: flex;
+    height: var(--m-tab-h);
+    margin-bottom: 0.75rem;
+    color: var(--m-ground);
+  }
+
+  .m-tab__label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.25rem 0.125rem 0 1rem;
+    border-top-left-radius: var(--m-sheet-r);
+    background: var(--m-ground);
+    color: var(--m-text);
+    font-size: 1.1875rem;
+    font-weight: 700;
+    letter-spacing: -0.018em;
+    white-space: nowrap;
+  }
+
+  .m-tab__shoulder {
+    display: block;
+    flex: none;
+    width: calc(var(--m-tab-h) * 1.6);
+    height: 100%;
+    margin-left: -1px;
+    overflow: visible;
+    fill: currentColor;
+  }
+
+  /* ═══ SECTIONS ═══════════════════════════════════════════════════════════ */
+  .m-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1875rem;
+    font-weight: 700;
+    letter-spacing: -0.018em;
+    color: var(--m-text);
+  }
+
+  .m-link {
+    color: var(--m-link);
+    font-weight: 600;
+    transition: opacity 140ms ease;
+  }
+
+  a.m-link:active {
+    opacity: 0.65;
+  }
+
+  /* ═══ BOTTOM BAR ═════════════════════════════════════════════════════════ */
+  .m-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 40;
+    padding-bottom: var(--safe-b);
+    border-radius: 1.625rem 1.625rem 0 0;
+    background: linear-gradient(180deg, #2b1a1f 0%, #1c1014 100%);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.08),
+      0 -18px 40px -18px rgb(0 0 0 / 0.9);
+  }
+
+  .m-nav__row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    max-width: 32rem;
+    height: var(--m-bar-h);
+    margin: 0 auto;
+    padding: 0 0.5rem;
+  }
+
+  .m-nav__item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    gap: 0.1875rem;
+    min-width: 4.5rem;
+    height: 100%;
+    /* Rounded so a keyboard focus ring reads as a soft tile, not a hard box. */
+    border-radius: 1rem;
+    color: #9d8a90;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: color 160ms ease;
+  }
+
+  .m-nav__item svg {
+    transition: color 160ms ease, filter 160ms ease;
+  }
+
+  .m-nav__item[data-on="true"] {
+    color: #ffffff;
+  }
+
+  .m-nav__item[data-on="true"] svg {
+    color: #ff9db3;
+    filter: drop-shadow(0 0 7px rgb(255 110 150 / 0.55));
+  }
+
+  /* The orb stands out of the bar: centred in the row, then lifted until the
+     glass sits across the bar's top edge. The ring is the bar's own colour, so
+     it reads as a socket the orb rises from. */
+  .m-orb {
+    position: relative;
+    isolation: isolate;
+    display: block;
+    width: var(--m-orb);
+    height: var(--m-orb);
+    translate: 0 -31%;
+    border-radius: 999px;
+    transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .m-orb > svg {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .m-orb::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 12.5%;
+    border-radius: 999px;
+    box-shadow:
+      0 0 0 5px #2a191e,
+      0 12px 32px 0 rgb(212 79 117 / 0.62);
+  }
+
+  .m-orb:active {
+    transform: scale(0.93);
+  }
+
+  /* Reporting is off for this account: the glass goes quiet and carries a lock. */
+  .m-orb--locked > svg {
+    filter: saturate(0.25) brightness(0.72);
+  }
+
+  .m-orb--locked::before {
+    box-shadow:
+      0 0 0 5px #2a191e,
+      0 10px 24px 0 rgb(0 0 0 / 0.55);
+  }
+
+  .m-orb__lock {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #ffffff;
+    filter: drop-shadow(0 1px 2px rgb(20 2 8 / 0.6));
+  }
+
+  /* The ambient sheen: a band of light crosses the glass every few seconds. */
+  .m-orb__sheen {
+    position: absolute;
+    inset: 12.5%;
+    overflow: hidden;
+    border-radius: 999px;
+    pointer-events: none;
+  }
+
+  .m-orb__sheen::before {
+    content: "";
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: -70%;
+    width: 55%;
+    background: linear-gradient(100deg, transparent 0%, rgb(255 255 255 / 0.55) 50%, transparent 100%);
+    transform: translateX(0) skewX(-16deg);
+    animation: m-sheen 6s ease-in-out 1.5s infinite;
+  }
+
+  @keyframes m-sheen {
+    0% {
+      transform: translateX(0) skewX(-16deg);
+    }
+    34%,
+    100% {
+      transform: translateX(360%) skewX(-16deg);
+    }
+  }
+
+  /* ═══ MENU ═══════════════════════════════════════════════════════════════
+     A tall sheet over a near black scrim, holding a black panel of circles in
+     a staggered 3 / 2 / 3, middle column higher. The close orb sits where the
+     bar's orb was and straddles the panel's lower edge. */
+  .m-scrim--menu {
+    background: rgb(5 1 3 / 0.8);
+  }
+
+  .m-menu {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 61;
+    max-height: calc(100dvh - 0.75rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.5rem 0.625rem calc(var(--safe-b) + 0.625rem);
+    border-radius: 2rem 2rem 0 0;
+    background: linear-gradient(180deg, #27171c 0%, #1b0f13 100%);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.09),
+      0 -24px 60px -24px rgb(0 0 0 / 0.95);
+    animation: m-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .m-menu__panel {
+    --m-rise: 1.375rem;
+
+    position: relative;
+    max-width: 28rem;
+    margin: 0 auto;
+    padding: 1.5rem 0.5rem 3rem;
+    border-radius: 1.75rem;
+    background:
+      radial-gradient(90% 50% at 50% 0%, rgb(255 140 175 / 0.07) 0%, transparent 70%),
+      #0b0507;
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.04),
+      inset 0 14px 30px -22px rgb(0 0 0 / 1);
+  }
+
+  .m-menu__grid {
+    container-type: inline-size;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    row-gap: 1.625rem;
+    margin: 0;
+    padding: var(--m-rise) 0 0;
+    list-style: none;
+  }
+
+  .m-menu__cell {
+    display: flex;
+    justify-content: center;
+  }
+
+  .m-menu__cell--up {
+    translate: 0 calc(-1 * var(--m-rise));
+  }
+
+  /* The last row's raised middle would otherwise crowd the labels above it. */
+  .m-menu__cell--last {
+    margin-top: 1rem;
+  }
+
+  .m-menu__item {
+    --m-dot: min(6.25rem, calc(100cqw / 3 - 1rem));
+
+    display: flex;
+    width: var(--m-dot);
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    animation: m-pop 230ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+    animation-delay: calc(70ms + var(--i, 0) * 22ms);
+  }
+
+  .m-menu__dot {
+    position: relative;
+    display: grid;
+    width: var(--m-dot);
+    height: var(--m-dot);
+    place-items: center;
+    border-radius: 999px;
+    /* A lit top lip and a faint wine glow pooling at the foot give the dark
+       circle a surface to hold the 3D object. */
+    background:
+      radial-gradient(70% 45% at 50% 100%, rgb(194 74 107 / 0.2) 0%, transparent 100%),
+      radial-gradient(circle at 50% 26%, #3a2630 0%, #23151b 58%, #180d11 100%);
+    box-shadow:
+      inset 0 1.5px 0 0 rgb(255 255 255 / 0.12),
+      inset 0 -10px 18px -8px rgb(0 0 0 / 0.5),
+      0 0 0 1px rgb(255 255 255 / 0.03),
+      0 12px 22px -14px rgb(0 0 0 / 1);
+    transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease;
+  }
+
+  .m-menu__dot > svg {
+    width: 62%;
+    height: 62%;
+  }
+
+  .m-menu__item:active .m-menu__dot {
+    transform: scale(0.93);
+  }
+
+  .m-menu__item[aria-current="page"] .m-menu__dot {
+    box-shadow:
+      inset 0 0 0 2px rgb(255 143 163 / 0.75),
+      inset 0 -10px 18px -6px rgb(0 0 0 / 0.55),
+      0 0 22px -6px rgb(255 110 150 / 0.5);
+  }
+
+  .m-menu__label {
+    color: #eadde1;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+  }
+
+  .m-menu__badge {
+    position: absolute;
+    top: 8%;
+    right: 8%;
+    display: grid;
+    min-width: 1.375rem;
+    height: 1.375rem;
+    place-items: center;
+    padding: 0 0.375rem;
+    border-radius: 999px;
+    background: #ff3d62;
+    color: #ffffff;
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 2.5px #0b0507;
+  }
+
+  .m-menu__foot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: -1.875rem;
+  }
+
+  .m-menu__close {
+    display: grid;
+    width: 3.75rem;
+    height: 3.75rem;
+    place-items: center;
+    border-radius: 999px;
+    color: #ffffff;
+    /* The bar orb's wine glass, quieter: closing is not the call to action. */
+    background:
+      radial-gradient(40% 30% at 36% 24%, rgb(255 214 226 / 0.5) 0%, transparent 100%),
+      radial-gradient(circle at 42% 34%, #8a3a53 0%, #5a2336 52%, #2e1019 100%);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.22),
+      inset 0 -6px 12px -4px rgb(20 2 8 / 0.5),
+      0 0 0 5px #1d1115,
+      0 10px 26px -6px rgb(194 74 107 / 0.45);
+    animation: m-turn-in 240ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+    transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .m-menu__close:active {
+    transform: scale(0.93);
+  }
+
+  .m-menu__close-label {
+    margin-top: 0.375rem;
+    color: var(--m-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ═══ FOCUS ══════════════════════════════════════════════════════════════ */
+  .m-app :focus-visible,
+  .m-float :focus-visible {
+    outline: 2px solid #ff8fa3;
+    outline-offset: 2px;
+  }
+
+  .m-paper :focus-visible {
+    outline-color: var(--wine-600);
+  }
+
+  .m-hero :focus-visible,
+  .m-pagebar :focus-visible {
+    outline-color: #ffffff;
+  }
+
+  /* A Menu item is a circle over a label. The ring follows the circle, and the
+     label underlines, rather than a square drawn round both. */
+  .m-menu__item:focus-visible {
+    outline: none;
+  }
+
+  .m-menu__item:focus-visible .m-menu__dot {
+    box-shadow:
+      0 0 0 3px #0b0507,
+      0 0 0 5px #ff8fa3,
+      inset 0 1.5px 0 0 rgb(255 255 255 / 0.12),
+      inset 0 -10px 18px -8px rgb(0 0 0 / 0.5);
+  }
+
+  .m-menu__item:focus-visible .m-menu__label {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  /* ═══ TOUCH ══════════════════════════════════════════════════════════════
+     `.m-tap` grows the hit area to 44px without touching the drawn box.
+     Because this is layered, `absolute` at a call site beats its `relative`. */
+  .m-tap {
+    position: relative;
+  }
+
+  .m-tap::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
+  .m-tap-abs {
+    position: absolute;
+  }
+
+  /* ═══ PRESS ══════════════════════════════════════════════════════════════
+     There is no hover on a touch screen, so the press is the only thing that
+     says a surface is live. */
+  .m-press {
+    transition:
+      transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 160ms ease,
+      border-color 160ms ease;
+  }
+
+  .m-press:active {
+    transform: scale(0.98);
+  }
+
+  .m-press-light:active {
+    background-color: var(--m-press);
+  }
+
+  .m-press-solid:active {
+    filter: brightness(0.9);
+  }
+
+  /* ═══ SURFACES ═══════════════════════════════════════════════════════════ */
+  .m-card {
+    border-radius: 1.25rem;
+    background: var(--m-card);
+    box-shadow: var(--m-edge), var(--m-drop);
+  }
+
+  .m-card--lg {
+    border-radius: 1.5rem;
+  }
+
+  /* ═══ BUTTONS ════════════════════════════════════════════════════════════ */
+  .m-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    user-select: none;
+    transition:
+      transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 140ms ease,
+      box-shadow 140ms ease,
+      filter 140ms ease;
+  }
+
+  .m-btn:active {
+    transform: scale(0.97);
+  }
+
+  .m-btn:disabled,
+  .m-btn[aria-disabled="true"] {
+    pointer-events: none;
+    background: var(--m-raised);
+    color: var(--m-faint);
+    box-shadow: none;
+    text-shadow: none;
+    filter: none;
+  }
+
+  /* Wine glass: a lit top lip, a darker foot, and a press that sinks. */
+  .m-btn--primary {
+    color: #ffffff;
+    background: linear-gradient(180deg, #c24a6b 0%, #8a2342 100%);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 214 226 / 0.45),
+      inset 0 -1px 0 0 rgb(45 6 18 / 0.4),
+      0 10px 22px -12px rgb(194 74 107 / 0.8);
+    text-shadow: 0 1px 0 rgb(70 12 30 / 0.35);
+  }
+
+  .m-btn--primary:active {
+    transform: translateY(1px) scale(0.985);
+    background: linear-gradient(180deg, #a83c5b 0%, #761c38 100%);
+    box-shadow:
+      inset 0 2px 7px 0 rgb(40 5 16 / 0.5),
+      0 4px 10px -8px rgb(194 74 107 / 0.6);
+  }
+
+  .m-btn--secondary {
+    color: var(--m-text);
+    background: var(--m-raised);
+    box-shadow:
+      inset 0 0 0 1px var(--m-line),
+      inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+  }
+
+  .m-btn--secondary:active {
+    background: var(--m-line);
+  }
+
+  .m-paper .m-btn--secondary {
+    background: #ffffff;
+  }
+
+  .m-paper .m-btn--secondary:active {
+    background: var(--m-press);
+  }
+
+  .m-btn--quiet {
+    color: var(--m-act-fg);
+    background: var(--m-act-bg);
+  }
+
+  .m-btn--quiet:active {
+    filter: brightness(1.18);
+  }
+
+  .m-paper .m-btn--quiet:active {
+    filter: brightness(0.96);
+  }
+
+  .m-btn--danger {
+    color: var(--m-bad-fg);
+    background: transparent;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--m-bad-fg) 38%, transparent);
+  }
+
+  .m-btn--danger:active {
+    background: var(--m-bad-bg);
+  }
+
+  .m-btn--whatsapp {
+    color: #ffffff;
+    background: #059669;
+  }
+
+  .m-btn--whatsapp:active {
+    background: #047857;
+  }
+
+  /* ═══ FIELDS ═════════════════════════════════════════════════════════════ */
+  .m-field {
+    border: 1px solid var(--m-line);
+    background-color: var(--m-card);
+    color: var(--m-text);
+    transition:
+      border-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+
+  .m-field::placeholder {
+    color: var(--m-faint);
+    opacity: 1;
+  }
+
+  .m-field:focus,
+  .m-field:focus-within {
+    border-color: #d0567a;
+    box-shadow: 0 0 0 3px rgb(194 74 107 / 0.32);
+  }
+
+  /* A field that failed, said with more than colour. */
+  .m-bad {
+    border-color: var(--m-bad-fg);
+    background-color: color-mix(in oklab, var(--m-bad-bg) 45%, var(--m-card));
+  }
+
+  /* ═══ CHIPS AND NOTES ════════════════════════════════════════════════════ */
+  .m-chip {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .m-chip__dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .m-tone-neutral {
+    color: var(--m-muted);
+    background-color: var(--m-raised);
+  }
+
+  .m-tone-act {
+    color: var(--m-act-fg);
+    background-color: var(--m-act-bg);
+  }
+
+  .m-tone-heads {
+    color: var(--m-heads-fg);
+    background-color: var(--m-heads-bg);
+  }
+
+  .m-tone-good {
+    color: var(--m-good-fg);
+    background-color: var(--m-good-bg);
+  }
+
+  .m-tone-warn {
+    color: var(--m-warn-fg);
+    background-color: var(--m-warn-bg);
+  }
+
+  .m-tone-bad {
+    color: var(--m-bad-fg);
+    background-color: var(--m-bad-bg);
+  }
+
+  .m-note {
+    padding: 0.75rem 0.875rem;
+    border-radius: 0.875rem;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ═══ MONEY ══════════════════════════════════════════════════════════════
+     The naira sign and the kobo sit at a smaller optical size than the whole
+     number, and every figure uses tabular digits. */
+  .m-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .m-money {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .m-money__sign {
+    margin-right: 0.06em;
+    font-size: 0.56em;
+    font-weight: 600;
+    letter-spacing: 0;
+    opacity: 0.72;
+    vertical-align: 0.16em;
+  }
+
+  .m-money__kobo {
+    font-size: 0.56em;
+    font-weight: 600;
+    letter-spacing: 0;
+    opacity: 0.72;
+  }
+
+  .m-money--hero {
+    font-size: var(--m-figure, 2.625rem);
+    letter-spacing: -0.03em;
+  }
+
+  .m-money--hero .m-money__sign {
+    margin-right: 0.08em;
+    font-size: 0.52em;
+    vertical-align: 0.62em;
+  }
+
+  .m-money--hero .m-money__kobo {
+    font-size: 0.52em;
+  }
+
+  /* Hidden: spaced dots on the figure's own line. */
+  .m-money__dots {
+    display: inline-block;
+    font-size: 0.5em;
+    letter-spacing: 0.22em;
+    vertical-align: 0.34em;
+  }
+
+  /* Hidden, the dots take the figure's place and the eye comes in beside
+     them, as it sits beside the figure. The figure stays in the line at no
+     width, so the row keeps its height and nothing below moves. */
+  .m-figure {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+  }
+
+  .m-figure--hidden > .m-money {
+    width: 0;
+    overflow: hidden;
+    visibility: hidden;
+  }
+
+  .m-figure__dots {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-inline: 0.25rem;
+  }
+
+  .m-figure__dots > span {
+    width: 0.6875rem;
+    height: 0.6875rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .m-money--lg {
+    font-size: 24px;
+  }
+
+  .m-money--md {
+    font-size: 17px;
+  }
+
+  .m-money--sm {
+    font-size: 13px;
+  }
+
+  /* ═══ SEGMENTED ══════════════════════════════════════════════════════════ */
+  .m-seg {
+    position: relative;
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    padding: 0.25rem;
+    border-radius: 999px;
+    background: var(--m-track);
+    box-shadow: inset 0 0 0 1px var(--m-line);
+  }
+
+  .m-paper .m-seg {
+    box-shadow: none;
+  }
+
+  .m-seg__ind {
+    position: absolute;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    left: 0.25rem;
+    width: calc((100% - 0.5rem) / var(--m-seg-count));
+    transform: translateX(calc(var(--m-seg-index) * 100%));
+    border-radius: 999px;
+    background: var(--m-thumb);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.07),
+      0 1px 3px 0 rgb(0 0 0 / 0.35);
+    transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .m-paper .m-seg__ind {
+    box-shadow:
+      0 0 0 1px rgb(44 27 31 / 0.05),
+      0 1px 3px 0 rgb(44 27 31 / 0.16);
+  }
+
+  /* `min-width: 0` plus the clip keep a long label inside its third. */
+  .m-seg__btn {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    min-height: 2.25rem;
+    overflow: hidden;
+    border-radius: 999px;
+    color: var(--m-muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 180ms ease;
+  }
+
+  .m-seg--tight .m-seg__btn {
+    font-size: 12px;
+    letter-spacing: -0.012em;
+  }
+
+  .m-seg__btn[aria-selected="true"] {
+    color: var(--m-text);
+  }
+
+  /* ═══ PROGRESS ═══════════════════════════════════════════════════════════ */
+  .m-prog {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--m-line);
+  }
+
+  .m-prog__fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #a83c5b, #e0708e);
+    transition: width 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ═══ SHEET ══════════════════════════════════════════════════════════════
+     Rises from the bottom over a scrim that dims the page. The bottom pad
+     carries the home indicator and the keyboard iOS draws over it. */
+  @keyframes m-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes m-rise {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+
+  @keyframes m-pop {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.88);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes m-turn-in {
+    from {
+      opacity: 0;
+      transform: rotate(-90deg) scale(0.6);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .m-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgb(6 2 4 / 0.64);
+    animation: m-fade 200ms ease both;
+  }
+
+  .m-paper .m-scrim,
+  .m-paper.m-float .m-scrim {
+    background: rgb(28 18 20 / 0.52);
+  }
+
+  .m-sheet {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 61;
+    max-height: min(88dvh, 46rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: calc(1.25rem + var(--safe-b) + var(--c-kb));
+    border-radius: 1.75rem 1.75rem 0 0;
+    background: var(--m-sheet);
+    color: var(--m-text);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.07),
+      0 -20px 50px -20px rgb(0 0 0 / 0.85);
+    animation: m-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .m-sheet__grip {
+    display: block;
+    width: 2.5rem;
+    height: 0.3125rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.2);
+  }
+
+  .m-paper .m-sheet__grip {
+    background: var(--mist-300);
+  }
+
+  /* ═══ SKELETONS ══════════════════════════════════════════════════════════
+     A sweeping highlight rather than a pulse, at the console's 1.4s. */
+  @keyframes m-sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  .m-skel {
+    position: relative;
+    overflow: hidden;
+    background: var(--m-skel);
+  }
+
+  .m-skel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--m-skel-hi), transparent);
+    animation: m-sweep 1.4s ease-in-out infinite;
+  }
+
+  .m-skel--onwine {
+    background: rgb(255 255 255 / 0.1);
+  }
+
+  .m-skel--onwine::after {
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.14), transparent);
+  }
+
+  /* ═══ RAILS ══════════════════════════════════════════════════════════════
+     A sideways strip of cards that snaps one card at a time and peeks the
+     next, bleeding to the screen edge. */
+  /* The gap matches the side padding, so a swiped strip shows no sliver of the
+     card before. */
+  .m-rail {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1rem;
+    padding: 0.125rem 1rem 0.5rem;
+    scrollbar-width: none;
+  }
+
+  .m-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .m-rail > * {
+    flex: none;
+    scroll-snap-align: start;
+  }
+
+  .m-rail--wide > * {
+    width: 86%;
+    max-width: 26rem;
+  }
+
+  .m-rail--cards > * {
+    width: 74%;
+    max-width: 17.5rem;
+  }
+
+  .m-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.375rem;
+    padding-top: 0.25rem;
+  }
+
+  .m-dots > span {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.22);
+    transition:
+      width 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 220ms ease;
+  }
+
+  .m-dots > span[data-on="true"] {
+    width: 1.125rem;
+    background: #ffffff;
+  }
+
+  /* ═══ UPDATE CARDS ═══════════════════════════════════════════════════════ */
+  .m-update {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-height: 9rem;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+    padding: 0.875rem 1rem 1rem;
+    border-radius: 1.375rem;
+    color: #ffffff;
+    background: var(--m-card);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.07),
+      0 18px 30px -24px rgb(0 0 0 / 1);
+  }
+
+  /* Dark from the left, where the words are, so the photo still shows on the
+     right. Wherever a title can reach, the two layers together block about
+     60% of the photo: white type then clears 4.5:1 over a white wall. */
+  .m-update__shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(90deg, rgb(14 6 9 / 0.86) 0%, rgb(14 6 9 / 0.62) 50%, rgb(14 6 9 / 0.5) 78%, rgb(14 6 9 / 0.04) 100%),
+      linear-gradient(180deg, rgb(14 6 9 / 0.12) 0%, rgb(14 6 9 / 0.25) 40%, rgb(14 6 9 / 0.55) 100%);
+  }
+
+  .m-update--wine {
+    background:
+      radial-gradient(85% 90% at 100% 0%, rgb(255 168 196 / 0.4) 0%, transparent 62%),
+      linear-gradient(150deg, #c24a6b 0%, #8a2342 46%, #3a0f1e 100%);
+  }
+
+  .m-update--gold {
+    background:
+      radial-gradient(85% 90% at 100% 0%, rgb(255 234 176 / 0.5) 0%, transparent 60%),
+      linear-gradient(150deg, #e0a44c 0%, #9c611e 44%, #3a210d 100%);
+  }
+
+  .m-update--plum {
+    background:
+      radial-gradient(85% 90% at 100% 0%, rgb(190 172 242 / 0.36) 0%, transparent 62%),
+      linear-gradient(150deg, #5b3b50 0%, #34212c 48%, #150b10 100%);
+  }
+
+  .m-update--wine .m-update__shade,
+  .m-update--gold .m-update__shade,
+  .m-update--plum .m-update__shade {
+    background: linear-gradient(180deg, transparent 40%, rgb(14 6 9 / 0.45) 100%);
+  }
+
+  .m-update__art {
+    position: absolute;
+    top: 0.625rem;
+    right: 0.625rem;
+    z-index: -1;
+    filter: drop-shadow(0 12px 16px rgb(0 0 0 / 0.35));
+  }
+
+  .m-update__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    height: 2rem;
+    margin-top: 0.625rem;
+    padding: 0 0.625rem 0 0.875rem;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #7a2140;
+    box-shadow: 0 8px 16px -10px rgb(0 0 0 / 0.7);
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+
+  .m-update--empty {
+    min-height: 7.25rem;
+  }
+
+  /* ═══ ALERT CARDS ════════════════════════════════════════════════════════ */
+  /* No fixed height: the strip stretches every card to its tallest, so the
+     cards line up and none is taller than its words need. */
+  .m-alert-card {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    padding: 0.75rem 0.875rem 0.875rem 1rem;
+    border-radius: 1.375rem;
+    background: var(--m-card);
+    box-shadow: var(--m-edge), var(--m-drop);
+  }
+
+  /* ═══ WIDE SCREENS ═══════════════════════════════════════════════════════
+     A phone app opened on a laptop is drawn as a phone-width column rather
+     than stretched, and everything pinned to the viewport follows the column. */
+  @media (min-width: 40rem) {
+    .m-shell {
+      width: 100%;
+      max-width: 30rem;
+      margin-inline: auto;
+      box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 40px 90px -40px rgb(0 0 0 / 0.9);
+    }
+
+    .m-nav,
+    .m-pagebar,
+    .m-sheet,
+    .m-menu {
+      right: auto;
+      left: 50%;
+      width: 100%;
+      max-width: 30rem;
+      translate: -50% 0;
+    }
+  }
+
+  /* ═══ SMALL THINGS ═══════════════════════════════════════════════════════ */
+
+  /* A strip with its scrollbar hidden has nothing left to say that it scrolls,
+     so its trailing edge fades instead. */
+  .m-fade-r {
+    mask-image: linear-gradient(90deg, #000 calc(100% - 1.5rem), transparent 100%);
+  }
+}
+
+/* ═══ REDUCED MOTION ═════════════════════════════════════════════════════════
+   Every animation here decorates a screen that is already correct without it,
+   so all of it goes, delays included: a staggered item that keeps its delay
+   stays invisible for that long. The pressed transforms go too; the tints
+   still answer the tap. */
+@media (prefers-reduced-motion: reduce) {
+  .m-app *,
+  .m-app *::before,
+  .m-app *::after,
+  .m-float *,
+  .m-float *::before,
+  .m-float *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .m-press:active,
+  .m-btn:active,
+  .m-btn--primary:active,
+  .m-orb:active,
+  .m-menu__item:active .m-menu__dot,
+  .m-menu__close:active {
+    transform: none !important;
+  }
+
+  .m-orb__sheen,
+  .m-skel::after {
+    display: none;
+  }
+}

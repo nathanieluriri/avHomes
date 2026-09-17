@@ -71,7 +71,15 @@ export function formatBytes(bytes: number): string {
 
 /* ───────────────────────────── notifications ──────────────────────────── */
 
-export const NOTIFICATION_KINDS = ["quota-request", "note-created", "note-updated", "template-request"] as const;
+export const NOTIFICATION_KINDS = [
+  "quota-request",
+  "note-created",
+  "note-updated",
+  "template-request",
+  "marketing-deal",
+  "marketing-issue",
+  "marketing-bank",
+] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export interface AppNotification {

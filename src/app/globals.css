@@ -135,6 +135,18 @@
   --color-slate-600: var(--slate-600);
   --color-slate-550: var(--slate-550);
 
+  /* The marketer app's surface roles, as `bg-m-card`, `text-m-muted` and so on.
+     The values are set on `.m-app` in src/app/m/m.css, dark by default and
+     light under `.m-paper`, so one class reads right in both. */
+  --color-m-ground: var(--m-ground);
+  --color-m-card: var(--m-card);
+  --color-m-raised: var(--m-raised);
+  --color-m-line: var(--m-line);
+  --color-m-text: var(--m-text);
+  --color-m-muted: var(--m-muted);
+  --color-m-faint: var(--m-faint);
+  --color-m-link: var(--m-link);
+
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -197,10 +209,42 @@
    *
    * `.console-float` covers surfaces portaled to document.body, which land
    * outside the console's own subtree.
+   *
+   * The marketer app at `/m` is exempt for the same reasons and one more: it is
+   * a phone app, where elevation is how a fixed tab bar, a hero card and a
+   * rising sheet say which layer they are on. `.m-float` is its portal target,
+   * the counterpart of `.console-float`.
    */
-  *:not(.console, .console *, .console-float, .console-float *),
-  *:not(.console, .console *, .console-float, .console-float *)::before,
-  *:not(.console, .console *, .console-float, .console-float *)::after {
+  *:not(
+      .console,
+      .console *,
+      .console-float,
+      .console-float *,
+      .m-app,
+      .m-app *,
+      .m-float,
+      .m-float *
+    ),
+  *:not(
+      .console,
+      .console *,
+      .console-float,
+      .console-float *,
+      .m-app,
+      .m-app *,
+      .m-float,
+      .m-float *
+    )::before,
+  *:not(
+      .console,
+      .console *,
+      .console-float,
+      .console-float *,
+      .m-app,
+      .m-app *,
+      .m-float,
+      .m-float *
+    )::after {
     box-shadow: none !important;
   }
 }

@@ -1,12 +1,16 @@
 import {
+  Banknote,
   Bell,
   Building2,
   Gauge,
   GraduationCap,
+  Handshake,
   History,
   Images,
   Inbox,
   Mail,
+  Megaphone,
+  MessageCircleWarning,
   MailOpen,
   Newspaper,
   PencilRuler,
@@ -14,6 +18,7 @@ import {
   TriangleAlert,
   UserRoundCheck,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { hasDomain, type Domain, type Role } from "@avhomes/contracts";
@@ -156,6 +161,54 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
+    /* Commission hangs off these screens instead of taking a rail row: it is a
+       settings page nobody visits twice a month. A rail that lists every route
+       stops being a list of what this person does all day.
+
+       Deals is first because it is the one with a queue behind it, and the only
+       row in this group that carries a badge. Updates sits above Marketers for
+       the reason `sectionFor` gives: its path is under `/admin/marketers`, and
+       the first match wins. */
+    label: "Marketers",
+    items: [
+      {
+        href: "/admin/marketers/deals",
+        label: "Deals",
+        hint: "Sales a marketer reported, waiting to be checked",
+        icon: Handshake,
+        domain: "marketing",
+      },
+      {
+        href: "/admin/marketers/pay",
+        label: "Pay day",
+        hint: "This month's transfers, and who is still owed",
+        icon: Banknote,
+        domain: "marketing",
+      },
+      {
+        href: "/admin/marketers/problems",
+        label: "Problems",
+        hint: "Marketers who say a payment never arrived",
+        icon: MessageCircleWarning,
+        domain: "marketing",
+      },
+      {
+        href: "/admin/marketers/updates",
+        label: "Updates",
+        hint: "News cards on the marketer app's home screen",
+        icon: Megaphone,
+        domain: "marketing",
+      },
+      {
+        href: "/admin/marketers",
+        label: "Marketers",
+        hint: "Everyone selling, their team and what they earned",
+        icon: UsersRound,
+        domain: "marketing",
+      },
+    ],
+  },
+  {
     label: "Access",
     items: [
       {
@@ -208,7 +261,18 @@ export function isSectionActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/** The nav row a URL belongs to, or null. Feeds the breadcrumb's parent chip. */
+/**
+ * The nav row a URL belongs to, or null. Feeds the breadcrumb's parent chip and
+ * the rail's highlight.
+ *
+ * FIRST MATCH WINS, and that is what settles the one place two rows overlap:
+ * Deals and Pay day sit UNDER Marketers in the URL tree, so `/admin/marketers`
+ * is a prefix of both and `isSectionActive` says yes to two rows at once. Both
+ * children are declared ahead of their parent in `NAV`, so the specific row is
+ * the one found. Anything the group does not name, such as an open marketer or
+ * the commission screen, falls through to Marketers, which is where a reader
+ * would look for it.
+ */
 export function sectionFor(pathname: string): NavItem | null {
   return NAV_ITEMS.find((item) => isSectionActive(pathname, item.href)) ?? null;
 }

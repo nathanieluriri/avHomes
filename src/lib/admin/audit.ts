@@ -28,6 +28,10 @@ const ENTITY_NOUN: Record<AuditEntity, string> = {
   settings: "settings",
   session: "session",
   auth: "sign-in",
+  marketer: "marketer",
+  deal: "deal",
+  payrun: "pay run",
+  update: "marketer update",
   unknown: "record",
 };
 
@@ -46,6 +50,10 @@ export const ENTITY_FILTER_LABEL: Record<AuditEntity, string> = {
   settings: "Settings",
   session: "Sessions",
   auth: "Sign-in",
+  marketer: "Marketers",
+  deal: "Deals",
+  payrun: "Pay runs",
+  update: "Marketer updates",
   unknown: "Other",
 };
 
@@ -195,6 +203,7 @@ const ENTITY_SCREEN: Partial<Record<AuditEntity, { href: string; label: string }
   note: { href: "/admin/customize", label: "the customize studio" },
   stat: { href: "/admin", label: "the dashboard" },
   settings: { href: "/admin/settings", label: "the settings screen" },
+  update: { href: "/admin/marketers/updates", label: "the updates screen" },
 };
 
 /** Where the console shows this record, and what the link should call it. */

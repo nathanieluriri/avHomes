@@ -1,3 +1,4 @@
+import { formatMoney, payMonthLabel } from "./marketing";
 import type { Domain } from "./roles";
 import type { ClientLogo, Office } from "./types";
 
@@ -101,6 +102,26 @@ export interface SiteHealthSnapshot {
     /** New and unanswered for more than two days. */
     stale: number;
   };
+  /**
+   * The only block here whose subject is a person rather than a page.
+   *
+   * Everything above costs a visitor something. These cost a marketer money
+   * they have already worked for, which is why the checks below are worded at
+   * them and not at the site.
+   */
+  marketing: {
+    /** Reported, with proof attached, and nobody has looked yet. */
+    dealsWaiting: number;
+    /** A marketer says a transfer they were told about never arrived. */
+    issuesOpen: number;
+    /** The month whose pay run has not been made yet, or empty. */
+    monthDue: string;
+    /** Approved and not yet in any pay run. */
+    owedMinor: number;
+    marketersActive: number;
+    /** Level 1 pays zero, so a deal closed today is worth nothing. */
+    ratesUnset: boolean;
+  };
 }
 
 /*
@@ -137,7 +158,7 @@ function plural(n: number, one: string, many: string): string {
  */
 export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
   const out: SiteAlert[] = [];
-  const { listings, posts, settings, enquiries } = snap;
+  const { listings, posts, settings, enquiries, marketing } = snap;
 
   /* ─────────────────────────────── blockers ─────────────────────────────── */
 
@@ -187,6 +208,17 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
       title: `${listings.incomplete} published ${plural(listings.incomplete, "listing has", "listings have")} no price or no address`,
       message: `${plural(listings.incomplete, "It is", "They are")} live on the site with a public URL that anyone can find and share. A blank listing does more damage than a missing one: it tells a buyer the company does not check its own work.`,
       action: { label: "Finish or unpublish", href: "/admin/properties" },
+    });
+  }
+
+  if (marketing.issuesOpen > 0) {
+    out.push({
+      id: "pay-issues-open",
+      severity: "blocker",
+      domain: "marketing",
+      title: `${marketing.issuesOpen} payment ${plural(marketing.issuesOpen, "problem is", "problems are")} open`,
+      message: `A marketer was told their commission went out and says it never arrived, so somebody is out of pocket on a sale they already closed. ${plural(marketing.issuesOpen, "That person keeps", "Those people keep")} selling on trust, and this is what spends it.`,
+      action: { label: "Answer them", href: "/admin/marketers/problems" },
     });
   }
 
@@ -266,6 +298,28 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
     });
   }
 
+  if (marketing.dealsWaiting > 0) {
+    out.push({
+      id: "deals-waiting",
+      severity: "warning",
+      domain: "marketing",
+      title: `${marketing.dealsWaiting} ${plural(marketing.dealsWaiting, "deal is", "deals are")} waiting to be checked`,
+      message: `The marketer who closed ${plural(marketing.dealsWaiting, "it", "them")} cannot be paid until somebody opens the proof and approves it. Until then they are watching a screen that says pending and wondering whether anyone read it.`,
+      action: { label: "Check the deals", href: "/admin/marketers/deals" },
+    });
+  }
+
+  if (marketing.monthDue !== "") {
+    out.push({
+      id: "pay-run-not-made",
+      severity: "warning",
+      domain: "marketing",
+      title: `${payMonthLabel(marketing.monthDue)} has not been prepared`,
+      message: `${formatMoney(marketing.owedMinor)} is approved and waiting on a pay run nobody has made, so every marketer owed a share of it is waiting on a transfer that has not been started. They chased the sale; this is the half they cannot do themselves.`,
+      action: { label: "Make the pay run", href: "/admin/marketers/pay" },
+    });
+  }
+
   /* ────────────────────────────── advisories ────────────────────────────── */
 
   if (posts.published < THIN_JOURNAL) {
@@ -320,6 +374,19 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
       title: `${enquiries.stale} ${plural(enquiries.stale, "enquiry has", "enquiries have")} waited more than two days`,
       message: `Somebody asked about a specific house and has heard nothing back. By now ${plural(enquiries.stale, "they have", "most of them have")} asked someone else.`,
       action: { label: "Answer them", href: "/admin/enquiries" },
+    });
+  }
+
+  if (marketing.marketersActive === 0) {
+    out.push({
+      id: "no-marketers",
+      severity: "advisory",
+      domain: "marketing",
+      title: "Nobody has joined as a marketer yet",
+      message: marketing.ratesUnset
+        ? "Nobody is out selling your listings on commission, and the level 1 rate is still zero, so the first person who did join would close a sale and earn nothing on it. The rates and the switch that opens the join page are the same screen."
+        : "Nobody is out selling your listings on commission, so every buyer still has to find you through the site on their own. The rates are already set and the join page is one switch away from being open to anybody you send to it.",
+      action: { label: "Open commission", href: "/admin/marketers/settings" },
     });
   }
 

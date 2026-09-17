@@ -1,3 +1,4 @@
+import type { Document } from "mongodb";
 import { ALL_ROLES, AUDIT_ENTITIES } from "@avhomes/contracts";
 import { COLLECTIONS } from "../collections";
 import { ensureCollection, ensureIndex, type Migration } from "../migrate";
@@ -86,8 +87,44 @@ shared lower tier every feature package imports rather than a peer, and
 nothing else) exists to keep out.`,
 
   async up(db) {
-    await ensureCollection(db, COLLECTIONS.audit, {
-      $jsonSchema: {
+    await ensureCollection(db, COLLECTIONS.audit, auditValidator());
+
+    /*
+     * expireAfterSeconds: 0 against a per-document date sweeps a row at the
+     * moment named ON it, rather than N seconds after some fixed point, which
+     * is exactly what a per-row two year expiry needs. See the `why` above.
+     */
+    await ensureIndex(
+      db,
+      COLLECTIONS.audit,
+      { expiresAtDate: 1 },
+      { name: "audit_ttl", expireAfterSeconds: 0 },
+    );
+
+    // The log, newest first. `_id` breaks ties within the same millisecond,
+    // the same tiebreaker every keyset page in this repository already uses.
+    await ensureIndex(db, COLLECTIONS.audit, { at: -1, _id: -1 }, { name: "audit_recent" });
+
+    // This record's history: the admin log's entity filter and the property
+    // editor's History panel both resolve to a scan of this index.
+    await ensureIndex(
+      db,
+      COLLECTIONS.audit,
+      { entity: 1, entityId: 1, at: -1, _id: -1 },
+      { name: "audit_entity" },
+    );
+  },
+};
+
+/**
+ * The trail's validator, as a function so a later migration can re-apply it
+ * when `ALL_ROLES` or `AUDIT_ENTITIES` grows. A validator is frozen at the
+ * moment it is applied, so a new role would otherwise be refused by a database
+ * that migrated before the role existed.
+ */
+export function auditValidator(): Document {
+  return {
+    $jsonSchema: {
         bsonType: "object",
         required: [
           "_id",
@@ -132,31 +169,5 @@ nothing else) exists to keep out.`,
           expiresAtDate: DATE,
         },
       },
-    });
-
-    /*
-     * expireAfterSeconds: 0 against a per-document date sweeps a row at the
-     * moment named ON it, rather than N seconds after some fixed point, which
-     * is exactly what a per-row two year expiry needs. See the `why` above.
-     */
-    await ensureIndex(
-      db,
-      COLLECTIONS.audit,
-      { expiresAtDate: 1 },
-      { name: "audit_ttl", expireAfterSeconds: 0 },
-    );
-
-    // The log, newest first. `_id` breaks ties within the same millisecond,
-    // the same tiebreaker every keyset page in this repository already uses.
-    await ensureIndex(db, COLLECTIONS.audit, { at: -1, _id: -1 }, { name: "audit_recent" });
-
-    // This record's history: the admin log's entity filter and the property
-    // editor's History panel both resolve to a scan of this index.
-    await ensureIndex(
-      db,
-      COLLECTIONS.audit,
-      { entity: 1, entityId: 1, at: -1, _id: -1 },
-      { name: "audit_entity" },
-    );
-  },
-};
+  };
+}

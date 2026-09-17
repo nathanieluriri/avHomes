@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { readReferral } from "@/lib/referral";
 
 const fieldClass =
   "mt-2 w-full rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm text-plum-950 outline-none transition-colors placeholder:text-slate-500 focus:border-wine-600";
@@ -51,6 +52,7 @@ export default function ContactForm({
     const subject =
       SUBJECTS.find((s) => s.value === subjectValue)?.label ?? subjectValue;
     const message = String(form.get("message") ?? "");
+    const referralCode = readReferral();
 
     try {
       const res = await fetch("/api/enquiries", {
@@ -66,6 +68,7 @@ export default function ContactForm({
           website: String(form.get("website") ?? ""),
           ...(propertyId ? { propertyId } : {}),
           ...(propertySlug ? { propertySlug } : {}),
+          ...(referralCode ? { referralCode } : {}),
         }),
       });
 

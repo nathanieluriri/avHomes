@@ -39,6 +39,12 @@ export const ID_PREFIXES = {
   notification: "ntf",
   newsletter: "nwsl",
   templateRequest: "treq",
+  marketer: "mkt",
+  deal: "deal",
+  ledgerLine: "ledg",
+  payRun: "prun",
+  payIssue: "pisu",
+  marketingUpdate: "upd",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];
