@@ -283,5 +283,9 @@ videos/*/snapshots/
 videos/*/renders/
 videos/*/assets/.frames/
 
+# Apple's iPhone bezels for the phone app videos. Apple's license forbids redistributing them;
+# re-extract with videos/_tools/dmg.py (VIDEOS.md section 12).
+videos/*/assets/iphone-*.png
+
 # Playwright MCP session logs, written by browser tooling.
 .playwright-mcp/

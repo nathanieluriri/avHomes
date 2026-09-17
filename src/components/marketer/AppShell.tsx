@@ -185,6 +185,24 @@ function BackControl({ back, onBack }: { back?: string; onBack?: () => void }) {
   return null;
 }
 
+/**
+ * The status bar strip. Home, sign in and join have no pinned bar, so once they
+ * scroll their content would run under the clock and the Dynamic Island. It
+ * covers exactly `env(safe-area-inset-top)`, is zero high where there is no
+ * inset, and only shows once the page has moved, so it never sits on a hero at
+ * rest.
+ */
+export function SafeTop() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return <div aria-hidden className="m-safetop" data-show={scrolled} />;
+}
+
 /** True once `target` has scrolled up under the top of the screen. */
 function useScrolledPast(target: RefObject<HTMLElement | null>, enabled: boolean): boolean {
   const [past, setPast] = useState(false);
@@ -287,6 +305,7 @@ export function AppShell({
     <MarketerCtx.Provider value={state}>
       <PaperContext.Provider value={paper}>
         <div className={shell}>
+          <SafeTop />
           <header className={`m-hero ${home ? "m-hero--home" : ""}`}>
             {/* The logo holds the top of every screen. A marketer showing this
                 app to somebody they are inviting is showing them AV Homes. */}

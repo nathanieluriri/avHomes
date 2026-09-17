@@ -1,0 +1,69 @@
+{
+  "footageDuration": 39.74,
+  "captions": [
+    {
+      "at": 1.8,
+      "until": 4.98,
+      "title": "Marketers, then Pay day",
+      "line": "It says how much is waiting to be paid out this month.",
+      "start": 0.1,
+      "end": 3.28
+    },
+    {
+      "at": 5.08,
+      "until": 10.39,
+      "title": "Make this month's list",
+      "line": "One row per person, with the bank account to send it to.",
+      "start": 3.38,
+      "end": 8.69
+    },
+    {
+      "at": 10.48,
+      "until": 15.73,
+      "title": "Copy the account number",
+      "line": "Send the transfer from your bank first, then record it here.",
+      "start": 8.78,
+      "end": 14.03
+    },
+    {
+      "at": 15.91,
+      "until": 22.43,
+      "title": "Mark as paid, then the reference",
+      "line": "Whatever the transfer receipt calls it.",
+      "start": 14.21,
+      "end": 20.73
+    },
+    {
+      "at": 22.59,
+      "until": 26.67,
+      "title": "Add the receipt",
+      "line": "The marketer sees it on their own screen.",
+      "start": 20.89,
+      "end": 24.97
+    },
+    {
+      "at": 26.77,
+      "until": 32.14,
+      "title": "Record the payment",
+      "line": "Their row turns Paid, and the total sent goes up.",
+      "start": 25.07,
+      "end": 30.44
+    },
+    {
+      "at": 33.28,
+      "until": 39.97,
+      "title": "Work down the list",
+      "line": "One transfer per person, recorded the same way.",
+      "start": 30.12,
+      "end": 33.7
+    },
+    {
+      "at": 40.26,
+      "until": 45.91,
+      "title": "Watch the total climb",
+      "line": "Once nobody is left to pay, the button turns into Close this run.",
+      "start": 33.99,
+      "end": 39.64
+    }
+  ]
+}

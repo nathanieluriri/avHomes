@@ -1,0 +1,51 @@
+{
+  "segments": [
+    [2.11, 36.31, 1],
+    [37.42, 41.28, 1],
+    [42.09, 50.9, 1]
+  ],
+  "captions": [
+    {
+      "at": 2.21,
+      "until": 7.46,
+      "title": "Marketers, then Problems",
+      "line": "Transfers a marketer says never landed."
+    },
+    {
+      "at": 7.57,
+      "until": 13.69,
+      "title": "Open it and read the thread",
+      "line": "The month, the amount, and what they told you."
+    },
+    {
+      "at": 13.87,
+      "until": 25.92,
+      "title": "Reply with what happened",
+      "line": "They read this in the app, on their phone."
+    },
+    {
+      "at": 26.11,
+      "until": 30.83,
+      "title": "Attach the new receipt",
+      "line": "Proof the money left, with the reference on it."
+    },
+    {
+      "at": 31,
+      "until": 36.26,
+      "title": "Send reply",
+      "line": "It lands in their app, receipt and all."
+    },
+    {
+      "at": 37.5,
+      "until": 41.23,
+      "title": "Mark as sorted once it lands",
+      "line": "It leaves the Open list."
+    },
+    {
+      "at": 42.21,
+      "until": 50.85,
+      "title": "Kept under Sorted",
+      "line": "The whole conversation stays, receipt included."
+    }
+  ]
+}

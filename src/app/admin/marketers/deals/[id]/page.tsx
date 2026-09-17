@@ -227,11 +227,13 @@ function DealScreen({ initial }: { initial: DealDetail }) {
    */
   const aside = (
     <aside className="space-y-4">
-      <Card>
+      {/* `deal-decided` tells the walkthrough there is no decision left to make here. */}
+      <Card spotlight={canReview ? undefined : "deal-decided"}>
         <CardHead title="Who gets paid" />
 
         <Field
           label="Final amount"
+          spotlight="deal-amount"
           hint={
             settled
               ? "This deal is settled. The shares below are what was written when it was approved."
@@ -249,7 +251,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
         </Field>
         {amountRefusal && <p className="mt-1 text-[12px] text-red-700">{amountRefusal}</p>}
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-4 space-y-2" data-spotlight="deal-split">
           {lines.length === 0 ? (
             <EmptyState
               bare
@@ -293,7 +295,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
       </Card>
 
       {canReview && (
-        <Card>
+        <Card spotlight="deal-decide">
           <CardHead title="Decide" />
           <Field
             label="Reason"
@@ -386,7 +388,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
           a phone, which is where the one thing this screen is for would be. */}
       <PageColumns asideFirstOnMobile aside={aside}>
         <div className="space-y-4">
-          <Card>
+          <Card spotlight="deal-proof">
             <CardHead title="Proof" />
             {deal.proof.length === 0 ? (
               <EmptyState

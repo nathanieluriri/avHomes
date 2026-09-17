@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>AVHomes marketers tutorial: Reporting a deal (iPhone)</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=Inter:wght@600&display=swap" rel="stylesheet" />
+    <style>
+      /* Tokens from src/app/globals.css. */
+      :root {
+        --plum-950: #1c1214; --wine-700: #762d3f; --wine-600: #983c53; --wine-500: #b45069;
+        --wine-300: #e6a8b7; --wine-100: #f2dee3; --chrome-900: #321119; --chrome-800: #4d1a26;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body, #root { width: 1080px; height: 1920px; }
+      html, body { overflow: hidden; background: var(--chrome-900); font-family: "Geist", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+      #root { position: relative; overflow: hidden; background: radial-gradient(120% 70% at 18% 6%, #5a2130 0%, var(--chrome-800) 34%, var(--chrome-900) 72%, #230b11 100%); }
+      .clip { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+      video.clip { object-fit: cover; background: #140b0e; }
+
+      /* The phone: Apple's iPhone 18 Pro bezel (Silver) over the take, filmed at its 402x874. */
+      .device-shadow { position: absolute; left: 139px; top: 231px; width: 802px; height: 1653px; border-radius: 164px; background: #0b0b0c;
+        box-shadow: 0 46px 90px -12px rgb(12 2 6 / 0.62), 0 14px 34px rgb(12 2 6 / 0.4); }
+      .screen { position: absolute; left: 171px; top: 256px; width: 738px; height: 1604px; overflow: hidden;
+        border-radius: 128px; background: #140b0e url("assets/last-frame.jpg") center / cover no-repeat; }
+      .bezel { position: absolute; left: 129px; top: 218px; width: 822px; height: 1680px; }
+      .status { position: absolute; left: 173px; top: 297px; width: 734px; height: 44px; color: #fff; }
+      .status .time { position: absolute; left: 70px; top: 0; width: 120px; height: 44px; line-height: 44px; text-align: center;
+        font-family: "Inter", "Geist", system-ui, sans-serif; font-weight: 600; font-size: 31px; letter-spacing: -0.02em; }
+      .status .icons { position: absolute; left: 547px; top: 11px; height: 22px; display: flex; align-items: center; gap: 11px; }
+      .status svg { display: block; flex: 0 0 auto; }
+      .home-ind { position: absolute; left: 412px; top: 1832px; width: 256px; height: 9px; border-radius: 9px; background: #fff; }
+
+      .card { background: radial-gradient(120% 90% at 18% 20%, #5a2130 0%, var(--chrome-800) 38%, var(--chrome-900) 78%, #230b11 100%); }
+      .intro .inner { position: absolute; left: 96px; right: 96px; top: 50%; transform: translateY(-50%); }
+      .intro .mark { width: 136px; height: auto; display: block; margin-bottom: 56px; }
+      .eyebrow { color: var(--wine-300); font-size: 26px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+      .intro h1 { margin-top: 24px; color: #fff; font-size: 128px; font-weight: 700; letter-spacing: -.035em; line-height: 1.0; }
+      h1 em, h2 em { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; color: var(--wine-300); letter-spacing: -.01em; }
+      .intro .sub { margin-top: 38px; color: var(--wine-100); font-size: 42px; font-weight: 400; line-height: 1.3; max-width: 880px; }
+      .intro .rule { margin-top: 60px; width: 240px; height: 4px; border-radius: 3px; background: var(--wine-500); transform-origin: 0 50%; }
+
+      .cap { position: absolute; left: 40px; right: 40px; top: 46px; z-index: 20; opacity: 0;
+        background: rgb(28 18 20 / 0.95); border-radius: 22px; padding: 20px 32px 22px 46px;
+        box-shadow: 0 18px 44px rgb(28 18 20 / 0.36), 0 0 0 1px rgb(255 255 255 / 0.06); }
+      .cap .bar { position: absolute; left: 0; top: 18px; bottom: 18px; width: 6px; border-radius: 3px; background: var(--wine-500); }
+      .cap .step { color: var(--wine-300); font-size: 19px; line-height: 1.2; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+      .cap .h { margin-top: 4px; color: #fff; font-size: 40px; font-weight: 700; letter-spacing: -.02em; line-height: 1.12; }
+      .cap .d { margin-top: 4px; color: var(--wine-100); font-size: 29px; font-weight: 400; line-height: 1.3; }
+
+      .progress { position: absolute; left: 0; bottom: 0; height: 8px; width: 1080px; background: var(--wine-500); transform-origin: 0 50%; z-index: 21; }
+
+      .outro .o-inner { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; }
+      .outro h2 { margin-top: 18px; color: #fff; font-size: 112px; font-weight: 700; letter-spacing: -.035em; line-height: 1.02; }
+      .o-close { margin: 44px auto 0; max-width: 1000px; padding: 0 40px; color: var(--wine-100); font-size: 36px; line-height: 1.45; }
+      .o-close b { color: #fff; font-weight: 600; }
+      .o-mark { width: 136px; height: auto; display: block; margin: 0 auto 40px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="61.79">
+      <div class="device-shadow" id="device-shadow" data-layout-allow-occlusion data-layout-allow-overlap></div>
+      <div class="screen" id="screen" data-layout-allow-occlusion data-layout-allow-overlap>
+        <video class="clip" id="footage" data-start="2.90" data-duration="53.89" data-media-start="0" src="assets/iphone.mp4" muted playsinline></video>
+      </div>
+      <div class="status" id="status" data-layout-allow-occlusion data-layout-allow-overlap>
+        <div class="time">4:08</div>
+        <div class="icons">
+          <svg width="35" height="22" viewBox="0 0 19 12" fill="#fff" aria-hidden="true"><rect x="0" y="7.3" width="3.2" height="4.7" rx="1"/><rect x="5.2" y="5" width="3.2" height="7" rx="1"/><rect x="10.4" y="2.5" width="3.2" height="9.5" rx="1"/><rect x="15.6" y="0" width="3.2" height="12" rx="1"/></svg>
+          <svg width="31" height="22" viewBox="0 0 17 12" fill="#fff" aria-hidden="true"><path d="M8.5 2.6c2.3 0 4.5.9 6.2 2.4.1.1.3.1.4 0l1.2-1.2c.1-.1.1-.3 0-.4C14.3 1.4 11.5.2 8.5.2S2.7 1.4.7 3.4c-.1.1-.1.3 0 .4l1.2 1.2c.1.1.3.1.4 0C4 3.5 6.2 2.6 8.5 2.6zm0 3.9c1.3 0 2.5.5 3.5 1.3.1.1.3.1.4 0l1.2-1.2c.1-.1.1-.3 0-.4-1.4-1.3-3.2-2-5.1-2s-3.7.7-5.1 2c-.1.1-.1.3 0 .4L4.6 7.8c.1.1.3.1.4 0 1-.8 2.2-1.3 3.5-1.3zm2.5 2.6c.1-.1.1-.3 0-.4-.7-.6-1.6-1-2.5-1s-1.8.4-2.5 1c-.1.1-.1.3 0 .4l2.3 2.3c.1.1.3.1.4 0L11 9.1z"/></svg>
+          <svg width="50" height="24" viewBox="0 0 27 13" aria-hidden="true"><rect x="0.5" y="0.5" width="23" height="12" rx="3.8" fill="none" stroke="#fff" stroke-opacity="0.4"/><rect x="2" y="2" width="20" height="9" rx="2.4" fill="#fff"/><path d="M25 4.4v4.2c.8-.3 1.4-1.2 1.4-2.1S25.8 4.7 25 4.4z" fill="#fff" fill-opacity="0.45"/></svg>
+        </div>
+      </div>
+      <div class="home-ind" id="home-ind" data-layout-allow-occlusion data-layout-allow-overlap></div>
+      <img class="bezel" id="bezel" src="assets/iphone-18-pro-silver.png" alt="" data-layout-allow-occlusion data-layout-allow-overlap />
+      <div class="progress" id="progress"></div>
+
+      <section class="clip card intro" id="intro" data-start="0" data-duration="3.40">
+        <div class="inner">
+          <img class="mark" id="i-mark" src="assets/logo-mark-reversed.png" alt="" />
+          <div class="eyebrow" id="i-eyebrow">AVHomes marketers &middot; Tutorial</div>
+          <h1 id="i-h">Reporting<br /><em>a deal</em></h1>
+          <p class="sub" id="i-sub">Sold a home? Tell AV Homes, send the proof, and get paid.</p>
+          <div class="rule" id="i-rule"></div>
+        </div>
+      </section>
+
+      <div class="cap top" id="cap0" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 1 of 11</div>
+        <div class="h">Tap the round + button</div>
+        <div class="d">It sits in the middle of the bar at the bottom.</div>
+      </div>
+      <div class="cap top" id="cap1" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 2 of 11</div>
+        <div class="h">Search for the home</div>
+        <div class="d">Type part of its name, the estate or the area.</div>
+      </div>
+      <div class="cap top" id="cap2" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 3 of 11</div>
+        <div class="h">Tap its photo card</div>
+        <div class="d">Check the photo, the area and the price first.</div>
+      </div>
+      <div class="cap top" id="cap3" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 4 of 11</div>
+        <div class="h">Sold or rented</div>
+        <div class="d">Sold is already picked for a home that was for sale.</div>
+      </div>
+      <div class="cap top" id="cap4" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 5 of 11</div>
+        <div class="h">What they paid in the end</div>
+        <div class="d">The final figure. Your 5% updates as you type.</div>
+      </div>
+      <div class="cap top" id="cap5" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 6 of 11</div>
+        <div class="h">The buyer's name and phone</div>
+        <div class="d">The phone helps AV Homes confirm the sale.</div>
+      </div>
+      <div class="cap top" id="cap6" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 7 of 11</div>
+        <div class="h">The day it was done</div>
+        <div class="d">It starts on today. Change it if it closed earlier.</div>
+      </div>
+      <div class="cap top" id="cap7" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 8 of 11</div>
+        <div class="h">Next, then see what you could earn</div>
+        <div class="d">5% of what they paid, once AV Homes approves it.</div>
+      </div>
+      <div class="cap top" id="cap8" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 9 of 11</div>
+        <div class="h">Add the proof</div>
+        <div class="d">A bank alert, a receipt or the signed agreement.</div>
+      </div>
+      <div class="cap top" id="cap9" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 10 of 11</div>
+        <div class="h">Send it in</div>
+        <div class="d">AV Homes checks the proof, usually in a day or two.</div>
+      </div>
+      <div class="cap top" id="cap10" data-layout-allow-occlusion data-layout-allow-overlap>
+        <span class="bar"></span>
+        <div class="step">Step 11 of 11</div>
+        <div class="h">It shows as Being checked</div>
+        <div class="d">Once it is approved, your share waits for pay day.</div>
+      </div>
+
+      <section class="clip card outro" id="outro" data-start="56.79" data-duration="5.00">
+        <div class="o-inner">
+          <img class="o-mark" src="assets/logo-mark-reversed.png" alt="" />
+          <h2 id="o-h">Now report<br /><em>yours.</em></h2>
+          <p class="o-close" id="o-close">Tap the round <b>+</b> in the middle of the bar.<br />We check the proof, then the money is yours.</p>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      var tl = gsap.timeline({ paused: true });
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+
+      tl.fromTo("#i-mark", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" }, 0.1);
+      tl.fromTo("#i-eyebrow", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.35);
+      tl.fromTo("#i-h", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.5);
+      tl.fromTo("#i-sub", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 0.85);
+      tl.fromTo("#i-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power2.inOut" }, 1.1);
+      tl.to("#intro", { opacity: 0, duration: 0.5, ease: "power1.in" }, 2.90);
+
+      tl.fromTo("#progress", { scaleX: 0 }, { scaleX: 1, duration: 53.79, ease: "none" }, 3.40);
+      tl.to("#progress", { opacity: 0, duration: 0.3 }, 56.89);
+
+      tl.fromTo("#cap0", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 3.51);
+      tl.to("#cap0", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 7.32);
+      tl.fromTo("#cap1", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 7.92);
+      tl.to("#cap1", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 11.93);
+      tl.fromTo("#cap2", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 12.53);
+      tl.to("#cap2", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 16.48);
+      tl.fromTo("#cap3", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 17.09);
+      tl.to("#cap3", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 20.38);
+      tl.fromTo("#cap4", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 20.98);
+      tl.to("#cap4", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 26.05);
+      tl.fromTo("#cap5", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 26.65);
+      tl.to("#cap5", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 33.54);
+      tl.fromTo("#cap6", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 34.14);
+      tl.to("#cap6", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 37.67);
+      tl.fromTo("#cap7", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 38.27);
+      tl.to("#cap7", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 42.81);
+      tl.fromTo("#cap8", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 43.41);
+      tl.to("#cap8", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 46.41);
+      tl.fromTo("#cap9", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 47.01);
+      tl.to("#cap9", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 52.40);
+      tl.fromTo("#cap10", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, 53);
+      tl.to("#cap10", { opacity: 0, x: -10, duration: 0.3, ease: "power1.in" }, 56.69);
+
+      tl.fromTo("#outro", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power1.out" }, 56.79);
+      tl.fromTo(".o-mark", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" }, 57.09);
+      tl.fromTo("#o-h", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 57.39);
+      tl.fromTo("#o-close", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 58.09);
+    </script>
+  </body>
+</html>

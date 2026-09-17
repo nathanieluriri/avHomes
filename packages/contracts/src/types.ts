@@ -649,13 +649,17 @@ export const TUTORIAL_IDS = [
   "log-a-change",
   "reply-to-an-enquiry",
   "write-a-journal-post",
-  // The phone app's own two.
+  // The phone app's own.
   "report-a-deal",
   "invite-and-earn",
+  "share-a-listing",
+  "send-more-proof",
+  "join-as-a-marketer",
   // The console's, about the marketer side of the business.
   "check-a-deal",
   "pay-your-marketers",
   "set-commission-rates",
+  "sort-a-payment-problem",
 ] as const;
 export type TutorialId = (typeof TUTORIAL_IDS)[number];
 

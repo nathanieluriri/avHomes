@@ -1,0 +1,29 @@
+[
+  {
+    "name": "icons-phone",
+    "path": "/m/icon-sheet",
+    "viewport": "phone",
+    "steps": [
+      { "eval": "document.scrollingElement.scrollHeight" },
+      { "eval": "(() => { const ids = [...document.querySelectorAll('[id]')].map((e) => e.id); const seen = new Set(); const dups = ids.filter((id) => seen.has(id) || !seen.add(id)); return { ids: ids.length, duplicates: dups.length, svgs: document.querySelectorAll('svg').length }; })()" },
+      { "wait": 900, "shot": "a" },
+      { "scroll": 760, "wait": 300, "shot": "b" },
+      { "scroll": 760, "wait": 300, "shot": "c" },
+      { "scroll": 760, "wait": 300, "shot": "d" },
+      { "scroll": 760, "wait": 300, "shot": "e" },
+      { "scroll": 760, "wait": 300, "shot": "f" },
+      { "scroll": 760, "wait": 300, "shot": "g" }
+    ]
+  },
+  {
+    "name": "icons-desktop",
+    "path": "/m/icon-sheet",
+    "viewport": "desktop",
+    "steps": [
+      { "eval": "document.scrollingElement.scrollHeight" },
+      { "wait": 900, "shot": "a" },
+      { "scroll": 780, "wait": 300, "shot": "b" },
+      { "scroll": 780, "wait": 300, "shot": "c" }
+    ]
+  }
+]

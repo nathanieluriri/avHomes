@@ -274,7 +274,7 @@ function CommissionEditor({ initial }: { initial: MarketingSettings }) {
         asideFirstOnMobile
         aside={
           <aside>
-            <Card>
+            <Card spotlight="commission-example">
               <CardHead title="What that pays out" />
               <div className="space-y-3">
                 <div className="rounded-xl bg-mist-50 p-3">
@@ -310,7 +310,7 @@ function CommissionEditor({ initial }: { initial: MarketingSettings }) {
               Percentages of the sale price, one per level. The three together
               cannot come to more than the whole deal.
             </p>
-            <Field label="Rates" as="group">
+            <Field label="Rates" as="group" spotlight="commission-sale-rates">
               {rateFields("saleRates")}
             </Field>
           </Card>

@@ -1,0 +1,65 @@
+{
+  "segments": [
+    [
+      0.1,
+      53.33,
+      1
+    ]
+  ],
+  "captions": [
+    {
+      "at": 0.2,
+      "until": 6.35,
+      "title": "Open the invite link",
+      "line": "It shows who invited you. You join their team."
+    },
+    {
+      "at": 6.45,
+      "until": 13.37,
+      "title": "About you",
+      "line": "Your full name and the email you check."
+    },
+    {
+      "at": 13.46,
+      "until": 20.02,
+      "title": "Your phone and your state",
+      "line": "The state is where you mostly work."
+    },
+    {
+      "at": 20.11,
+      "until": 27.36,
+      "title": "Choose a password",
+      "line": "Eight letters or more. Then tap Next."
+    },
+    {
+      "at": 27.46,
+      "until": 33.87,
+      "title": "Where your money goes",
+      "line": "Pick your bank, then type your ten digit account number."
+    },
+    {
+      "at": 33.96,
+      "until": 40.45,
+      "title": "The name comes from your bank",
+      "line": "If it is not your name, check the number again."
+    },
+    {
+      "at": 40.55,
+      "until": 45.15,
+      "title": "Three things, then you are in",
+      "line": "Free to join, real deals only, paid every month."
+    },
+    {
+      "at": 45.25,
+      "until": 48.1,
+      "title": "Create my account",
+      "line": "One tap, and you are signed in straight away."
+    },
+    {
+      "at": 48.2,
+      "until": 53.21,
+      "title": "This is your home screen",
+      "line": "Your own invite code is here, ready to share."
+    }
+  ]
+}

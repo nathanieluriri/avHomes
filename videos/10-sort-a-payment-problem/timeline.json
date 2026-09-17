@@ -1,0 +1,61 @@
+{
+  "footageDuration": 45.97,
+  "captions": [
+    {
+      "at": 2.21,
+      "until": 7.46,
+      "title": "Marketers, then Problems",
+      "line": "Transfers a marketer says never landed.",
+      "start": 0.1,
+      "end": 5.35
+    },
+    {
+      "at": 7.57,
+      "until": 13.69,
+      "title": "Open it and read the thread",
+      "line": "The month, the amount, and what they told you.",
+      "start": 5.46,
+      "end": 11.58
+    },
+    {
+      "at": 13.87,
+      "until": 25.92,
+      "title": "Reply with what happened",
+      "line": "They read this in the app, on their phone.",
+      "start": 11.76,
+      "end": 23.81
+    },
+    {
+      "at": 26.11,
+      "until": 30.83,
+      "title": "Attach the new receipt",
+      "line": "Proof the money left, with the reference on it.",
+      "start": 24,
+      "end": 28.72
+    },
+    {
+      "at": 31,
+      "until": 36.26,
+      "title": "Send reply",
+      "line": "It lands in their app, receipt and all.",
+      "start": 28.89,
+      "end": 34.15
+    },
+    {
+      "at": 37.5,
+      "until": 41.23,
+      "title": "Mark as sorted once it lands",
+      "line": "It leaves the Open list.",
+      "start": 33.83,
+      "end": 37.56
+    },
+    {
+      "at": 42.21,
+      "until": 50.85,
+      "title": "Kept under Sorted",
+      "line": "The whole conversation stays, receipt included.",
+      "start": 37.28,
+      "end": 45.92
+    }
+  ]
+}

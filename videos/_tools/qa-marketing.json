@@ -1,0 +1,286 @@
+[
+  {
+    "name": "m-home",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1200, "shot": "top" },
+      { "eval": "document.querySelector('.m-money--hero').textContent" },
+      { "scroll": 400, "wait": 500, "shot": "updates-and-needs-you" },
+      { "eval": "(() => { const r = document.querySelector('.m-rail--wide'); r.scrollBy({ left: 330, behavior: 'instant' }); return r.scrollLeft; })()", "wait": 600, "shot": "updates-swiped" },
+      { "scroll": 500, "wait": 500, "shot": "quick-access" }
+    ]
+  },
+  {
+    "name": "m-home-switcher",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 900 },
+      { "click": "button[aria-label^='Showing']", "wait": 600, "shot": "open" },
+      { "click": "::-p-text(Paid so far)", "wait": 600, "shot": "paid-so-far" }
+    ]
+  },
+  {
+    "name": "m-home-hidden",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 900 },
+      { "click": "button[aria-label='Hide amounts']", "wait": 500, "shot": "hidden" },
+      { "scroll": 400, "wait": 500, "shot": "hidden-alerts-masked" }
+    ]
+  },
+  {
+    "name": "m-menu",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 900 },
+      { "click": "button[aria-haspopup='dialog'][aria-expanded]", "wait": 900, "shot": "open" },
+      { "key": "Escape", "wait": 400 },
+      { "eval": "document.activeElement.getAttribute('aria-expanded') + ' ' + document.activeElement.textContent" }
+    ]
+  },
+  {
+    "name": "m-alerts",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1000, "shot": "top" },
+      { "scroll": 700, "wait": 600, "shot": "scrolled" }
+    ]
+  },
+  {
+    "name": "m-home-360",
+    "path": "/m",
+    "viewport": "phone-small",
+    "steps": [
+      { "wait": 1200, "shot": "top" },
+      { "scroll": 400, "wait": 500, "shot": "updates-and-needs-you" },
+      { "click": "button[aria-haspopup='dialog'][aria-expanded]", "wait": 900, "shot": "menu" }
+    ]
+  },
+  {
+    "name": "m-alerts-360",
+    "path": "/m/alerts",
+    "viewport": "phone-small",
+    "steps": [{ "wait": 1000, "shot": "top" }]
+  },
+  {
+    "name": "m-home-empty",
+    "path": "/m",
+    "viewport": "phone",
+    "mock": { "GET /api/marketing/updates": { "items": [] }, "GET /api/marketing/alerts": { "items": [] } },
+    "steps": [{ "scroll": 400, "wait": 600, "shot": "nothing-yet" }]
+  },
+  {
+    "name": "m-home-loading",
+    "path": "/m",
+    "viewport": "phone",
+    "delay": { "GET /api/marketing/me": 9000, "GET /api/marketing/updates": 9000 },
+    "steps": [{ "shot": "skeletons" }]
+  },
+  {
+    "name": "m-deals",
+    "path": "/m/deals",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 900, "shot": "mine" },
+      { "click": "::-p-text(My team)", "wait": 900, "shot": "team" },
+      { "scroll": 500, "wait": 400, "shot": "team-scrolled" }
+    ]
+  },
+  {
+    "name": "m-deal-new",
+    "path": "/m/deals/new",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1200, "shot": "step1-pick-home" },
+      { "click": "button.m-press-light", "wait": 900, "shot": "step2-facts" },
+      { "click": "input[placeholder='Chidinma Okafor']", "type": "Chidinma Okafor" },
+      { "click": "input[placeholder='0803 000 0000']", "type": "0803 448 2019" },
+      { "wait": 400, "shot": "step2-filled" },
+      { "click": "::-p-text(Next)", "wait": 1400, "shot": "step3-earnings" },
+      {
+        "eval": "(() => { const i = document.querySelectorAll('input[type=file]')[1]; const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([255,216,255,224])], 'receipt.jpg', { type: 'image/jpeg' })); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return 'picked a proof photo'; })()"
+      },
+      { "waitFor": "img[alt='Proof you sent']", "wait": 900, "shot": "step3-proof" },
+      { "scroll": 500, "wait": 700 },
+      { "click": "textarea", "type": "Paid in two parts, the second part cleared on Monday.", "wait": 300, "shot": "step3-note" },
+      { "click": "::-p-text(Send it in)", "waitFor": "::-p-text(We got your deal)", "wait": 900, "shot": "sent-sheet" }
+    ]
+  },
+  {
+    "name": "m-team",
+    "path": "/m/team",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 900, "shot": "level-1" },
+      { "click": "::-p-text(Level 2)", "wait": 700, "shot": "level-2" },
+      { "click": "::-p-text(Level 3)", "wait": 700, "shot": "level-3" },
+      { "scroll": 600, "wait": 400, "shot": "how-it-works" }
+    ]
+  },
+  {
+    "name": "m-money",
+    "path": "/m/money",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1000, "shot": "balance" },
+      { "scroll": 520, "wait": 400, "shot": "payments" },
+      { "scroll": 520, "wait": 400, "shot": "earnings" }
+    ]
+  },
+  {
+    "name": "m-payment",
+    "path": "/m/money/prun_2026_08",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1000, "shot": "payment" },
+      { "scroll": 400, "wait": 400, "shot": "slip-and-report" },
+      { "click": "::-p-text(get this money)", "wait": 700, "shot": "report-sheet" },
+      { "click": "textarea", "type": "Nothing came into my GTBank account on that date.", "wait": 300, "shot": "report-typed" },
+      { "click": "::-p-text(Send this to AV Homes)", "waitFor": "::-p-text(You told us about this)", "wait": 800, "shot": "thread" }
+    ]
+  },
+  {
+    "name": "m-profile",
+    "path": "/m/profile",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1000, "shot": "details" },
+      { "scroll": 520, "wait": 400, "shot": "bank" },
+      { "click": "::-p-text(Change bank account)", "wait": 900, "shot": "bank-edit" },
+      { "scroll": 520, "wait": 400, "shot": "support-and-sign-out" }
+    ]
+  },
+  {
+    "name": "m-join",
+    "path": "/m/join",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1000, "shot": "step1-you" },
+      { "click": "input[placeholder='Ada Nwachukwu']", "type": "Ada Nwachukwu" },
+      { "click": "input[placeholder='you@example.com']", "type": "ada.nwachukwu@gmail.com" },
+      { "click": "input[placeholder='0803 000 0000']", "type": "0803 221 7788" },
+      { "click": "input[placeholder='Lagos']", "type": "Lagos" },
+      { "click": "input[placeholder='Something only you know']", "type": "kuje-estate-2026" },
+      { "wait": 400, "shot": "step1-filled" },
+      { "click": "::-p-text(Next)", "wait": 900, "shot": "step2-bank" },
+      {
+        "eval": "(() => { const s = document.querySelector('select'); s.value = '058'; s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()"
+      },
+      { "click": "input[placeholder='0123456789']", "type": "0123456789", "wait": 1600, "shot": "step2-name-checked" },
+      { "click": "::-p-text(Add my bank later)", "wait": 800, "shot": "step3-promises" }
+    ]
+  },
+  {
+    "name": "m-sign-in",
+    "path": "/m/sign-in",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 900, "shot": "sign-in" },
+      { "click": "input[type='email']", "type": "adaeze@avhomes.com" },
+      { "click": "input[type='password']", "type": "not-a-real-password", "wait": 300, "shot": "sign-in-filled" }
+    ]
+  },
+  {
+    "name": "admin-deals",
+    "path": "/admin/marketers/deals",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1000, "shot": "waiting" },
+      { "click": "::-p-text(Approved)", "wait": 900, "shot": "approved" },
+      { "click": "::-p-text(Need info)", "wait": 900, "shot": "need-info" },
+      { "click": "input[type='search']", "type": "Chidi", "wait": 1200, "shot": "search" }
+    ]
+  },
+  {
+    "name": "admin-deal",
+    "path": "/admin/marketers/deals/deal_oniru_let",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1000, "shot": "pending" },
+      { "scroll": 500, "wait": 400, "shot": "proof-and-decide" },
+      { "click": "::-p-text(Approve deal)", "wait": 2600, "shot": "approved" }
+    ]
+  },
+  {
+    "name": "admin-pay",
+    "path": "/admin/marketers/pay",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1200, "shot": "august-run" },
+      { "click": "::-p-text(Mark as paid)", "wait": 900, "shot": "mark-paid-sheet" },
+      { "click": "input[placeholder='FT26091234567']", "type": "FT26091234567" },
+      { "click": "::-p-text(Record the payment)", "wait": 1200, "shot": "all-paid" },
+      { "click": "::-p-text(Make this month)", "wait": 1500, "shot": "september-list" }
+    ]
+  },
+  {
+    "name": "admin-problems",
+    "path": "/admin/marketers/problems",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1000, "shot": "open" },
+      { "click": ".c-main button[aria-expanded='false']", "wait": 800, "shot": "thread" },
+      { "click": "textarea", "type": "The bank has confirmed the transfer went out. Please check again after 4pm.", "wait": 400, "shot": "reply-typed" },
+      { "click": "::-p-text(Send reply)", "wait": 1000, "shot": "replied" },
+      { "click": "::-p-text(Mark as sorted)", "wait": 1200, "shot": "resolved" }
+    ]
+  },
+  {
+    "name": "admin-marketers",
+    "path": "/admin/marketers",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1000, "shot": "all" },
+      { "click": "::-p-text(Paused)", "wait": 900, "shot": "paused" },
+      { "click": "::-p-text(Banned)", "wait": 900, "shot": "banned" }
+    ]
+  },
+  {
+    "name": "admin-marketer",
+    "path": "/admin/marketers/mkt_av0002",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1200, "shot": "detail" },
+      { "scroll": 600, "wait": 400, "shot": "team-and-deals" },
+      { "scroll": 700, "wait": 400, "shot": "money" }
+    ]
+  },
+  {
+    "name": "admin-settings",
+    "path": "/admin/marketers/settings",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1000, "shot": "rates" },
+      { "scroll": 600, "wait": 400, "shot": "rules" },
+      { "scroll": 700, "wait": 400, "shot": "pay-day" }
+    ]
+  },
+  {
+    "name": "admin-updates",
+    "path": "/admin/marketers/updates",
+    "viewport": "desktop",
+    "steps": [
+      { "waitFor": "::-p-text(Saturday site visits at Tropical Oasis)", "wait": 900, "shot": "list" },
+      { "click": "::-p-xpath(//tr[.//*[normalize-space()='Saturday site visits at Tropical Oasis']]//button[normalize-space()='Edit'])", "waitFor": "::-p-text(Save changes)", "wait": 900, "shot": "edit-existing" },
+      { "click": "::-p-xpath(//div[@role='dialog']//button[normalize-space()='Cancel'])", "wait": 700 },
+      { "click": "::-p-xpath(//button[normalize-space()='New update'])", "waitFor": "::-p-text(Add update)", "wait": 700 },
+      { "click": "input[placeholder='Site visits every Saturday in Lekki']", "type": "Show homes open this Sunday at Kuje Garden Estate" },
+      { "click": "textarea[placeholder^='Bring your buyers']", "type": "Two new units are finished. Bring buyers from 11am, and ask for Folake at the gate." },
+      { "click": "input[placeholder='See the homes']", "type": "See Kuje Garden" },
+      { "click": "input[placeholder='/m/listings']", "type": "/m/listings?focus=demo_kuje-garden-estate" },
+      { "click": "::-p-xpath(//div[@role='dialog']//label[.//span[normalize-space()='Plum']])" },
+      {
+        "eval": "(() => { const [first, last] = document.querySelectorAll('div[role=dialog] input[type=date]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; for (const [input, value] of [[first, '2026-09-18'], [last, '2026-09-20']]) { set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); } return [first.value, last.value]; })()"
+      },
+      { "click": "::-p-xpath(//div[@role='dialog']//button[@role='switch'])" },
+      { "click": "::-p-xpath(//div[@role='dialog']//label[.//span[normalize-space()='Live']])", "wait": 500, "shot": "new-typed" },
+      { "eval": "(() => { const body = document.querySelector('div[role=dialog] .overflow-y-auto'); body.scrollTop = body.scrollHeight; return body.scrollTop; })()", "wait": 400, "shot": "new-typed-bottom" },
+      { "click": "::-p-xpath(//button[normalize-space()='Add update'])", "waitFor": "::-p-text(Show homes open this Sunday at Kuje Garden Estate)", "wait": 900, "shot": "added" }
+    ]
+  }
+]

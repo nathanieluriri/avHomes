@@ -104,6 +104,12 @@ export default function DealsPage() {
 
   const rows = data?.items ?? [];
 
+  /* The check-a-deal walkthrough opens the first deal still waiting, and says so
+     when there is none. Never while loading: the rows held over from the last tab
+     are not waiting deals. */
+  const settled = !loading && !error && Boolean(data);
+  const tutorialRow = settled && tab === "pending" ? rows[0] : undefined;
+
   const columns: Column<Deal>[] = [
     {
       key: "listing",
@@ -193,6 +199,8 @@ export default function DealsPage() {
         rows={rows}
         rowKey={(deal) => deal.id}
         hrefFor={(deal) => `/admin/marketers/deals/${deal.id}`}
+        rowSpotlight={(deal) => (deal === tutorialRow ? "deal-row" : undefined)}
+        spotlight={settled && tab === "pending" && query === "" && rows.length === 0 ? "deal-none" : undefined}
         loading={loading}
         toolbar={
           <TableToolbar
@@ -204,6 +212,7 @@ export default function DealsPage() {
                 count: countFor(option.value),
               })),
               onChange: (value) => setTab(value as DealStatus),
+              spotlight: tab !== "pending" ? { value: "pending", name: "deal-find-waiting" } : undefined,
             }}
             search={{
               value: searchInput,

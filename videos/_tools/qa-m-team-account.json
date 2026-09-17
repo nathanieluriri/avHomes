@@ -1,0 +1,1299 @@
+[
+  {
+    "name": "m-team",
+    "path": "/m/team",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "level-1"
+      },
+      {
+        "click": "::-p-xpath(//button[@role='tab'][normalize-space()='They invited'])",
+        "wait": 700,
+        "shot": "level-2"
+      },
+      {
+        "click": "::-p-xpath(//button[@role='tab'][normalize-space()='One more step'])",
+        "wait": 700,
+        "shot": "level-3"
+      },
+      {
+        "scroll": 640,
+        "wait": 500,
+        "shot": "how-it-pays"
+      }
+    ]
+  },
+  {
+    "name": "m-team-empty",
+    "path": "/m/team",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/team": {
+        "levels": [
+          0,
+          0,
+          0
+        ],
+        "members": []
+      }
+    },
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "invite-prompt"
+      },
+      {
+        "scroll": 600,
+        "wait": 500,
+        "shot": "how-it-pays"
+      }
+    ]
+  },
+  {
+    "name": "m-team-loading",
+    "path": "/m/team",
+    "viewport": "phone",
+    "delay": {
+      "GET /api/marketing/team": 9000,
+      "GET /api/marketing/me": 9000
+    },
+    "steps": [
+      {
+        "shot": "skeletons"
+      }
+    ]
+  },
+  {
+    "name": "m-team-360",
+    "path": "/m/team",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "level-1"
+      },
+      {
+        "click": "::-p-xpath(//button[@role='tab'][normalize-space()='One more step'])",
+        "wait": 700,
+        "shot": "level-3"
+      },
+      {
+        "scroll": 640,
+        "wait": 500,
+        "shot": "how-it-pays"
+      }
+    ]
+  },
+  {
+    "name": "m-invite",
+    "path": "/m/invite",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "click": "button[aria-label='Copy your link']",
+        "wait": 500,
+        "shot": "copied"
+      },
+      {
+        "eval": "document.querySelector('[role=status]').textContent"
+      },
+      {
+        "click": "::-p-text(Make it bigger)",
+        "wait": 800,
+        "shot": "qr-sheet"
+      },
+      {
+        "key": "Escape",
+        "wait": 500
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "what-they-get"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "what-you-get"
+      }
+    ]
+  },
+  {
+    "name": "m-invite-paused",
+    "path": "/m/invite",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0006",
+          "userId": "usr_av0006",
+          "code": "AV-0006",
+          "displayName": "Ibrahim Danjuma",
+          "email": "ibrahim.danjuma@gmail.com",
+          "phone": "+234 807 905 6612",
+          "state": "Kaduna",
+          "status": "paused",
+          "statusReason": "We are waiting on the bank details you were asked for.",
+          "parentId": "mkt_av0002",
+          "upline": [
+            "mkt_av0002",
+            "mkt_av0001"
+          ],
+          "bank": null,
+          "isAdmin": false,
+          "joinedAt": 1747000000000,
+          "createdAt": 1747000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 0,
+          "scheduledMinor": 0,
+          "paidMinor": 0,
+          "pendingMinor": 0
+        },
+        "levels": [
+          0,
+          0,
+          0
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            4,
+            1.5,
+            0.5
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": false,
+        "alertCount": 2
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "paused-note"
+      },
+      {
+        "scroll": 560,
+        "wait": 500,
+        "shot": "rent-rates-differ"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "nobody-yet"
+      }
+    ]
+  },
+  {
+    "name": "m-invite-360",
+    "path": "/m/invite",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "what-they-get"
+      }
+    ]
+  },
+  {
+    "name": "m-listings",
+    "path": "/m/listings",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 2500,
+        "shot": "sale"
+      },
+      {
+        "scroll": 700,
+        "wait": 1500,
+        "shot": "sale-scrolled"
+      },
+      {
+        "scroll": -700,
+        "wait": 400
+      },
+      {
+        "click": "::-p-xpath(//button[@role='tab'][normalize-space()='For rent'])",
+        "wait": 2500,
+        "shot": "rent"
+      },
+      {
+        "click": "input[aria-label='Search homes']",
+        "type": "lekki",
+        "wait": 2500,
+        "shot": "search-typed"
+      },
+      {
+        "eval": "document.querySelectorAll('article').length + ' cards'"
+      }
+    ]
+  },
+  {
+    "name": "m-listings-search-empty",
+    "path": "/m/listings",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1500
+      },
+      {
+        "click": "input[aria-label='Search homes']",
+        "type": "zzqxw",
+        "wait": 2500,
+        "shot": "no-match"
+      }
+    ]
+  },
+  {
+    "name": "m-listings-focus-from-home",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "click": "a[href='/m/listings?focus=demo_kuje-garden-estate']",
+        "wait": 1600,
+        "shot": "ringing",
+        "waitFor": "::-p-text(Homes to share)"
+      },
+      {
+        "wait": 2600,
+        "shot": "settled"
+      },
+      {
+        "eval": "(() => { const a = [...document.querySelectorAll('article')]; const i = a.findIndex((n) => n.querySelector('h3').textContent === 'Kuje Garden Estate'); const r = a[i].getBoundingClientRect(); return { index: i, top: Math.round(r.top), bottom: Math.round(r.bottom), url: location.pathname + location.search }; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-listings-focus-rent",
+    "path": "/m/listings?focus=demo_banana-island-penthouse-let",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 400,
+        "shot": "landed"
+      },
+      {
+        "eval": "(() => { const tab = document.querySelector('[role=tab][aria-selected=true]').textContent; const a = [...document.querySelectorAll('article')]; const n = a.find((x) => x.querySelector('h3').textContent === 'Banana Island Penthouse'); const r = n && n.getBoundingClientRect(); return { tab, found: Boolean(n), top: r && Math.round(r.top) }; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-listings-360",
+    "path": "/m/listings",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 2500,
+        "shot": "sale"
+      },
+      {
+        "scroll": 600,
+        "wait": 1500,
+        "shot": "sale-scrolled"
+      }
+    ]
+  },
+  {
+    "name": "m-profile",
+    "path": "/m/profile",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "details"
+      },
+      {
+        "scroll": 560,
+        "wait": 500,
+        "shot": "bank"
+      },
+      {
+        "click": "::-p-text(Change bank account)",
+        "wait": 900,
+        "shot": "bank-edit"
+      },
+      {
+        "eval": "(() => { const i = document.querySelector(\"input[placeholder='0123456789']\"); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ''); i.dispatchEvent(new Event('input', { bubbles: true })); return i.value; })()"
+      },
+      {
+        "click": "input[placeholder='0123456789']",
+        "type": "31104",
+        "wait": 300,
+        "shot": "bank-typing"
+      },
+      {
+        "type": "62288",
+        "wait": 150,
+        "shot": "bank-checking"
+      },
+      {
+        "wait": 1400,
+        "shot": "bank-name-checked"
+      },
+      {
+        "scroll": 600,
+        "wait": 500,
+        "shot": "help-and-sign-out"
+      }
+    ]
+  },
+  {
+    "name": "m-profile-edit-details",
+    "path": "/m/profile",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400
+      },
+      {
+        "click": "input[type=tel]"
+      },
+      {
+        "eval": "(() => { const i = document.querySelector('input[type=tel]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ''); i.dispatchEvent(new Event('input', { bubbles: true })); return i.value; })()"
+      },
+      {
+        "type": "+234 803 448 2019",
+        "wait": 400,
+        "shot": "changed"
+      },
+      {
+        "click": "::-p-text(Save changes)",
+        "wait": 300,
+        "shot": "saved"
+      },
+      {
+        "wait": 1500
+      },
+      {
+        "eval": "document.querySelector('input[type=tel]').value"
+      }
+    ]
+  },
+  {
+    "name": "m-profile-bank-anchor",
+    "path": "/m/profile#bank",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "landed-on-bank"
+      },
+      {
+        "eval": "(() => { const b = document.getElementById('bank'); const bar = document.querySelector('.m-pagebar'); return { url: location.pathname + location.hash, bankTop: b ? Math.round(b.getBoundingClientRect().top) : null, barBottom: bar ? Math.round(bar.getBoundingClientRect().bottom) : null }; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-profile-bank-missing",
+    "path": "/m/profile#bank",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "active",
+          "statusReason": "",
+          "parentId": null,
+          "upline": [],
+          "bank": null,
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 3
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "add-bank"
+      },
+      {
+        "eval": "(() => { const s = document.querySelector('select'); s.value = '058'; s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()"
+      },
+      {
+        "click": "input[placeholder='0123456789']",
+        "type": "2211445566",
+        "wait": 1500,
+        "shot": "add-bank-checked"
+      }
+    ]
+  },
+  {
+    "name": "m-profile-bank-unchecked",
+    "path": "/m/profile#bank",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals on the same home. Call the office if this takes more than a week.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": null
+          },
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 1
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "check-again"
+      },
+      {
+        "scroll": -2000,
+        "wait": 500,
+        "shot": "paused-top"
+      },
+      {
+        "scroll": 1400,
+        "wait": 500,
+        "shot": "no-support-number"
+      }
+    ]
+  },
+  {
+    "name": "m-profile-360",
+    "path": "/m/profile",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "details"
+      },
+      {
+        "scroll": 560,
+        "wait": 500,
+        "shot": "bank"
+      }
+    ]
+  },
+  {
+    "name": "m-help",
+    "path": "/m/help",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "click": "::-p-text(Invite people and earn)",
+        "wait": 900,
+        "shot": "steps-sheet"
+      },
+      {
+        "key": "Escape",
+        "wait": 500
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "how-you-get-paid"
+      }
+    ]
+  },
+  {
+    "name": "m-help-360",
+    "path": "/m/help",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "how-you-get-paid"
+      }
+    ]
+  },
+  {
+    "name": "m-join",
+    "path": "/m/join",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "step1-you"
+      },
+      {
+        "scroll": 700,
+        "wait": 300
+      },
+      {
+        "click": "::-p-text(Next)",
+        "wait": 500,
+        "shot": "step1-errors"
+      },
+      {
+        "click": "input[placeholder='Ada Nwachukwu']",
+        "type": "Ada Nwachukwu"
+      },
+      {
+        "click": "input[placeholder='you@example.com']",
+        "type": "ada.nwachukwu@gmail.com"
+      },
+      {
+        "click": "input[placeholder='0803 000 0000']",
+        "type": "0803 221 7788"
+      },
+      {
+        "click": "input[placeholder='Lagos']",
+        "type": "Lagos"
+      },
+      {
+        "click": "input[placeholder='Something only you know']",
+        "type": "kuje-estate-2026"
+      },
+      {
+        "wait": 400,
+        "shot": "step1-filled"
+      },
+      {
+        "click": "::-p-text(Next)",
+        "wait": 900,
+        "shot": "step2-bank"
+      },
+      {
+        "eval": "(() => { const s = document.querySelector('select'); s.value = '058'; s.dispatchEvent(new Event('change', { bubbles: true })); return s.value; })()"
+      },
+      {
+        "click": "input[placeholder='0123456789']",
+        "type": "2211445566",
+        "wait": 1600,
+        "shot": "step2-name-checked"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 900,
+        "shot": "step3-promises"
+      }
+    ]
+  },
+  {
+    "name": "m-join-invited",
+    "path": "/m/join/AV-0002",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "invited-by"
+      },
+      {
+        "scroll": 420,
+        "wait": 400,
+        "shot": "invited-form"
+      }
+    ]
+  },
+  {
+    "name": "m-join-unknown-code",
+    "path": "/m/join/AV-9999",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "scroll": 300,
+        "shot": "unknown-link"
+      }
+    ]
+  },
+  {
+    "name": "m-join-closed",
+    "path": "/m/join",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/public/marketing/join": {
+        "open": false,
+        "supportPhone": "+234 801 234 5678",
+        "rates": [
+          5,
+          2,
+          1
+        ],
+        "bankCheck": true,
+        "referrer": null
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "closed"
+      }
+    ]
+  },
+  {
+    "name": "m-join-360",
+    "path": "/m/join/AV-0002",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "invited-by"
+      },
+      {
+        "scroll": 500,
+        "wait": 400,
+        "shot": "form"
+      }
+    ]
+  },
+  {
+    "name": "m-sign-in",
+    "path": "/m/sign-in",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1000,
+        "shot": "empty"
+      },
+      {
+        "click": "input[type='email']",
+        "type": "adaeze@avhomes.com"
+      },
+      {
+        "click": "input[autocomplete='current-password']",
+        "type": "not-a-real-password",
+        "wait": 300,
+        "shot": "filled"
+      },
+      {
+        "click": "button[aria-label='Show password']",
+        "wait": 300,
+        "shot": "password-shown"
+      }
+    ]
+  },
+  {
+    "name": "m-sign-in-360",
+    "path": "/m/sign-in",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1000,
+        "shot": "empty"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-bank",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/alerts": {
+        "items": [
+          {
+            "id": "bank-missing",
+            "tone": "act",
+            "icon": "bank",
+            "title": "Add your bank account",
+            "body": "We cannot pay you without it.",
+            "detail": "",
+            "action": {
+              "label": "Add bank account",
+              "href": "/m/profile#bank"
+            },
+            "at": 1789000000000
+          },
+          {
+            "id": "no-team",
+            "tone": "heads-up",
+            "icon": "team",
+            "title": "Invite your first marketer",
+            "body": "You earn a share of every deal the people you invite close.",
+            "detail": "",
+            "action": {
+              "label": "Invite someone",
+              "href": "/m/invite"
+            },
+            "at": 1788000000000
+          }
+        ]
+      },
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "active",
+          "statusReason": "",
+          "parentId": null,
+          "upline": [],
+          "bank": null,
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 1
+      }
+    },
+    "steps": [
+      {
+        "wait": 1600,
+        "shot": "alerts"
+      },
+      {
+        "click": "a[href='/m/profile#bank']",
+        "wait": 1600,
+        "shot": "landed",
+        "waitFor": "#bank"
+      },
+      {
+        "eval": "(() => { const b = document.getElementById('bank'); const bar = document.querySelector('.m-pagebar'); return { url: location.pathname + location.hash, bankTop: b ? Math.round(b.getBoundingClientRect().top) : null, barBottom: bar ? Math.round(bar.getBoundingClientRect().bottom) : null }; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-invite",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/alerts": {
+        "items": [
+          {
+            "id": "bank-missing",
+            "tone": "act",
+            "icon": "bank",
+            "title": "Add your bank account",
+            "body": "We cannot pay you without it.",
+            "detail": "",
+            "action": {
+              "label": "Add bank account",
+              "href": "/m/profile#bank"
+            },
+            "at": 1789000000000
+          },
+          {
+            "id": "no-team",
+            "tone": "heads-up",
+            "icon": "team",
+            "title": "Invite your first marketer",
+            "body": "You earn a share of every deal the people you invite close.",
+            "detail": "",
+            "action": {
+              "label": "Invite someone",
+              "href": "/m/invite"
+            },
+            "at": 1788000000000
+          }
+        ]
+      },
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "active",
+          "statusReason": "",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1770000000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 1
+      }
+    },
+    "steps": [
+      {
+        "wait": 1600
+      },
+      {
+        "click": "a[href='/m/invite']",
+        "wait": 1600,
+        "shot": "landed",
+        "waitFor": "::-p-text(Scan to join)"
+      },
+      {
+        "eval": "location.pathname + ' ' + document.querySelector('.m-tab__label').textContent"
+      }
+    ]
+  },
+  {
+    "name": "m-invite-share-ways",
+    "path": "/m/invite",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400
+      },
+      {
+        "eval": "(() => { window.__shared = []; navigator.share = async (data) => { window.__shared.push(data); }; window.open = (url) => { window.__shared.push({ url }); return null; }; return 'stubbed'; })()"
+      },
+      {
+        "click": "::-p-text(Send on WhatsApp)",
+        "wait": 400
+      },
+      {
+        "click": "button[aria-label='Share another way']",
+        "wait": 400
+      },
+      {
+        "eval": "JSON.stringify(window.__shared)"
+      },
+      {
+        "eval": "(() => { const svg = document.querySelector('svg[role=img][aria-label^=\"QR code\"]'); return svg ? svg.getAttribute('aria-label') : 'no qr'; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-listings-share-ref",
+    "path": "/m/listings",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 2500
+      },
+      {
+        "eval": "(() => { window.__shared = []; navigator.share = async (data) => { window.__shared.push(data); }; window.open = (url) => { window.__shared.push({ url }); return null; }; return 'stubbed'; })()"
+      },
+      {
+        "click": "article button[aria-label^='Share ']",
+        "wait": 600
+      },
+      {
+        "eval": "JSON.stringify(window.__shared)"
+      }
+    ]
+  },
+  {
+    "name": "m-listings-paused",
+    "path": "/m/listings",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals on the same home.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1770000000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 1
+      }
+    },
+    "steps": [
+      {
+        "wait": 2500,
+        "shot": "share-only"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-bank-360",
+    "path": "/m/profile#bank",
+    "viewport": "phone-small",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "active",
+          "statusReason": "",
+          "parentId": null,
+          "upline": [],
+          "bank": null,
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 1
+      }
+    },
+    "steps": [
+      {
+        "wait": 2400,
+        "shot": "landed"
+      },
+      {
+        "eval": "(() => { const b = document.getElementById('bank'); const bar = document.querySelector('.m-pagebar'); return { url: location.pathname + location.hash, bankTop: b ? Math.round(b.getBoundingClientRect().top) : null, barBottom: bar ? Math.round(bar.getBoundingClientRect().bottom) : null }; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-invite-paused-360",
+    "path": "/m/invite",
+    "viewport": "phone-small",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals on the same home.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1770000000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 1
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "paused-note"
+      },
+      {
+        "scroll": 1600,
+        "wait": 500,
+        "shot": "team-so-far"
+      }
+    ]
+  },
+  {
+    "name": "m-listings-focus-360",
+    "path": "/m/listings?focus=demo_banana-island-penthouse-let",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "ringing"
+      }
+    ]
+  },
+  {
+    "name": "m-join-steps-360",
+    "path": "/m/join",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "click": "input[placeholder='Ada Nwachukwu']",
+        "type": "Ada Nwachukwu"
+      },
+      {
+        "click": "input[placeholder='you@example.com']",
+        "type": "ada.nwachukwu@gmail.com"
+      },
+      {
+        "click": "input[placeholder='0803 000 0000']",
+        "type": "0803 221 7788"
+      },
+      {
+        "click": "input[placeholder='Something only you know']",
+        "type": "kuje-estate-2026"
+      },
+      {
+        "click": "::-p-text(Next)",
+        "wait": 900,
+        "shot": "step2-bank"
+      },
+      {
+        "click": "::-p-text(Add my bank later)",
+        "wait": 900,
+        "shot": "step3-no-bank"
+      }
+    ]
+  },
+  {
+    "name": "m-help-sheet-360",
+    "path": "/m/help",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "click": "::-p-text(Report a deal)",
+        "wait": 900,
+        "shot": "steps-sheet"
+      }
+    ]
+  }
+]
