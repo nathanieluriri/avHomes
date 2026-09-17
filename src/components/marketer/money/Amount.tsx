@@ -46,6 +46,42 @@ export function NegativeAmount({
   );
 }
 
+/**
+ * An amount that says which way it went.
+ *
+ * Three signals, not one. Colour is the fastest to read and the one that fails
+ * first: about one man in twelve cannot separate this green from this red, and
+ * nobody can in a greyscale screenshot. So the sign is real text and the
+ * direction is spelled out for a screen reader, and the row beside this carries
+ * the words "Money In" or "Money Out". Colour is the accelerator, never the
+ * carrier.
+ */
+export function DirectedAmount({
+  minor,
+  currency = "NGN",
+  size = "md",
+  className = "",
+}: {
+  /** Signed. Negative is money leaving the marketer. */
+  minor: number;
+  currency?: string;
+  size?: MoneySize;
+  className?: string;
+}) {
+  const out = minor < 0;
+  return (
+    <span
+      className={`whitespace-nowrap ${out ? "text-(color:--m-out-fg)" : "text-(color:--m-in-fg)"} ${className}`}
+    >
+      <span aria-hidden className="m-money mr-px">
+        {out ? "−" : "+"}
+      </span>
+      <span className="sr-only">{out ? "minus " : "plus "}</span>
+      <Amount minor={Math.abs(minor)} currency={currency} size={size} />
+    </span>
+  );
+}
+
 /** The eye that hides and shows every amount in the app. */
 export function EyeButton({ onWine = false }: { onWine?: boolean }) {
   const [hidden, setHidden] = useMoneyHidden();

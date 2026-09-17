@@ -28,6 +28,7 @@ export {
   marketingCounts,
   reconcile,
   rootMarketer,
+  statementFor,
   teamFor,
   type MarketingCounts,
   type TeamSummary,

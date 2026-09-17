@@ -769,3 +769,50 @@ export function leadWantLine(lead: Lead): string {
     lead.wantBudgetMinor > 0 ? `about ${formatMoney(lead.wantBudgetMinor, lead.currency)}` : "";
   return [area, budget].filter(Boolean).join(", ") || "No details yet";
 }
+
+/* ════════════════════════════════════════════════════ TRANSACTION HISTORY ══ */
+
+/**
+ * One row of the marketer's statement.
+ *
+ * `/m/money` deliberately keeps earnings and payments apart, because merged
+ * without labels they read as double counting. The history screen merges them
+ * because a statement is what it is, and pays for that by naming every row's
+ * kind: "Commission earned" and "Paid to your bank" are two sides of the same
+ * naira and a reader must never have to work that out from the amount alone.
+ */
+export const TX_KINDS = ["earning", "payout", "clawback", "adjustment"] as const;
+export type TxKind = (typeof TX_KINDS)[number];
+
+export const TX_KIND_LABEL: Record<TxKind, string> = {
+  earning: "Commission earned",
+  payout: "Paid to your bank",
+  clawback: "Taken back",
+  adjustment: "Adjustment",
+};
+
+export interface Transaction {
+  id: string;
+  at: number;
+  /** Signed, from the marketer's side. Negative is money leaving them. */
+  amountMinor: number;
+  currency: string;
+  kind: TxKind;
+  /** The deal, or the month of the pay run. */
+  title: string;
+  /** Plain words: "Waiting", "On the way", "Paid", "Held". */
+  status: string;
+  reference: string;
+  dealId: string | null;
+  payRunId: string | null;
+  /** "Wema Bank 4493", for a payout. Empty otherwise. */
+  bankLabel: string;
+  note: string;
+}
+
+/** Money In is everything arriving; Money Out is what was taken back. */
+export type TxDirection = "in" | "out";
+
+export function txDirection(tx: { amountMinor: number }): TxDirection {
+  return tx.amountMinor < 0 ? "out" : "in";
+}

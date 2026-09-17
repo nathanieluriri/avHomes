@@ -41,6 +41,16 @@
   --m-bad-fg: #ff9a9a;
   --m-bad-bg: #3f1519;
 
+  /* Money has a DIRECTION, and it is not the same axis as a status.
+     --m-good-fg colours "Approved"; these colour an amount. Sharing one token
+     means the day somebody retunes the approved green they silently retune
+     every credit in the app. Never the only signal: an amount also carries a
+     sign, and its row carries the words Money In or Money Out. */
+  --m-in-fg: #5fd3a3;
+  --m-in-bg: #102c22;
+  --m-out-fg: #ff8a8a;
+  --m-out-bg: #3a1417;
+
   --m-sheet: #1f1216;
   --m-track: #0e0709;
   --m-thumb: #36232a;
@@ -49,7 +59,10 @@
   --m-skel-hi: rgb(255 255 255 / 0.07);
   /* A dark card's edge is light, not shadow: a hairline and a lit top lip. */
   --m-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgb(255 255 255 / 0.04);
-  --m-drop: 0 18px 36px -26px rgb(0 0 0 / 0.95);
+  /* Flat app: nothing casts. A dark surface is told apart by its fill and its
+     hairline, never by a blur underneath it. Kept as a no-op rather than
+     deleted so no rule that names it silently becomes invalid. */
+  --m-drop: 0 0 0 0 transparent;
 
   --m-tab-h: 3rem;
   --m-sheet-r: 1.75rem;
@@ -80,14 +93,19 @@
   --m-bad-fg: #991b1b;
   --m-bad-bg: #fee2e2;
 
+  --m-in-fg: #047857;
+  --m-in-bg: #ecfdf5;
+  --m-out-fg: #b91c1c;
+  --m-out-bg: #fef2f2;
+
   --m-sheet: #ffffff;
   --m-track: #f1f5f9;
   --m-thumb: #ffffff;
   --m-press: #fbf4f6;
   --m-skel: #f1f5f9;
   --m-skel-hi: rgb(255 255 255 / 0.85);
-  --m-edge: 0 0 0 1px rgb(44 27 31 / 0.05), 0 1px 2px 0 rgb(44 27 31 / 0.05);
-  --m-drop: 0 8px 24px -20px rgb(44 27 31 / 0.5);
+  --m-edge: 0 0 0 1px rgb(44 27 31 / 0.08);
+  --m-drop: 0 0 0 0 transparent;
 
   color-scheme: light;
 }
@@ -239,7 +257,6 @@ html:has(.m-app) > body {
     background:
       radial-gradient(60% 140% at 100% 0%, rgb(255 72 132 / 0.26) 0%, transparent 70%),
       linear-gradient(162deg, #5a1024 0%, #7a1631 100%);
-    box-shadow: 0 10px 22px -16px rgb(0 0 0 / 0.95);
     pointer-events: none;
     opacity: 0;
     transition: opacity 160ms ease;
@@ -261,7 +278,9 @@ html:has(.m-app) > body {
     background:
       radial-gradient(60% 140% at 100% 0%, rgb(255 72 132 / 0.26) 0%, transparent 70%),
       linear-gradient(162deg, #5a1024 0%, #7a1631 100%);
-    box-shadow: 0 12px 26px -18px rgb(0 0 0 / 0.95);
+    /* A hairline, not a blur: the bar is fixed over scrolling content and still
+       has to end somewhere visible. */
+    box-shadow: inset 0 -1px 0 0 rgb(255 255 255 / 0.1);
     opacity: 0;
     transform: translateY(-100%);
     visibility: hidden;
@@ -377,9 +396,7 @@ html:has(.m-app) > body {
     padding-bottom: var(--safe-b);
     border-radius: 1.625rem 1.625rem 0 0;
     background: linear-gradient(180deg, #2b1a1f 0%, #1c1014 100%);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.08),
-      0 -18px 40px -18px rgb(0 0 0 / 0.9);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.08);
   }
 
   .m-nav__row {
@@ -421,7 +438,6 @@ html:has(.m-app) > body {
 
   .m-nav__item[data-on="true"] svg {
     color: #ff9db3;
-    filter: drop-shadow(0 0 7px rgb(255 110 150 / 0.55));
   }
 
   /* The orb stands out of the bar: centred in the row, then lifted until the
@@ -451,9 +467,7 @@ html:has(.m-app) > body {
     z-index: -1;
     inset: 12.5%;
     border-radius: 999px;
-    box-shadow:
-      0 0 0 5px #2a191e,
-      0 12px 32px 0 rgb(212 79 117 / 0.62);
+    box-shadow: 0 0 0 5px #2a191e;
   }
 
   .m-orb:active {
@@ -466,9 +480,7 @@ html:has(.m-app) > body {
   }
 
   .m-orb--locked::before {
-    box-shadow:
-      0 0 0 5px #2a191e,
-      0 10px 24px 0 rgb(0 0 0 / 0.55);
+    box-shadow: 0 0 0 5px #2a191e;
   }
 
   .m-orb__lock {
@@ -477,7 +489,6 @@ html:has(.m-app) > body {
     display: grid;
     place-items: center;
     color: #ffffff;
-    filter: drop-shadow(0 1px 2px rgb(20 2 8 / 0.6));
   }
 
   /* The ambient sheen: a band of light crosses the glass every few seconds. */
@@ -529,9 +540,7 @@ html:has(.m-app) > body {
     padding: 0.5rem 0.625rem calc(var(--safe-b) + 0.625rem);
     border-radius: 2rem 2rem 0 0;
     background: linear-gradient(180deg, #27171c 0%, #1b0f13 100%);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.09),
-      0 -24px 60px -24px rgb(0 0 0 / 0.95);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.09);
     animation: m-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
@@ -599,11 +608,12 @@ html:has(.m-app) > body {
     background:
       radial-gradient(70% 45% at 50% 100%, rgb(194 74 107 / 0.2) 0%, transparent 100%),
       radial-gradient(circle at 50% 26%, #3a2630 0%, #23151b 58%, #180d11 100%);
+    /* The insets stay: they are the dish the 3D icon sits in, which is form
+       rather than decoration. What goes is the drop underneath it. */
     box-shadow:
       inset 0 1.5px 0 0 rgb(255 255 255 / 0.12),
       inset 0 -10px 18px -8px rgb(0 0 0 / 0.5),
-      0 0 0 1px rgb(255 255 255 / 0.03),
-      0 12px 22px -14px rgb(0 0 0 / 1);
+      0 0 0 1px rgb(255 255 255 / 0.03);
     transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease;
   }
 
@@ -619,8 +629,7 @@ html:has(.m-app) > body {
   .m-menu__item[aria-current="page"] .m-menu__dot {
     box-shadow:
       inset 0 0 0 2px rgb(255 143 163 / 0.75),
-      inset 0 -10px 18px -6px rgb(0 0 0 / 0.55),
-      0 0 22px -6px rgb(255 110 150 / 0.5);
+      inset 0 -10px 18px -6px rgb(0 0 0 / 0.55);
   }
 
   .m-menu__label {
@@ -671,8 +680,7 @@ html:has(.m-app) > body {
     box-shadow:
       inset 0 1px 0 0 rgb(255 255 255 / 0.22),
       inset 0 -6px 12px -4px rgb(20 2 8 / 0.5),
-      0 0 0 5px #1d1115,
-      0 10px 26px -6px rgb(194 74 107 / 0.45);
+      0 0 0 5px #1d1115;
     animation: m-turn-in 240ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
     transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -771,7 +779,7 @@ html:has(.m-app) > body {
   .m-card {
     border-radius: 1.25rem;
     background: var(--m-card);
-    box-shadow: var(--m-edge), var(--m-drop);
+    box-shadow: var(--m-edge);
   }
 
   .m-card--lg {
@@ -810,31 +818,22 @@ html:has(.m-app) > body {
     filter: none;
   }
 
-  /* Wine glass: a lit top lip, a darker foot, and a press that sinks. */
+  /* One flat wine. No gradient, no lit lip, nothing pooling underneath: the
+     press is the only thing that says it was tapped. White on this clears
+     6.3:1, so the label is readable rather than merely bright. */
   .m-btn--primary {
     color: #ffffff;
-    background: linear-gradient(180deg, #c24a6b 0%, #8a2342 100%);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 214 226 / 0.45),
-      inset 0 -1px 0 0 rgb(45 6 18 / 0.4),
-      0 10px 22px -12px rgb(194 74 107 / 0.8);
-    text-shadow: 0 1px 0 rgb(70 12 30 / 0.35);
+    background: #a83550;
   }
 
   .m-btn--primary:active {
-    transform: translateY(1px) scale(0.985);
-    background: linear-gradient(180deg, #a83c5b 0%, #761c38 100%);
-    box-shadow:
-      inset 0 2px 7px 0 rgb(40 5 16 / 0.5),
-      0 4px 10px -8px rgb(194 74 107 / 0.6);
+    background: #8c2740;
   }
 
   .m-btn--secondary {
     color: var(--m-text);
     background: var(--m-raised);
-    box-shadow:
-      inset 0 0 0 1px var(--m-line),
-      inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+    box-shadow: inset 0 0 0 1px var(--m-line);
   }
 
   .m-btn--secondary:active {
@@ -1089,16 +1088,12 @@ html:has(.m-app) > body {
     transform: translateX(calc(var(--m-seg-index) * 100%));
     border-radius: 999px;
     background: var(--m-thumb);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.07),
-      0 1px 3px 0 rgb(0 0 0 / 0.35);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.07);
     transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .m-paper .m-seg__ind {
-    box-shadow:
-      0 0 0 1px rgb(44 27 31 / 0.05),
-      0 1px 3px 0 rgb(44 27 31 / 0.16);
+    box-shadow: 0 0 0 1px rgb(44 27 31 / 0.12);
   }
 
   /* `min-width: 0` plus the clip keep a long label inside its third. */
@@ -1208,9 +1203,7 @@ html:has(.m-app) > body {
     border-radius: 1.75rem 1.75rem 0 0;
     background: var(--m-sheet);
     color: var(--m-text);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.07),
-      0 -20px 50px -20px rgb(0 0 0 / 0.85);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.07);
     animation: m-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
@@ -1331,9 +1324,7 @@ html:has(.m-app) > body {
     border-radius: 1.375rem;
     color: #ffffff;
     background: var(--m-card);
-    box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.07),
-      0 18px 30px -24px rgb(0 0 0 / 1);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
   }
 
   /* Dark from the left, where the words are, so the photo still shows on the
@@ -1377,7 +1368,6 @@ html:has(.m-app) > body {
     top: 0.625rem;
     right: 0.625rem;
     z-index: -1;
-    filter: drop-shadow(0 12px 16px rgb(0 0 0 / 0.35));
   }
 
   .m-update__cta {
@@ -1390,13 +1380,41 @@ html:has(.m-app) > body {
     border-radius: 999px;
     background: #ffffff;
     color: #7a2140;
-    box-shadow: 0 8px 16px -10px rgb(0 0 0 / 0.7);
     font-size: 12.5px;
     font-weight: 700;
   }
 
   .m-update--empty {
     min-height: 7.25rem;
+  }
+
+  /* ═══ SUCCESS BURST ══════════════════════════════════════════════════════
+     The badge lands before the confetti leaves it, so the burst reads as
+     caused by the mark rather than as decoration that happens to be nearby.
+     The overshoot is what makes it feel struck rather than faded in. */
+  .m-burst {
+    position: relative;
+    display: block;
+    animation: m-burst-in 380ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  }
+
+  /* Reduced motion gets the mark with no growth and no particles at all. */
+  .m-burst--still {
+    animation: none;
+  }
+
+  @keyframes m-burst-in {
+    0% {
+      transform: scale(0.2);
+      opacity: 0;
+    }
+    60% {
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 
   /* ═══ ALERT CARDS ════════════════════════════════════════════════════════ */
@@ -1411,7 +1429,7 @@ html:has(.m-app) > body {
     padding: 0.75rem 0.875rem 0.875rem 1rem;
     border-radius: 1.375rem;
     background: var(--m-card);
-    box-shadow: var(--m-edge), var(--m-drop);
+    box-shadow: var(--m-edge);
   }
 
   /* ═══ WIDE SCREENS ═══════════════════════════════════════════════════════
@@ -1422,7 +1440,7 @@ html:has(.m-app) > body {
       width: 100%;
       max-width: 30rem;
       margin-inline: auto;
-      box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 40px 90px -40px rgb(0 0 0 / 0.9);
+      box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
     }
 
     .m-nav,

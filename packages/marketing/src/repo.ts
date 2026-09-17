@@ -32,6 +32,7 @@ import {
   type DealShare,
   type DealStatus,
   type LedgerLine,
+  type LedgerStatus,
   type Marketer,
   type MarketerAlert,
   type MarketerAlertTone,
@@ -45,6 +46,7 @@ import {
   type PayIssue,
   type PayRun,
   type TeamMember,
+  type Transaction,
 } from "@avhomes/contracts";
 import {
   toDeal,
@@ -1045,6 +1047,75 @@ export async function payHistoryFor(db: Db, marketerId: string, limit: number): 
   }
   return out;
 }
+
+/**
+ * The marketer's statement: every money event, newest first.
+ *
+ * Two sources merged, and the merge is the reason this function exists rather
+ * than the screen doing it: the two collections sort on different fields, so a
+ * naive concat interleaves wrongly at the boundary and the list reads as
+ * out of order exactly where a reader is looking hardest.
+ *
+ * Every row names its kind. An earning and the payout that later carries it are
+ * both money arriving from the marketer's side, so both are positive, and the
+ * label is what stops that reading as being paid twice.
+ */
+export async function statementFor(
+  db: Db,
+  marketerId: string,
+  limit: number,
+): Promise<Transaction[]> {
+  const [lines, payments] = await Promise.all([
+    listLedger(db, marketerId, limit),
+    payHistoryFor(db, marketerId, 48),
+  ]);
+
+  const rows: Transaction[] = lines.map((line) => ({
+    id: line.id,
+    at: line.createdAt,
+    amountMinor: line.amountMinor,
+    currency: line.currency,
+    kind: line.kind === "clawback" ? "clawback" : line.kind === "adjust" ? "adjustment" : "earning",
+    title: line.dealTitle || (line.kind === "adjust" ? "Adjustment" : "Commission"),
+    status: LEDGER_WORD[line.status],
+    reference: line.id,
+    dealId: line.dealId,
+    payRunId: line.payRunId,
+    bankLabel: "",
+    note: line.note,
+  }));
+
+  for (const pay of payments) {
+    // Only a transfer that actually went out. A pending row is a promise, and
+    // it is already on the money screen as "on the way".
+    if (pay.status !== "paid" || pay.paidAt === null) continue;
+    rows.push({
+      id: `${pay.payRunId}:${marketerId}`,
+      at: pay.paidAt,
+      amountMinor: pay.totalMinor,
+      currency: pay.currency,
+      kind: "payout",
+      title: `${payMonthLabel(pay.month)} payout`,
+      status: "Paid",
+      reference: pay.reference,
+      dealId: null,
+      payRunId: pay.payRunId,
+      bankLabel: pay.bankLabel,
+      note: "",
+    });
+  }
+
+  rows.sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1));
+  return rows;
+}
+
+/** The ledger's own states, as the marketer reads them. */
+const LEDGER_WORD: Record<LedgerStatus, string> = {
+  earned: "Waiting",
+  scheduled: "On the way",
+  paid: "Paid",
+  void: "Cancelled",
+};
 
 /* ═══════════════════════════════════════════════════════ PAYMENT PROBLEMS ══ */
 

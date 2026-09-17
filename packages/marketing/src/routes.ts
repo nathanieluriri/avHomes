@@ -128,6 +128,7 @@ import {
   reviewDeal,
   saveUpdate,
   setMarketerStatus,
+  statementFor,
   teamFor,
   updateMarketerBank,
   updateMarketerProfile,
@@ -889,6 +890,16 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       issueWindowDays: settings.issueWindowDays,
       month: payMonth(Date.now()),
     });
+  });
+
+  /** Every money event, for the history screen. Filtered on the client: a
+      marketer's statement is small enough that a round trip per filter tap
+      would be slower than the filter itself. */
+  routes.get("/marketing/statement", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const items = await statementFor(db, marketer.id, 400);
+    return c.json({ items, joinedAt: marketer.joinedAt });
   });
 
   routes.post("/marketing/issues", requireAuth(), async (c) => {
