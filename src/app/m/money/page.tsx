@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Receipt } from "lucide-react";
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import {
   payMonth,
@@ -209,6 +209,25 @@ function MoneyBody({ money }: { money: MoneyRead }) {
   return (
     <div className="px-4">
       <Totals data={money.data} />
+
+      {/* The statement. This screen answers "what am I owed"; that one answers
+          "what happened, and when", which is a different question and a
+          different list. */}
+      <Link
+        href="/m/money/history"
+        className="m-card m-press-light mt-6 flex items-center gap-3 px-4 py-3.5"
+      >
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-m-raised text-(color:--m-link)">
+          <Receipt className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold text-m-text">Transaction history</span>
+          <span className="block text-[12.5px] text-m-muted">
+            Search every naira in and out, with receipts
+          </span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-m-faint" aria-hidden />
+      </Link>
 
       <section className="mt-7">
         <SectionLabel>Payments</SectionLabel>

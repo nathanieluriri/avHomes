@@ -11,6 +11,7 @@ import type {
   CommissionRates,
   Deal,
   DealShare,
+  LeadRow,
   LedgerLine,
   Marketer,
   MarketerAlert,
@@ -19,6 +20,7 @@ import type {
   MarketingUpdate,
   PayIssue,
   TeamMember,
+  Transaction,
 } from "@avhomes/contracts";
 
 /** `GET /api/marketing/me`. The whole app's opening read. */
@@ -90,6 +92,19 @@ export interface MoneyResponse {
   bank: MarketerBank | null;
   issueWindowDays: number;
   month: string;
+}
+
+/** `GET /api/marketing/leads`. Potential buyers this marketer handed over. */
+export interface LeadsResponse {
+  items: LeadRow[];
+  total: number;
+}
+
+/** `GET /api/marketing/statement`. Every money event, newest first. */
+export interface StatementResponse {
+  items: Transaction[];
+  /** The account's first day, so the date picker offers nothing before it. */
+  joinedAt: number;
 }
 
 export interface TeamResponse {

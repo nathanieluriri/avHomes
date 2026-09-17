@@ -29,6 +29,7 @@ import {
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import type { JoinInfo, MarketerResponse } from "@/lib/marketer/api";
+import { rememberAccount } from "@/lib/marketer/last-account";
 import { NIGERIAN_STATES } from "@/lib/marketer/states";
 
 /**
@@ -150,6 +151,7 @@ export function JoinFlow({ code }: { code: string }) {
           : {}),
       });
       // The join route issues the session, so the app is already signed in.
+      rememberAccount({ name: displayName.trim(), email: email.trim() });
       router.replace("/m");
     } catch (err) {
       setError(toApiError(err));

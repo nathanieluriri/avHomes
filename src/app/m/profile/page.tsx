@@ -31,6 +31,7 @@ import {
 } from "@/components/marketer/ui";
 import { ApiError, api } from "@/lib/admin/client";
 import { initials, type MarketerResponse, type MeResponse } from "@/lib/marketer/api";
+import { forgetAccount } from "@/lib/marketer/last-account";
 import { NIGERIAN_STATES } from "@/lib/marketer/states";
 
 /**
@@ -506,6 +507,9 @@ function SignOutButton() {
       // A logout the server did not hear is still a logout here: the next
       // screen asks for the session again and bounces if it is still alive.
     }
+    // The name comes off the phone too. Signing out and still being greeted by
+    // name is the opposite of what somebody handing over their phone wants.
+    forgetAccount();
     router.replace("/m/sign-in");
   }
 
