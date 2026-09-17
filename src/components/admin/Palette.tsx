@@ -8,7 +8,7 @@ import { api } from "@/lib/admin/client";
 import { useDebounced, useIsTouch } from "@/lib/admin/hooks";
 import { BottomSheet } from "./BottomSheet";
 import { IconButton } from "./ui";
-import { NAV_ITEMS, canSeeNavItem, type NavItem } from "./nav";
+import { NAV_ITEMS, canSeeNavItem, type NavPage } from "./nav";
 
 /**
  * The topbar's search, opened by its handle or by Ctrl+K.
@@ -131,7 +131,7 @@ export function Palette({
         item.label.toLowerCase().includes(q) ||
         item.hint.toLowerCase().includes(q),
     );
-    const go: Row[] = matched.map((item: NavItem) => ({
+    const go: Row[] = matched.map((item: NavPage) => ({
       key: `nav:${item.href}`,
       href: item.href,
       title: item.label,
