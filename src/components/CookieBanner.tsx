@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Cookie, X } from "lucide-react";
 
@@ -22,7 +22,6 @@ type Choice = "accepted" | "rejected";
  */
 export default function CookieBanner() {
   const [visible, setVisible] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     /*
@@ -58,101 +57,81 @@ export default function CookieBanner() {
     setVisible(false);
   }
 
-  /*
-   * Publishes its own height so the chat launcher can sit clear of it.
-   *
-   * MEASURED, not a constant: this banner is one row on a desktop and three
-   * stacked on a phone, so any number hard coded on the other side is wrong at
-   * some width. The ResizeObserver also catches a reflow when the text wraps
-   * differently, which a single measurement at mount would miss.
-   *
-   * The value goes on the root element rather than down a prop, because the
-   * launcher is portalled to the body and is not a descendant of anything this
-   * component could hand a prop to. The cleanup zeroes it, which is what makes
-   * dismissal drop the launcher back to the corner.
-   */
+  // Modal until answered: freeze page scroll behind the overlay.
   useEffect(() => {
-    const node = box.current;
-    if (!node) return;
-    const publish = () => {
-      document.documentElement.style.setProperty(
-        "--cookie-banner-h",
-        `${Math.ceil(node.getBoundingClientRect().height)}px`,
-      );
-    };
-    publish();
-    const observer = new ResizeObserver(publish);
-    observer.observe(node);
+    if (!visible) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     return () => {
-      observer.disconnect();
-      document.documentElement.style.setProperty("--cookie-banner-h", "0px");
+      document.body.style.overflow = previous;
     };
-    /*
-     * Keyed on `visible`, and it has to be. The banner starts hidden while the
-     * stored consent is read, so on the first run the ref is null and there is
-     * nothing to measure. With no dependency this effect never ran again and the
-     * variable stayed unset for the whole visit, which is precisely the case it
-     * exists to handle.
-     */
   }, [visible]);
 
   if (!visible) return null;
 
   return (
-    <div
-      ref={box}
-      role="dialog"
-      aria-modal="false"
-      aria-labelledby="cookie-title"
-      aria-describedby="cookie-body"
-      className="fixed inset-x-0 bottom-0 z-[60] px-4 pb-4 sm:px-6 sm:pb-6"
-    >
-      <div className="mx-auto flex max-w-3xl flex-col gap-4 rounded-2xl border border-mist-200 bg-white p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50 text-wine-600">
-          <Cookie className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-        </span>
+    // Full screen scrim sits above the chat dock (z-[95]) and swallows every click until a choice is made.
+    <div className="fixed inset-0 z-[100] flex items-end bg-plum-950/60 backdrop-blur-[2px]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cookie-title"
+        aria-describedby="cookie-body"
+        className="w-full px-4 pb-4 sm:px-6 sm:pb-6"
+      >
+        <div className="mx-auto flex max-w-3xl flex-col gap-4 rounded-2xl border border-mist-200 bg-white p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wine-50 text-wine-600">
+            <Cookie className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
+          </span>
 
-        <div className="min-w-0 flex-1">
-          <p id="cookie-title" className="text-sm font-semibold text-plum-950">
-            We use cookies
-          </p>
-          <p id="cookie-body" className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Strictly necessary cookies keep the site working. We would also like
-            to set analytics cookies to understand how listings are browsed.
-            Read the{" "}
-            <Link
-              href="/privacy#cookies"
-              className="font-medium text-wine-600 underline underline-offset-2 hover:text-wine-700"
+          <div className="min-w-0 flex-1">
+            <p
+              id="cookie-title"
+              className="text-sm font-semibold text-plum-950"
             >
-              cookie policy
-            </Link>
-            .
-          </p>
-        </div>
+              We use cookies
+            </p>
+            <p
+              id="cookie-body"
+              className="mt-1 text-sm leading-relaxed text-muted-foreground"
+            >
+              Strictly necessary cookies keep the site working. We would also
+              like to set analytics cookies to understand how listings are
+              browsed. Read the{" "}
+              <Link
+                href="/privacy#cookies"
+                className="font-medium text-wine-600 underline underline-offset-2 hover:text-wine-700"
+              >
+                cookie policy
+              </Link>
+              .
+            </p>
+          </div>
 
-        <div className="flex shrink-0 items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => choose("rejected")}
-            className="flex-1 rounded-full border border-mist-200 px-5 py-2.5 text-sm font-semibold text-plum-950 transition-colors hover:border-wine-600 hover:text-wine-600 sm:flex-none"
-          >
-            Reject
-          </button>
-          <button
-            type="button"
-            onClick={() => choose("accepted")}
-            className="flex-1 rounded-full bg-wine-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 sm:flex-none"
-          >
-            Accept
-          </button>
-          <button
-            type="button"
-            onClick={() => choose("rejected")}
-            aria-label="Dismiss and reject non essential cookies"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 transition-colors hover:bg-mist-100 hover:text-plum-950"
-          >
-            <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => choose("rejected")}
+              className="flex-1 rounded-full border border-mist-200 px-5 py-2.5 text-sm font-semibold text-plum-950 transition-colors hover:border-wine-600 hover:text-wine-600 sm:flex-none"
+            >
+              Reject
+            </button>
+            <button
+              type="button"
+              onClick={() => choose("accepted")}
+              className="flex-1 rounded-full bg-wine-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 sm:flex-none"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={() => choose("rejected")}
+              aria-label="Dismiss and reject non essential cookies"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 transition-colors hover:bg-mist-100 hover:text-plum-950"
+            >
+              <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

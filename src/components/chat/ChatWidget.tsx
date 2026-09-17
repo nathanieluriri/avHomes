@@ -45,17 +45,8 @@ export default function ChatWidget() {
   if (!hydrated) return null;
 
   return createPortal(
-    /*
-     * `--cookie-banner-h` is published by CookieBanner and is 0px whenever it is
-     * not on screen, so this padding costs nothing the rest of the time. Both
-     * are pinned to the bottom of the viewport, and on a phone the banner is
-     * three stacked rows tall: without this the launcher sits on top of a
-     * consent notice the visitor has to answer.
-     */
-    <div
-      className="chat-dock pointer-events-none fixed inset-0 z-[95] flex flex-col items-end justify-end p-4 sm:p-6"
-      style={{ paddingBottom: "calc(1rem + var(--cookie-banner-h, 0px))" }}
-    >
+    // Stays below the cookie consent overlay (z-[100]) until the visitor answers it.
+    <div className="chat-dock pointer-events-none fixed inset-0 z-[95] flex flex-col items-end justify-end p-4 sm:p-6">
       {chat.open && <Panel />}
       <Launcher />
     </div>,
