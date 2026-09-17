@@ -101,7 +101,7 @@ function Settlement({ tx }: { tx: Transaction }) {
   if (tx.carriedBy !== "") {
     return (
       <span className="mt-1 block truncate text-[11.5px] text-m-faint">
-        Paid to you in the {tx.carriedBy} payout
+        In the {tx.carriedBy} payout
       </span>
     );
   }
@@ -112,8 +112,8 @@ function Settlement({ tx }: { tx: Transaction }) {
   const out = tx.amountMinor < 0;
   const word = out
     ? tx.state === "sending"
-      ? "Coming off this payment"
-      : "Comes off your next payment"
+      ? "Off this payment"
+      : "Off your next payment"
     : tx.state === "sending"
       ? "On the way"
       : "Not paid yet";
