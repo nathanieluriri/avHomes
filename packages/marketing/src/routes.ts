@@ -35,6 +35,7 @@ import {
   type AppEnv,
 } from "@avhomes/core";
 import {
+  ACCOUNT_PROVIDERS,
   DEAL_KINDS,
   LEAD_STATES,
   LEAD_NOTE_MAX,
@@ -53,6 +54,7 @@ import {
   ratesRefusal,
   updateRefusal,
   leadRefusal,
+  namesMatch,
   type Deal,
   type Lead,
   type Marketer,
@@ -73,7 +75,7 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "@avhomes/identity";
-import { listBanks, paystackConfigured, resolveAccount } from "./bank";
+import { listBanks, providerState, resolveAccount } from "./bank";
 import {
   createLead,
   getLead,
@@ -85,7 +87,12 @@ import {
   winLead,
   withShares,
 } from "./leads";
-import { readMarketingSettings, writeMarketingSettings } from "./settings";
+import {
+  paystackKeySaved,
+  readMarketingSettings,
+  writeMarketingSettings,
+  writePaystackKey,
+} from "./settings";
 import { toMarketingUpdate } from "./schema";
 import {
   alertsFor,
@@ -327,6 +334,11 @@ const SettingsBody = z
     blockSelfDeals: z.boolean().optional(),
     minPayoutMinor: z.number().int().min(0).optional(),
     supportPhone: str().max(40).optional(),
+    accountProvider: z.enum(ACCOUNT_PROVIDERS).optional(),
+    /* The key is write-only. Absent leaves what is saved alone, because the
+       form posts every field on every save and can never prefill this one.
+       null is how an admin clears it deliberately. */
+    paystackKey: str().max(200).nullable().optional(),
   })
   .strict();
 
@@ -345,7 +357,7 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
       open: settings.joinOpen,
       supportPhone: settings.supportPhone,
       rates: settings.saleRates,
-      bankCheck: paystackConfigured(),
+      bankCheck: (await providerState(db)).ready,
       referrer:
         referrer && referrer.status === "active"
           ? { code: referrer.code, displayName: referrer.displayName }
@@ -354,9 +366,10 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
   });
 
   routes.get("/public/marketing/banks", async (c) => {
+    const db = await currentDb(c);
     const banks = await listBanks();
     c.header("cache-control", "public, max-age=3600");
-    return c.json({ banks, checked: paystackConfigured() });
+    return c.json({ banks, checked: (await providerState(db)).ready });
   });
 
   /** The name on an account, so nobody signs up with a typo for a bank account. */
@@ -369,7 +382,7 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
     }
     const db = await currentDb(c);
     await limit(db, `bankcheck:${clientIp(c)}`, 20, JOIN_WINDOW_MS);
-    const resolved = await resolveAccount(body.accountNumber, body.bankCode);
+    const resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
     return c.json({ accountName: resolved?.accountName ?? "", checked: resolved !== null });
   });
 
@@ -408,7 +421,7 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
           { path: "bank.accountNumber", message: "an account number is ten digits" },
         ]);
       }
-      const resolved = await resolveAccount(body.bank.accountNumber, body.bank.bankCode);
+      const resolved = await resolveAccount(db, body.bank.accountNumber, body.bank.bankCode);
       bank = {
         bankCode: body.bank.bankCode,
         bankName: body.bank.bankName,
@@ -560,7 +573,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const db = await currentDb(c);
     const marketer = await currentMarketer(db, c);
     const settings = await readMarketingSettings(db);
-    const bankCheck = paystackConfigured();
+    const bankCheck = (await providerState(db)).ready;
     const [balance, team, alerts] = await Promise.all([
       balanceFor(db, marketer.id, settings.currency),
       teamFor(db, marketer.id),
@@ -585,7 +598,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const marketer = await currentMarketer(db, c);
     const settings = await readMarketingSettings(db);
     return c.json({
-      items: await alertsFor(db, marketer, settings, { bankCheck: paystackConfigured() }),
+      items: await alertsFor(db, marketer, settings, { bankCheck: (await providerState(db)).ready }),
     });
   });
 
@@ -636,7 +649,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         { path: "accountNumber", message: "an account number is ten digits" },
       ]);
     }
-    const resolved = await resolveAccount(body.accountNumber, body.bankCode);
+    const resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
     const bank: MarketerBank = {
       bankCode: body.bankCode,
       bankName: body.bankName,
@@ -1015,7 +1028,14 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
 
   routes.get("/admin/marketing/settings", requireAuth(), async (c) => {
     const db = await currentDb(c);
-    return c.json({ settings: await readMarketingSettings(db), bankCheck: paystackConfigured() });
+    const [settings, provider, keySaved] = await Promise.all([
+      readMarketingSettings(db),
+      providerState(db),
+      paystackKeySaved(db),
+    ]);
+    // The key itself never leaves the server; the console only needs to know
+    // whether one is saved so it can say so and offer to replace it.
+    return c.json({ settings, bankCheck: provider.ready, paystackKeySaved: keySaved });
   });
 
   routes.patch("/admin/marketing/settings", requireAuth(), async (c) => {
@@ -1027,8 +1047,11 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
       const refusal = ratesRefusal(value);
       if (refusal) throw new BadRequestError(key, [{ path: key, message: refusal }]);
     }
-    const settings = await writeMarketingSettings(db, body as Partial<MarketingSettings>);
-    return c.json({ settings });
+    const { paystackKey, ...rest } = body;
+    if (paystackKey !== undefined) await writePaystackKey(db, paystackKey);
+    const settings = await writeMarketingSettings(db, rest as Partial<MarketingSettings>);
+    const [provider, keySaved] = await Promise.all([providerState(db), paystackKeySaved(db)]);
+    return c.json({ settings, bankCheck: provider.ready, paystackKeySaved: keySaved });
   });
 
   routes.get("/admin/marketing/marketers", requireAuth(), async (c) => {
@@ -1096,6 +1119,55 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
     );
     const page = await listDeals(db, { status: q.status, q: q.q, limit: 60 });
     return c.json(page);
+  });
+
+  /**
+   * Check a marketer's bank account, now, from the console.
+   *
+   * THE ACCOUNT RESOLVING IS THE VERIFICATION. Whether the returned name looks
+   * like the marketer's name is reported and never enforced: a wife's account,
+   * a business name, a middle name nobody uses and a bank that puts the surname
+   * first are all ordinary, and refusing those would send an admin back to
+   * typing names by hand. So the name is saved either way and the console shows
+   * both, with `matches` as advice.
+   */
+  routes.post("/admin/marketing/marketers/:id/verify-bank", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const id = pathParam(c, "id");
+    const marketer = await findMarketerById(db, id);
+    if (!marketer) throw new NotFoundError(`marketer ${id}`);
+    if (!marketer.bank) {
+      throw new PreconditionFailedError("no_bank", {
+        detail: "This marketer has not added a bank account yet.",
+      });
+    }
+
+    const resolved = await resolveAccount(db, marketer.bank.accountNumber, marketer.bank.bankCode);
+    if (!resolved) {
+      return c.json({
+        marketer,
+        found: false,
+        matches: false,
+        accountName: "",
+        detail: "That account number and bank did not match any account.",
+      });
+    }
+
+    const bank: MarketerBank = {
+      ...marketer.bank,
+      accountName: resolved.accountName,
+      verifiedAt: resolved.verifiedAt,
+    };
+    const after = await updateMarketerBank(db, marketer.id, bank);
+    auditEntityId(c, marketer.id);
+
+    return c.json({
+      marketer: after,
+      found: true,
+      accountName: resolved.accountName,
+      matches: namesMatch(resolved.accountName, marketer.displayName),
+      detail: "",
+    });
   });
 
   routes.get("/admin/marketing/deals/:id", requireAuth(), async (c) => {

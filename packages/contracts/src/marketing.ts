@@ -409,6 +409,55 @@ export type CommissionRates = [number, number, number];
 export const RENT_BASES = ["upfront", "period"] as const;
 export type RentBasis = (typeof RENT_BASES)[number];
 
+/**
+ * Who answers "what name is on this account number".
+ *
+ * Kora needs no key and is what this site runs on today. Paystack needs a free
+ * key and is the one to be on: Kora's resolve endpoint is reachable without
+ * auth because of a hole in their middleware rather than because it is offered,
+ * so it can close with no notice. Swapping is one field on the settings screen,
+ * deliberately, so the day it closes is a settings change and not a deploy.
+ */
+export const ACCOUNT_PROVIDERS = ["kora", "paystack"] as const;
+export type AccountProvider = (typeof ACCOUNT_PROVIDERS)[number];
+
+export const ACCOUNT_PROVIDER_LABEL: Record<AccountProvider, string> = {
+  kora: "Kora",
+  paystack: "Paystack",
+};
+
+/**
+ * Do these two names plausibly belong to the same person?
+ *
+ * Deliberately loose, and never an equality test. A real answer from a Nigerian
+ * bank looks like `URIRI  NATHANIEL ELO OGHENE`: two spaces in the middle, the
+ * surname first, and middle names the account holder never types. Comparing
+ * that to "Nathaniel Uriri" with `===` fails every time, so the check is how
+ * many words the two share.
+ *
+ * This is ADVICE, not a gate. The account resolving at all is the thing that
+ * stops money going to a typo; whether the name matches is for a human to look
+ * at, because a wife's account, a business name and a middle name nobody uses
+ * are all legitimate and all fail a strict check.
+ */
+export function namesMatch(bankName: string, personName: string): boolean {
+  const words = (value: string) =>
+    new Set(
+      value
+        .toLowerCase()
+        .replace(/[^a-z\s]/gu, " ")
+        .split(/\s+/u)
+        .filter((word) => word.length > 1),
+    );
+  const bank = words(bankName);
+  const person = words(personName);
+  if (person.size === 0 || bank.size === 0) return false;
+  let shared = 0;
+  for (const word of person) if (bank.has(word)) shared += 1;
+  // Two shared words, or every word of a single-word name.
+  return shared >= Math.min(2, person.size);
+}
+
 export interface MarketingSettings {
   /** Rates for a sale. Level 1 is the person who closed it. */
   saleRates: CommissionRates;
@@ -433,6 +482,12 @@ export interface MarketingSettings {
   currency: string;
   /** Shown on the marketer's sign up page and in the app's help sheet. */
   supportPhone: string;
+  /**
+   * Who checks bank account names. The KEY is not on this type on purpose: this
+   * shape goes to the browser, and a secret that is one `console.log` from a
+   * screenshot is not a secret. The server reads the key separately.
+   */
+  accountProvider: AccountProvider;
   updatedAt: number;
 }
 
@@ -448,6 +503,7 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   minPayoutMinor: 0,
   currency: DEFAULT_CURRENCY,
   supportPhone: "",
+  accountProvider: "kora",
   updatedAt: 0,
 };
 

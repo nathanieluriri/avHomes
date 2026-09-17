@@ -597,6 +597,7 @@ function marketingFixtures(ownerId, props) {
       minPayoutMinor: 0,
       currency: "NGN",
       supportPhone: "+234 801 234 5678",
+      accountProvider: "kora",
       updatedAt: ago(30),
     },
   };
@@ -1368,7 +1369,23 @@ function marketingApi(S) {
 
     /* ───────────────────────────────────────────────────────────── admin ── */
     ["GET", /^\/api\/admin\/marketing\/counts$/, () => ({ counts: counts() })],
-    ["GET", /^\/api\/admin\/marketing\/settings$/, () => ({ settings: M.settings, bankCheck: true })],
+    ["GET", /^\/api\/admin\/marketing\/settings$/, () => ({ settings: M.settings, bankCheck: true, paystackKeySaved: false })],
+    /* The console's one-tap account check. Answers the way the real provider
+       does: a name back, and whether it looks like the marketer's. */
+    ["POST", /^\/api\/admin\/marketing\/marketers\/([^/]+)\/verify-bank$/, (m) => {
+      const p = mkt(m[1]);
+      if (!p || !p.bank) return { found: false, matches: false, accountName: "", detail: "This marketer has not added a bank account yet." };
+      const shares = (a, b) => {
+        const w = (v) => new Set(String(v).toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter((x) => x.length > 1));
+        const A = w(a), B = w(b);
+        let n = 0;
+        for (const x of B) if (A.has(x)) n += 1;
+        return n >= Math.min(2, B.size);
+      };
+      const name = p.bank.accountName || `${p.displayName.toUpperCase()}`;
+      p.bank = { ...p.bank, accountName: name, verifiedAt: now() };
+      return { marketer: p, found: true, accountName: name, matches: shares(name, p.displayName), detail: "" };
+    }],
     ["PATCH", /^\/api\/admin\/marketing\/settings$/, (m, u, b) => {
       Object.assign(M.settings, b, { updatedAt: now() });
       return { settings: M.settings };
