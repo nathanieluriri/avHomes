@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type { EnquiryThread } from "@avhomes/contracts";
+import { readReferral } from "@/lib/referral";
 import {
   THREAD_TOKEN_HEADER,
   newestAt,
@@ -290,6 +291,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const start = useCallback(
     async (target: ChatTarget, who: Identity, message: string, honeypot: string) => {
+      const referralCode = readReferral();
       const res = await fetch("/api/enquiries/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -300,6 +302,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           ...(target.propertyId ? { propertyId: target.propertyId } : {}),
           ...(target.propertySlug ? { propertySlug: target.propertySlug } : {}),
           propertyTitle: target.title,
+          ...(referralCode ? { referralCode } : {}),
         }),
       });
       if (!res.ok) throw new Error(await readError(res));

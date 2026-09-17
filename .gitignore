@@ -282,3 +282,6 @@ videos/_captures/
 videos/*/snapshots/
 videos/*/renders/
 videos/*/assets/.frames/
+
+# Playwright MCP session logs, written by browser tooling.
+.playwright-mcp/

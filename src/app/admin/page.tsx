@@ -4,13 +4,20 @@ import Link from "next/link";
 import {
   ArrowRight,
   Building2,
+  Handshake,
   Images,
   Inbox,
   Newspaper,
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { hasDomain, type Domain, type SiteAlert, type SitePulse } from "@avhomes/contracts";
+import {
+  formatMoney,
+  hasDomain,
+  type Domain,
+  type SiteAlert,
+  type SitePulse,
+} from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync, useIsNarrow, useSession } from "@/lib/admin/hooks";
 import { relative } from "@/lib/admin/format";
@@ -49,6 +56,13 @@ interface Dashboard {
   enquiries: { new: number; open: number; closed: number; spam: number };
   recentEnquiries: { id: string; name: string; status: string; createdAt: number }[];
   pulse: SitePulse;
+  /** Null for a role without the marketing domain: the server does not send it. */
+  marketing: {
+    dealsWaiting: number;
+    issuesOpen: number;
+    owedMinor: number;
+    marketersActive: number;
+  } | null;
 }
 
 interface Destination {
@@ -104,6 +118,15 @@ const DESTINATIONS: readonly Destination[] = [
     kicker: () => null,
   },
   {
+    href: "/admin/marketers/deals",
+    label: "Marketers",
+    title: "Check what they closed",
+    body: "Approve the deals marketers reported, and see what is owed on them.",
+    icon: Handshake,
+    domain: "marketing",
+    kicker: (d) => marketingKicker(d.marketing),
+  },
+  {
     href: "/admin/team",
     label: "Team",
     title: "Who can sign in",
@@ -113,6 +136,19 @@ const DESTINATIONS: readonly Destination[] = [
     kicker: () => null,
   },
 ];
+
+/**
+ * Two figures in one kicker, because either alone is misleading: deals waiting
+ * with nothing owed is a quiet week, and money owed with nothing waiting is a
+ * pay run somebody has not made.
+ */
+function marketingKicker(marketing: Dashboard["marketing"]): string | null {
+  if (!marketing) return null;
+  const parts: string[] = [];
+  if (marketing.dealsWaiting > 0) parts.push(`${marketing.dealsWaiting} to check`);
+  if (marketing.owedMinor > 0) parts.push(`${formatMoney(marketing.owedMinor)} owed`);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
 
 export default function DashboardPage() {
   const { session } = useSession();

@@ -15,3 +15,4 @@ export * from "./listing-rules";
 export * from "./site-health";
 export * from "./media";
 export * from "./email";
+export * from "./marketing";

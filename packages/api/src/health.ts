@@ -11,14 +11,15 @@ import {
   type SiteHealthSnapshot,
 } from "@avhomes/contracts";
 import { readPublicSettings } from "@avhomes/settings";
+import { marketingCounts, readMarketingSettings } from "@avhomes/marketing";
 
 /**
  * What the site is currently getting wrong.
  *
  * It lives HERE for the same reason `dashboard.ts` does: it is a read that
- * spans listings, content, enquiries and settings at once, and no feature
- * package is allowed to know about another. Putting it in any of them would be
- * the cross-import the layout exists to prevent.
+ * spans listings, content, enquiries, marketing and settings at once, and no
+ * feature package is allowed to know about another. Putting it in any of them
+ * would be the cross-import the layout exists to prevent.
  *
  * The JUDGEMENT is not here. This file gathers counts and hands them to
  * `siteAlerts` in contracts, which decides what is wrong and how to say it.
@@ -83,6 +84,8 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
     siteStats,
     stale,
     settings,
+    marketing,
+    marketingSettings,
   ] = await Promise.all([
     properties.countDocuments(onSite),
     properties.countDocuments({ status: "live", deletedAt: null }),
@@ -107,6 +110,8 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
       .collection(COLLECTIONS.enquiries)
       .countDocuments({ status: "new", createdAt: { $lt: Date.now() - TWO_DAYS_MS } }),
     readPublicSettings(db),
+    marketingCounts(db),
+    readMarketingSettings(db),
   ]);
 
   return {
@@ -116,5 +121,8 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
     siteStats,
     settings,
     enquiries: { stale },
+    // Level 1 is the rate the person who actually closed the deal earns. Zero
+    // there means the whole split resolves to nothing, whatever 2 and 3 say.
+    marketing: { ...marketing, ratesUnset: marketingSettings.saleRates[0] === 0 },
   };
 }

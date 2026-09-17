@@ -1,4 +1,5 @@
-import { ENQUIRY_CHANNELS, ENQUIRY_STATUSES, REPLY_IDENTITIES } from "@avhomes/contracts";
+import type { Document } from "mongodb";
+import { ALL_ROLES, ENQUIRY_CHANNELS, ENQUIRY_STATUSES, REPLY_IDENTITIES } from "@avhomes/contracts";
 import { COLLECTIONS } from "../collections";
 import { ensureCollection, ensureIndex, type Migration } from "../migrate";
 
@@ -137,32 +138,7 @@ thousand historical rows to say what their absence already says.`,
 
     /* ────────────────────────────── users ───────────────────────────── */
 
-    await ensureCollection(db, COLLECTIONS.users, {
-      $jsonSchema: {
-        bsonType: "object",
-        required: ["_id", "email", "displayName", "role", "createdAt"],
-        properties: {
-          _id: STR,
-          email: STR,
-          displayName: STR,
-          role: { enum: ["owner", "developer", "agent", "editor", "support"] },
-          // Null when the deployment runs the Clerk door, or before a claim.
-          passwordHash: NULLABLE_STR,
-          /*
-           * The card a buyer meets. Optional: absent on every account that
-           * existed before the chat did, and clearable, because an agent who
-           * uploaded the wrong photo must be able to take it down without
-           * waiting until they have a replacement.
-           */
-          avatarUrl: NULLABLE_STR,
-          title: NULLABLE_STR,
-          phone: NULLABLE_STR,
-          createdAt: TS,
-          updatedAt: TS,
-          disabledAt: NULLABLE_TS,
-        },
-      },
-    });
+    await ensureCollection(db, COLLECTIONS.users, usersValidator());
 
     /* ──────────────────────────── settings ──────────────────────────── */
 
@@ -183,3 +159,41 @@ thousand historical rows to say what their absence already says.`,
     });
   },
 };
+
+/**
+ * The users validator, as a function so a later migration can re-apply it when
+ * `ALL_ROLES` grows.
+ *
+ * The role list here was once written out by hand, and a validator is frozen at
+ * the moment it is applied, so a role added later is refused by every database
+ * that ran this migration. Built from `ALL_ROLES`, a fresh database gets every
+ * role, and an old one gets them the next time a migration re-applies this.
+ */
+export function usersValidator(): Document {
+  return {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["_id", "email", "displayName", "role", "createdAt"],
+      properties: {
+        _id: STR,
+        email: STR,
+        displayName: STR,
+        role: { enum: [...ALL_ROLES] },
+        // Null when the deployment runs the Clerk door, or before a claim.
+        passwordHash: NULLABLE_STR,
+        /*
+         * The card a buyer meets. Optional: absent on every account that
+         * existed before the chat did, and clearable, because an agent who
+         * uploaded the wrong photo must be able to take it down without
+         * waiting until they have a replacement.
+         */
+        avatarUrl: NULLABLE_STR,
+        title: NULLABLE_STR,
+        phone: NULLABLE_STR,
+        createdAt: TS,
+        updatedAt: TS,
+        disabledAt: NULLABLE_TS,
+      },
+    },
+  };
+}

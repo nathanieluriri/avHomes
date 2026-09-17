@@ -28,6 +28,7 @@ import {
 } from "@avhomes/core";
 import {
   ENQUIRY_STATUSES,
+  referralCodeFrom,
   type Enquiry,
   type EnquiryChannel,
   type EnquiryMessage,
@@ -115,6 +116,12 @@ interface EnquiryDoc {
   propertyId: string | null;
   propertySlug: string | null;
   propertyTitle: string | null;
+  /**
+   * The marketer code on the shared link the visitor came in through. Optional:
+   * absent on every row written before marketers existed, and the validator
+   * admits it without a migration because it lists no forbidden fields.
+   */
+  referralCode?: string | null;
   status: EnquiryStatus;
   createdAt: number;
   updatedAt: number;
@@ -150,6 +157,7 @@ const LIST_PROJECTION = {
   propertyId: 1,
   propertySlug: 1,
   propertyTitle: 1,
+  referralCode: 1,
   status: 1,
   createdAt: 1,
   updatedAt: 1,
@@ -187,6 +195,7 @@ function toEnquiry(doc: EnquiryDoc, handlerName: string | null): Enquiry {
     propertyId: doc.propertyId,
     propertySlug: doc.propertySlug,
     propertyTitle: doc.propertyTitle ?? null,
+    referralCode: doc.referralCode ?? null,
     status: doc.status,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
@@ -428,6 +437,12 @@ const SubmitBody = z
     propertySlug: str().max(200).optional(),
     propertyTitle: str().max(300).optional(),
     /**
+     * The `?ref=` a marketer's shared link carried. Loose on purpose: anything
+     * that is not a marketer code is dropped in `openingDoc`, never refused,
+     * because a mangled link must not cost a buyer their enquiry.
+     */
+    referralCode: str().max(40).optional(),
+    /**
      * A honeypot. Bots fill every field they find; a human never sees this one,
      * so a non-empty value is a bot and the response is a normal 201 telling it
      * nothing. Refusing loudly just teaches the next attempt.
@@ -498,6 +513,7 @@ function openingDoc(
     propertyId: body.propertyId ?? null,
     propertySlug: body.propertySlug ?? null,
     propertyTitle: body.propertyTitle ?? null,
+    referralCode: referralCodeFrom(body.referralCode),
     status: "new",
     createdAt: now,
     updatedAt: now,

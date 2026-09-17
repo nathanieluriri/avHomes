@@ -395,6 +395,12 @@ export interface Enquiry {
   propertyId: string | null;
   propertySlug: string | null;
   propertyTitle: string | null;
+  /**
+   * The marketer code, such as AV-0042, on the shared link this visitor arrived
+   * through in the same browser session. Unverified: it says which link was
+   * followed, not that the marketer is owed anything.
+   */
+  referralCode: string | null;
   status: EnquiryStatus;
   createdAt: number;
   updatedAt: number;
@@ -585,7 +591,8 @@ export interface SitePulse {
 /** The entity kinds an audit entry can name. See the spec's derivation table. */
 export const AUDIT_ENTITIES = [
   "property", "post", "category", "image", "enquiry", "user", "invite",
-  "testimonial", "stat", "note", "settings", "session", "auth", "unknown",
+  "testimonial", "stat", "note", "settings", "session", "auth",
+  "marketer", "deal", "payrun", "update", "unknown",
 ] as const;
 export type AuditEntity = (typeof AUDIT_ENTITIES)[number];
 
@@ -631,14 +638,24 @@ export interface AuditEntry {
 
 /**
  * The server's allowlist, checked by the progress route. The console's catalogue
- * names the same four. Migration 0010 only bounds the stored subject's length, so
- * adding an id here needs no migration.
+ * and the marketer app's help screen both draw from it. Migration 0010 only
+ * bounds the stored subject's length, so adding an id here needs no migration.
+ *
+ * An id is listed before its video is rendered. Until then the help screens show
+ * the written steps, and progress is still stored against the id.
  */
 export const TUTORIAL_IDS = [
   "add-a-listing",
   "log-a-change",
   "reply-to-an-enquiry",
   "write-a-journal-post",
+  // The phone app's own two.
+  "report-a-deal",
+  "invite-and-earn",
+  // The console's, about the marketer side of the business.
+  "check-a-deal",
+  "pay-your-marketers",
+  "set-commission-rates",
 ] as const;
 export type TutorialId = (typeof TUTORIAL_IDS)[number];
 

@@ -21,11 +21,12 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { hasDomain, type AuthUser } from "@avhomes/contracts";
+import { hasDomain, isConsoleRole, type AuthUser } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useIsNarrow, useKeyboardInset, useSession } from "@/lib/admin/hooks";
 import { initials } from "@/lib/admin/format";
-import { NAV, canSeeNavItem, homeFor, isSectionActive } from "./nav";
+import type { MarketingCounts } from "@/lib/admin/marketing";
+import { NAV, canSeeNavItem, homeFor, sectionFor } from "./nav";
 import { Palette } from "./Palette";
 import { ResponsiveMenu } from "./BottomSheet";
 import { ButtonLink, Spinner } from "./ui";
@@ -58,6 +59,16 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const unread = useUnreadNotifications(
     session.status === "signed-in" && session.user.role === "developer",
+    pathname,
+  );
+  /* The same deal the notifications badge gets, for the same reason: the number
+     of deals waiting is the only thing in this section that arrives without
+     anybody asking, and a marketer who reported a sale this morning is standing
+     next to a customer waiting to hear it was accepted. Gated on the domain the
+     rows themselves are gated on, so a role that cannot see Deals never polls
+     an endpoint that would answer 403. */
+  const dealsWaiting = useDealsWaiting(
+    session.status === "signed-in" && hasDomain(session.user.role, "marketing"),
     pathname,
   );
   const mainRef = useRef<HTMLElement>(null);
@@ -103,7 +114,23 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
    */
   const home = session.status === "signed-in" ? homeFor(session.user.role) : "/admin";
 
+  /*
+   * A marketer has no console.
+   *
+   * Their role grants no domain at all, so every rail row is filtered away and
+   * `homeFor` falls through to the one row with no domain on it: they signed in
+   * and landed on Alerts, an empty screen inside a frame built for somebody
+   * else. The marketer app at `/m` is where that account belongs, and this is
+   * the one place that can say so, because it is the only thing between a
+   * session and a console screen.
+   */
+  const offConsole = session.status === "signed-in" && !isConsoleRole(session.user.role);
+
   useEffect(() => {
+    if (offConsole) {
+      router.replace("/m");
+      return;
+    }
     if (session.status === "signed-out" && !isSignIn) router.replace("/admin/sign-in");
     if (session.status === "signed-in" && isSignIn) router.replace(home);
     // Covers the bookmark and the typed URL as well as the redirect: landing on
@@ -111,7 +138,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     if (session.status === "signed-in" && !isSignIn && pathname === "/admin" && home !== "/admin") {
       router.replace(home);
     }
-  }, [session.status, isSignIn, pathname, home, router]);
+  }, [session.status, isSignIn, pathname, home, offConsole, router]);
 
   /*
    * The drawer closes itself on any navigation. An overlay that outlives the tap
@@ -229,6 +256,12 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     );
   }
 
+  /* Nothing at all while the redirect above runs, INCLUDING on the sign-in
+     screen: a marketer who just typed their password there is on their way to
+     `/m`, and drawing the console's login form again behind that navigation is
+     the one frame that would make it look like the sign-in failed. */
+  if (offConsole) return null;
+
   if (isSignIn) return <div className="console min-h-[100dvh] bg-haze">{children}</div>;
   if (session.status !== "signed-in") return null;
 
@@ -249,6 +282,9 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   }
 
   const { user } = session;
+
+  /* One lookup for the whole rail rather than one per row. */
+  const currentSection = sectionFor(pathname);
 
   const frame = (
     <div className="console fixed inset-0 z-40 flex flex-col bg-chrome-900">
@@ -403,7 +439,19 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                   </p>
                 )}
                 {visible.map((item) => {
-                  const active = isSectionActive(pathname, item.href);
+                  /* `sectionFor`, not `isSectionActive` per row. Deals and Pay
+                     day live under Marketers in the URL tree, so the plain
+                     prefix test lights the parent row as well as the child and
+                     the rail claims you are in two places at once. One lookup
+                     against the whole list settles it the same way the
+                     breadcrumb already does. */
+                  const active = currentSection === item;
+                  const badge =
+                    item.href === "/admin/notifications"
+                      ? unread
+                      : item.href === "/admin/marketers/deals"
+                        ? dealsWaiting
+                        : 0;
                   return (
                     /* 44px below lg. Below that breakpoint this drawer is the
                        ONLY route between sections, so these are the most
@@ -427,12 +475,12 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                         aria-hidden="true"
                       />
                       <span className="truncate">{item.label}</span>
-                      {item.href === "/admin/notifications" && unread > 0 && (
+                      {badge > 0 && (
                         <span
                           className="ml-auto rounded-full bg-wine-600 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white"
-                          aria-label={`${unread} unread`}
+                          aria-label={`${badge} waiting`}
                         >
-                          {unread > 99 ? "99+" : unread}
+                          {badge > 99 ? "99+" : badge}
                         </span>
                       )}
                     </Link>
@@ -665,6 +713,37 @@ function useUnreadNotifications(enabled: boolean, pathname: string): number {
       controller.abort();
       window.clearInterval(timer);
       window.removeEventListener("avhomes:notifications-read", load);
+    };
+  }, [enabled, pathname]);
+  return enabled ? count : 0;
+}
+
+/**
+ * Deals waiting to be checked, on the same schedule as the count above.
+ *
+ * Every navigation and once a minute, because the source is other people's
+ * phones rather than anything happening in this tab. A failed read is
+ * swallowed: a badge that cannot be fetched is a badge that is not drawn, and
+ * the rail is the wrong place to report a network problem.
+ */
+function useDealsWaiting(enabled: boolean, pathname: string): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    const load = () =>
+      api
+        .get<{ counts: MarketingCounts }>("/admin/marketing/counts", controller.signal)
+        .then((res) => setCount(res.counts.dealsWaiting))
+        .catch(() => {});
+    void load();
+    const timer = window.setInterval(() => void load(), 60_000);
+    // The deals screen settles rows; it announces that so the badge follows.
+    window.addEventListener("avhomes:deals-reviewed", load);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("avhomes:deals-reviewed", load);
     };
   }, [enabled, pathname]);
   return enabled ? count : 0;

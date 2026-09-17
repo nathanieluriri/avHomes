@@ -31,6 +31,9 @@ export interface Env {
   MAIL_FROM: string;
   /** Where a new enquiry is announced. Empty means "do not send". */
   ENQUIRY_NOTIFY_TO: string;
+  /** Paystack, used only to read the name on a marketer's bank account.
+   *  Empty means the account is taken as typed and marked unchecked. */
+  PAYSTACK_SECRET_KEY: string;
   NODE_ENV: string;
 }
 
@@ -56,6 +59,7 @@ export function getEnv(): Env {
     RESEND_API_KEY: read("RESEND_API_KEY"),
     MAIL_FROM: read("MAIL_FROM"),
     ENQUIRY_NOTIFY_TO: read("ENQUIRY_NOTIFY_TO"),
+    PAYSTACK_SECRET_KEY: read("PAYSTACK_SECRET_KEY"),
     NODE_ENV: read("NODE_ENV", "development"),
   };
   return cached;
