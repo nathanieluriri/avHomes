@@ -14,6 +14,9 @@ import type {
   DealStatus,
   IssueMessage,
   IssueStatus,
+  Lead,
+  LeadEvent,
+  LeadState,
   LedgerKind,
   LedgerLine,
   LedgerStatus,
@@ -69,6 +72,7 @@ export interface DealDoc {
   reporterId: string;
   reporterName: string;
   reporterCode: string;
+  leadId: string | null;
   status: DealStatus;
   reason: string;
   reviewedBy: string;
@@ -142,6 +146,33 @@ export interface IssueDoc {
   resolvedAt: number | null;
 }
 
+/**
+ * A potential buyer a marketer handed over.
+ *
+ * `events` is the record; `state` is only the last event's destination, kept
+ * flat so the queue index need not reach into the array.
+ */
+export interface LeadDoc {
+  _id: string;
+  buyerName: string;
+  buyerPhone: string;
+  listingId: string | null;
+  listingTitle: string;
+  wantKind: DealKind | null;
+  wantArea: string;
+  wantBudgetMinor: number;
+  currency: string;
+  brief: string;
+  reporterId: string;
+  reporterName: string;
+  reporterCode: string;
+  state: LeadState;
+  events: LeadEvent[];
+  dealId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** Only what an admin wrote. Listing cards are made at read time and never stored. */
 export interface UpdateDoc {
   _id: string;
@@ -202,6 +233,7 @@ export function toDeal(doc: DealDoc): Deal {
     reporterId: doc.reporterId,
     reporterName: doc.reporterName ?? "",
     reporterCode: doc.reporterCode ?? "",
+    leadId: doc.leadId ?? null,
     status: doc.status,
     reason: doc.reason ?? "",
     reviewedBy: doc.reviewedBy ?? "",
@@ -281,6 +313,29 @@ export function toPayIssue(doc: IssueDoc): PayIssue {
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     resolvedAt: doc.resolvedAt ?? null,
+  };
+}
+
+export function toLead(doc: LeadDoc): Lead {
+  return {
+    id: doc._id,
+    buyerName: doc.buyerName ?? "",
+    buyerPhone: doc.buyerPhone ?? "",
+    listingId: doc.listingId ?? null,
+    listingTitle: doc.listingTitle ?? "",
+    wantKind: doc.wantKind ?? null,
+    wantArea: doc.wantArea ?? "",
+    wantBudgetMinor: doc.wantBudgetMinor ?? 0,
+    currency: doc.currency,
+    brief: doc.brief ?? "",
+    reporterId: doc.reporterId,
+    reporterName: doc.reporterName ?? "",
+    reporterCode: doc.reporterCode ?? "",
+    state: doc.state,
+    events: doc.events ?? [],
+    dealId: doc.dealId ?? null,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
   };
 }
 

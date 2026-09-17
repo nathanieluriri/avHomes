@@ -36,6 +36,9 @@ import {
 } from "@avhomes/core";
 import {
   DEAL_KINDS,
+  LEAD_STATES,
+  LEAD_NOTE_MAX,
+  LEAD_NOTE_MIN,
   MARKETER_STATUSES,
   MARKETING_UPDATE_STATUSES,
   MARKETING_UPDATE_TONES,
@@ -49,7 +52,9 @@ import {
   previewEarning,
   ratesRefusal,
   updateRefusal,
+  leadRefusal,
   type Deal,
+  type Lead,
   type Marketer,
   type MarketerBank,
   type MarketingSettings,
@@ -69,6 +74,18 @@ import {
   verifyPassword,
 } from "@avhomes/identity";
 import { listBanks, paystackConfigured, resolveAccount } from "./bank";
+import {
+  createLead,
+  getLead,
+  getLeadFor,
+  leadCounts,
+  listLeads,
+  moveLead,
+  noteOnLead,
+  openLeadCount,
+  winLead,
+  withShares,
+} from "./leads";
 import { readMarketingSettings, writeMarketingSettings } from "./settings";
 import { toMarketingUpdate } from "./schema";
 import {
@@ -248,6 +265,55 @@ function assertUpdate(update: Parameters<typeof updateRefusal>[0]): void {
   const refusal = updateRefusal(update);
   if (refusal) throw new BadRequestError(refusal.message, [refusal]);
 }
+
+/* Trimmed before the length check, so a note of spaces is not four characters. */
+const MoveBody = z
+  .object({
+    to: z.enum(LEAD_STATES),
+    reason: str().trim().max(120),
+    note: str().trim().min(LEAD_NOTE_MIN).max(LEAD_NOTE_MAX),
+  })
+  .strict();
+
+const LeadNoteBody = z
+  .object({ note: str().trim().min(LEAD_NOTE_MIN).max(LEAD_NOTE_MAX) })
+  .strict();
+
+const LeadBody = z
+  .object({
+    buyerName: str().trim().min(2).max(160),
+    buyerPhone: str().trim().min(7).max(40),
+    listingId: str().max(64).nullable().default(null),
+    listingTitle: str().max(300).default(""),
+    wantKind: z.enum(DEAL_KINDS).nullable().default(null),
+    wantArea: str().trim().max(160).default(""),
+    wantBudgetMinor: z.number().int().min(0).default(0),
+    brief: str().trim().max(600).default(""),
+  })
+  .strict();
+
+const WinBody = z
+  .object({
+    listingId: str().max(64),
+    listingTitle: str().max(300),
+    listingLocation: str().max(200).default(""),
+    listingEstate: str().max(200).default(""),
+    listingType: z.enum(DEAL_KINDS),
+    unitKey: str().max(80).default(""),
+    amountMinor: z.number().int().min(1),
+    closedOn: z.number().int().min(0).default(0),
+    reason: str().trim().max(120),
+    note: str().trim().min(LEAD_NOTE_MIN).max(LEAD_NOTE_MAX),
+  })
+  .strict();
+
+const LeadQuery = z
+  .object({
+    state: z.enum(LEAD_STATES).optional(),
+    q: str().trim().max(120).default(""),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+  })
+  .strict();
 
 const SettingsBody = z
   .object({
@@ -700,6 +766,112 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     return c.json(dealView(deal, marketer.id));
   });
 
+  /* ═══ BUYERS ════════════════════════════════════════════════════════════ */
+
+  /** One lead, with this marketer's share on it. Same shape the list returns. */
+  async function one(db: Db, lead: Lead, marketerId: string) {
+    const [row] = await withShares(db, [lead], marketerId);
+    return row;
+  }
+
+  /** Everyone this marketer handed over, newest movement first. */
+  routes.get("/marketing/leads", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const page = await listLeads(db, { reporterId: marketer.id, limit: 100 });
+    const items = await withShares(db, page.items, marketer.id);
+    return c.json({ items, total: page.total });
+  });
+
+  routes.post("/marketing/leads", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    assertActive(marketer);
+    const body = await readJson(c, LeadBody);
+    const refusal = leadRefusal(body);
+    if (refusal) throw new BadRequestError(refusal.message, [refusal]);
+
+    const settings = await readMarketingSettings(db);
+    const lead = await createLead(db, marketer, body, settings);
+    auditEntityId(c, lead.id);
+
+    if (deps.notify) {
+      await deps.notify(db, {
+        kind: "marketing-deal",
+        title: `${marketer.displayName} logged a buyer`,
+        body: `${lead.buyerName}. Reach them and move it along.`,
+        href: `/admin/marketers/buyers/${lead.id}`,
+        actorId: marketer.userId,
+        actorName: marketer.displayName,
+      });
+    }
+    return c.json(await one(db, lead, marketer.id), 201);
+  });
+
+  /** Theirs, or the 404 a missing id gets. Somebody else's buyer is not their business. */
+  routes.get("/marketing/leads/:id", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const id = pathParam(c, "id");
+    const lead = await getLeadFor(db, id, marketer.id);
+    if (!lead) throw new NotFoundError(`lead ${id}`);
+    return c.json(await one(db, lead, marketer.id));
+  });
+
+  /**
+   * The marketer closing their own buyer.
+   *
+   * Only `lost`, and `moveLead` enforces that rather than trusting this route:
+   * the rule belongs next to the write, where the admin path cannot route
+   * around it either.
+   */
+  routes.post("/marketing/leads/:id/state", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    assertActive(marketer);
+    const id = pathParam(c, "id");
+    const found = await getLeadFor(db, id, marketer.id);
+    if (!found) throw new NotFoundError(`lead ${id}`);
+
+    const body = await readJson(c, MoveBody);
+    const lead = await moveLead(db, id, body.to, body, {
+      id: marketer.id,
+      name: marketer.displayName,
+      side: "marketer",
+    });
+    auditEntityId(c, lead.id);
+
+    if (deps.notify) {
+      await deps.notify(db, {
+        kind: "marketing-deal",
+        title: `${marketer.displayName} closed a buyer`,
+        body: `${lead.buyerName}. ${body.reason}.`,
+        href: `/admin/marketers/buyers/${lead.id}`,
+        actorId: marketer.userId,
+        actorName: marketer.displayName,
+      });
+    }
+    return c.json(await one(db, lead, marketer.id));
+  });
+
+  routes.post("/marketing/leads/:id/note", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    assertActive(marketer);
+    const id = pathParam(c, "id");
+    const found = await getLeadFor(db, id, marketer.id);
+    if (!found) throw new NotFoundError(`lead ${id}`);
+
+    const body = await readJson(c, LeadNoteBody);
+    const lead = await noteOnLead(db, id, body.note, {
+      id: marketer.id,
+      name: marketer.displayName,
+      side: "marketer",
+    });
+    auditEntityId(c, lead.id);
+    return c.json(await one(db, lead, marketer.id));
+  });
+
   routes.get("/marketing/money", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const marketer = await currentMarketer(db, c);
@@ -961,6 +1133,91 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
     const body = await readJson(c, z.object({ reason: str().max(400).default("") }).strict());
     const deal = await cancelDeal(db, id, body.reason, { id: user.id, name: user.displayName });
     return c.json({ deal });
+  });
+
+  /* ═══ BUYERS ════════════════════════════════════════════════════════════ */
+
+  routes.get("/admin/marketing/leads", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const query = readQuery(c, LeadQuery);
+    const [page, counts] = await Promise.all([
+      listLeads(db, { limit: query.limit, q: query.q, ...(query.state ? { state: query.state } : {}) }),
+      leadCounts(db),
+    ]);
+    return c.json({ items: page.items, total: page.total, counts });
+  });
+
+  routes.get("/admin/marketing/leads/:id", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const id = pathParam(c, "id");
+    const lead = await getLead(db, id);
+    if (!lead) throw new NotFoundError(`lead ${id}`);
+    return c.json(lead);
+  });
+
+  /**
+   * Any state but `won`, which needs an amount and goes through `convert`.
+   *
+   * Leaving `won` un-mints the money, and `moveLead` does that by cancelling the
+   * deal rather than by deleting anything: the marketer keeps a readable history
+   * and a clawback line if they had already been paid.
+   */
+  routes.post("/admin/marketing/leads/:id/state", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const before = await getLead(db, id);
+    if (!before) throw new NotFoundError(`lead ${id}`);
+    auditBefore(c, before as unknown as Record<string, unknown>);
+
+    const body = await readJson(c, MoveBody);
+    const lead = await moveLead(db, id, body.to, body, {
+      id: user.id,
+      name: user.displayName,
+      side: "admin",
+    });
+    auditEntityId(c, lead.id);
+    return c.json(lead);
+  });
+
+  routes.post("/admin/marketing/leads/:id/note", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const body = await readJson(c, LeadNoteBody);
+    const lead = await noteOnLead(db, id, body.note, {
+      id: user.id,
+      name: user.displayName,
+      side: "admin",
+    });
+    auditEntityId(c, lead.id);
+    return c.json(lead);
+  });
+
+  /** They bought. Mints the deal, approves it, and the ledger does the rest. */
+  routes.post("/admin/marketing/leads/:id/convert", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const before = await getLead(db, id);
+    if (!before) throw new NotFoundError(`lead ${id}`);
+    auditBefore(c, before as unknown as Record<string, unknown>);
+
+    const reporter = await findMarketerById(db, before.reporterId);
+    if (!reporter) throw new NotFoundError(`marketer ${before.reporterId}`);
+
+    const body = await readJson(c, WinBody);
+    const settings = await readMarketingSettings(db);
+    const { lead, dealId } = await winLead(
+      db,
+      id,
+      { ...body, closedOn: body.closedOn || Date.now() },
+      reporter,
+      { id: user.id, name: user.displayName, side: "admin" },
+      settings,
+    );
+    auditEntityId(c, lead.id);
+    return c.json({ lead, dealId });
   });
 
   routes.get("/admin/marketing/pay-runs", requireAuth(), async (c) => {

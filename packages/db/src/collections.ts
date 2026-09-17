@@ -39,6 +39,7 @@ export const COLLECTIONS = {
   marketingPayRuns: "marketing_pay_runs",
   marketingIssues: "marketing_issues",
   marketingUpdates: "marketing_updates",
+  marketingLeads: "marketing_leads",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

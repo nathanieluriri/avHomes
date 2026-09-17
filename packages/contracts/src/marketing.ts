@@ -129,6 +129,8 @@ export interface Deal {
   reporterId: string;
   reporterName: string;
   reporterCode: string;
+  /** The potential buyer this grew out of, when it did. */
+  leadId: string | null;
   status: DealStatus;
   /** Admin's one line when the deal was refused or sent back. */
   reason: string;
@@ -577,4 +579,193 @@ export function ratesRefusal(rates: readonly number[]): string | null {
   const total = rates.reduce((sum, rate) => sum + rate, 0);
   if (total > 100) return "The three rates add up to more than the whole deal.";
   return null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════ LEADS ══ */
+
+/**
+ * Somebody a marketer thinks will buy, handed to AV Homes to close.
+ *
+ * A lead is not a deal and must not become one. A deal records an outcome: one
+ * decision, one reason, one reviewer. A lead records a process that moves over
+ * months, and the value of the record is the sequence rather than the current
+ * value. So the storage here is a timeline, and `state` is only the last event's
+ * destination, kept flat so a list query need not read the array.
+ */
+export const LEAD_STATES = [
+  "new",
+  "contacted",
+  "meeting",
+  "viewed",
+  "offer",
+  "won",
+  "lost",
+] as const;
+export type LeadState = (typeof LEAD_STATES)[number];
+
+/** Plain words on both sides. Nobody is shown the word the database uses. */
+export const LEAD_STATE_LABEL: Record<LeadState, string> = {
+  new: "Logged",
+  contacted: "We called them",
+  meeting: "Meeting booked",
+  viewed: "They viewed",
+  offer: "Talking price",
+  won: "Bought",
+  lost: "Closed",
+};
+
+/** One line for a list row, where the label alone is too terse to act on. */
+export const LEAD_STATE_HINT: Record<LeadState, string> = {
+  new: "Waiting for AV Homes to reach them",
+  contacted: "Someone has spoken to them",
+  meeting: "A viewing is on the calendar",
+  viewed: "They have seen the property",
+  offer: "Terms are being agreed",
+  won: "They bought. Your commission is on its way",
+  lost: "This one is over",
+};
+
+/** Live states, in pipeline order. A lead outside these is finished. */
+export const LEAD_OPEN_STATES = ["new", "contacted", "meeting", "viewed", "offer"] as const;
+
+export function isLeadOpen(state: LeadState): boolean {
+  return (LEAD_OPEN_STATES as readonly LeadState[]).includes(state);
+}
+
+/**
+ * The chips offered for each destination.
+ *
+ * A chip is filterable data and the note beside it is what a human reads months
+ * later. Both are required, including when the chip looks self-explanatory:
+ * making the note conditional optimises for the tap and throws away the only
+ * part with real information in it.
+ */
+export const LEAD_REASONS: Record<LeadState, readonly string[]> = {
+  new: ["Logged by marketer"],
+  contacted: ["Reached them", "Left a message", "Wrong number"],
+  meeting: ["They picked a date", "We offered dates", "Rescheduled"],
+  viewed: ["Inspection done", "They came alone", "Agent showed them"],
+  offer: ["They made an offer", "We sent terms", "Negotiating price"],
+  won: ["Paid in full", "Deposit taken", "Papers signed"],
+  lost: [
+    "Went quiet",
+    "Bought elsewhere",
+    "Price too high",
+    "Not ready yet",
+    "Wrong details",
+    "Other",
+  ],
+};
+
+export const LEAD_NOTE_MIN = 4;
+export const LEAD_NOTE_MAX = 400;
+
+/** One move. Appended, never edited, the discipline the ledger already keeps. */
+export interface LeadEvent {
+  at: number;
+  from: LeadState;
+  to: LeadState;
+  bySide: "marketer" | "admin";
+  byName: string;
+  /** The chip they picked. Empty on a note that moved nothing. */
+  reason: string;
+  /** Their own words. Never empty: that is the point of the feature. */
+  note: string;
+}
+
+export interface Lead {
+  id: string;
+  buyerName: string;
+  buyerPhone: string;
+  /** Set when the buyer already has a property in mind. */
+  listingId: string | null;
+  /** Snapshot, so a renamed listing cannot rewrite a settled lead. */
+  listingTitle: string;
+  /** What they want when no listing is picked. */
+  wantKind: DealKind | null;
+  wantArea: string;
+  wantBudgetMinor: number;
+  currency: string;
+  /** What the marketer wrote when they logged it. */
+  brief: string;
+  reporterId: string;
+  reporterName: string;
+  reporterCode: string;
+  state: LeadState;
+  /**
+   * The whole history, oldest first. Both sides render this same array: there is
+   * no admin-private note, because the moment one exists the marketer's copy
+   * stops being the history.
+   */
+  events: LeadEvent[];
+  /** The deal a win minted, or null. Survives a reversal so the thread is readable. */
+  dealId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** What the app's list draws, with this marketer's share once it is won. */
+export interface LeadRow extends Lead {
+  myShareMinor: number;
+}
+
+/** A marketer may only close their own lead, and only while it is still live. */
+export function marketerMayMove(state: LeadState, to: LeadState): boolean {
+  return to === "lost" && isLeadOpen(state);
+}
+
+/** Everything a state change is refused for, checked the same way on both sides. */
+export function leadMoveRefusal(move: {
+  from: LeadState;
+  to: LeadState;
+  reason: string;
+  note: string;
+}): { path: string; message: string } | null {
+  if (move.from === move.to) {
+    return { path: "to", message: `This is already ${LEAD_STATE_LABEL[move.to].toLowerCase()}.` };
+  }
+  if (!(LEAD_REASONS[move.to] ?? []).includes(move.reason)) {
+    return { path: "reason", message: "Pick a reason for the change." };
+  }
+  const note = move.note.trim();
+  if (note.length < LEAD_NOTE_MIN) {
+    return { path: "note", message: "Say what happened, in your own words." };
+  }
+  if (note.length > LEAD_NOTE_MAX) {
+    return { path: "note", message: `Keep it under ${LEAD_NOTE_MAX} characters.` };
+  }
+  return null;
+}
+
+/** A lead needs a person, and needs to say what that person wants. */
+export function leadRefusal(lead: {
+  buyerName: string;
+  buyerPhone: string;
+  listingId: string | null;
+  wantArea: string;
+  wantBudgetMinor: number;
+}): { path: string; message: string } | null {
+  if (lead.buyerName.trim() === "") {
+    return { path: "buyerName", message: "Who is the buyer?" };
+  }
+  if (!/^[0-9+\s()-]{7,20}$/u.test(lead.buyerPhone.trim())) {
+    return { path: "buyerPhone", message: "Add a phone number we can reach them on." };
+  }
+  const hasWant = lead.wantArea.trim() !== "" || lead.wantBudgetMinor > 0;
+  if (!lead.listingId && !hasWant) {
+    return {
+      path: "wantArea",
+      message: "Pick a property, or say where they want it and roughly their budget.",
+    };
+  }
+  return null;
+}
+
+/** "Lekki, about ₦80,000,000" or the listing's own name. For a one line row. */
+export function leadWantLine(lead: Lead): string {
+  if (lead.listingTitle.trim() !== "") return lead.listingTitle;
+  const area = lead.wantArea.trim();
+  const budget =
+    lead.wantBudgetMinor > 0 ? `about ${formatMoney(lead.wantBudgetMinor, lead.currency)}` : "";
+  return [area, budget].filter(Boolean).join(", ") || "No details yet";
 }

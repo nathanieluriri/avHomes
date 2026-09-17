@@ -36,7 +36,25 @@ export {
 export { listBanks, paystackConfigured, resolveAccount, type BankOption } from "./bank";
 
 export {
+  createLead,
+  getLead,
+  getLeadFor,
+  leadCounts,
+  listLeads,
+  moveLead,
+  noteOnLead,
+  openLeadCount,
+  winLead,
+  withShares,
+  type LeadActor,
+  type LeadInput,
+  type LeadListQuery,
+  type WinInput,
+} from "./leads";
+
+export {
   toDeal,
+  toLead,
   toLedgerLine,
   toMarketer,
   toMarketingUpdate,
@@ -44,6 +62,7 @@ export {
   toPayRun,
   type DealDoc,
   type IssueDoc,
+  type LeadDoc,
   type LedgerDoc,
   type MarketerDoc,
   type PayRunDoc,

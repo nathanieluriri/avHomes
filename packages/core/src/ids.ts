@@ -45,6 +45,7 @@ export const ID_PREFIXES = {
   payRun: "prun",
   payIssue: "pisu",
   marketingUpdate: "upd",
+  lead: "lead",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

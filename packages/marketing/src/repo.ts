@@ -416,6 +416,8 @@ export interface DealInput {
   proof: string[];
   note: string;
   closedOn: number;
+  /** Set when a won lead minted this deal. */
+  leadId?: string | null;
 }
 
 /** Somebody else already has this listing settled or waiting. */
@@ -462,6 +464,7 @@ export async function createDeal(
     reporterId: reporter.id,
     reporterName: reporter.displayName,
     reporterCode: reporter.code,
+    leadId: input.leadId ?? null,
     status: "pending",
     reason: "",
     reviewedBy: "",
