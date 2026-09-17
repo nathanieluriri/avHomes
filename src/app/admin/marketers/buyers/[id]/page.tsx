@@ -154,6 +154,11 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
      wanted, but shown and changeable, because that value arrived from a phone
      and nothing has checked it against the real listing. */
   const [kind, setKind] = useState<DealKind>(lead.wantKind ?? "sale");
+  /* Which option inside an estate actually sold. A lead can carry several,
+     because a buyer shops around; a deal is one house. Pre-picked when there is
+     only one, since then there is nothing to decide. */
+  const units = lead.wantUnits ?? [];
+  const [unitKey, setUnitKey] = useState(units.length === 1 ? units[0]!.key : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -166,7 +171,12 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
     picked &&
     reason !== "" &&
     note.trim().length >= LEAD_NOTE_MIN &&
-    (!winning || (amountMinor > 0 && lead.listingId !== null));
+    (!winning ||
+      (amountMinor > 0 &&
+        lead.listingId !== null &&
+        // An estate deal must name the house, or the uniqueness rule that stops
+        // two marketers being paid for one sale has nothing to key on.
+        (units.length === 0 || unitKey !== "")));
 
   async function move() {
     if (to === "" || !ready) return;
@@ -178,6 +188,7 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
           listingId: lead.listingId,
           listingTitle: lead.listingTitle,
           listingType: kind,
+          unitKey,
           amountMinor,
           reason,
           note: note.trim(),
@@ -210,6 +221,23 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
               </a>
             </DRow>
             <DRow label="Looking for">{leadWantLine(lead)}</DRow>
+            {units.length > 0 && (
+              <DRow label="Options">
+                <span className="block text-right">
+                  {units.map((unit) => (
+                    <span key={unit.key} className="block">
+                      {unit.name}
+                      {unit.priceMinor > 0 && (
+                        <span className="text-slate-600">
+                          {" "}
+                          · {formatMoney(unit.priceMinor, lead.currency)}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </span>
+              </DRow>
+            )}
             {lead.wantBudgetMinor > 0 && (
               <DRow label="Budget">{formatMoney(lead.wantBudgetMinor, lead.currency)}</DRow>
             )}
@@ -255,6 +283,28 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
           </Field>
 
           {picked && <p className="text-[12px] text-slate-600">{LEAD_STATE_HINT[to]}</p>}
+
+          {winning && units.length > 0 && (
+            <Field label="Which one sold" as="group">
+              <div className="flex flex-wrap gap-1.5">
+                {units.map((unit) => (
+                  <button
+                    key={unit.key}
+                    type="button"
+                    onClick={() => setUnitKey(unit.key)}
+                    aria-pressed={unitKey === unit.key}
+                    className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition ${
+                      unitKey === unit.key
+                        ? "bg-wine-700 text-white"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    {unit.name}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
 
           {winning && (
             <>

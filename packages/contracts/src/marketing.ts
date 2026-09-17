@@ -729,6 +729,25 @@ export interface LeadEvent {
   note: string;
 }
 
+/**
+ * One option inside an estate the buyer is interested in.
+ *
+ * An estate listing is not a house, it is a development with several designs
+ * inside it: a 2 bed, a 4 bed, a bare plot. Picking the estate alone tells an
+ * admin almost nothing, so a buyer interested in an estate picks which options,
+ * plural, because "the 3 bed or the 4 bed depending on price" is what people
+ * actually say.
+ *
+ * The name and price are SNAPSHOTS. A developer renaming a prototype or moving
+ * its price next year must not rewrite what a buyer asked about in July.
+ */
+export interface LeadUnit {
+  /** The prototype's own id on the listing. */
+  key: string;
+  name: string;
+  priceMinor: number;
+}
+
 export interface Lead {
   id: string;
   buyerName: string;
@@ -737,6 +756,8 @@ export interface Lead {
   listingId: string | null;
   /** Snapshot, so a renamed listing cannot rewrite a settled lead. */
   listingTitle: string;
+  /** Which options inside an estate. Empty for a listing that is one home. */
+  wantUnits: LeadUnit[];
   /** What they want when no listing is picked. */
   wantKind: DealKind | null;
   wantArea: string;
@@ -819,7 +840,12 @@ export function leadRefusal(lead: {
 
 /** "Lekki, about ₦80,000,000" or the listing's own name. For a one line row. */
 export function leadWantLine(lead: Lead): string {
-  if (lead.listingTitle.trim() !== "") return lead.listingTitle;
+  if (lead.listingTitle.trim() !== "") {
+    const units = lead.wantUnits ?? [];
+    if (units.length === 1) return `${lead.listingTitle} · ${units[0]!.name}`;
+    if (units.length > 1) return `${lead.listingTitle} · ${units.length} options`;
+    return lead.listingTitle;
+  }
   const area = lead.wantArea.trim();
   const budget =
     lead.wantBudgetMinor > 0 ? `about ${formatMoney(lead.wantBudgetMinor, lead.currency)}` : "";

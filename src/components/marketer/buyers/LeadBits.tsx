@@ -179,4 +179,29 @@ export function LeadTimeline({ events }: { events: readonly LeadEvent[] }) {
   );
 }
 
+/** The estate options a buyer asked about, when the listing is a development. */
+export function LeadUnits({ lead }: { lead: LeadRow }) {
+  const units = lead.wantUnits ?? [];
+  if (units.length === 0) return null;
+  return (
+    <div className="m-card mb-4 px-4 py-3.5">
+      <p className="text-[13px] font-semibold text-m-muted">
+        {units.length === 1 ? "The option they want" : "The options they want"}
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {units.map((unit) => (
+          <li key={unit.key} className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate text-[14.5px] text-m-text">{unit.name}</span>
+            {unit.priceMinor > 0 && (
+              <span className="shrink-0 text-[13px] font-semibold text-m-muted">
+                {formatMoney(unit.priceMinor, lead.currency)}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export { LEAD_STATE_HINT };

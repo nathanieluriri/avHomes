@@ -292,6 +292,21 @@ const LeadBody = z
     buyerPhone: str().trim().min(7).max(40),
     listingId: str().max(64).nullable().default(null),
     listingTitle: str().max(300).default(""),
+    /* Which options inside an estate. Snapshotted by the client from the
+       listing it just read, and capped: an estate is twenty prototypes at the
+       very most (PROTOTYPES_MAX), so a body claiming more is not a real buyer. */
+    wantUnits: z
+      .array(
+        z
+          .object({
+            key: str().max(64),
+            name: str().max(160),
+            priceMinor: z.number().int().min(0).default(0),
+          })
+          .strict(),
+      )
+      .max(20)
+      .default([]),
     wantKind: z.enum(DEAL_KINDS).nullable().default(null),
     wantArea: str().trim().max(160).default(""),
     wantBudgetMinor: z.number().int().min(0).default(0),

@@ -24,6 +24,7 @@ import {
   type LeadEvent,
   type LeadRow,
   type LeadState,
+  type LeadUnit,
   type Marketer,
   type MarketingSettings,
 } from "@avhomes/contracts";
@@ -39,6 +40,7 @@ export interface LeadInput {
   buyerPhone: string;
   listingId: string | null;
   listingTitle: string;
+  wantUnits: LeadUnit[];
   wantKind: DealKind | null;
   wantArea: string;
   wantBudgetMinor: number;
@@ -78,6 +80,7 @@ export async function createLead(
     buyerPhone: input.buyerPhone.trim(),
     listingId: input.listingId,
     listingTitle: input.listingTitle,
+    wantUnits: input.wantUnits,
     wantKind: input.wantKind,
     wantArea: input.wantArea.trim(),
     wantBudgetMinor: input.wantBudgetMinor,

@@ -2,9 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Search, X } from "lucide-react";
-import { formatMoney, leadRefusal, type DealKind, type Page, type Property } from "@avhomes/contracts";
+import { Check, X } from "lucide-react";
+import {
+  ESTATE_TYPE,
+  formatMoney,
+  leadRefusal,
+  type DealKind,
+  type EstatePrototype,
+  type LeadUnit,
+  type Page,
+  type Property,
+} from "@avhomes/contracts";
 import { AppShell, BottomBar, useMarketer, useReportBlock } from "@/components/marketer/AppShell";
+import { Combobox } from "@/components/marketer/Combobox";
 import { NairaInput } from "@/components/marketer/deals/NairaInput";
 import { IconHandshake } from "@/components/marketer/icons3d";
 import {
@@ -13,7 +23,6 @@ import {
   Note,
   PrimaryButton,
   Segmented,
-  Skeleton,
   inputCls,
 } from "@/components/marketer/ui";
 import { ApiError, api } from "@/lib/admin/client";
@@ -38,6 +47,9 @@ interface Picked {
   id: string;
   title: string;
   kind: DealKind;
+  currency: string;
+  /** The estate's options. Empty when the listing is a single home. */
+  prototypes: EstatePrototype[];
 }
 
 /**
@@ -58,6 +70,7 @@ export default function LogBuyerPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [listing, setListing] = useState<Picked | null>(null);
+  const [units, setUnits] = useState<LeadUnit[]>([]);
   const [kind, setKind] = useState<DealKind>("sale");
   const [area, setArea] = useState("");
   const [budget, setBudget] = useState(0);
@@ -87,6 +100,7 @@ export default function LogBuyerPage() {
         buyerPhone: phone.trim(),
         listingId: listing?.id ?? null,
         listingTitle: listing?.title ?? "",
+        wantUnits: units,
         wantKind: listing ? listing.kind : kind,
         wantArea: area.trim(),
         wantBudgetMinor: budget,
@@ -118,7 +132,14 @@ export default function LogBuyerPage() {
         phone={phone}
         setPhone={setPhone}
         listing={listing}
-        setListing={setListing}
+        setListing={(next) => {
+          setListing(next);
+          // Options belong to the estate that was picked, so a new listing
+          // starts with none rather than carrying the last one's ticks across.
+          setUnits([]);
+        }}
+        units={units}
+        setUnits={setUnits}
         kind={kind}
         setKind={setKind}
         area={area}
@@ -155,6 +176,8 @@ interface FieldsProps {
   setPhone: (v: string) => void;
   listing: Picked | null;
   setListing: (v: Picked | null) => void;
+  units: LeadUnit[];
+  setUnits: (v: LeadUnit[]) => void;
   kind: DealKind;
   setKind: (v: DealKind) => void;
   area: string;
@@ -176,6 +199,8 @@ function Fields({
   setPhone,
   listing,
   setListing,
+  units,
+  setUnits,
   kind,
   setKind,
   area,
@@ -246,19 +271,34 @@ function Fields({
             What do they want?
           </h2>
           {listing ? (
-            <div className="m-card flex items-center gap-3 px-3.5 py-3">
-              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-m-text">
-                {listing.title}
-              </span>
-              <button
-                type="button"
-                onClick={() => setListing(null)}
-                aria-label="Clear the property"
-                className="m-tap grid h-9 w-9 shrink-0 place-items-center rounded-full text-m-muted active:bg-m-raised"
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
+            <>
+              <div className="m-card flex items-center gap-3 px-3.5 py-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold text-m-text">
+                    {listing.title}
+                  </span>
+                  {listing.prototypes.length > 0 && (
+                    <span className="block text-[12.5px] text-m-muted">
+                      {units.length === 0
+                        ? "An estate. Pick which ones below."
+                        : `${units.length} option${units.length === 1 ? "" : "s"} picked`}
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setListing(null)}
+                  aria-label="Clear the property"
+                  className="m-tap grid h-9 w-9 shrink-0 place-items-center rounded-full text-m-muted active:bg-m-raised"
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
+
+              {listing.prototypes.length > 0 && (
+                <UnitPicker listing={listing} chosen={units} onChange={setUnits} />
+              )}
+            </>
           ) : (
             <>
               <ListingPick onPick={setListing} />
@@ -323,6 +363,13 @@ function Fields({
 }
 
 /** Live listings, searched as they type. Optional, so it never blocks the form. */
+/**
+ * Find the property, as a typeahead over live listings.
+ *
+ * Searched on the server rather than filtered on the client: there is no bound
+ * on how many homes AV Homes lists, so the list cannot be shipped to a phone
+ * the way the bank list can.
+ */
 function ListingPick({ onPick }: { onPick: (picked: Picked) => void }) {
   const [term, setTerm] = useState("");
   const query = useDebounced(term, 280);
@@ -332,64 +379,144 @@ function ListingPick({ onPick }: { onPick: (picked: Picked) => void }) {
       query.trim().length < 2
         ? Promise.resolve(null)
         : api.get<Page<Property>>(
-            `/public/properties?limit=6&q=${encodeURIComponent(query.trim())}`,
+            `/public/properties?limit=8&q=${encodeURIComponent(query.trim())}`,
             signal,
           ),
     [query],
   );
 
-  return (
-    <div>
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-m-faint"
-          aria-hidden
-        />
-        <input
-          value={term}
-          onChange={(event) => setTerm(event.target.value)}
-          placeholder="Search a property they liked"
-          aria-label="Search a property"
-          className={`${inputCls} pl-11`}
-        />
-      </div>
+  const items = found.data?.items ?? [];
 
-      {query.trim().length >= 2 && (
-        <div className="mt-2 space-y-1.5">
-          {found.loading && <Skeleton className="h-12 w-full rounded-[14px]" />}
-          {found.data?.items.length === 0 && (
-            <p className="px-1 text-[13px] text-m-faint">
-              Nothing matched. Describe what they want instead.
-            </p>
-          )}
-          {found.data?.items.map((property) => (
-            <button
-              key={property.id}
-              type="button"
-              onClick={() =>
-                onPick({
-                  id: property.id,
-                  title: property.title,
-                  kind: property.listingType === "rent" ? "rent" : "sale",
-                })
-              }
-              className="m-press-light flex w-full items-center justify-between gap-3 rounded-[14px] bg-m-card px-3.5 py-3 text-left"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14.5px] font-semibold text-m-text">
-                  {property.title}
+  return (
+    <Combobox
+      label="Search a property"
+      placeholder="Search a property they liked"
+      loading={found.loading && query.trim().length >= 2}
+      value=""
+      emptyText={
+        query.trim().length < 2
+          ? "Type at least two letters"
+          : "Nothing matched. Describe what they want instead."
+      }
+      options={items.map((property) => ({
+        value: property.id,
+        label: property.title,
+        hint: [property.city, property.type === ESTATE_TYPE ? "Estate" : ""]
+          .filter(Boolean)
+          .join(" · "),
+        trailing:
+          property.priceMinor > 0 ? formatMoney(property.priceMinor, property.currency) : undefined,
+      }))}
+      onPick={(choice) => {
+        if (!choice) return;
+        const property = items.find((row) => row.id === choice.value);
+        if (!property) return;
+        onPick({
+          id: property.id,
+          title: property.title,
+          kind: property.listingType === "rent" ? "rent" : "sale",
+          currency: property.currency,
+          prototypes: property.type === ESTATE_TYPE ? (property.prototypes ?? []) : [],
+        });
+      }}
+      onType={setTerm}
+      typed={term}
+    />
+  );
+}
+
+/**
+ * Which options inside an estate.
+ *
+ * An estate is a development, not a house: picking "Kuje Gardens" tells an
+ * admin nothing about whether to show somebody a 2 bed, a 4 bed or a bare plot.
+ * Checkboxes rather than one choice, because "the 3 bed or the 4 bed depending
+ * on price" is how people actually shop, and an admin who knows both can show
+ * both on one visit.
+ *
+ * Sold-out options stay listed and disabled: a buyer asking about the one that
+ * is gone is worth knowing, and silently hiding it makes the estate look like it
+ * never had it.
+ */
+function UnitPicker({
+  listing,
+  chosen,
+  onChange,
+}: {
+  listing: Picked;
+  chosen: LeadUnit[];
+  onChange: (next: LeadUnit[]) => void;
+}) {
+  const keys = new Set(chosen.map((unit) => unit.key));
+
+  function toggle(prototype: EstatePrototype) {
+    if (!prototype.available) return;
+    onChange(
+      keys.has(prototype.id)
+        ? chosen.filter((unit) => unit.key !== prototype.id)
+        : [
+            ...chosen,
+            { key: prototype.id, name: prototype.name, priceMinor: prototype.priceMinor },
+          ],
+    );
+  }
+
+  return (
+    <div role="group" aria-labelledby="units-heading" className="mt-3">
+      <h3 id="units-heading" className="mb-1 text-[14px] font-bold text-m-text">
+        Which one in {listing.title}?
+      </h3>
+      <p className="mb-2.5 text-[13px] text-m-muted">
+        Tick every option they are interested in. You can pick more than one.
+      </p>
+
+      <ul className="overflow-hidden rounded-[16px] bg-m-card">
+        {listing.prototypes.map((prototype) => {
+          const on = keys.has(prototype.id);
+          const gone = !prototype.available;
+          return (
+            <li key={prototype.id} className="border-b border-m-line last:border-0">
+              <label
+                className={`flex items-center gap-3 px-3.5 py-3 ${gone ? "opacity-50" : "m-press-light"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  disabled={gone}
+                  onChange={() => toggle(prototype)}
+                  className="sr-only"
+                />
+                <span
+                  aria-hidden
+                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-[8px] ${
+                    on ? "bg-[#a83550] text-white" : "bg-m-raised text-transparent ring-1 ring-m-line"
+                  }`}
+                >
+                  <Check className="h-4 w-4" strokeWidth={3} />
                 </span>
-                <span className="block truncate text-[12.5px] text-m-muted">{property.city}</span>
-              </span>
-              {property.priceMinor > 0 && (
-                <span className="shrink-0 text-[13px] font-semibold text-m-muted">
-                  {formatMoney(property.priceMinor, property.currency)}
+
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14.5px] font-semibold text-m-text">
+                    {prototype.name}
+                  </span>
+                  <span className="block truncate text-[12.5px] text-m-muted">
+                    {prototype.kind === "plot"
+                      ? `${prototype.sizeSqm > 0 ? `${prototype.sizeSqm} sqm ` : ""}plot`
+                      : `${prototype.bedrooms} bed`}
+                    {gone ? " · Sold out" : ""}
+                  </span>
                 </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+
+                {prototype.priceMinor > 0 && (
+                  <span className="shrink-0 text-[13px] font-semibold text-m-muted">
+                    {formatMoney(prototype.priceMinor, listing.currency)}
+                  </span>
+                )}
+              </label>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

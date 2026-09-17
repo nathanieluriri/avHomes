@@ -21,7 +21,7 @@
  */
 
 import type { Db } from "mongodb";
-import { getEnv, UpstreamError } from "@avhomes/core";
+import { UpstreamError } from "@avhomes/core";
 import type { AccountProvider } from "@avhomes/contracts";
 import { readMarketingSettings, readPaystackKey } from "./settings";
 
@@ -108,16 +108,9 @@ export async function providerState(db: Db): Promise<ProviderState> {
   return { provider: "paystack", ready: (await paystackKey(db)) !== "" };
 }
 
-/**
- * Settings first, environment second.
- *
- * The console is where this belongs and where a change takes effect without a
- * deploy. The env var is kept only so a site that was already configured that
- * way keeps working until somebody moves the key across.
- */
+/** Settings, and only settings. The console is the one place this is set. */
 async function paystackKey(db: Db): Promise<string> {
-  const saved = await readPaystackKey(db);
-  return saved !== "" ? saved : getEnv().PAYSTACK_SECRET_KEY.trim();
+  return readPaystackKey(db);
 }
 
 async function viaKora(accountNumber: string, bankCode: string): Promise<string | null> {

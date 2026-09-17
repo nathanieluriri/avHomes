@@ -18,7 +18,7 @@ import {
 import { AppShell } from "@/components/marketer/AppShell";
 import { Sheet } from "@/components/marketer/Sheet";
 import { SuccessBurst } from "@/components/marketer/SuccessBurst";
-import { LeadTimeline } from "@/components/marketer/buyers/LeadBits";
+import { LeadTimeline, LeadUnits } from "@/components/marketer/buyers/LeadBits";
 import { IconHandshake } from "@/components/marketer/icons3d";
 import {
   Button,
@@ -76,6 +76,8 @@ export default function BuyerPage() {
             </Suspense>
 
             {data.state === "won" && data.myShareMinor > 0 && <Paid lead={data} />}
+
+            <LeadUnits lead={data} />
 
             <div className="mb-4 flex gap-2">
               <ButtonLink

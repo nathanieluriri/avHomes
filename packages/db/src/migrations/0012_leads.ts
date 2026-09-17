@@ -57,6 +57,8 @@ sale that falls through still reads as one story rather than two.`,
           listingId: NULLABLE_STR,
           // Snapshot, so a listing renamed next year cannot rewrite a settled lead.
           listingTitle: STR,
+          // Which options inside an estate, snapshotted the same way.
+          wantUnits: ARR,
           wantKind: { enum: ["sale", "rent", null] },
           wantArea: STR,
           wantBudgetMinor: MONEY,

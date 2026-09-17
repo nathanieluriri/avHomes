@@ -17,6 +17,7 @@ import type {
   Lead,
   LeadEvent,
   LeadState,
+  LeadUnit,
   LedgerKind,
   LedgerLine,
   LedgerStatus,
@@ -158,6 +159,7 @@ export interface LeadDoc {
   buyerPhone: string;
   listingId: string | null;
   listingTitle: string;
+  wantUnits: LeadUnit[];
   wantKind: DealKind | null;
   wantArea: string;
   wantBudgetMinor: number;
@@ -323,6 +325,7 @@ export function toLead(doc: LeadDoc): Lead {
     buyerPhone: doc.buyerPhone ?? "",
     listingId: doc.listingId ?? null,
     listingTitle: doc.listingTitle ?? "",
+    wantUnits: doc.wantUnits ?? [],
     wantKind: doc.wantKind ?? null,
     wantArea: doc.wantArea ?? "",
     wantBudgetMinor: doc.wantBudgetMinor ?? 0,

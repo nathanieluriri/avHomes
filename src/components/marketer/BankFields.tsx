@@ -1,11 +1,12 @@
 "use client";
 
-import { BadgeCheck, ChevronDown } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 import { isNuban } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync, useDebounced } from "@/lib/admin/hooks";
 import type { BanksResponse, ResolvedAccount } from "@/lib/marketer/api";
-import { Field, Note, Skeleton, Spin, inputCls } from "./ui";
+import { Combobox } from "./Combobox";
+import { Field, Note, Spin, inputCls } from "./ui";
 
 /**
  * Where the money goes, and the name check that stops a typo becoming a
@@ -74,37 +75,30 @@ export function BankFields({
 
   return (
     <div className="space-y-4">
+      {/* `group`, not `label`: a label wrapping a listbox makes every tap on a
+          row also a tap on the label, and the combobox names itself anyway. */}
       <Field
         label="Your bank"
+        as="group"
         error={showErrors && value.bankName.trim() === "" ? "Pick your bank." : undefined}
       >
-        {banks.loading ? (
-          <Skeleton className="h-[50px]" radius="14px" />
-        ) : list.length > 0 ? (
-          <span className="relative block">
-            <select
-              value={value.bankCode}
-              onChange={(event) => {
-                const code = event.target.value;
-                const found = list.find((bank) => bank.code === code);
-                onChange({ ...value, bankCode: code, bankName: found?.name ?? "" });
-              }}
-              className={`${inputCls} appearance-none pr-11 ${value.bankCode === "" ? "text-m-faint" : ""} ${
-                showErrors && value.bankName.trim() === "" ? "m-bad" : ""
-              }`}
-            >
-              <option value="">Choose your bank</option>
-              {list.map((bank) => (
-                <option key={bank.code} value={bank.code}>
-                  {bank.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              className="pointer-events-none absolute right-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-m-muted"
-              aria-hidden
-            />
-          </span>
+        {list.length > 0 || banks.loading ? (
+          <Combobox
+            label="Your bank"
+            placeholder="Type your bank's name"
+            loading={banks.loading}
+            invalid={showErrors && value.bankName.trim() === ""}
+            value={value.bankCode}
+            options={list.map((bank) => ({ value: bank.code, label: bank.name }))}
+            emptyText="No bank by that name. Check the spelling, or try a shorter word."
+            onPick={(choice) =>
+              onChange({
+                ...value,
+                bankCode: choice?.value ?? "",
+                bankName: choice?.label ?? "",
+              })
+            }
+          />
         ) : (
           <input
             type="text"
