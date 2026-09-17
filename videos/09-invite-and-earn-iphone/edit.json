@@ -1,0 +1,104 @@
+{
+  "segments": [
+    [
+      0.1,
+      7.73,
+      1
+    ],
+    [
+      7.73,
+      13.18,
+      1.25
+    ],
+    [
+      13.18,
+      28.53,
+      1
+    ],
+    [
+      28.53,
+      33.34,
+      1.4
+    ],
+    [
+      33.34,
+      53.95,
+      1
+    ]
+  ],
+  "captions": [
+    {
+      "at": 0.2,
+      "until": 7.63,
+      "title": "Share my link, right on home",
+      "line": "One tap sends your link, with your invite code in it.",
+      "message": {
+        "delay": 2.3,
+        "label": "The message they get",
+        "text": "Join AV Homes with me and earn money on every home you help sell or rent.",
+        "link": "https://av-homes.vercel.app/m/join/AV-0001",
+        "code": "AV-0001"
+      }
+    },
+    {
+      "at": 7.83,
+      "until": 13.08,
+      "title": "More ways: Menu, then Invite",
+      "line": "Your link, WhatsApp and a QR code in one place."
+    },
+    {
+      "at": 13.28,
+      "until": 18.47,
+      "title": "Copy your link",
+      "line": "Paste it in a text, a status or a group chat."
+    },
+    {
+      "at": 18.67,
+      "until": 22.24,
+      "title": "Or send it on WhatsApp",
+      "line": "The message is written for you, with your link."
+    },
+    {
+      "at": 22.44,
+      "until": 28.43,
+      "title": "Or let them scan it",
+      "line": "They open your link with their own phone camera."
+    },
+    {
+      "at": 28.63,
+      "until": 33.24,
+      "title": "Then open Your team",
+      "line": "It sits at the bottom of Invite."
+    },
+    {
+      "at": 33.44,
+      "until": 36.54,
+      "title": "Your team, three levels deep",
+      "line": "Everyone who joined through you, and who they brought."
+    },
+    {
+      "at": 36.64,
+      "until": 40.42,
+      "title": "They invited",
+      "line": "People brought in by somebody you invited."
+    },
+    {
+      "at": 40.62,
+      "until": 45.88,
+      "title": "One more step, then it stops",
+      "line": "People their people invited. No further."
+    },
+    {
+      "at": 45.98,
+      "until": 50.02,
+      "title": "What each level earns you",
+      "line": "5% of your own deals, 2% and 1% of your team's."
+    },
+    {
+      "at": 50.12,
+      "until": 53.85,
+      "title": "Only real deals pay",
+      "line": "Nobody earns anything from somebody joining."
+    }
+  ]
+}

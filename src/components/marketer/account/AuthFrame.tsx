@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useKeyboardInset } from "@/lib/admin/hooks";
-import { Lockup, SheetTab } from "../AppShell";
+import { Lockup, SafeTop, SheetTab } from "../AppShell";
 import { HeroArt } from "../team/bits";
 import { inputCls } from "../ui";
 
@@ -38,6 +38,7 @@ export function AuthFrame({
 
   return (
     <div className="m-shell m-shell--tab">
+      <SafeTop />
       <header className="m-hero m-hero--auth px-4">
         <Lockup size="tall" />
         {art && <HeroArt>{art}</HeroArt>}

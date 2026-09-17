@@ -134,7 +134,12 @@ export default function PayPage() {
                 list is still a draft: rebuilding a draft picks up anything
                 approved since it was made, which the repo allows on purpose. */}
             {(!currentRun || currentRun.status === "draft") && (
-              <Button onClick={() => void makeList()} disabled={making}>
+              <Button
+                onClick={() => void makeList()}
+                disabled={making}
+                // Only once the runs are read: until then there is no telling whether this month has a list.
+                spotlight={list.data && !currentRun ? "pay-make" : undefined}
+              >
                 {making
                   ? "Working"
                   : currentRun
@@ -198,6 +203,7 @@ export default function PayPage() {
           initial={detail.data.run}
           check={detail.data.check}
           onChanged={() => list.reload()}
+          tutorial={Boolean(list.data && currentRun)}
         />
       )}
     </>
@@ -208,11 +214,14 @@ function RunPanel({
   initial,
   check,
   onChanged,
+  tutorial,
 }: {
   initial: PayRun;
   check: RunDetail["check"];
   /** Re-reads the runs, so the header's list button and the month picker follow this run's status. */
   onChanged: () => void;
+  /** This month's list is made, so the pay walkthrough works on this panel rather than on Make this month's list. */
+  tutorial: boolean;
 }) {
   const [run, setRun] = useState<PayRun>(initial);
   const [sheet, setSheet] = useState<{ mode: "pay" | "hold"; item: PayRunItem } | null>(null);
@@ -224,6 +233,8 @@ function RunPanel({
 
   const closed = run.status === "closed";
   const waiting = run.items.filter((item) => item.status === "pending").length;
+  // The pay walkthrough points at the first person still waiting, and has nothing to show without one.
+  const tutorialItem = tutorial && !closed ? run.items.find((item) => item.status === "pending") : undefined;
 
   function open(mode: "pay" | "hold", item: PayRunItem) {
     setReference(item.reference);
@@ -295,7 +306,11 @@ function RunPanel({
     return (
       <span className="flex items-center gap-1.5">
         {item.status !== "paid" && (
-          <Button size="sm" onClick={() => open("pay", item)}>
+          <Button
+            size="sm"
+            onClick={() => open("pay", item)}
+            spotlight={item === tutorialItem ? "pay-mark" : undefined}
+          >
             Mark as paid
           </Button>
         )}
@@ -332,7 +347,11 @@ function RunPanel({
                 {item.bank.accountName ? ` · ${item.bank.accountName}` : ""}
               </span>
             </span>
-            <CopyButton value={item.bank.accountNumber} name={item.displayName} />
+            <CopyButton
+              value={item.bank.accountNumber}
+              name={item.displayName}
+              spotlight={item === tutorialItem ? "pay-copy" : undefined}
+            />
           </span>
         ) : (
           <Badge tone="red">No bank account</Badge>
@@ -392,7 +411,7 @@ function RunPanel({
         </Card>
       )}
 
-      <Card className="mb-4">
+      <Card className="mb-4" spotlight={tutorial && !tutorialItem ? "pay-none" : undefined}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -430,6 +449,7 @@ function RunPanel({
 
       <DataTable
         caption={`Payments for ${payMonthLabel(run.month)}`}
+        spotlight={tutorial ? "pay-list" : undefined}
         columns={columns}
         rows={run.items}
         rowKey={(item) => item.marketerId}
@@ -517,13 +537,14 @@ function RunPanel({
 }
 
 /** The account number, on the clipboard, because the next stop is a bank app. */
-function CopyButton({ value, name }: { value: string; name: string }) {
+function CopyButton({ value, name, spotlight }: { value: string; name: string; spotlight?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <IconButton
       label={copied ? "Copied" : `Copy ${name}'s account number`}
       icon={copied ? Check : Copy}
       size="dense"
+      spotlight={spotlight}
       onClick={() => {
         void navigator.clipboard.writeText(value);
         setCopied(true);

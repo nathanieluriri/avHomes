@@ -1,0 +1,77 @@
+{
+  "footageDuration": 53.23,
+  "captions": [
+    {
+      "at": 0.2,
+      "until": 6.35,
+      "title": "Open the invite link",
+      "line": "It shows who invited you. You join their team.",
+      "start": 0.1,
+      "end": 6.25
+    },
+    {
+      "at": 6.45,
+      "until": 13.37,
+      "title": "About you",
+      "line": "Your full name and the email you check.",
+      "start": 6.35,
+      "end": 13.27
+    },
+    {
+      "at": 13.46,
+      "until": 20.02,
+      "title": "Your phone and your state",
+      "line": "The state is where you mostly work.",
+      "start": 13.36,
+      "end": 19.92
+    },
+    {
+      "at": 20.11,
+      "until": 27.36,
+      "title": "Choose a password",
+      "line": "Eight letters or more. Then tap Next.",
+      "start": 20.01,
+      "end": 27.26
+    },
+    {
+      "at": 27.46,
+      "until": 33.87,
+      "title": "Where your money goes",
+      "line": "Pick your bank, then type your ten digit account number.",
+      "start": 27.36,
+      "end": 33.77
+    },
+    {
+      "at": 33.96,
+      "until": 40.45,
+      "title": "The name comes from your bank",
+      "line": "If it is not your name, check the number again.",
+      "start": 33.86,
+      "end": 40.35
+    },
+    {
+      "at": 40.55,
+      "until": 45.15,
+      "title": "Three things, then you are in",
+      "line": "Free to join, real deals only, paid every month.",
+      "start": 40.45,
+      "end": 45.05
+    },
+    {
+      "at": 45.25,
+      "until": 48.1,
+      "title": "Create my account",
+      "line": "One tap, and you are signed in straight away.",
+      "start": 45.15,
+      "end": 48
+    },
+    {
+      "at": 48.2,
+      "until": 53.21,
+      "title": "This is your home screen",
+      "line": "Your own invite code is here, ready to share.",
+      "start": 48.1,
+      "end": 53.11
+    }
+  ]
+}

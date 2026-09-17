@@ -1,0 +1,792 @@
+[
+  {
+    "name": "mh-first-screen",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "top"
+      },
+      {
+        "eval": "(() => { const f = document.querySelector('.m-money--hero'); const col = f ? f.closest('.flex-col') : null; const cap = col ? [...col.querySelectorAll('p')].map(p => p.textContent.trim()).join(' / ') : ''; return (f ? f.textContent : 'none') + ' :: ' + cap; })()"
+      },
+      {
+        "eval": "(() => [...document.querySelectorAll('a,button')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; }).map(e => (e.getAttribute('aria-label') || e.textContent.replace(/\\s+/g,' ').trim()).slice(0, 26) + '->' + (e.getAttribute('href') || 'btn')).join(' | '))()"
+      }
+    ]
+  },
+  {
+    "name": "mh-first-screen-360",
+    "path": "/m",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "top"
+      },
+      {
+        "eval": "(() => [...document.querySelectorAll('a,button')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; }).map(e => (e.getAttribute('aria-label') || e.textContent.replace(/\\s+/g,' ').trim()).slice(0, 26) + '->' + (e.getAttribute('href') || 'btn')).join(' | '))()"
+      }
+    ]
+  },
+  {
+    "name": "mh-checking",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "click": "button[aria-label^='Showing']",
+        "wait": 700,
+        "shot": "picker"
+      },
+      {
+        "click": "::-p-text(Being checked)",
+        "wait": 900,
+        "shot": "being-checked"
+      },
+      {
+        "eval": "(() => { const f = document.querySelector('.m-money--hero'); const col = f ? f.closest('.flex-col') : null; const cap = col ? [...col.querySelectorAll('p')].map(p => p.textContent.trim()).join(' / ') : ''; return (f ? f.textContent : 'none') + ' :: ' + cap; })()"
+      }
+    ]
+  },
+  {
+    "name": "mh-money-tile",
+    "path": "/m/money",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "totals"
+      },
+      {
+        "eval": "[...document.querySelectorAll('.grid-cols-3 > *')].map(t => t.textContent.replace(/\\s+/g, ' ').trim()).join(' || ')"
+      }
+    ]
+  },
+  {
+    "name": "mh-hidden",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "eval": "(() => { const d = document.querySelector('.m-figure'); const e = document.querySelector('button[aria-label=\"Hide amounts\"]'); if (!d || !e) return 'missing'; const a = d.getBoundingClientRect(), b = e.getBoundingClientRect(); return JSON.stringify({ figure: [Math.round(a.left), Math.round(a.right), Math.round(a.top), Math.round(a.bottom)], eye: [Math.round(b.left), Math.round(b.right)], gap: Math.round(b.left - a.right) }); })()"
+      },
+      {
+        "click": "button[aria-label='Hide amounts']",
+        "wait": 600,
+        "shot": "hidden"
+      },
+      {
+        "eval": "(() => { const d = document.querySelector('.m-figure__dots'); const e = document.querySelector('button[aria-label=\"Show amounts\"]'); if (!d || !e) return 'missing'; const a = d.getBoundingClientRect(), b = e.getBoundingClientRect(); return JSON.stringify({ dots: [Math.round(a.left), Math.round(a.right), Math.round(a.top), Math.round(a.bottom)], eye: [Math.round(b.left), Math.round(b.right)], gap: Math.round(b.left - a.right), dotsCentre: Math.round((a.left + a.right) / 2), screenCentre: innerWidth / 2 }); })()"
+      }
+    ]
+  },
+  {
+    "name": "mh-hidden-360",
+    "path": "/m",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "click": "button[aria-label='Hide amounts']",
+        "wait": 600,
+        "shot": "hidden"
+      },
+      {
+        "eval": "(() => { const d = document.querySelector('.m-figure__dots'); const e = document.querySelector('button[aria-label=\"Show amounts\"]'); if (!d || !e) return 'missing'; const a = d.getBoundingClientRect(), b = e.getBoundingClientRect(); return JSON.stringify({ dots: [Math.round(a.left), Math.round(a.right), Math.round(a.top), Math.round(a.bottom)], eye: [Math.round(b.left), Math.round(b.right)], gap: Math.round(b.left - a.right), dotsCentre: Math.round((a.left + a.right) / 2), screenCentre: innerWidth / 2 }); })()"
+      }
+    ]
+  },
+  {
+    "name": "mh-rail",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "cards"
+      },
+      {
+        "eval": "(() => { const ul = document.querySelector('.m-rail--cards'); if (!ul) return 'no rail'; const h2 = ul.closest('section').querySelector('h2'); return (h2 ? h2.textContent : '') + ' || ' + [...ul.querySelectorAll('a')].map(a => { const r = a.getBoundingClientRect(); const spans = [...a.children].map(s => s.textContent.trim()).filter(Boolean); const body = a.querySelector('.text-m-muted'); const clipped = body ? body.scrollHeight > body.clientHeight + 1 : 'n/a'; return Math.round(r.height) + 'px ' + a.getAttribute('href') + ' [' + spans.join(' / ') + '] clipped=' + clipped; }).join(' || '); })()"
+      },
+      {
+        "eval": "(() => { const r = document.querySelector('.m-rail--cards'); r.scrollBy({ left: 5000, behavior: 'instant' }); return r.scrollLeft; })()",
+        "wait": 700,
+        "shot": "cards-end"
+      }
+    ]
+  },
+  {
+    "name": "mh-rail-360",
+    "path": "/m",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "scroll": 400,
+        "wait": 500,
+        "shot": "cards"
+      },
+      {
+        "eval": "(() => { const ul = document.querySelector('.m-rail--cards'); if (!ul) return 'no rail'; const h2 = ul.closest('section').querySelector('h2'); return (h2 ? h2.textContent : '') + ' || ' + [...ul.querySelectorAll('a')].map(a => { const r = a.getBoundingClientRect(); const spans = [...a.children].map(s => s.textContent.trim()).filter(Boolean); const body = a.querySelector('.text-m-muted'); const clipped = body ? body.scrollHeight > body.clientHeight + 1 : 'n/a'; return Math.round(r.height) + 'px ' + a.getAttribute('href') + ' [' + spans.join(' / ') + '] clipped=' + clipped; }).join(' || '); })()"
+      },
+      {
+        "eval": "(() => { const r = document.querySelector('.m-rail--cards'); r.scrollBy({ left: 5000, behavior: 'instant' }); return r.scrollLeft; })()",
+        "wait": 700,
+        "shot": "cards-end"
+      }
+    ]
+  },
+  {
+    "name": "mh-good-only",
+    "path": "/m",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/alerts": {
+        "items": [
+          {
+            "id": "payment-sent:prun_2026_08",
+            "tone": "good",
+            "icon": "money",
+            "title": "₦28,950,000 was sent to you",
+            "body": "Your August 2026 pay went to the account ending 6789.",
+            "detail": "",
+            "action": {
+              "label": "See the payment",
+              "href": "/m/money/prun_2026_08"
+            },
+            "at": 1789027200000
+          },
+          {
+            "id": "deal-approved:deal_ikoyi_glass",
+            "tone": "good",
+            "icon": "check",
+            "title": "You earned ₦24,000,000",
+            "body": "Ikoyi Glass House was approved.",
+            "detail": "",
+            "action": {
+              "label": "See the deal",
+              "href": "/m/deals/deal_ikoyi_glass"
+            },
+            "at": 1788681600000
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "for-you"
+      },
+      {
+        "eval": "(() => { const ul = document.querySelector('.m-rail--cards'); if (!ul) return 'no rail'; const h2 = ul.closest('section').querySelector('h2'); return (h2 ? h2.textContent : '') + ' || ' + [...ul.querySelectorAll('a')].map(a => { const r = a.getBoundingClientRect(); const spans = [...a.children].map(s => s.textContent.trim()).filter(Boolean); const body = a.querySelector('.text-m-muted'); const clipped = body ? body.scrollHeight > body.clientHeight + 1 : 'n/a'; return Math.round(r.height) + 'px ' + a.getAttribute('href') + ' [' + spans.join(' / ') + '] clipped=' + clipped; }).join(' || '); })()"
+      },
+      {
+        "eval": "(() => { const b = document.querySelector('.m-badge'); const chip = [...document.querySelectorAll('h2 .m-chip')].map(c => c.textContent).join(','); const bell = document.querySelector('a[href=\"/m/alerts\"]'); return 'badge=' + (b ? b.textContent : 'none') + ' chip=' + (chip || 'none') + ' bell=' + (bell ? bell.getAttribute('aria-label') : 'none'); })()"
+      }
+    ]
+  },
+  {
+    "name": "mh-paused",
+    "path": "/m",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals reported on the same home. Call us so we can sort it out.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1771920000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1752912000000,
+          "createdAt": 1752912000000,
+          "updatedAt": 1752912000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 2942500000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 3
+      },
+      "GET /api/marketing/alerts": {
+        "items": [
+          {
+            "id": "issue-reply:pisu_jul_adaeze",
+            "tone": "act",
+            "icon": "money",
+            "title": "AV Homes replied about July 2026",
+            "body": "Read what they said about your pay.",
+            "detail": "Our bank held the second part of the transfer. It went out again this morning with reference AVH-2607-0001B. Tell us here if it has not landed by tomorrow.",
+            "action": {
+              "label": "Read the reply",
+              "href": "/m/money/prun_2026_07#thread"
+            },
+            "at": 1789099200000
+          },
+          {
+            "id": "deal-info:deal_chevron_info",
+            "tone": "act",
+            "icon": "photo",
+            "title": "Chevron Drive Townhouse needs more info",
+            "body": "Send the proof AV Homes asked for.",
+            "detail": "The transfer slip is cut off. Send one that shows the date and the full amount.",
+            "action": {
+              "label": "Send more proof",
+              "href": "/m/deals/deal_chevron_info"
+            },
+            "at": 1789027200000
+          },
+          {
+            "id": "paused",
+            "tone": "act",
+            "icon": "shield",
+            "title": "Your account is paused",
+            "body": "Talk to AV Homes to turn it back on.",
+            "detail": "We are checking two deals reported on the same home. Call us so we can sort it out.",
+            "action": {
+              "label": "Call AV Homes",
+              "href": "tel:+2348012345678"
+            },
+            "at": 1752912000000
+          },
+          {
+            "id": "pay-day",
+            "tone": "heads-up",
+            "icon": "payday",
+            "title": "Pay day is 30 September",
+            "body": "₦24,000,000 is waiting for you.",
+            "detail": "Anything approved after the 25th goes out the month after.",
+            "action": {
+              "label": "See your money",
+              "href": "/m/money"
+            },
+            "at": 1788681600000
+          },
+          {
+            "id": "payment-sent:prun_2026_08",
+            "tone": "good",
+            "icon": "money",
+            "title": "₦28,950,000 was sent to you",
+            "body": "Your August 2026 pay went to the account ending 6789.",
+            "detail": "",
+            "action": {
+              "label": "See the payment",
+              "href": "/m/money/prun_2026_08"
+            },
+            "at": 1789027200000
+          },
+          {
+            "id": "deal-approved:deal_ikoyi_glass",
+            "tone": "good",
+            "icon": "check",
+            "title": "You earned ₦24,000,000",
+            "body": "Ikoyi Glass House was approved.",
+            "detail": "",
+            "action": {
+              "label": "See the deal",
+              "href": "/m/deals/deal_ikoyi_glass"
+            },
+            "at": 1788681600000
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "top"
+      },
+      {
+        "eval": "(() => [...document.querySelectorAll('a,button')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; }).map(e => (e.getAttribute('aria-label') || e.textContent.replace(/\\s+/g,' ').trim()).slice(0, 26) + '->' + (e.getAttribute('href') || 'btn')).join(' | '))()"
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "scrolled"
+      },
+      {
+        "eval": "[...document.querySelectorAll('.m-rail--wide li')].map(li => { const a = li.querySelector('a'); return (a ? a.getAttribute('href') : 'no link') + ' ' + li.textContent.replace(/\\s+/g, ' ').slice(0, 40); }).join(' | ')"
+      },
+      {
+        "click": "button.m-orb--locked",
+        "wait": 800,
+        "shot": "orb-sheet"
+      }
+    ]
+  },
+  {
+    "name": "mh-paused-360",
+    "path": "/m",
+    "viewport": "phone-small",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals reported on the same home. Call us so we can sort it out.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1771920000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1752912000000,
+          "createdAt": 1752912000000,
+          "updatedAt": 1752912000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 2942500000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 3
+      },
+      "GET /api/marketing/alerts": {
+        "items": [
+          {
+            "id": "issue-reply:pisu_jul_adaeze",
+            "tone": "act",
+            "icon": "money",
+            "title": "AV Homes replied about July 2026",
+            "body": "Read what they said about your pay.",
+            "detail": "Our bank held the second part of the transfer. It went out again this morning with reference AVH-2607-0001B. Tell us here if it has not landed by tomorrow.",
+            "action": {
+              "label": "Read the reply",
+              "href": "/m/money/prun_2026_07#thread"
+            },
+            "at": 1789099200000
+          },
+          {
+            "id": "deal-info:deal_chevron_info",
+            "tone": "act",
+            "icon": "photo",
+            "title": "Chevron Drive Townhouse needs more info",
+            "body": "Send the proof AV Homes asked for.",
+            "detail": "The transfer slip is cut off. Send one that shows the date and the full amount.",
+            "action": {
+              "label": "Send more proof",
+              "href": "/m/deals/deal_chevron_info"
+            },
+            "at": 1789027200000
+          },
+          {
+            "id": "paused",
+            "tone": "act",
+            "icon": "shield",
+            "title": "Your account is paused",
+            "body": "Talk to AV Homes to turn it back on.",
+            "detail": "We are checking two deals reported on the same home. Call us so we can sort it out.",
+            "action": {
+              "label": "Call AV Homes",
+              "href": "tel:+2348012345678"
+            },
+            "at": 1752912000000
+          },
+          {
+            "id": "pay-day",
+            "tone": "heads-up",
+            "icon": "payday",
+            "title": "Pay day is 30 September",
+            "body": "₦24,000,000 is waiting for you.",
+            "detail": "Anything approved after the 25th goes out the month after.",
+            "action": {
+              "label": "See your money",
+              "href": "/m/money"
+            },
+            "at": 1788681600000
+          },
+          {
+            "id": "payment-sent:prun_2026_08",
+            "tone": "good",
+            "icon": "money",
+            "title": "₦28,950,000 was sent to you",
+            "body": "Your August 2026 pay went to the account ending 6789.",
+            "detail": "",
+            "action": {
+              "label": "See the payment",
+              "href": "/m/money/prun_2026_08"
+            },
+            "at": 1789027200000
+          },
+          {
+            "id": "deal-approved:deal_ikoyi_glass",
+            "tone": "good",
+            "icon": "check",
+            "title": "You earned ₦24,000,000",
+            "body": "Ikoyi Glass House was approved.",
+            "detail": "",
+            "action": {
+              "label": "See the deal",
+              "href": "/m/deals/deal_ikoyi_glass"
+            },
+            "at": 1788681600000
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "top"
+      }
+    ]
+  },
+  {
+    "name": "mh-me-late",
+    "path": "/m",
+    "viewport": "phone",
+    "delay": {
+      "GET /api/marketing/me": 7000
+    },
+    "steps": [
+      {
+        "wait": 1800,
+        "shot": "alerts-first"
+      },
+      {
+        "eval": "(() => { const b = document.querySelector('.m-badge'); const chip = [...document.querySelectorAll('h2 .m-chip')].map(c => c.textContent).join(','); const bell = document.querySelector('a[href=\"/m/alerts\"]'); return 'badge=' + (b ? b.textContent : 'none') + ' chip=' + (chip || 'none') + ' bell=' + (bell ? bell.getAttribute('aria-label') : 'none'); })()"
+      },
+      {
+        "wait": 6500,
+        "shot": "me-landed"
+      },
+      {
+        "eval": "(() => { const b = document.querySelector('.m-badge'); const chip = [...document.querySelectorAll('h2 .m-chip')].map(c => c.textContent).join(','); const bell = document.querySelector('a[href=\"/m/alerts\"]'); return 'badge=' + (b ? b.textContent : 'none') + ' chip=' + (chip || 'none') + ' bell=' + (bell ? bell.getAttribute('aria-label') : 'none'); })()"
+      }
+    ]
+  },
+  {
+    "name": "mh-menu-focus",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "click": "button[aria-haspopup='dialog'][aria-expanded]",
+        "wait": 900
+      },
+      {
+        "key": "Tab",
+        "wait": 100
+      },
+      {
+        "key": "Tab",
+        "wait": 350,
+        "shot": "focus-team"
+      },
+      {
+        "eval": "document.activeElement.textContent + ' outline=' + getComputedStyle(document.activeElement).outlineStyle + ' dot=' + getComputedStyle(document.activeElement.querySelector('.m-menu__dot')).boxShadow.slice(0, 90)"
+      },
+      {
+        "key": "Tab",
+        "wait": 100
+      },
+      {
+        "key": "Tab",
+        "wait": 100
+      },
+      {
+        "key": "Tab",
+        "wait": 100
+      },
+      {
+        "key": "Tab",
+        "wait": 350,
+        "shot": "focus-alerts"
+      }
+    ]
+  },
+  {
+    "name": "mh-alerts",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "eval": "document.title + ' // hero=' + document.querySelector('.m-hero').textContent.replace(/\\s+/g, ' ')"
+      },
+      {
+        "scroll": 620,
+        "wait": 500,
+        "shot": "scrolled"
+      },
+      {
+        "scroll": 700,
+        "wait": 500,
+        "shot": "bottom"
+      }
+    ]
+  },
+  {
+    "name": "mh-alerts-360",
+    "path": "/m/alerts",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      }
+    ]
+  },
+  {
+    "name": "mh-alerts-empty",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/alerts": {
+        "items": []
+      }
+    },
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "empty"
+      },
+      {
+        "eval": "document.querySelector('.m-hero').textContent.replace(/\\s+/g, ' ') + ' // body=' + document.querySelector('.m-body').textContent.replace(/\\s+/g, ' ').slice(0, 160)"
+      }
+    ]
+  },
+  {
+    "name": "mh-read-reply",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "scroll": 420,
+        "wait": 400
+      },
+      {
+        "click": "a[href$='#thread']",
+        "wait": 3500,
+        "shot": "landed"
+      },
+      {
+        "eval": "(() => { const t = document.getElementById('thread'); return location.pathname + location.hash + ' scrollY=' + Math.round(scrollY) + ' threadTop=' + (t ? Math.round(t.getBoundingClientRect().top) : 'none'); })()"
+      }
+    ]
+  },
+  {
+    "name": "mh-updates-white",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "scroll": 330,
+        "wait": 300
+      },
+      {
+        "eval": "(() => { const imgs = [...document.querySelectorAll('.m-update img')]; imgs.forEach(i => { i.style.filter = 'brightness(0) invert(1)'; }); return imgs.length; })()",
+        "wait": 500,
+        "shot": "white-photo"
+      },
+      {
+        "eval": "(() => { const r = document.querySelector('.m-rail--wide'); r.scrollBy({ left: 702, behavior: 'instant' }); return r.scrollLeft; })()",
+        "wait": 700
+      },
+      {
+        "eval": "(() => { const imgs = [...document.querySelectorAll('.m-update img')]; imgs.forEach(i => { i.style.filter = 'brightness(0) invert(1)'; }); return imgs.length; })()",
+        "wait": 400,
+        "shot": "white-photo-listing"
+      },
+      {
+        "eval": "[...document.querySelectorAll('.m-rail--wide a')].map(a => a.textContent.replace(/\\s+/g, ' ').slice(0, 60)).join(' || ')"
+      }
+    ]
+  },
+  {
+    "name": "mh-updates-worst",
+    "path": "/m",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/updates": {
+        "items": [
+          {
+            "id": "upd_worst",
+            "title": "Weekend open house at Lekki Phase One Gardens this Saturday",
+            "body": "Bring your buyers to the show home at 10am. Our team runs the tour and the deal stays yours.",
+            "imageUrl": "/images/library/av-render-02.jpg",
+            "linkLabel": "See the homes",
+            "linkHref": "/m/listings",
+            "tone": "gold",
+            "pinned": true,
+            "status": "live",
+            "startsAt": 0,
+            "endsAt": null,
+            "createdByName": "AV Homes",
+            "createdAt": 0,
+            "updatedAt": 0,
+            "source": "admin"
+          },
+          {
+            "id": "upd_short",
+            "title": "Kuje Garden Estate",
+            "body": "Just listed in Abuja",
+            "imageUrl": "/images/library/av-render-03.jpg",
+            "linkLabel": "Share it",
+            "linkHref": "/m/listings",
+            "tone": "gold",
+            "pinned": false,
+            "status": "live",
+            "startsAt": 0,
+            "endsAt": null,
+            "createdByName": "AV Homes",
+            "createdAt": 0,
+            "updatedAt": 0,
+            "source": "listing"
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "scroll": 330,
+        "wait": 400,
+        "shot": "real-photo"
+      },
+      {
+        "eval": "(() => { const imgs = [...document.querySelectorAll('.m-update img')]; imgs.forEach(i => { i.style.filter = 'brightness(0) invert(1)'; }); return imgs.length; })()",
+        "wait": 500,
+        "shot": "white-photo"
+      },
+      {
+        "eval": "(() => [...document.querySelectorAll('.m-update')].slice(0, 2).map(card => { const c = card.getBoundingClientRect(); const out = { card: [Math.round(c.left), Math.round(c.top), Math.round(c.right), Math.round(c.bottom)] }; for (const [key, el] of [['title', card.querySelector('.line-clamp-2.font-bold')], ['body', card.querySelector('.line-clamp-2.font-bold + span')]]) { if (!el) continue; const range = document.createRange(); range.selectNodeContents(el); out[key] = [...range.getClientRects()].map(r => [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)]); } return JSON.stringify(out); }).join(' ## '))()"
+      }
+    ]
+  },
+  {
+    "name": "mh-hero-deals",
+    "path": "/m/deals",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      }
+    ]
+  },
+  {
+    "name": "mh-hero-sign-in",
+    "path": "/m/sign-in",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      }
+    ]
+  },
+  {
+    "name": "mh-hero-team",
+    "path": "/m/team",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      }
+    ]
+  }
+]

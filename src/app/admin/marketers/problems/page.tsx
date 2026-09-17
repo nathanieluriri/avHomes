@@ -16,6 +16,7 @@ import { useAsync } from "@/lib/admin/hooks";
 import { messageTime, relative } from "@/lib/admin/format";
 import { toApiError } from "@/lib/admin/marketing";
 import ImagePicker from "@/components/admin/ImagePicker";
+import { signalSpotlight } from "@/components/admin/spotlight/signal";
 import {
   Badge,
   Button,
@@ -70,6 +71,7 @@ export default function ProblemsPage() {
             key={option.value}
             type="button"
             aria-pressed={tab === option.value}
+            data-spotlight={option.value === "open" && tab !== "open" ? "problems-find-open" : undefined}
             onClick={() => {
               setTab(option.value);
               setOpenId(null);
@@ -89,22 +91,26 @@ export default function ProblemsPage() {
       {loading && !data && <Skeleton className="h-40 rounded-2xl" />}
 
       {data && items.length === 0 && (
-        <EmptyState
-          icon={LifeBuoy}
-          title={tab === "open" ? "Nothing is disputed" : "Nothing sorted yet"}
-          hint={
-            tab === "open"
-              ? "Every payment this month is accounted for. A marketer raises one of these from their own app."
-              : "Problems you have closed will be kept here."
-          }
-        />
+        // Tells the walkthrough there is nothing open to practise on.
+        <div data-spotlight={tab === "open" && !loading ? "problems-none" : undefined}>
+          <EmptyState
+            icon={LifeBuoy}
+            title={tab === "open" ? "Nothing is disputed" : "Nothing sorted yet"}
+            hint={
+              tab === "open"
+                ? "Every payment this month is accounted for. A marketer raises one of these from their own app."
+                : "Problems you have closed will be kept here."
+            }
+          />
+        </div>
       )}
 
       <div className="space-y-3">
-        {items.map((issue) => (
+        {items.map((issue, index) => (
           <IssueCard
             key={issue.id}
             issue={issue}
+            tutorial={tab === "open" && !loading && index === 0}
             open={openId === issue.id}
             onToggle={() => setOpenId((current) => (current === issue.id ? null : issue.id))}
             onChanged={reload}
@@ -117,11 +123,14 @@ export default function ProblemsPage() {
 
 function IssueCard({
   issue: initial,
+  tutorial,
   open,
   onToggle,
   onChanged,
 }: {
   issue: PayIssue;
+  /** The card the sort-a-payment-problem walkthrough opens. */
+  tutorial: boolean;
   open: boolean;
   onToggle: () => void;
   /** Re-reads the list, so a sorted problem leaves the Open tab. */
@@ -144,6 +153,7 @@ function IssueCard({
       setIssue(res.issue);
       setText("");
       setProof([]);
+      if (kind === "reply") signalSpotlight("problem-replied");
       if (kind === "resolve") onChanged();
     } catch (err) {
       setError(toApiError(err));
@@ -163,6 +173,7 @@ function IssueCard({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
+        data-spotlight={tutorial ? "problem-open" : undefined}
         className="flex w-full items-center gap-3 p-4 text-left sm:p-5"
       >
         <span className="min-w-0 flex-1">
@@ -195,7 +206,7 @@ function IssueCard({
             </div>
           )}
 
-          <ul className="space-y-3" aria-label="The conversation so far">
+          <ul className="space-y-3" aria-label="The conversation so far" data-spotlight="problem-thread">
             {issue.messages.map((message, index) => (
               <li
                 key={`${message.at}-${index}`}
@@ -235,7 +246,7 @@ function IssueCard({
           </ul>
 
           <div className="mt-4 space-y-3 border-t border-mist-100 pt-4">
-            <Field label="Reply" hint="They read this in the app, on their phone.">
+            <Field label="Reply" hint="They read this in the app, on their phone." spotlight="problem-reply">
               <textarea
                 className={inputClass}
                 rows={3}
@@ -246,7 +257,7 @@ function IssueCard({
             </Field>
             {/* `as="group"`, not a label: ImagePicker owns a hidden file input,
                 and a bare label forwards a tap on its own whitespace to it. */}
-            <Field label="Receipt" hint="Optional. Proof the money left." as="group">
+            <Field label="Receipt" hint="Optional. Proof the money left." as="group" spotlight="problem-receipt">
               <ImagePicker value={proof} onChange={setProof} max={1} coverLabel="Receipt" />
             </Field>
 
@@ -254,6 +265,7 @@ function IssueCard({
               <Button
                 onClick={() => void send("reply")}
                 disabled={busy || text.trim() === ""}
+                spotlight="problem-send"
               >
                 {busy ? "Sending" : "Send reply"}
               </Button>
@@ -262,6 +274,7 @@ function IssueCard({
                   variant="ghost"
                   onClick={() => void send("resolve")}
                   disabled={busy}
+                  spotlight="problem-sort"
                 >
                   Mark as sorted
                 </Button>

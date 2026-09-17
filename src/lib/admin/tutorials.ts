@@ -99,6 +99,44 @@ export const TUTORIALS: readonly Tutorial[] = [
     ["content", "media"],
     true,
   ),
+  entry(
+    "check-a-deal",
+    "Check a deal",
+    "A marketer says they sold a house. Check it, then approve it.",
+    57,
+    "/admin/marketers/deals",
+    ["marketing"],
+    false,
+  ),
+  // `media` for the receipt, uploaded in the sheet that Mark as paid opens.
+  entry(
+    "pay-your-marketers",
+    "Pay your marketers",
+    "The end of the month: one list, one transfer per person.",
+    48,
+    "/admin/marketers/pay",
+    ["marketing", "media"],
+    false,
+  ),
+  entry(
+    "sort-a-payment-problem",
+    "Sort a payment problem",
+    "A marketer says their money never arrived. Answer it, then close it.",
+    51,
+    "/admin/marketers/problems",
+    ["marketing", "media"],
+    false,
+  ),
+  // Commission has no rail row of its own, so the walkthrough starts on Marketers and opens it from there.
+  entry(
+    "set-commission-rates",
+    "Set commission rates",
+    "Change what marketers earn, and see what it pays before you save.",
+    42,
+    "/admin/marketers",
+    ["marketing"],
+    false,
+  ),
 ];
 
 export function tutorialsFor(role: Role): Tutorial[] {

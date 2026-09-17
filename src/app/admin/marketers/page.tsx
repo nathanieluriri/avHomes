@@ -144,7 +144,7 @@ export default function MarketersPage() {
             : "Everyone selling, and the people they brought in."
         }
         actions={
-          <ButtonLink href="/admin/marketers/settings" variant="ghost">
+          <ButtonLink href="/admin/marketers/settings" variant="ghost" spotlight="commission-link">
             <Percent className="mr-1.5 h-4 w-4" aria-hidden="true" />
             Commission
           </ButtonLink>

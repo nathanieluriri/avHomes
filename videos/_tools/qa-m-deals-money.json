@@ -1,0 +1,1719 @@
+[
+  {
+    "name": "m-deals",
+    "path": "/m/deals",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "mine"
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "mine-scrolled"
+      },
+      {
+        "scroll": -2000,
+        "wait": 300
+      },
+      {
+        "click": "::-p-text(My team)",
+        "wait": 1000,
+        "shot": "team"
+      }
+    ]
+  },
+  {
+    "name": "m-deals-every-status",
+    "path": "/m/deals",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/deals": {
+        "total": 5,
+        "items": [
+          {
+            "id": "deal_chevron_info",
+            "listingId": "demo_chevron-drive-townhouse",
+            "listingTitle": "Chevron Drive Townhouse",
+            "listingType": "sale",
+            "listingLocation": "Chevron Drive, Lekki, Lagos",
+            "listingEstate": "",
+            "unitKey": "",
+            "amountMinor": 23500000000,
+            "currency": "NGN",
+            "buyerName": "Tunde Bakare",
+            "buyerPhone": "0809 113 4420",
+            "proof": [
+              "/images/library/av-photo-03.jpg"
+            ],
+            "note": "",
+            "reporterId": "mkt_av0001",
+            "reporterName": "Adaeze Vincent",
+            "reporterCode": "AV-0001",
+            "status": "info",
+            "reason": "The transfer slip is cut off.",
+            "reviewedBy": "",
+            "reviewedByName": "",
+            "reviewedAt": 1789000000000,
+            "closedOn": 1788800000000,
+            "shares": [],
+            "createdAt": 1788900000000,
+            "updatedAt": 1789000000000,
+            "myShare": null
+          },
+          {
+            "id": "deal_oniru_let",
+            "listingId": "demo_oniru-beachfront-apartment",
+            "listingTitle": "Oniru Beachfront Apartment",
+            "listingType": "rent",
+            "listingLocation": "Oniru, Victoria Island, Lagos",
+            "listingEstate": "",
+            "unitKey": "",
+            "amountMinor": 1800000000,
+            "currency": "NGN",
+            "buyerName": "Chidinma Okafor",
+            "buyerPhone": "0803 448 2019",
+            "proof": [
+              "/images/library/av-photo-01.jpg"
+            ],
+            "note": "",
+            "reporterId": "mkt_av0001",
+            "reporterName": "Adaeze Vincent",
+            "reporterCode": "AV-0001",
+            "status": "pending",
+            "reason": "",
+            "reviewedBy": "",
+            "reviewedByName": "",
+            "reviewedAt": null,
+            "closedOn": 1788650000000,
+            "shares": [],
+            "createdAt": 1788800000000,
+            "updatedAt": 1788800000000,
+            "myShare": null
+          },
+          {
+            "id": "deal_ikoyi_glass",
+            "listingId": "demo_ikoyi-glass-house",
+            "listingTitle": "Ikoyi Glass House",
+            "listingType": "sale",
+            "listingLocation": "Old Ikoyi, Lagos",
+            "listingEstate": "",
+            "unitKey": "",
+            "amountMinor": 48000000000,
+            "currency": "NGN",
+            "buyerName": "Olumide Sanni",
+            "buyerPhone": "0803 229 0071",
+            "proof": [
+              "/images/library/av-photo-01.jpg"
+            ],
+            "note": "",
+            "reporterId": "mkt_av0001",
+            "reporterName": "Adaeze Vincent",
+            "reporterCode": "AV-0001",
+            "status": "approved",
+            "reason": "",
+            "reviewedBy": "",
+            "reviewedByName": "",
+            "reviewedAt": 1788600000000,
+            "closedOn": 1788250000000,
+            "shares": [],
+            "createdAt": 1788500000000,
+            "updatedAt": 1788600000000,
+            "myShare": {
+              "marketerId": "mkt_av0001",
+              "marketerName": "Adaeze Vincent",
+              "code": "AV-0001",
+              "level": 1,
+              "rate": 5,
+              "amountMinor": 2400000000
+            }
+          },
+          {
+            "id": "deal_gwarinpa_mine",
+            "listingId": "demo_gwarinpa-family-home",
+            "listingTitle": "Gwarinpa Family Home",
+            "listingType": "sale",
+            "listingLocation": "Gwarinpa, Abuja",
+            "listingEstate": "",
+            "unitKey": "",
+            "amountMinor": 14800000000,
+            "currency": "NGN",
+            "buyerName": "Aisha Mohammed",
+            "buyerPhone": "0802 771 6644",
+            "proof": [
+              "/images/library/av-photo-03.jpg"
+            ],
+            "note": "",
+            "reporterId": "mkt_av0001",
+            "reporterName": "Adaeze Vincent",
+            "reporterCode": "AV-0001",
+            "status": "rejected",
+            "reason": "The alert is for a different property on the same street.",
+            "reviewedBy": "",
+            "reviewedByName": "",
+            "reviewedAt": 1788200000000,
+            "closedOn": 1787700000000,
+            "shares": [],
+            "createdAt": 1787900000000,
+            "updatedAt": 1788200000000,
+            "myShare": null
+          },
+          {
+            "id": "deal_wuse_cancelled",
+            "listingId": "demo_wuse-studio-loft",
+            "listingTitle": "Wuse Studio Loft",
+            "listingType": "rent",
+            "listingLocation": "Wuse 2, Abuja",
+            "listingEstate": "",
+            "unitKey": "",
+            "amountMinor": 320000000,
+            "currency": "NGN",
+            "buyerName": "Sadiq Bello",
+            "buyerPhone": "0806 114 7720",
+            "proof": [
+              "/images/library/av-photo-02.jpg"
+            ],
+            "note": "",
+            "reporterId": "mkt_av0001",
+            "reporterName": "Adaeze Vincent",
+            "reporterCode": "AV-0001",
+            "status": "cancelled",
+            "reason": "The tenant pulled out before the rent cleared.",
+            "reviewedBy": "",
+            "reviewedByName": "",
+            "reviewedAt": 1787000000000,
+            "closedOn": 1786500000000,
+            "shares": [],
+            "createdAt": 1786600000000,
+            "updatedAt": 1787000000000,
+            "myShare": null
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "all-five"
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "all-five-scrolled"
+      }
+    ]
+  },
+  {
+    "name": "m-deals-empty",
+    "path": "/m/deals",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/deals": {
+        "items": [],
+        "total": 0
+      }
+    },
+    "steps": [
+      {
+        "wait": 1000,
+        "shot": "mine-empty"
+      },
+      {
+        "click": "::-p-text(My team)",
+        "wait": 800,
+        "shot": "team-empty"
+      }
+    ]
+  },
+  {
+    "name": "m-deals-loading",
+    "path": "/m/deals",
+    "viewport": "phone",
+    "delay": {
+      "GET /api/marketing/deals": 9000
+    },
+    "steps": [
+      {
+        "wait": 600,
+        "shot": "skeletons"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-approved",
+    "path": "/m/deals/deal_ikoyi_glass",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "scroll": 460,
+        "wait": 500,
+        "shot": "facts-and-proof"
+      },
+      {
+        "click": "button[aria-label^='Open proof you sent']",
+        "wait": 900,
+        "shot": "photo-full-size"
+      },
+      {
+        "click": "button[aria-label='Next photo']",
+        "wait": 700,
+        "shot": "photo-next"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-hidden",
+    "path": "/m/deals/deal_ikoyi_glass",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1000
+      },
+      {
+        "click": "button[aria-label='Hide amounts']",
+        "wait": 500,
+        "shot": "masked"
+      },
+      {
+        "click": "a[href='/m/deals']",
+        "wait": 1200,
+        "shot": "list-masked"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-team",
+    "path": "/m/deals/deal_banana_mansion",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "scroll": 460,
+        "wait": 500,
+        "shot": "scrolled"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-pending",
+    "path": "/m/deals/deal_oniru_let",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "scrolled"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-info",
+    "path": "/m/deals/deal_chevron_info",
+    "viewport": "phone",
+    "delay": {
+      "POST /api/marketing/uploads": 2600
+    },
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "needs-more"
+      },
+      {
+        "scroll": 380,
+        "wait": 500,
+        "shot": "form"
+      },
+      {
+        "eval": "(() => { const i = document.querySelectorAll('input[type=file]')[1]; const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([255,216,255,224])], 'slip.jpg', { type: 'image/jpeg' })); dt.items.add(new File([new Uint8Array([255,216,255,224])], 'slip-2.jpg', { type: 'image/jpeg' })); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return 'picked two photos'; })()"
+      },
+      {
+        "wait": 700,
+        "shot": "uploading-1-of-2"
+      },
+      {
+        "wait": 2600,
+        "shot": "uploading-2-of-2"
+      },
+      {
+        "waitFor": "img[alt='Proof photo 3']",
+        "wait": 900,
+        "shot": "photos-added"
+      },
+      {
+        "click": "textarea",
+        "type": "This slip shows the date and the full amount. The second photo is the bank alert.",
+        "wait": 400,
+        "shot": "note-typed"
+      },
+      {
+        "click": "::-p-text(Send it back)",
+        "waitFor": "::-p-text(We got it)",
+        "wait": 1400,
+        "shot": "sent-back"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-info-errors",
+    "path": "/m/deals/deal_chevron_info",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "click": "button[aria-label='Remove photo 1']",
+        "wait": 400
+      },
+      {
+        "click": "::-p-text(Send it back)",
+        "wait": 600,
+        "shot": "nothing-to-send"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-rejected",
+    "path": "/m/deals/deal_gwarinpa_mine",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/deals/deal_gwarinpa_mine": {
+        "deal": {
+          "id": "deal_gwarinpa_mine",
+          "listingId": "demo_gwarinpa-family-home",
+          "listingTitle": "Gwarinpa Family Home",
+          "listingType": "sale",
+          "listingLocation": "Gwarinpa, Abuja",
+          "listingEstate": "",
+          "unitKey": "",
+          "amountMinor": 14800000000,
+          "currency": "NGN",
+          "buyerName": "Aisha Mohammed",
+          "buyerPhone": "0802 771 6644",
+          "proof": [
+            "/images/library/av-photo-03.jpg"
+          ],
+          "note": "Paid in full by transfer.",
+          "reporterId": "mkt_av0001",
+          "reporterName": "Adaeze Vincent",
+          "reporterCode": "AV-0001",
+          "status": "rejected",
+          "reason": "The alert is for a different property on the same street.",
+          "reviewedBy": "usr_demo_owner",
+          "reviewedByName": "Adaeze Vincent",
+          "reviewedAt": 1788200000000,
+          "closedOn": 1787700000000,
+          "shares": [],
+          "createdAt": 1787900000000,
+          "updatedAt": 1788200000000
+        },
+        "myShare": null
+      }
+    },
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "scrolled"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-cancelled",
+    "path": "/m/deals/deal_wuse_cancelled",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/deals/deal_wuse_cancelled": {
+        "deal": {
+          "id": "deal_wuse_cancelled",
+          "listingId": "demo_wuse-studio-loft",
+          "listingTitle": "Wuse Studio Loft",
+          "listingType": "rent",
+          "listingLocation": "Wuse 2, Abuja",
+          "listingEstate": "",
+          "unitKey": "",
+          "amountMinor": 320000000,
+          "currency": "NGN",
+          "buyerName": "Sadiq Bello",
+          "buyerPhone": "0806 114 7720",
+          "proof": [
+            "/images/library/av-photo-02.jpg"
+          ],
+          "note": "",
+          "reporterId": "mkt_av0001",
+          "reporterName": "Adaeze Vincent",
+          "reporterCode": "AV-0001",
+          "status": "cancelled",
+          "reason": "The tenant pulled out before the rent cleared.",
+          "reviewedBy": "usr_demo_owner",
+          "reviewedByName": "Adaeze Vincent",
+          "reviewedAt": 1787000000000,
+          "closedOn": 1786500000000,
+          "shares": [],
+          "createdAt": 1786600000000,
+          "updatedAt": 1787000000000
+        },
+        "myShare": null
+      }
+    },
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-missing",
+    "path": "/m/deals/deal_nobody_has",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "not-found"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-loading",
+    "path": "/m/deals/deal_ikoyi_glass",
+    "viewport": "phone",
+    "delay": {
+      "GET /api/marketing/deals/deal_ikoyi_glass": 9000
+    },
+    "steps": [
+      {
+        "wait": 600,
+        "shot": "skeletons"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new",
+    "path": "/m/deals/new",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "step1-pick-home"
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "step1-cards"
+      },
+      {
+        "scroll": -2000,
+        "wait": 300
+      },
+      {
+        "click": "ul li button.m-card",
+        "wait": 900,
+        "shot": "step2-facts"
+      },
+      {
+        "eval": "(() => { document.querySelector(\"input[placeholder='Chidinma Okafor']\").scrollIntoView({ block: 'center' }); return 'buyer fields in view'; })()",
+        "wait": 400
+      },
+      {
+        "click": "input[placeholder='Chidinma Okafor']",
+        "type": "Chidinma Okafor"
+      },
+      {
+        "click": "input[placeholder='0803 000 0000']",
+        "type": "0803 448 2019"
+      },
+      {
+        "wait": 400,
+        "shot": "step2-filled"
+      },
+      {
+        "scroll": 260,
+        "wait": 400,
+        "shot": "step2-date"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1500,
+        "shot": "step3-earnings"
+      },
+      {
+        "eval": "(() => { const i = document.querySelectorAll('input[type=file]')[1]; const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([255,216,255,224])], 'receipt.jpg', { type: 'image/jpeg' })); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); return 'picked a proof photo'; })()"
+      },
+      {
+        "waitFor": "img[alt='Proof photo 1']",
+        "wait": 900,
+        "shot": "step3-proof"
+      },
+      {
+        "scroll": 500,
+        "wait": 500
+      },
+      {
+        "click": "textarea",
+        "type": "Paid in two parts, the second part cleared on Monday.",
+        "wait": 400,
+        "shot": "step3-note"
+      },
+      {
+        "click": "::-p-text(Send it in)",
+        "waitFor": "::-p-text(We got your deal)",
+        "wait": 1000,
+        "shot": "sent-sheet"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-errors",
+    "path": "/m/deals/new",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1500
+      },
+      {
+        "click": "ul li button.m-card",
+        "wait": 900
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 700,
+        "shot": "step2-missing-name"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-search",
+    "path": "/m/deals/new",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1500
+      },
+      {
+        "click": "input[type='search']",
+        "type": "zzqx nothing here",
+        "wait": 1600,
+        "shot": "no-match"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-claimed",
+    "path": "/m/deals?new=claimed",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "sent-sheet-claimed"
+      }
+    ]
+  },
+  {
+    "name": "m-money",
+    "path": "/m/money",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 480,
+        "wait": 500,
+        "shot": "payments"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "earnings"
+      }
+    ]
+  },
+  {
+    "name": "m-money-hidden",
+    "path": "/m/money",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "click": "button[aria-label='Hide amounts']",
+        "wait": 500,
+        "shot": "hidden"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "hidden-scrolled"
+      }
+    ]
+  },
+  {
+    "name": "m-money-on-the-way",
+    "path": "/m/money",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/money": {
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 45000000,
+          "scheduledMinor": 2895000000,
+          "paidMinor": 47500000,
+          "pendingMinor": 1800000000
+        },
+        "lines": [
+          {
+            "id": "ledg_a",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_ikoyi_glass",
+            "level": 1,
+            "kind": "earn",
+            "amountMinor": 2400000000,
+            "currency": "NGN",
+            "status": "scheduled",
+            "payRunId": "prun_2026_09",
+            "reversesId": null,
+            "note": "",
+            "dealTitle": "Ikoyi Glass House",
+            "createdAt": 1788600000000,
+            "updatedAt": 1788600000000
+          },
+          {
+            "id": "ledg_b",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_banana_mansion",
+            "level": 2,
+            "kind": "earn",
+            "amountMinor": 2500000000,
+            "currency": "NGN",
+            "status": "scheduled",
+            "payRunId": "prun_2026_09",
+            "reversesId": null,
+            "note": "",
+            "dealTitle": "The Banana Island Mansion",
+            "createdAt": 1788500000000,
+            "updatedAt": 1788500000000
+          },
+          {
+            "id": "ledg_c",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_asokoro_villa",
+            "level": 3,
+            "kind": "clawback",
+            "amountMinor": -2005000000,
+            "currency": "NGN",
+            "status": "scheduled",
+            "payRunId": "prun_2026_09",
+            "reversesId": "ledg_x",
+            "note": "",
+            "dealTitle": "Asokoro Hillside Villa",
+            "createdAt": 1788400000000,
+            "updatedAt": 1788400000000
+          },
+          {
+            "id": "ledg_d",
+            "marketerId": "mkt_av0001",
+            "dealId": null,
+            "level": 0,
+            "kind": "adjust",
+            "amountMinor": 45000000,
+            "currency": "NGN",
+            "status": "earned",
+            "payRunId": null,
+            "reversesId": null,
+            "note": "Bonus for the Lekki open day",
+            "dealTitle": "",
+            "createdAt": 1788300000000,
+            "updatedAt": 1788300000000
+          },
+          {
+            "id": "ledg_e",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_maitama_let",
+            "level": 1,
+            "kind": "earn",
+            "amountMinor": 47500000,
+            "currency": "NGN",
+            "status": "void",
+            "payRunId": null,
+            "reversesId": null,
+            "note": "",
+            "dealTitle": "Maitama Terrace",
+            "createdAt": 1785000000000,
+            "updatedAt": 1785000000000
+          }
+        ],
+        "payments": [
+          {
+            "payRunId": "prun_2026_09",
+            "month": "2026-09",
+            "totalMinor": 2895000000,
+            "currency": "NGN",
+            "status": "pending",
+            "paidAt": null,
+            "proof": [],
+            "reference": "",
+            "issueId": null,
+            "bankLabel": "Guaranty Trust Bank 6789"
+          },
+          {
+            "payRunId": "prun_2026_06",
+            "month": "2026-06",
+            "totalMinor": 47500000,
+            "currency": "NGN",
+            "status": "held",
+            "paidAt": null,
+            "proof": [],
+            "reference": "",
+            "issueId": null,
+            "bankLabel": "Guaranty Trust Bank 6789"
+          }
+        ],
+        "bank": {
+          "bankCode": "058",
+          "bankName": "Guaranty Trust Bank",
+          "accountNumber": "0123456789",
+          "accountName": "ADAEZE NGOZI VINCENT",
+          "verifiedAt": 1770000000000
+        },
+        "issueWindowDays": 14,
+        "month": "2026-09"
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 480,
+        "wait": 500,
+        "shot": "payments"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "take-back-and-void"
+      },
+      {
+        "scroll": -3000,
+        "wait": 300
+      },
+      {
+        "click": "a[href='/m/money/prun_2026_09']",
+        "wait": 1500,
+        "shot": "payment-on-the-way"
+      }
+    ]
+  },
+  {
+    "name": "m-money-empty",
+    "path": "/m/money",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/money": {
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 0,
+          "scheduledMinor": 0,
+          "paidMinor": 0,
+          "pendingMinor": 0
+        },
+        "lines": [],
+        "payments": [],
+        "bank": null,
+        "issueWindowDays": 14,
+        "month": "2026-09"
+      }
+    },
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "top"
+      },
+      {
+        "scroll": 480,
+        "wait": 500,
+        "shot": "scrolled"
+      }
+    ]
+  },
+  {
+    "name": "m-money-loading",
+    "path": "/m/money",
+    "viewport": "phone",
+    "delay": {
+      "GET /api/marketing/money": 9000
+    },
+    "steps": [
+      {
+        "wait": 600,
+        "shot": "skeletons"
+      }
+    ]
+  },
+  {
+    "name": "m-payment",
+    "path": "/m/money/prun_2026_08",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 460,
+        "wait": 500,
+        "shot": "slip-and-report"
+      },
+      {
+        "click": "::-p-text(Tell AV Homes)",
+        "wait": 800,
+        "shot": "report-sheet"
+      },
+      {
+        "click": "div[role='dialog'] textarea",
+        "type": "Nothing came into my GTBank account on that date. I checked the app and the statement.",
+        "wait": 400,
+        "shot": "report-typed"
+      },
+      {
+        "click": "::-p-text(Send to AV Homes)",
+        "waitFor": "::-p-text(Your report)",
+        "wait": 1400,
+        "shot": "thread-opened"
+      }
+    ]
+  },
+  {
+    "name": "m-payment-thread",
+    "path": "/m/money/prun_2026_07",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "thread"
+      },
+      {
+        "click": "button[aria-label^='Open photo from av homes']",
+        "wait": 900,
+        "shot": "admin-photo"
+      },
+      {
+        "key": "Escape",
+        "wait": 500
+      },
+      {
+        "click": "textarea[aria-label='Write a reply']",
+        "type": "Still nothing this morning. I will check again at 4pm.",
+        "wait": 300,
+        "shot": "reply-typed"
+      },
+      {
+        "click": "button[aria-label='Send reply']",
+        "wait": 1000,
+        "shot": "replied"
+      },
+      {
+        "click": "::-p-text(Got it now)",
+        "wait": 1200,
+        "shot": "sorted"
+      }
+    ]
+  },
+  {
+    "name": "m-payment-hidden",
+    "path": "/m/money/prun_2026_07",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1200
+      },
+      {
+        "click": "button[aria-label='Hide amounts']",
+        "wait": 500,
+        "shot": "masked"
+      }
+    ]
+  },
+  {
+    "name": "m-deals-360",
+    "path": "/m/deals",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "mine"
+      },
+      {
+        "click": "::-p-text(My team)",
+        "wait": 900,
+        "shot": "team"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-360",
+    "path": "/m/deals/deal_chevron_info",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1200,
+        "shot": "needs-more"
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "form"
+      },
+      {
+        "scroll": 520,
+        "wait": 500,
+        "shot": "form-bottom"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-360",
+    "path": "/m/deals/new",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1500,
+        "shot": "step1"
+      },
+      {
+        "click": "ul li button.m-card",
+        "wait": 900,
+        "shot": "step2"
+      },
+      {
+        "eval": "(() => { document.querySelector(\"input[placeholder='Chidinma Okafor']\").scrollIntoView({ block: 'center' }); return 'buyer fields in view'; })()",
+        "wait": 400
+      },
+      {
+        "click": "input[placeholder='Chidinma Okafor']",
+        "type": "Chidinma Okafor"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1500,
+        "shot": "step3"
+      }
+    ]
+  },
+  {
+    "name": "m-money-360",
+    "path": "/m/money",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 480,
+        "wait": 500,
+        "shot": "payments"
+      }
+    ]
+  },
+  {
+    "name": "m-payment-360",
+    "path": "/m/money/prun_2026_07",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 420,
+        "wait": 500,
+        "shot": "thread"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-from-listing",
+    "path": "/m/deals/new?listing=demo_chevron-drive-townhouse",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 2200,
+        "shot": "preselected"
+      },
+      {
+        "eval": "(() => ({ tab: document.querySelector('.m-tab__label').textContent, amount: document.querySelector('input[inputmode=numeric]').value }))()"
+      },
+      {
+        "click": "input[inputmode=numeric]"
+      },
+      {
+        "eval": "(() => { const i = document.querySelector('input[inputmode=numeric]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, ''); i.dispatchEvent(new Event('input', { bubbles: true })); return i.value; })()"
+      },
+      {
+        "type": "125000000",
+        "wait": 600,
+        "shot": "live-earn-typed"
+      },
+      {
+        "click": "::-p-xpath(//button[@role='tab'][normalize-space()='Rented'])",
+        "wait": 500,
+        "shot": "switched-to-rented"
+      },
+      {
+        "scroll": 460,
+        "wait": 500,
+        "shot": "date-hint"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-from-listings-card",
+    "path": "/m/listings",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 2500
+      },
+      {
+        "click": "article a[href^='/m/deals/new?listing=']",
+        "wait": 1600,
+        "shot": "landed-on-step-2",
+        "waitFor": "::-p-text(Next: the proof)"
+      },
+      {
+        "eval": "location.pathname + location.search + ' ' + document.querySelector('.m-tab__label').textContent"
+      },
+      {
+        "click": "button[aria-label='Back']",
+        "wait": 1600,
+        "shot": "back-to-listings",
+        "waitFor": "::-p-text(Homes to share)"
+      },
+      {
+        "eval": "location.pathname + location.search"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-listing-gone",
+    "path": "/m/deals/new?listing=prop_taken_down_long_ago",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 2500,
+        "shot": "not-found-note"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-paused",
+    "path": "/m/deals/new?listing=demo_chevron-drive-townhouse",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals on the same home. Call the office if this takes more than a week.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1770000000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 2
+      }
+    },
+    "steps": [
+      {
+        "wait": 2200,
+        "shot": "blocked"
+      },
+      {
+        "eval": "(() => ({ bars: document.querySelectorAll('.fixed.bottom-0').length, tab: document.querySelector('.m-tab__label').textContent }))()"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-info-paused",
+    "path": "/m/deals/deal_chevron_info",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals on the same home. Call the office if this takes more than a week.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1770000000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 2
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "reason-and-note"
+      },
+      {
+        "scroll": 380,
+        "wait": 500,
+        "shot": "no-form"
+      }
+    ]
+  },
+  {
+    "name": "m-deals-paused-empty",
+    "path": "/m/deals",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/me": {
+        "marketer": {
+          "id": "mkt_av0001",
+          "userId": "usr_demo_owner",
+          "code": "AV-0001",
+          "displayName": "Adaeze Vincent",
+          "email": "adaeze@avhomes.com",
+          "phone": "+234 801 234 5678",
+          "state": "Lagos",
+          "status": "paused",
+          "statusReason": "We are checking two deals on the same home. Call the office if this takes more than a week.",
+          "parentId": null,
+          "upline": [],
+          "bank": {
+            "bankCode": "058",
+            "bankName": "Guaranty Trust Bank",
+            "accountNumber": "0123456789",
+            "accountName": "ADAEZE NGOZI VINCENT",
+            "verifiedAt": 1770000000000
+          },
+          "isAdmin": true,
+          "joinedAt": 1721000000000,
+          "createdAt": 1721000000000,
+          "updatedAt": 1757400000000
+        },
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 2400000000,
+          "scheduledMinor": 0,
+          "paidMinor": 3500000000,
+          "pendingMinor": 1800000000
+        },
+        "levels": [
+          3,
+          3,
+          2
+        ],
+        "rates": {
+          "sale": [
+            5,
+            2,
+            1
+          ],
+          "rent": [
+            5,
+            2,
+            1
+          ]
+        },
+        "supportPhone": "+234 801 234 5678",
+        "bankCheck": true,
+        "isAdmin": true,
+        "alertCount": 2
+      },
+      "GET /api/marketing/deals": {
+        "items": [],
+        "total": 0
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "no-report-button"
+      }
+    ]
+  },
+  {
+    "name": "m-payment-thread-landing",
+    "path": "/m/money/prun_2026_07#thread",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 2600,
+        "shot": "landed-on-thread"
+      },
+      {
+        "eval": "(() => { const t = document.getElementById('thread'); const bar = document.querySelector('.m-pagebar'); return { url: location.pathname + location.hash, threadTop: t ? Math.round(t.getBoundingClientRect().top) : null, barBottom: bar ? Math.round(bar.getBoundingClientRect().bottom) : null, scrollY: Math.round(scrollY) }; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-thread",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1600,
+        "shot": "alerts"
+      },
+      {
+        "click": "a[href='/m/money/prun_2026_07#thread']",
+        "wait": 1600,
+        "shot": "landed",
+        "waitFor": "#thread"
+      },
+      {
+        "eval": "(() => { const t = document.getElementById('thread'); const bar = document.querySelector('.m-pagebar'); return { url: location.pathname + location.hash, threadTop: t ? Math.round(t.getBoundingClientRect().top) : null, barBottom: bar ? Math.round(bar.getBoundingClientRect().bottom) : null, scrollY: Math.round(scrollY) }; })()"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-deal-info",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1600
+      },
+      {
+        "click": "a[href='/m/deals/deal_chevron_info']",
+        "wait": 1600,
+        "shot": "landed",
+        "waitFor": "::-p-text(AV Homes needs more from you)"
+      },
+      {
+        "eval": "location.pathname + ' ' + document.querySelector('.m-tab__label').textContent"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-deal-approved",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1600
+      },
+      {
+        "click": "a[href='/m/deals/deal_ikoyi_glass']",
+        "wait": 1600,
+        "shot": "landed",
+        "waitFor": "::-p-text(You earned)"
+      },
+      {
+        "eval": "location.pathname + ' ' + document.querySelector('.m-tab__label').textContent"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-deal-refused",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "mock": {
+      "GET /api/marketing/alerts": {
+        "items": [
+          {
+            "id": "deal-refused:deal_gwarinpa_mine",
+            "tone": "heads-up",
+            "icon": "deals",
+            "title": "Gwarinpa Family Home was not approved",
+            "body": "See why AV Homes said no.",
+            "detail": "The alert is for a different property on the same street.",
+            "action": {
+              "label": "See why",
+              "href": "/m/deals/deal_gwarinpa_mine"
+            },
+            "at": 1788200000000
+          }
+        ]
+      },
+      "GET /api/marketing/deals/deal_gwarinpa_mine": {
+        "deal": {
+          "id": "deal_gwarinpa_mine",
+          "listingId": "demo_gwarinpa-family-home",
+          "listingTitle": "Gwarinpa Family Home",
+          "listingType": "sale",
+          "listingLocation": "Gwarinpa, Abuja",
+          "listingEstate": "",
+          "unitKey": "",
+          "amountMinor": 14800000000,
+          "currency": "NGN",
+          "buyerName": "Aisha Mohammed",
+          "buyerPhone": "0802 771 6644",
+          "proof": [
+            "/images/library/av-photo-03.jpg"
+          ],
+          "note": "Paid in full by transfer.",
+          "reporterId": "mkt_av0001",
+          "reporterName": "Adaeze Vincent",
+          "reporterCode": "AV-0001",
+          "status": "rejected",
+          "reason": "The alert is for a different property on the same street.",
+          "reviewedBy": "usr_demo_owner",
+          "reviewedByName": "Adaeze Vincent",
+          "reviewedAt": 1788200000000,
+          "closedOn": 1787700000000,
+          "shares": [],
+          "createdAt": 1787900000000,
+          "updatedAt": 1788200000000
+        },
+        "myShare": null
+      }
+    },
+    "steps": [
+      {
+        "wait": 1600
+      },
+      {
+        "click": "a[href='/m/deals/deal_gwarinpa_mine']",
+        "wait": 1600,
+        "shot": "landed",
+        "waitFor": "::-p-text(What they said)"
+      },
+      {
+        "eval": "location.pathname + ' ' + document.querySelector('.m-tab__label').textContent"
+      }
+    ]
+  },
+  {
+    "name": "m-alert-lands-payment-sent",
+    "path": "/m/alerts",
+    "viewport": "phone",
+    "steps": [
+      {
+        "wait": 1600
+      },
+      {
+        "click": "a[href='/m/money/prun_2026_08']",
+        "wait": 1600,
+        "shot": "landed",
+        "waitFor": "::-p-text(Where it went)"
+      },
+      {
+        "eval": "location.pathname + ' ' + document.querySelector('.m-tab__label').textContent"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-new-from-listing-360",
+    "path": "/m/deals/new?listing=demo_oniru-beachfront-apartment",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 2200,
+        "shot": "preselected-rent"
+      },
+      {
+        "scroll": 460,
+        "wait": 500,
+        "shot": "date-hint"
+      }
+    ]
+  },
+  {
+    "name": "m-deal-approved-360",
+    "path": "/m/deals/deal_ikoyi_glass",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 460,
+        "wait": 500,
+        "shot": "facts-and-proof"
+      }
+    ]
+  },
+  {
+    "name": "m-money-on-the-way-360",
+    "path": "/m/money",
+    "viewport": "phone-small",
+    "mock": {
+      "GET /api/marketing/money": {
+        "balance": {
+          "currency": "NGN",
+          "waitingMinor": 45000000,
+          "scheduledMinor": 2895000000,
+          "paidMinor": 47500000,
+          "pendingMinor": 1800000000
+        },
+        "lines": [
+          {
+            "id": "ledg_a",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_ikoyi_glass",
+            "level": 1,
+            "kind": "earn",
+            "amountMinor": 2400000000,
+            "currency": "NGN",
+            "status": "scheduled",
+            "payRunId": "prun_2026_09",
+            "reversesId": null,
+            "note": "",
+            "dealTitle": "Ikoyi Glass House",
+            "createdAt": 1788600000000,
+            "updatedAt": 1788600000000
+          },
+          {
+            "id": "ledg_b",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_banana_mansion",
+            "level": 2,
+            "kind": "earn",
+            "amountMinor": 2500000000,
+            "currency": "NGN",
+            "status": "scheduled",
+            "payRunId": "prun_2026_09",
+            "reversesId": null,
+            "note": "",
+            "dealTitle": "The Banana Island Mansion",
+            "createdAt": 1788500000000,
+            "updatedAt": 1788500000000
+          },
+          {
+            "id": "ledg_c",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_asokoro_villa",
+            "level": 3,
+            "kind": "clawback",
+            "amountMinor": -2005000000,
+            "currency": "NGN",
+            "status": "scheduled",
+            "payRunId": "prun_2026_09",
+            "reversesId": "ledg_x",
+            "note": "",
+            "dealTitle": "Asokoro Hillside Villa",
+            "createdAt": 1788400000000,
+            "updatedAt": 1788400000000
+          },
+          {
+            "id": "ledg_d",
+            "marketerId": "mkt_av0001",
+            "dealId": null,
+            "level": 0,
+            "kind": "adjust",
+            "amountMinor": 45000000,
+            "currency": "NGN",
+            "status": "earned",
+            "payRunId": null,
+            "reversesId": null,
+            "note": "Bonus for the Lekki open day",
+            "dealTitle": "",
+            "createdAt": 1788300000000,
+            "updatedAt": 1788300000000
+          },
+          {
+            "id": "ledg_e",
+            "marketerId": "mkt_av0001",
+            "dealId": "deal_maitama_let",
+            "level": 1,
+            "kind": "earn",
+            "amountMinor": 47500000,
+            "currency": "NGN",
+            "status": "void",
+            "payRunId": null,
+            "reversesId": null,
+            "note": "",
+            "dealTitle": "Maitama Terrace",
+            "createdAt": 1785000000000,
+            "updatedAt": 1785000000000
+          }
+        ],
+        "payments": [
+          {
+            "payRunId": "prun_2026_09",
+            "month": "2026-09",
+            "totalMinor": 2895000000,
+            "currency": "NGN",
+            "status": "pending",
+            "paidAt": null,
+            "proof": [],
+            "reference": "",
+            "issueId": null,
+            "bankLabel": "Guaranty Trust Bank 6789"
+          },
+          {
+            "payRunId": "prun_2026_06",
+            "month": "2026-06",
+            "totalMinor": 47500000,
+            "currency": "NGN",
+            "status": "held",
+            "paidAt": null,
+            "proof": [],
+            "reference": "",
+            "issueId": null,
+            "bankLabel": "Guaranty Trust Bank 6789"
+          }
+        ],
+        "bank": {
+          "bankCode": "058",
+          "bankName": "Guaranty Trust Bank",
+          "accountNumber": "0123456789",
+          "accountName": "ADAEZE NGOZI VINCENT",
+          "verifiedAt": 1770000000000
+        },
+        "issueWindowDays": 14,
+        "month": "2026-09"
+      }
+    },
+    "steps": [
+      {
+        "wait": 1400,
+        "shot": "top"
+      },
+      {
+        "scroll": 900,
+        "wait": 500,
+        "shot": "take-back"
+      }
+    ]
+  },
+  {
+    "name": "m-payment-report-360",
+    "path": "/m/money/prun_2026_08",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 1600,
+        "shot": "top"
+      },
+      {
+        "scroll": 460,
+        "wait": 500,
+        "shot": "didnt-get-it"
+      },
+      {
+        "click": "::-p-text(Tell AV Homes)",
+        "wait": 800,
+        "shot": "report-sheet"
+      }
+    ]
+  },
+  {
+    "name": "m-payment-thread-landing-360",
+    "path": "/m/money/prun_2026_07#thread",
+    "viewport": "phone-small",
+    "steps": [
+      {
+        "wait": 2600,
+        "shot": "landed-on-thread"
+      },
+      {
+        "eval": "(() => { const t = document.getElementById('thread'); const bar = document.querySelector('.m-pagebar'); return { url: location.pathname + location.hash, threadTop: t ? Math.round(t.getBoundingClientRect().top) : null, barBottom: bar ? Math.round(bar.getBoundingClientRect().bottom) : null, scrollY: Math.round(scrollY) }; })()"
+      }
+    ]
+  }
+]

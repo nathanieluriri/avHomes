@@ -3,21 +3,29 @@
 //
 //   node videos/_tools/qa.cjs <jobs.json> [outDir]
 //
-// jobs.json: [{ "name": "tutorials-desktop", "path": "/admin/tutorials", "viewport": "desktop" | "phone",
-//               "role": "owner", "steps": [ {"click": "<selector>"}, {"type": "text"}, {"key": "Enter"},
+// jobs.json: [{ "name": "tutorials-desktop", "path": "/admin/tutorials",
+//               "viewport": "desktop" | "phone" | "phone-small",
+//               "role": "owner", "reducedMotion": false, "mock": { "GET /api/marketing/updates": { "items": [] } },
+//               "steps": [ {"click": "<selector>"}, {"type": "text"}, {"key": "Enter"},
 //               {"wait": 800}, {"waitFor": "<selector>"}, {"scroll": 600}, {"eval": "js expression"},
 //               {"shot": "label"} ] }]
 // Selectors are puppeteer selectors, so ::-p-text(New listing) and ::-p-xpath(...) work.
+// `mock` answers an exact method and path with a fixed body before the recorder's mock is asked,
+// for an empty or unusual state the shared fixtures do not have. A body with a numeric `__status`
+// is sent with that status, for a refusal. `delay` holds a method and path back that many ms, for
+// a loading state: { "delay": { "GET /api/marketing/me": 6000 } }.
 // A shot is taken at the end of every job as well. Console errors and unmocked API calls are
 // printed, because a screen that only looks right is not the same as one that works.
 const fs = require("fs");
 const path = require("path");
-const { fixtures, mockApi, CURSOR_JS, BASE } = require("./record.cjs");
+const { fixtures, mockApi, shouldMock, answer, CURSOR_JS, BASE } = require("./record.cjs");
 const puppeteer = require(process.env.PUPPETEER_CORE);
 
 const VIEWPORTS = {
   desktop: { width: 1536, height: 864, deviceScaleFactor: 1.25 },
   phone: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  // A 360px Android, the narrowest screen the marketer app is judged on.
+  "phone-small": { width: 360, height: 780, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
 };
 
 async function run() {
@@ -32,7 +40,8 @@ async function run() {
     const ctx = await browser.createBrowserContext();
     const tab = await ctx.newPage();
     await tab.setViewport(VIEWPORTS[job.viewport || "desktop"]);
-    if (job.viewport === "phone") await tab.setUserAgent("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36");
+    if (job.reducedMotion) await tab.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
+    if (String(job.viewport).startsWith("phone")) await tab.setUserAgent("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36");
     await tab.evaluateOnNewDocument(CURSOR_JS);
     await tab.evaluateOnNewDocument(() => { try { localStorage.setItem("avh-cookie-consent", "rejected"); } catch {} });
     tab.on("pageerror", (e) => console.log(`[${job.name}] PAGEERROR`, String(e.message || e).slice(0, 300)));
@@ -41,15 +50,27 @@ async function run() {
     await tab.setRequestInterception(true);
     tab.on("request", (rq) => {
       const u = new URL(rq.url());
-      if (u.origin !== BASE || !u.pathname.startsWith("/api/") || u.pathname.startsWith("/api/public/")) return rq.continue();
-      let body = null;
-      try { body = rq.postData() ? JSON.parse(rq.postData()) : null; } catch { body = null; }
-      for (const [method, re, fn] of routes) {
-        const m = u.pathname.match(re);
-        if (m && rq.method() === method) return rq.respond({ status: 200, contentType: "application/json", body: JSON.stringify(fn(m, u, body)) });
-      }
-      console.log(`[${job.name}] UNMOCKED`, rq.method(), u.pathname + u.search);
-      return rq.respond({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "not_found" }) });
+      if (!shouldMock(u)) return rq.continue();
+      const key = `${rq.method()} ${u.pathname}`;
+      const reply = () => {
+        const fixed = job.mock && job.mock[key];
+        if (fixed !== undefined) {
+          const { __status, ...rest } = fixed;
+          return rq.respond({ status: typeof __status === "number" ? __status : 200, contentType: "application/json", body: JSON.stringify(rest) });
+        }
+        let body = null;
+        try { body = rq.postData() ? JSON.parse(rq.postData()) : null; } catch { body = null; }
+        for (const [method, re, fn] of routes) {
+          const m = u.pathname.match(re);
+          if (m && rq.method() === method) return rq.respond(answer(fn(m, u, body)));
+        }
+        console.log(`[${job.name}] UNMOCKED`, rq.method(), u.pathname + u.search);
+        return rq.respond({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "not_found" }) });
+      };
+      const hold = job.delay && job.delay[key];
+      // A held request can outlive its page, and a respond on a closed page must not kill the run.
+      if (hold) return void setTimeout(() => reply().catch(() => {}), hold);
+      return reply();
     });
     try {
       await tab.goto(BASE + job.path, { waitUntil: "networkidle2", timeout: 120000 });

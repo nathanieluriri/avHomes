@@ -1,0 +1,57 @@
+{
+  "segments": [
+    [
+      0.1,
+      6.31,
+      1
+    ],
+    [
+      6.31,
+      8.19,
+      2
+    ],
+    [
+      8.19,
+      32.49,
+      1
+    ]
+  ],
+  "captions": [
+    {
+      "at": 0.2,
+      "until": 6.8,
+      "title": "Tap the alert that needs you",
+      "line": "It is under Needs you on home, marked Do this."
+    },
+    {
+      "at": 6.9,
+      "until": 12.39,
+      "title": "Read what AV Homes said",
+      "line": "It says exactly what is missing from your proof."
+    },
+    {
+      "at": 12.47,
+      "until": 17.27,
+      "title": "Add the photo they asked for",
+      "line": "Tap From phone. The new one is marked New."
+    },
+    {
+      "at": 17.37,
+      "until": 25.36,
+      "title": "Add a short note",
+      "line": "Say what you changed. It is not required."
+    },
+    {
+      "at": 25.45,
+      "until": 28.47,
+      "title": "Send it back",
+      "line": "The new photo and your note go in one tap."
+    },
+    {
+      "at": 28.57,
+      "until": 32.39,
+      "title": "It is back to Being checked",
+      "line": "AV Homes checks it again, usually in a day or two."
+    }
+  ]
+}

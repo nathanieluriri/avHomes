@@ -459,6 +459,7 @@ export function IconButton({
   size = "md",
   disabled = false,
   className = "",
+  spotlight,
 }: {
   /** Becomes both `aria-label` and `title`. Say what happens, not what it is. */
   label: string;
@@ -473,6 +474,8 @@ export function IconButton({
   size?: "md" | "dense";
   disabled?: boolean;
   className?: string;
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
 }) {
   const box = size === "dense" ? "h-11 w-11 sm:h-7 sm:w-7" : "h-11 w-11 sm:h-9 sm:w-9";
   const glyph = size === "dense" ? "h-4 w-4" : "h-[18px] w-[18px]";
@@ -484,6 +487,7 @@ export function IconButton({
       disabled={disabled}
       aria-label={label}
       title={label}
+      data-spotlight={spotlight}
       className={`${BUTTON_BASE} ${box} ${VARIANT[variant]} ${className}`}
     >
       <Icon className={glyph} aria-hidden />
@@ -573,15 +577,22 @@ export function ButtonLink({
   variant = "primary",
   size = "md",
   className = "",
+  spotlight,
 }: {
   children: ReactNode;
   href: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
   className?: string;
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
 }) {
   return (
-    <Link href={href} className={`${BUTTON_BASE} ${SIZE[size]} ${VARIANT[variant]} ${className}`}>
+    <Link
+      href={href}
+      data-spotlight={spotlight}
+      className={`${BUTTON_BASE} ${SIZE[size]} ${VARIANT[variant]} ${className}`}
+    >
       {children}
     </Link>
   );

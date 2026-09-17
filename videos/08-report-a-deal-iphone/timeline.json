@@ -1,0 +1,93 @@
+{
+  "footageDuration": 53.79,
+  "captions": [
+    {
+      "at": 0.32,
+      "until": 4.52,
+      "title": "Tap the round + button",
+      "line": "It sits in the middle of the bar at the bottom.",
+      "start": 0.11,
+      "end": 4.31
+    },
+    {
+      "at": 4.73,
+      "until": 9.13,
+      "title": "Search for the home",
+      "line": "Type part of its name, the estate or the area.",
+      "start": 4.52,
+      "end": 8.92
+    },
+    {
+      "at": 9.34,
+      "until": 13.59,
+      "title": "Tap its photo card",
+      "line": "Check the photo, the area and the price first.",
+      "start": 9.13,
+      "end": 13.38
+    },
+    {
+      "at": 13.9,
+      "until": 17.59,
+      "title": "Sold or rented",
+      "line": "Sold is already picked for a home that was for sale.",
+      "start": 13.69,
+      "end": 17.38
+    },
+    {
+      "at": 17.79,
+      "until": 23.25,
+      "title": "What they paid in the end",
+      "line": "The final figure. Your 5% updates as you type.",
+      "start": 17.58,
+      "end": 23.04
+    },
+    {
+      "at": 23.46,
+      "until": 30.76,
+      "title": "The buyer's name and phone",
+      "line": "The phone helps AV Homes confirm the sale.",
+      "start": 23.25,
+      "end": 30.55
+    },
+    {
+      "at": 30.95,
+      "until": 34.87,
+      "title": "The day it was done",
+      "line": "It starts on today. Change it if it closed earlier.",
+      "start": 30.74,
+      "end": 34.66
+    },
+    {
+      "at": 35.08,
+      "until": 40.05,
+      "title": "Next, then see what you could earn",
+      "line": "5% of what they paid, once AV Homes approves it.",
+      "start": 34.87,
+      "end": 39.84
+    },
+    {
+      "at": 40.22,
+      "until": 43.63,
+      "title": "Add the proof",
+      "line": "A bank alert, a receipt or the signed agreement.",
+      "start": 40.01,
+      "end": 43.42
+    },
+    {
+      "at": 43.82,
+      "until": 49.61,
+      "title": "Send it in",
+      "line": "AV Homes checks the proof, usually in a day or two.",
+      "start": 43.61,
+      "end": 49.4
+    },
+    {
+      "at": 49.81,
+      "until": 53.9,
+      "title": "It shows as Being checked",
+      "line": "Once it is approved, your share waits for pay day.",
+      "start": 49.6,
+      "end": 53.69
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 /**
- * The four guided walkthroughs, as data.
+ * The guided walkthroughs, as data.
  *
  * Each step names a `data-spotlight` anchor on a real console screen, says in
  * one line what to do there, and says what counts as having done it. The engine
@@ -16,6 +16,10 @@ export const SPOTLIGHT_TOUR_IDS = [
   "log-a-change",
   "reply-to-an-enquiry",
   "write-a-journal-post",
+  "check-a-deal",
+  "pay-your-marketers",
+  "set-commission-rates",
+  "sort-a-payment-problem",
 ] as const;
 
 export type SpotlightTourId = (typeof SPOTLIGHT_TOUR_IDS)[number];
@@ -33,7 +37,7 @@ export type SpotlightAdvance =
   | "signal";
 
 /** What a screen reports through `signalSpotlight`, after the thing actually happened. */
-export type SpotlightSignal = "enquiry-replied" | "note-saved";
+export type SpotlightSignal = "enquiry-replied" | "note-saved" | "problem-replied";
 
 export type SpotlightPlacement = "top" | "bottom" | "left" | "right";
 
@@ -445,11 +449,249 @@ const writeAJournalPost: SpotlightTour = {
   ],
 };
 
+const DEALS = "/admin/marketers/deals";
+const DEAL = "/admin/marketers/deals/*";
+
+/* Approving or cancelling ends what this walkthrough can show on a deal. Asking for
+   info or refusing does not: the deal can still be approved afterwards. */
+const DEAL_DECIDED = {
+  anchor: "deal-decided",
+  title: "This deal is already decided",
+  body: "Only a deal that is still waiting can be approved or refused. Pick one from Waiting to walk through it.",
+  restart: { href: DEALS, label: "Pick a waiting deal" },
+};
+
+const checkADeal: SpotlightTour = {
+  id: "check-a-deal",
+  title: "Check a deal",
+  start: DEALS,
+  steps: [
+    {
+      anchor: "deal-row",
+      page: DEALS,
+      title: "Open a waiting deal",
+      body: "A marketer says they closed this one. Open it to check the proof.",
+      advance: "route",
+      route: DEAL,
+      detour: {
+        anchor: "deal-find-waiting",
+        title: "Find a waiting deal",
+        body: "Choose Waiting to see the deals nobody has checked yet.",
+      },
+      none: {
+        anchor: "deal-none",
+        title: "Nothing to check yet",
+        body: "No deal is waiting right now. Try this again when a marketer reports one.",
+      },
+    },
+    {
+      anchor: "deal-proof",
+      page: DEAL,
+      title: "Check the proof",
+      body: "Click a photo to open it full size, and check it against the listing and the amount.",
+      advance: "manual",
+      none: DEAL_DECIDED,
+    },
+    {
+      anchor: "deal-amount",
+      page: DEAL,
+      title: "Correct the final amount",
+      body: "If the receipt or the note says something else, type what was really paid. The split under it follows when you leave the field.",
+      advance: "manual",
+      none: DEAL_DECIDED,
+    },
+    {
+      anchor: "deal-split",
+      page: DEAL,
+      title: "See who gets paid",
+      body: "Level 1 closed it, level 2 invited them, level 3 invited that person. Approving writes exactly these amounts.",
+      advance: "manual",
+      none: DEAL_DECIDED,
+    },
+    {
+      anchor: "deal-decide",
+      page: DEAL,
+      title: "Decide",
+      body: "Press Approve deal when the proof holds up, and the money is owed to everyone above. To ask for more or to refuse, write the reason first: the marketer reads it. That's the whole flow.",
+      advance: "manual",
+      final: true,
+      none: DEAL_DECIDED,
+    },
+  ],
+};
+
+const PAY = "/admin/marketers/pay";
+
+const NOTHING_TO_PAY = {
+  anchor: "pay-none",
+  title: "Nobody is waiting to be paid",
+  body: "Everyone on this list is paid or held. Try this again when next month's list is made.",
+};
+
+const payYourMarketers: SpotlightTour = {
+  id: "pay-your-marketers",
+  title: "Pay your marketers",
+  start: PAY,
+  steps: [
+    {
+      anchor: "pay-list",
+      page: PAY,
+      title: "One row per person",
+      body: "Each row is one transfer to send: who, the account it goes to, and how much.",
+      advance: "manual",
+      detour: {
+        anchor: "pay-make",
+        title: "Make this month's list",
+        body: "Press Make this month's list. It gathers everything approved up to the cut off day, one row per person. No money moves.",
+      },
+      none: NOTHING_TO_PAY,
+    },
+    {
+      anchor: "pay-copy",
+      page: PAY,
+      title: "Copy the account number",
+      body: "Then send the transfer from your bank's own app. Nothing on this screen moves money.",
+      advance: "manual",
+      none: NOTHING_TO_PAY,
+    },
+    {
+      anchor: "pay-mark",
+      page: PAY,
+      title: "Record it once it has gone",
+      body: "When the money has left your bank, press Mark as paid, type the bank reference, add the receipt and press Record the payment. The marketer sees both on their own screen. That's the whole flow.",
+      advance: "manual",
+      final: true,
+      none: NOTHING_TO_PAY,
+    },
+  ],
+};
+
+const COMMISSION = "/admin/marketers/settings";
+
+const setCommissionRates: SpotlightTour = {
+  id: "set-commission-rates",
+  title: "Set commission rates",
+  start: "/admin/marketers",
+  steps: [
+    {
+      anchor: "commission-link",
+      page: "/admin/marketers",
+      title: "Open Commission",
+      body: "Commission has no row of its own in the menu. It sits at the top of this screen.",
+      advance: "route",
+      route: COMMISSION,
+    },
+    {
+      anchor: "commission-sale-rates",
+      page: COMMISSION,
+      title: "Type the new sale rates",
+      body: "One percentage per level: level 1 closed the deal, level 2 invited them, level 3 invited that person.",
+      advance: "manual",
+    },
+    {
+      anchor: "commission-example",
+      page: COMMISSION,
+      title: "Read what it pays",
+      body: "This follows what you type, so you can see what a real sale pays each level before anything is saved.",
+      advance: "manual",
+      placement: "left",
+    },
+    {
+      anchor: "savebar-save",
+      page: COMMISSION,
+      title: "Save when the numbers are right",
+      body: "Deals approved from then on use the new rates. A deal already approved keeps the rates it was approved at. Discard puts the old ones back.",
+      advance: "manual",
+      final: true,
+      placement: "top",
+      detour: {
+        anchor: "commission-sale-rates",
+        title: "Change a rate first",
+        body: "Save appears once a number here is different. Type a new rate, or press Escape to leave the walkthrough.",
+      },
+    },
+  ],
+};
+
+const PROBLEMS = "/admin/marketers/problems";
+
+const sortAPaymentProblem: SpotlightTour = {
+  id: "sort-a-payment-problem",
+  title: "Sort a payment problem",
+  start: PROBLEMS,
+  steps: [
+    {
+      anchor: "problem-open",
+      page: PROBLEMS,
+      title: "Open the problem",
+      body: "A marketer says this money never arrived. Open it to read what they said.",
+      advance: "click",
+      detour: {
+        anchor: "problems-find-open",
+        title: "Find an open problem",
+        body: "Choose Open to see the problems nobody has sorted yet.",
+      },
+      none: {
+        anchor: "problems-none",
+        title: "Nothing to sort right now",
+        body: "No marketer has an open payment problem. Try this again when one comes in.",
+      },
+    },
+    {
+      anchor: "problem-thread",
+      page: PROBLEMS,
+      title: "Read the thread",
+      body: "What they told you, and anything already said back. Their messages are grey, ours are wine.",
+      advance: "manual",
+    },
+    {
+      anchor: "problem-reply",
+      page: PROBLEMS,
+      title: "Write your reply",
+      body: "Say what happened and give the bank reference. They read it in the app, on their phone.",
+      advance: "input",
+    },
+    {
+      anchor: "problem-receipt",
+      page: PROBLEMS,
+      title: "Attach the receipt",
+      body: "Optional. A screenshot of the transfer is the proof they can take to their bank.",
+      advance: "manual",
+    },
+    {
+      anchor: "problem-send",
+      page: PROBLEMS,
+      title: "Send it",
+      body: "This is a real reply: it goes to their app straight away. Sending it moves you on to the last step.",
+      advance: "signal",
+      signal: "problem-replied",
+      hint: "Moves on when it sends",
+      pending: {
+        body: "Sending your reply.",
+        until: "signal",
+        failed: "That didn't send. The reason is shown above the conversation and your words are still there. Press Send reply to try again.",
+      },
+    },
+    {
+      anchor: "problem-sort",
+      page: PROBLEMS,
+      title: "Mark as sorted once it lands",
+      body: "When they say the money arrived, press Mark as sorted. It leaves the Open list and the whole thread is kept under Sorted. That's the whole flow.",
+      advance: "manual",
+      final: true,
+    },
+  ],
+};
+
 export const SPOTLIGHT_TOURS: Record<SpotlightTourId, SpotlightTour> = {
   "add-a-listing": addAListing,
   "log-a-change": logAChange,
   "reply-to-an-enquiry": replyToAnEnquiry,
   "write-a-journal-post": writeAJournalPost,
+  "check-a-deal": checkADeal,
+  "pay-your-marketers": payYourMarketers,
+  "set-commission-rates": setCommissionRates,
+  "sort-a-payment-problem": sortAPaymentProblem,
 };
 
 export function isSpotlightTourId(value: string | null | undefined): value is SpotlightTourId {

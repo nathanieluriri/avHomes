@@ -1,0 +1,56 @@
+{
+  "footageDuration": 31.64,
+  "captions": [
+    {
+      "at": 1.34,
+      "until": 5.85,
+      "title": "Marketers, then Commission",
+      "line": "Commission sits at the top of the Marketers screen.",
+      "start": 0.09,
+      "end": 4.6
+    },
+    {
+      "at": 6.04,
+      "until": 11.35,
+      "title": "What that pays out",
+      "line": "Today's rates, worked out on a ₦60,000,000 sale and on rent.",
+      "start": 4.79,
+      "end": 10.1
+    },
+    {
+      "at": 12.72,
+      "until": 17.76,
+      "title": "Type the new sale rates",
+      "line": "Percentages of the sale price, one per level.",
+      "place": "raised",
+      "start": 9.74,
+      "end": 14.78
+    },
+    {
+      "at": 17.96,
+      "until": 21.86,
+      "title": "The example follows as you type",
+      "line": "At 7, 3 and 1, that sale pays ₦4,200,000, ₦1,800,000 and ₦600,000.",
+      "place": "raised",
+      "start": 14.98,
+      "end": 18.88
+    },
+    {
+      "at": 22.02,
+      "until": 26,
+      "title": "Press Save in the bar",
+      "line": "It shows once a number changes, and goes when the rates are saved.",
+      "place": "raised",
+      "start": 19.04,
+      "end": 23.02
+    },
+    {
+      "at": 27.35,
+      "until": 37.43,
+      "title": "Waiting deals use them at once",
+      "line": "A deal already approved keeps the rates it was approved at.",
+      "start": 22.69,
+      "end": 31.54
+    }
+  ]
+}

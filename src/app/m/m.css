@@ -228,6 +228,27 @@ html:has(.m-app) > body {
     box-shadow: 0 0 0 2px #8f2244;
   }
 
+  /* Home, sign in and join have no pinned bar, so once they scroll their
+     content would run under the status bar and the Dynamic Island. This strip
+     covers exactly the inset, and is nothing at all where there is no inset. */
+  .m-safetop {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 36;
+    height: env(safe-area-inset-top, 0px);
+    background:
+      radial-gradient(60% 140% at 100% 0%, rgb(255 72 132 / 0.26) 0%, transparent 70%),
+      linear-gradient(162deg, #5a1024 0%, #7a1631 100%);
+    box-shadow: 0 10px 22px -16px rgb(0 0 0 / 0.95);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+
+  .m-safetop[data-show="true"] {
+    opacity: 1;
+  }
+
   /* The compact bar an inner screen shows once its title scrolls away, so the
      way back never needs a scroll to the top. */
   .m-pagebar {

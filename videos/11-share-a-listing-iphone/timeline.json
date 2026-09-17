@@ -1,0 +1,52 @@
+{
+  "footageDuration": 29.41,
+  "captions": [
+    {
+      "at": 0.19,
+      "until": 6.86,
+      "title": "Listings is in the Menu",
+      "line": "Tap Menu at the bottom right, then Listings.",
+      "start": 0.07,
+      "end": 5.63
+    },
+    {
+      "at": 7.06,
+      "until": 11.94,
+      "title": "Search what the buyer wants",
+      "line": "An area, an estate or a home's name, such as Lekki.",
+      "start": 5.82,
+      "end": 10.7
+    },
+    {
+      "at": 12.13,
+      "until": 18.47,
+      "title": "For sale or for rent",
+      "line": "Switch lists to match what the buyer is after.",
+      "start": 10.89,
+      "end": 17.23
+    },
+    {
+      "at": 18.57,
+      "until": 22.72,
+      "title": "Check the home",
+      "line": "Its photo, the area and the price, ready to send.",
+      "start": 17.33,
+      "end": 21.48
+    },
+    {
+      "at": 22.83,
+      "until": 30.55,
+      "title": "Tap Share",
+      "line": "It goes out with your invite code in the link.",
+      "message": {
+        "delay": 1,
+        "label": "The message the buyer gets",
+        "text": "Have a look at this home on AV Homes: Tropical Oasis, Lekki Phase 1, Lagos. ₦245,000,000.",
+        "link": "https://av-homes.vercel.app/listings/tropical-oasis-lekki?ref=AV-0001",
+        "code": "AV-0001"
+      },
+      "start": 21.59,
+      "end": 29.31
+    }
+  ]
+}

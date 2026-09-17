@@ -3,8 +3,8 @@ import { ApiError, api } from "@/lib/admin/client";
 import { TUTORIAL_MEDIA, TUTORIAL_STEPS } from "@/lib/admin/tutorial-steps";
 
 /**
- * The help catalogue for the phone app: the two videos a marketer needs, and
- * the written steps that stand in for each one until its video is rendered.
+ * The help catalogue for the phone app: the videos a marketer needs, and the
+ * written steps that stand in for each one until its video is rendered.
  *
  * The console's `@/lib/admin/tutorials` is deliberately not reused. It builds
  * its catalogue at import and drags the console's whole nav in with it, and a
@@ -67,12 +67,48 @@ const WRITTEN: readonly Written[] = [
     title: "Invite people and earn",
     problem: "Share your link, and earn a slice of every deal your people close.",
     steps: [
-      { title: "Find your link", line: "It is on the home screen, under Share your link." },
+      { title: "Find your link", line: "Tap Share my link on your home screen, or open Invite from the Menu." },
       { title: "Send it on WhatsApp", line: "One tap. The message is already written for you." },
       { title: "They sign up on your link", line: "Their account is tied to your code from the start." },
       { title: "Watch your team grow", line: "Everybody you brought in shows under Team." },
       { title: "Earn from their deals", line: "A slice of every deal they close, and a smaller slice of the deals their own people close." },
       { title: "It lands in your money", line: "With the rest of what you are owed, paid at the end of the month." },
+    ],
+  },
+  {
+    id: "share-a-listing",
+    title: "Share a listing",
+    problem: "Send a buyer a home on AV Homes, with your code in the link.",
+    steps: [
+      { title: "Open Listings", line: "Tap Menu at the bottom right, then Listings." },
+      { title: "Search for the area", line: "Type what the buyer asked for, such as Lekki." },
+      { title: "For sale or for rent", line: "Switch lists to match what the buyer is after." },
+      { title: "Tap Share on the home", line: "Send it on WhatsApp or any app on your phone." },
+      { title: "Your code is in the link", line: "An enquiry from that link names you." },
+    ],
+  },
+  {
+    id: "send-more-proof",
+    title: "Send more proof",
+    problem: "AV Homes asked for more on a deal. Answer it and send it back.",
+    steps: [
+      { title: "Tap the alert", line: "It is under Needs you on your home screen, marked Do this." },
+      { title: "Read what AV Homes said", line: "It says exactly what is missing from your proof." },
+      { title: "Add the photo they asked for", line: "Tap From phone, or take one with the camera." },
+      { title: "Add a short note", line: "Say what you changed. It is not required." },
+      { title: "Send it back", line: "Your deal goes straight back to Being checked." },
+    ],
+  },
+  {
+    id: "join-as-a-marketer",
+    title: "Join as a marketer",
+    problem: "Open an invite link and create your account in three steps.",
+    steps: [
+      { title: "Open the invite link", line: "It shows who invited you. You join their team." },
+      { title: "About you", line: "Your name, email, phone, state and a password." },
+      { title: "Your bank", line: "Pick your bank and type your account number, then check the name." },
+      { title: "Three things, then you are in", line: "Free to join, real deals only, paid every month." },
+      { title: "Create my account", line: "You land on your home screen with your own invite code." },
     ],
   },
 ];
