@@ -82,7 +82,6 @@ import {
   listLeads,
   moveLead,
   noteOnLead,
-  openLeadCount,
   winLead,
   withShares,
 } from "./leads";

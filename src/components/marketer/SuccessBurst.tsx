@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { Check } from "lucide-react";
 
 /**
@@ -50,14 +50,10 @@ export function SuccessBurst({
   label?: string;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [still, setStill] = useState(false);
+  const still = useReducedMotion();
 
   useEffect(() => {
-    const quiet = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (quiet.matches) {
-      setStill(true);
-      return;
-    }
+    if (still) return;
 
     const el = canvas.current;
     if (!el) return;
@@ -135,7 +131,7 @@ export function SuccessBurst({
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [size]);
+  }, [size, still]);
 
   return (
     <div
@@ -165,6 +161,26 @@ export function SuccessBurst({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * The setting, read as the external state it is.
+ *
+ * `false` on the server and on the first client render, so the markup matches
+ * and the badge then settles to whatever the reader actually asked for.
+ */
+function useReducedMotion(): boolean {
+  const subscribe = useCallback((onChange: () => void) => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () => false,
   );
 }
 

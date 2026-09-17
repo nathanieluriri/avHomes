@@ -1,16 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AuthUser } from "@avhomes/contracts";
 import {
-  AuthFrame,
-  OtherDoor,
+  AuthDoor,
+  DoorTitle,
   Passport,
   PasswordInput,
 } from "@/components/marketer/account/AuthFrame";
-import { IconAccount } from "@/components/marketer/icons3d";
-import { Card, ErrorNote, Field, PrimaryButton, inputCls } from "@/components/marketer/ui";
+import { ErrorNote, Field, PrimaryButton, inputCls } from "@/components/marketer/ui";
 import { ApiError, api } from "@/lib/admin/client";
 import {
   firstName,
@@ -36,18 +36,16 @@ export default function SignInPage() {
   const router = useRouter();
   const last = useLastAccount();
 
-  const [email, setEmail] = useState("");
+  const [typed, setTyped] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
-  // `last` is null until the client has read storage, so the field fills in on
-  // mount rather than being wrong during hydration.
-  useEffect(() => {
-    if (last) setEmail(last.email);
-  }, [last]);
-
+  /* Derived, not synced. `last` is null on the server and until the client has
+     read storage, so an effect copying it into state would render the field
+     empty and then fill it, and would fight anything typed in between. */
   const known = last !== null;
+  const email = known ? last.email : typed;
   const ready = email.trim() !== "" && password !== "";
 
   async function signIn() {
@@ -73,17 +71,13 @@ export default function SignInPage() {
 
   function useAnotherAccount() {
     forgetAccount();
-    setEmail("");
+    setTyped("");
     setPassword("");
     setError(null);
   }
 
   return (
-    <AuthFrame
-      title="Welcome back"
-      hint="Sign in to see your money and report a deal."
-      tab={known ? "Your password" : "Sign in"}
-      art={<IconAccount size={96} />}
+    <AuthDoor
       head={
         known ? (
           <Passport
@@ -91,49 +85,58 @@ export default function SignInPage() {
             email={maskEmail(last.email)}
             onForget={useAnotherAccount}
           />
-        ) : undefined
+        ) : (
+          <DoorTitle
+            title="Welcome back"
+            hint="Sign in to see your money, your buyers and your team."
+          />
+        )
+      }
+      foot={
+        <p className="text-center text-[14.5px] text-m-muted">
+          No account yet?{" "}
+          <Link href="/m/join" className="m-tap m-link font-semibold">
+            Join AV Homes
+          </Link>
+        </p>
       }
     >
-      <Card className="m-card--lg">
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void signIn();
-          }}
-        >
-          {!known && (
-            <Field label="Email">
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                autoCapitalize="off"
-                placeholder="you@example.com"
-                className={inputCls}
-              />
-            </Field>
-          )}
-
-          <Field label="Password" as="group">
-            <PasswordInput
-              value={password}
-              onChange={setPassword}
-              autoComplete="current-password"
-              placeholder="Your password"
+      <form
+        className="space-y-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void signIn();
+        }}
+      >
+        {!known && (
+          <Field label="Email">
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setTyped(event.target.value)}
+              autoComplete="email"
+              autoCapitalize="off"
+              placeholder="you@example.com"
+              className={inputCls}
             />
           </Field>
+        )}
 
-          {error && <ErrorNote error={error} onRetry={() => void signIn()} />}
+        <Field label="Password" as="group">
+          <PasswordInput
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            placeholder="Enter your password"
+          />
+        </Field>
 
-          <PrimaryButton type="submit" busy={busy} disabled={!ready}>
-            Sign in
-          </PrimaryButton>
-        </form>
-      </Card>
+        {error && <ErrorNote error={error} onRetry={() => void signIn()} />}
 
-      <OtherDoor question="No account yet?" href="/m/join" action="Join AV Homes" />
-    </AuthFrame>
+        <PrimaryButton type="submit" busy={busy} disabled={!ready}>
+          Sign in
+        </PrimaryButton>
+      </form>
+    </AuthDoor>
   );
 }

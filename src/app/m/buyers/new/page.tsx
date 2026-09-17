@@ -8,7 +8,6 @@ import { AppShell, BottomBar, useMarketer, useReportBlock } from "@/components/m
 import { NairaInput } from "@/components/marketer/deals/NairaInput";
 import { IconHandshake } from "@/components/marketer/icons3d";
 import {
-  Button,
   ErrorNote,
   Field,
   Note,
@@ -41,7 +40,29 @@ interface Picked {
   kind: DealKind;
 }
 
+/**
+ * The shell is the page, and the form is its child.
+ *
+ * `useMarketer` and `useReportBlock` read a context AppShell provides, so they
+ * cannot be called by the component that renders AppShell: at that point the
+ * provider does not exist yet. Every screen in this app that needs the signed
+ * in marketer does it this way.
+ */
 export default function LogBuyerPage() {
+  return (
+    <AppShell
+      title="Log a buyer"
+      hint="Give us their name and number. We take it from there."
+      back="/m/buyers"
+      nav={null}
+      tab="Who are they?"
+    >
+      <Form />
+    </AppShell>
+  );
+}
+
+function Form() {
   const router = useRouter();
   const { me } = useMarketer();
   const block = useReportBlock();
@@ -96,31 +117,22 @@ export default function LogBuyerPage() {
 
   if (block) {
     return (
-      <AppShell title="Log a buyer" back="/m/buyers" nav={null}>
-        <div className="px-4">
-          <Note tone="warn">{block}</Note>
-        </div>
-      </AppShell>
+      <div className="px-4">
+        <Note tone="warn">{block}</Note>
+      </div>
     );
   }
 
   const rate = me?.rates.sale[0] ?? 0;
 
   return (
-    <AppShell
-      title="Log a buyer"
-      hint="Give us their name and number. We take it from there."
-      back="/m/buyers"
-      nav={null}
-      tab="Who are they?"
-      bottomBar={
-        <BottomBar>
-          <PrimaryButton busy={busy} onClick={() => void send()} disabled={touched && !!refusal}>
-            Send to AV Homes
-          </PrimaryButton>
-        </BottomBar>
-      }
-    >
+    <>
+      <BottomBar>
+        <PrimaryButton busy={busy} onClick={() => void send()} disabled={touched && !!refusal}>
+          Send to AV Homes
+        </PrimaryButton>
+      </BottomBar>
+
       <div className="space-y-5 px-4 pb-6">
         <Field label="Their name" error={touched && refusal?.path === "buyerName" ? refusal.message : ""}>
           <input
@@ -223,7 +235,7 @@ export default function LogBuyerPage() {
           </p>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
 

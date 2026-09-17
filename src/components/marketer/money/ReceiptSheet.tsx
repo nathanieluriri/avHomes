@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Check, ChevronDown, Copy } from "lucide-react";
-import { TX_KIND_LABEL, formatMoney, type Transaction } from "@avhomes/contracts";
+import { TX_KIND_LABEL, type Transaction } from "@avhomes/contracts";
 import { Sheet } from "../Sheet";
 import { SuccessBurst } from "../SuccessBurst";
-import { Button } from "../ui";
 import { DirectedAmount } from "./Amount";
 
 /**
@@ -91,15 +90,12 @@ export function ReceiptSheet({
 
           <div className="mt-5 flex gap-2">
             {tx.dealId && (
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => {
-                  window.location.href = `/m/deals/${tx.dealId}`;
-                }}
+              <Link
+                href={`/m/deals/${tx.dealId}`}
+                className="m-btn m-btn--secondary m-tap flex-1 px-4 py-3 text-[15px]"
               >
                 Open the deal
-              </Button>
+              </Link>
             )}
             {tx.payRunId && tx.kind === "payout" && (
               <Link

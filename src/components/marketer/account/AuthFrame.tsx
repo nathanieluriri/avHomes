@@ -1,73 +1,118 @@
 "use client";
 
+/**
+ * The two doors into the marketer app: sign in, and join.
+ *
+ * Deliberately NOT the app's own shell. Every screen inside is a wine hero with
+ * the body sheet notched into it, and that notch means "you are inside a
+ * section of something". Nobody at a door is inside anything yet, so the doors
+ * are one flat screen on the app's own ground, with the person's name as the
+ * only thing on it carrying any weight.
+ */
+
 import Link from "next/link";
+import Image from "next/image";
 import { useState, type ReactNode } from "react";
-import { Eye, EyeOff, Pencil } from "lucide-react";
+import { ChevronLeft, Eye, EyeOff, Pencil } from "lucide-react";
 import { useKeyboardInset } from "@/lib/admin/hooks";
-import { Lockup, SafeTop, SheetTab } from "../AppShell";
-import { HeroArt } from "../team/bits";
 import { inputCls } from "../ui";
 
 /**
- * Sign in and join in Night plum: the wine hero with the logo, then the dark
- * body sheet on its tab. No bottom bar and no session gate.
+ * The door: one flat screen, and no wine.
  *
- * Its own frame because the shared `AuthShell` still draws the light palette.
- * The hero pads like every inner screen's, so the logo, the title and the tab
- * label share one left edge.
+ * Every other screen in this app is a wine hero with the body sheet notched
+ * into it. The door deliberately is not, and the reason is what a door is for.
+ * The notch says "you are inside a section of something"; somebody signing in
+ * is not inside anything yet. Dropping it also means the one thing on screen
+ * with any weight is the person's own name, rather than a slab of brand colour
+ * above it.
+ *
+ * The mark stays as a watermark rather than a banner, so the screen is still
+ * recognisably AV Homes without spending the top third of a phone on saying so.
  */
-export function AuthFrame({
-  title,
-  hint,
-  art,
+export function AuthDoor({
+  back,
   head,
-  hero,
-  tab,
   children,
+  foot,
 }: {
-  title: string;
-  hint?: string;
-  /** Replaces the title and hint entirely. The passport block uses it. */
-  head?: ReactNode;
-  /** A 3D object level with the title. The hint wraps short of it. */
-  art?: ReactNode;
-  /** Anything under the title inside the wine. */
-  hero?: ReactNode;
-  /** The label on the tab that lifts the body into the hero. */
-  tab: ReactNode;
+  /** Where the chevron goes. Omitted on a door with nothing behind it. */
+  back?: string;
+  head: ReactNode;
   children: ReactNode;
+  foot?: ReactNode;
 }) {
   useKeyboardInset();
 
   return (
-    <div className="m-shell m-shell--tab">
-      <SafeTop />
-      <header className="m-hero m-hero--auth px-4">
-        <Lockup size="tall" />
-        {art && !head && <HeroArt>{art}</HeroArt>}
-        {head ?? (
-          <>
-            <h1
-              className={`mt-7 text-[30px] font-bold leading-[1.1] tracking-[-0.025em] ${art ? "pr-[5.5rem]" : ""}`}
-            >
-              {title}
-            </h1>
-            {hint && (
-              <p
-                className={`mt-2 max-w-[22rem] text-[14px] leading-relaxed text-white/75 ${art ? "pr-[5.5rem]" : ""}`}
-              >
-                {hint}
-              </p>
-            )}
-          </>
+    <div className="m-app relative flex min-h-dvh flex-col overflow-x-clip px-6">
+      <Watermark />
+
+      <div
+        className="flex items-center justify-between gap-3"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+      >
+        {back ? (
+          <Link
+            href={back}
+            aria-label="Back"
+            className="m-tap m-press-light -ml-2 grid h-10 w-10 place-items-center rounded-full text-m-text"
+          >
+            <ChevronLeft className="h-6 w-6" strokeWidth={2.2} aria-hidden />
+          </Link>
+        ) : (
+          <span />
         )}
-        {hero}
-      </header>
-      <main className="m-body">
-        <SheetTab>{tab}</SheetTab>
-        <div className="px-4">{children}</div>
-      </main>
+        <DoorMark />
+      </div>
+
+      <div className="mt-8">{head}</div>
+
+      <div className="mt-7 flex-1">{children}</div>
+
+      {foot && (
+        <div
+          className="pt-6"
+          style={{ paddingBottom: "calc(1.5rem + var(--safe-b) + var(--c-kb))" }}
+        >
+          {foot}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** The mark alone, small, at the end of the top row. No wordmark: the name is in the copy. */
+function DoorMark() {
+  return (
+    <Image
+      src="/brand/logo-mark-reversed.png"
+      alt="AV Homes"
+      width={279}
+      height={178}
+      priority
+      className="h-7 w-auto shrink-0 opacity-90"
+    />
+  );
+}
+
+/**
+ * The mark again, enormous and nearly invisible, bleeding off the right edge.
+ *
+ * It is `aria-hidden` and sits behind everything: it is texture, not content,
+ * and at this opacity it survives a bright screen outdoors as a shape rather
+ * than as a logo competing with the form.
+ */
+function Watermark() {
+  return (
+    <Image
+      src="/brand/logo-mark-reversed.png"
+      alt=""
+      aria-hidden
+      width={279}
+      height={178}
+      className="pointer-events-none absolute right-[-18%] top-[24%] w-[80%] select-none opacity-[0.045]"
+    />
   );
 }
 
@@ -94,17 +139,23 @@ export function Passport({
   onForget: () => void;
 }) {
   return (
-    <div className="mt-7">
-      <div className="flex items-center gap-3.5">
+    <div>
+      <div className="flex items-center gap-4">
         <span
           aria-hidden
-          className="grid h-[3.25rem] w-[3.25rem] shrink-0 place-items-center rounded-full bg-white/12 text-[22px] font-bold text-white ring-2 ring-white/35"
+          className="grid h-[4.5rem] w-[4.5rem] shrink-0 place-items-center rounded-full text-[26px] font-bold text-white ring-[3px] ring-(color:--m-link)/60"
+          style={{
+            background:
+              "radial-gradient(circle at 34% 28%, #e06c8d 0%, #a83550 46%, #5d1b2d 100%)",
+          }}
         >
           {name.charAt(0).toUpperCase()}
         </span>
         <span className="min-w-0">
-          <span className="block text-[14px] font-medium text-white/70">Welcome back</span>
-          <span className="block truncate text-[27px] font-bold leading-[1.15] tracking-[-0.025em] text-white">
+          <span className="block text-[19px] font-normal leading-tight text-m-text">
+            Welcome back
+          </span>
+          <span className="block truncate text-[26px] font-bold leading-tight tracking-[-0.02em] text-m-text">
             {name}
           </span>
         </span>
@@ -113,13 +164,27 @@ export function Passport({
       <button
         type="button"
         onClick={onForget}
-        className="m-tap m-glass m-press mt-4 inline-flex max-w-full items-center gap-2 rounded-full py-2 pl-4 pr-3 text-[14px]"
+        className="m-tap m-press-light mt-5 inline-flex max-w-full items-center gap-3 rounded-full bg-m-raised py-3 pl-5 pr-4 text-[15px] text-m-text"
       >
         <span className="truncate">{email}</span>
-        <span aria-hidden className="h-4 w-px shrink-0 bg-white/30" />
-        <Pencil className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+        <span aria-hidden className="h-5 w-px shrink-0 bg-m-line" />
+        <Pencil className="h-[18px] w-[18px] shrink-0 text-m-muted" strokeWidth={1.9} aria-hidden />
         <span className="sr-only">Not you? Use a different account</span>
       </button>
+    </div>
+  );
+}
+
+/** The door's own heading, when the phone has not seen anybody before. */
+export function DoorTitle({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div>
+      <h1 className="text-[30px] font-bold leading-[1.12] tracking-[-0.025em] text-m-text">
+        {title}
+      </h1>
+      {hint && (
+        <p className="mt-2 max-w-[21rem] text-[14.5px] leading-relaxed text-m-muted">{hint}</p>
+      )}
     </div>
   );
 }

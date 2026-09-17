@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Sheet } from "./Sheet";
 import { Calendar, endOfDay, startOfDay } from "./Calendar";
 import { Button } from "./ui";
@@ -54,16 +54,28 @@ export function DateRangeSheet({
   /** The account's first day. Nothing happened before it, so nothing before it is offerable. */
   earliest?: number;
 }) {
+  if (!open) return null;
+  /* The draft lives in the inner component, which only exists while the sheet is
+     open, so closing it throws the abandoned draft away. That is React's own
+     answer to "reset state when a prop changes" and it beats an effect writing
+     state back on every open, which renders twice and fights the reader if they
+     tap while it settles. */
+  return <Picker onClose={onClose} value={value} onApply={onApply} earliest={earliest} />;
+}
+
+function Picker({
+  onClose,
+  value,
+  onApply,
+  earliest,
+}: {
+  onClose: () => void;
+  value: DateRange;
+  onApply: (range: DateRange) => void;
+  earliest?: number;
+}) {
   const [draft, setDraft] = useState<DateRange>(value);
   const [picking, setPicking] = useState<"from" | "to">("from");
-
-  // Reopening after a cancel must not show the abandoned draft.
-  useEffect(() => {
-    if (open) {
-      setDraft(value);
-      setPicking("from");
-    }
-  }, [open, value]);
 
   function pick(day: number) {
     if (picking === "from") {
@@ -87,7 +99,7 @@ export function DateRangeSheet({
 
   return (
     <Sheet
-      open={open}
+      open
       onClose={onClose}
       title="Pick a date range"
       hint={picking === "from" ? "Tap the first day" : "Now tap the last day"}

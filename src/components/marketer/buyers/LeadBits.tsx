@@ -142,7 +142,9 @@ export function LeadTimeline({ events }: { events: readonly LeadEvent[] }) {
 
               <div className="min-w-0 flex-1">
                 <p className="text-[14.5px] font-semibold text-m-text">
-                  {moved ? LEAD_STATE_LABEL[event.to] : "Note added"}
+                  {/* The oldest entry is always the logging, by construction:
+                      createLead writes it and nothing else can precede it. */}
+                  {moved ? LEAD_STATE_LABEL[event.to] : last ? "Logged" : "Note added"}
                 </p>
                 {event.reason !== "" && (
                   <p className="mt-0.5 text-[13px] text-(color:--m-link)">{event.reason}</p>

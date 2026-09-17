@@ -10,6 +10,7 @@
 
 import type {
   DealStatus,
+  LeadState,
   LedgerKind,
   LedgerStatus,
   MarketerBank,
@@ -73,6 +74,23 @@ export const DEAL_TONE: Record<DealStatus, Tone> = {
   rejected: "red",
   info: "wine",
   cancelled: "neutral",
+};
+
+/**
+ * A lead's state, coloured by what it asks of the reader.
+ *
+ * `new` is amber because it is the only state with somebody waiting on a call.
+ * Everything in flight is wine, which reads as "in hand". Won is green and lost
+ * is grey, because a lead that is over needs no attention of any colour.
+ */
+export const LEAD_TONE: Record<LeadState, Tone> = {
+  new: "amber",
+  contacted: "wine",
+  meeting: "wine",
+  viewed: "wine",
+  offer: "wine",
+  won: "green",
+  lost: "neutral",
 };
 
 export const MARKETER_TONE: Record<MarketerStatus, Tone> = {

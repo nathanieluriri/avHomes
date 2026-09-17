@@ -91,7 +91,7 @@ export default function HistoryPage() {
               value={term}
               onChange={(event) => setTerm(event.target.value)}
               type="search"
-              placeholder="Search by name, amount, reference"
+              placeholder="Search name, amount, reference"
               aria-label="Search your statement"
               className={`${inputCls} pl-11 ${term !== "" ? "pr-11" : ""}`}
             />
@@ -168,10 +168,17 @@ export default function HistoryPage() {
             <EmptyState
               art={<IconMoney size={112} />}
               title={filtered ? "Nothing matched" : "No transactions yet"}
+              /* Name the filter that is actually hiding things. "Widen the
+                 dates" to somebody who only tapped Money Out sends them
+                 looking in the wrong place. */
               hint={
-                filtered
-                  ? "Try a different search, or widen the dates."
-                  : "Your first commission will show up here the moment a deal is approved."
+                !filtered
+                  ? "Your first commission will show up here the moment a deal is approved."
+                  : direction === "out"
+                    ? "Nothing has been taken back. That is good news."
+                    : direction === "in"
+                      ? "No money has come in yet in this range."
+                      : "Try a different search, or widen the dates."
               }
             />
           ) : (

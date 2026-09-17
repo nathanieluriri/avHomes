@@ -1,0 +1,93 @@
+[
+  {
+    "name": "m-buyers-open",
+    "path": "/m/buyers",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1400, "shot": "open" },
+      { "click": "::-p-text(Bought)", "wait": 900, "shot": "bought" },
+      { "click": "::-p-text(Closed)", "wait": 900, "shot": "closed" }
+    ]
+  },
+  {
+    "name": "m-buyers-empty",
+    "path": "/m/buyers",
+    "viewport": "phone",
+    "mock": { "GET /api/marketing/leads": { "items": [], "total": 0 } },
+    "steps": [{ "wait": 1200, "shot": "empty" }]
+  },
+  {
+    "name": "m-buyer-detail",
+    "path": "/m/buyers/lead_musa",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1400, "shot": "timeline" },
+      { "scroll": 500, "wait": 400, "shot": "timeline-scrolled" },
+      { "click": "::-p-text(This one is over)", "wait": 900, "shot": "close-sheet" },
+      { "click": "::-p-text(Went quiet)", "wait": 400, "shot": "reason-picked" }
+    ]
+  },
+  {
+    "name": "m-buyer-won",
+    "path": "/m/buyers/lead_amaka",
+    "viewport": "phone",
+    "steps": [{ "wait": 1400, "shot": "won" }]
+  },
+  {
+    "name": "m-buyer-new",
+    "path": "/m/buyers/new",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1400, "shot": "form" },
+      { "scroll": 500, "wait": 400, "shot": "form-scrolled" }
+    ]
+  },
+  {
+    "name": "m-history",
+    "path": "/m/money/history",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1500, "shot": "all" },
+      { "click": "::-p-text(Money In)", "wait": 700, "shot": "money-in" },
+      { "click": "::-p-text(Money Out)", "wait": 700, "shot": "money-out" },
+      { "click": "::-p-text(All)", "wait": 500 },
+      { "click": "button[aria-label^='Filter by date']", "wait": 900, "shot": "calendar" }
+    ]
+  },
+  {
+    "name": "m-history-small",
+    "path": "/m/money/history",
+    "viewport": "phone-small",
+    "steps": [{ "wait": 1500, "shot": "narrow" }]
+  },
+  {
+    "name": "m-menu",
+    "path": "/m",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 1500 },
+      { "click": "::-p-text(Menu)", "wait": 900, "shot": "menu" }
+    ]
+  },
+  {
+    "name": "admin-buyers",
+    "path": "/admin/marketers/buyers",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1500, "shot": "queue" },
+      { "click": "::-p-text(Everything)", "wait": 900, "shot": "everything" }
+    ]
+  },
+  {
+    "name": "admin-buyer-detail",
+    "path": "/admin/marketers/buyers/lead_grace",
+    "viewport": "desktop",
+    "steps": [{ "wait": 1600, "shot": "detail" }]
+  },
+  {
+    "name": "admin-buyer-won",
+    "path": "/admin/marketers/buyers/lead_amaka",
+    "viewport": "desktop",
+    "steps": [{ "wait": 1600, "shot": "won-warning" }]
+  }
+]

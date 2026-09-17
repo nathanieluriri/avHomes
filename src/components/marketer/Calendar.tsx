@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { nowMs } from "@/lib/marketer/api";
 
 /**
  * A month grid for picking one day.
@@ -61,7 +62,7 @@ export function Calendar({
   value,
   onPick,
   min,
-  max = Date.now(),
+  max,
   label = "Choose a date",
 }: {
   /** Null shows no selection and opens on today. */
@@ -73,11 +74,15 @@ export function Calendar({
   max?: number;
   label?: string;
 }) {
-  const floor = min ?? startOfDay(Date.now() - 3650 * DAY_MS);
-  const ceiling = startOfDay(max);
+  /* One clock reading for the life of this grid. Calling Date.now() per render
+     would let "today" move underneath the reader mid-interaction, and it is an
+     impure call in render besides. */
+  const [today] = useState(() => nowMs());
+  const ceiling = startOfDay(max ?? today);
+  const floor = min ?? startOfDay(today - 3650 * DAY_MS);
 
   // Opens where the reader already is, never on the epoch.
-  const [month, setMonth] = useState(() => monthKey(value ?? Math.min(Date.now(), max)));
+  const [month, setMonth] = useState(() => monthKey(value ?? Math.min(today, ceiling)));
   const [jumping, setJumping] = useState(false);
 
   const cells = useMemo(() => gridFor(month), [month]);
@@ -136,7 +141,7 @@ export function Calendar({
               const outside = new Date(day).getMonth() !== shownMonth.getMonth();
               const blocked = day < startOfDay(floor) || day > ceiling;
               const picked = value !== null && sameDay(day, value);
-              const today = sameDay(day, Date.now());
+              const isToday = sameDay(day, today);
 
               return (
                 <button
@@ -162,7 +167,7 @@ export function Calendar({
                   ].join(" ")}
                 >
                   {new Date(day).getDate()}
-                  {today && !picked && (
+                  {isToday && !picked && (
                     <span
                       aria-hidden
                       className="absolute bottom-1.5 h-1 w-1 rounded-full bg-(color:--m-link)"

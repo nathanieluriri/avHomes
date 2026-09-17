@@ -9,6 +9,7 @@ import {
   LEAD_NOTE_MIN,
   LEAD_REASONS,
   LEAD_STATE_HINT,
+  LEAD_STATE_LABEL,
   formatMoney,
   isLeadOpen,
   leadWantLine,
@@ -17,16 +18,14 @@ import {
 import { AppShell } from "@/components/marketer/AppShell";
 import { Sheet } from "@/components/marketer/Sheet";
 import { SuccessBurst } from "@/components/marketer/SuccessBurst";
-import { LeadState, LeadTimeline } from "@/components/marketer/buyers/LeadBits";
+import { LeadTimeline } from "@/components/marketer/buyers/LeadBits";
 import { IconHandshake } from "@/components/marketer/icons3d";
 import {
   Button,
   Card,
   ErrorNote,
   Field,
-  Note,
   PrimaryButton,
-  SectionLabel,
   Skeleton,
   inputCls,
 } from "@/components/marketer/ui";
@@ -78,14 +77,13 @@ export default function BuyerPage() {
             {data.state === "won" && data.myShareMinor > 0 && <Paid lead={data} />}
 
             <div className="mb-4 flex gap-2">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => (window.location.href = `tel:${data.buyerPhone}`)}
+              <a
+                href={`tel:${data.buyerPhone}`}
+                className="m-btn m-btn--secondary m-tap flex-1 px-4 py-3 text-[15px]"
               >
                 <Phone className="h-4 w-4" aria-hidden />
                 Call them
-              </Button>
+              </a>
               {open && (
                 <Button variant="secondary" className="flex-1" onClick={() => setNoting(true)}>
                   <MessageSquarePlus className="h-4 w-4" aria-hidden />
@@ -94,8 +92,7 @@ export default function BuyerPage() {
               )}
             </div>
 
-            <SectionLabel>What has happened</SectionLabel>
-            <Card className="mt-2 px-4 py-4">
+            <Card className="px-4 py-4">
               <LeadTimeline events={data.events} />
             </Card>
 
@@ -129,13 +126,14 @@ export default function BuyerPage() {
   );
 }
 
+/** The state on the wine, where the pill's own dark tones do not read. */
 function HeroState({ lead }: { lead: LeadRow }) {
   return (
     <div className="mt-4">
-      <div className="inline-flex rounded-full bg-white/10 px-1 py-1">
-        <LeadState state={lead.state} showTrack={false} />
-      </div>
-      <p className="mt-2 max-w-[20rem] text-[13.5px] leading-relaxed text-white/75">
+      <span className="m-glass inline-flex rounded-full px-3.5 py-1.5 text-[13px] font-semibold">
+        {LEAD_STATE_LABEL[lead.state]}
+      </span>
+      <p className="mt-2.5 max-w-[20rem] text-[13.5px] leading-relaxed text-white/75">
         {LEAD_STATE_HINT[lead.state]}
       </p>
     </div>
