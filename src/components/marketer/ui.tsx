@@ -18,14 +18,23 @@ import { isAppPath } from "@/lib/marketer/api";
 /**
  * The marketer app's component set, drawn in Night plum.
  *
- * Nothing here is shared with the console. The console is a dense briefing read
- * at a desk; this is one column on a phone held in one hand, where type is
- * larger, targets are 44px and money is the loudest thing on the screen.
+ * The surfaces are this app's own. The console is a dense briefing read at a
+ * desk; this is one column on a phone held in one hand, where type is larger,
+ * targets are 44px and money is the loudest thing on the screen. So cards,
+ * rows and chips take their colour from the `--m-*` roles in m.css
+ * (`bg-m-card`, `text-m-muted`), and the same component is right on the dark
+ * ground and inside `.m-paper`.
  *
- * Every colour comes from the `--m-*` roles in m.css (`bg-m-card`,
- * `text-m-muted`), so the same component is right on the dark ground and inside
- * `.m-paper`. No screen hand-rolls a card, a row or a button: every surface in
- * `/m` comes from this file, `Sheet.tsx`, `AppShell.tsx` or `NavBar.tsx`.
+ * THE BUTTONS ARE THE EXCEPTION, and they are the console's, down to the
+ * shadow alphas: the wine fill, the white second tier, the bevel, the pressed
+ * face and the flat disabled plate all come from console.css by way of m.css.
+ * A button is the one thing an operator uses in both places, and two answers
+ * to "what is a button" in one product is one too many. The `--m-*` roles do
+ * not reach them, on purpose: a key that changed colour with the ground would
+ * be a different key.
+ *
+ * No screen hand-rolls a card, a row or a button: every surface in `/m` comes
+ * from this file, `Sheet.tsx`, `AppShell.tsx` or `NavBar.tsx`.
  */
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
@@ -255,9 +264,17 @@ const NOTE_TONE: Record<NoteTone, string> = {
 /* ══════════════════════════════════════════════════════════════════ BUTTONS ══ */
 
 /**
- * `primary` is the wine glass, one per screen. `secondary` is raised plum on the
- * body. `hero` is translucent white, for the wine hero only. `ghost` is the old
+ * The console's key, in five tiers. `primary` is the wine one, one per screen.
+ * `secondary` is the raised one. `hero` is the flat pink glass, and it stays
+ * flat: it is drawn on the wine header, where a key with an edge of its own
+ * reads as a patch stuck on rather than as part of the hero. `quiet` is
+ * the wine wash, for a real action that is not the screen's. `ghost` is the old
  * name for `secondary`, kept so a screen not yet redrawn still compiles.
+ *
+ * Every tier's fill, glare, bevel, press and disabled plate is in m.css. The
+ * construction is the console's, with the bevel turned over for a dark ground:
+ * the lit lip on top, the dark mass underneath, the face catching its own
+ * light. Nothing about how a button looks is decided here.
  */
 export type ButtonVariant =
   | "primary"
@@ -278,9 +295,11 @@ const VARIANT: Record<ButtonVariant, string> = {
   whatsapp: "m-btn--whatsapp",
 };
 
-/* `sm` draws at 36px and still answers to a 44px thumb through `.m-tap`. */
+/* `sm` draws at 36px and still answers to a 44px thumb through `.m-tap`. No
+   size overrides the radius: the console draws every size at `--radius-lg`,
+   and a smaller corner on the dense one made it read as a chip, not a key. */
 const BTN_SIZE = {
-  sm: "m-tap h-9 px-3.5 text-[13px] rounded-[12px]",
+  sm: "m-tap h-9 px-3.5 text-[13px]",
   md: "h-11 px-4 text-[14px]",
   lg: "h-[52px] px-5 text-[15px]",
 } as const;

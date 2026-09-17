@@ -234,7 +234,7 @@ export function VideoSheet({
                     <button
                       type="button"
                       onClick={retry}
-                      className="m-press m-tap mt-3 inline-flex h-10 items-center gap-2 rounded-[14px] bg-white px-4 text-[14px] font-semibold text-[#1c1214]"
+                      className="m-btn m-btn--secondary m-tap mt-3 h-10 px-4 text-[14px]"
                     >
                       <RotateCcw className="h-4 w-4" aria-hidden />
                       Try again
