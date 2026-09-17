@@ -6,7 +6,6 @@ import type { CSSProperties, ComponentType, ReactNode } from "react";
 import {
   payMonth,
   payMonthLabel,
-  previewEarning,
   type LedgerLine,
   type LedgerStatus,
 } from "@avhomes/contracts";
@@ -42,7 +41,6 @@ import { shortDate } from "@/lib/admin/format";
 import { useAsync } from "@/lib/admin/hooks";
 import {
   payDayLabel,
-  type DealsResponse,
   type MoneyResponse,
   type PayHistoryRow,
 } from "@/lib/marketer/api";
