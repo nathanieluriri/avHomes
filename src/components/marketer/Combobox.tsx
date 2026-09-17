@@ -208,7 +208,12 @@ export function Combobox({
           {!loading &&
             shown.map((option, index) => (
               <li
-                key={option.value}
+                /* Index, not value. Nigerian bank lists really do repeat a
+                   code (Paystack five times, the NIP list eleven), and a list
+                   component must not crash on upstream data it did not choose.
+                   The rows are fully re-derived on every keystroke anyway, so
+                   there is no identity worth preserving across renders. */
+                key={`${option.value}-${index}`}
                 id={rowId(index)}
                 role="option"
                 aria-selected={option.value === value}

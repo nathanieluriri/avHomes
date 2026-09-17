@@ -149,6 +149,13 @@ export interface MarketerResponse {
   marketer: Marketer;
 }
 
+/** `PUT /api/marketing/me/bank`. Says whether the name check actually ran. */
+export interface BankSaved extends MarketerResponse {
+  checked: boolean;
+  /** Why it did not, in the marketer's own words. Empty when it did. */
+  detail: string;
+}
+
 /** Up to two letters for the avatar. Falls back to the first letter of a code. */
 export function initials(name: string, code = ""): string {
   const parts = name.trim().split(/\s+/u).filter(Boolean);

@@ -57,40 +57,108 @@ async function ask(url: string, init: RequestInit): Promise<unknown> {
 /* ══════════════════════════════════════════════════════════════════ BANKS ══ */
 
 /**
- * The Nigerian bank list, from Paystack, whichever provider resolves names.
+ * THE LIST MUST COME FROM WHOEVER RESOLVES. This is not a preference.
  *
- * Paystack serves this one without a key, Kora does not, and the codes are
- * interchangeable in the direction that matters: Kora accepts Paystack's
- * three-digit CBN codes. Taking the list from one place and resolving with
- * another would normally be a trap, because fintech codes are NOT portable
- * (Opay is `999992` to Paystack and `100004` on the NIP list), but the lenient
- * side is the one doing the accepting here.
+ * Nigerian bank codes are not portable, and the trap is that they LOOK
+ * portable: the traditional banks use the same three-digit CBN code everywhere,
+ * so GTBank is `058` to both providers and everything seems fine. The fintechs
+ * are where it breaks, and the fintechs are where most marketers actually bank.
  *
- * Cached for an hour in the module: it changes a few times a year, and a cold
- * signup screen should not wait on a call every other marketer already paid for.
+ *     Opay        Paystack 999992      NIP 100004
+ *     PalmPay     Paystack 999991      NIP 100033
+ *     Kuda        Paystack 50211       NIP 090267
+ *     Moniepoint  Paystack 50515       NIP 090405
+ *
+ * Kora answers `999992` with "Invalid bank provided" and `100004` with the
+ * account holder's name. Verified by calling both. So a list from one provider
+ * fed to the other silently fails to verify every Opay, PalmPay, Kuda and
+ * Moniepoint account on the site, which is a large share of them.
+ *
+ * Paystack serves its list without a key. Kora's needs one (its bank list is
+ * correctly authenticated, unlike its resolve endpoint), so the NIP list comes
+ * from NUBAPI's public file, which is the same NIBSS numbering Kora expects.
  */
-let bankCache: { at: number; banks: BankOption[] } | null = null;
+const NIP_LIST = "https://nubapi.com/bank-json";
+
+let bankCache: { at: number; provider: AccountProvider; banks: BankOption[] } | null = null;
 const BANK_TTL_MS = 60 * 60 * 1000;
 
-export async function listBanks(): Promise<BankOption[]> {
-  if (bankCache && Date.now() - bankCache.at < BANK_TTL_MS) return bankCache.banks;
+export async function listBanks(db: Db): Promise<BankOption[]> {
+  const { accountProvider } = await readMarketingSettings(db);
+  if (bankCache && bankCache.provider === accountProvider && Date.now() - bankCache.at < BANK_TTL_MS) {
+    return bankCache.banks;
+  }
 
+  const banks =
+    accountProvider === "paystack" ? await paystackBanks() : await nipBanks();
+
+  // A missing list is not worth a 500: the join form falls back to a plain bank
+  // name field and the account is taken unverified.
+  if (banks.length === 0) return bankCache?.banks ?? [];
+
+  bankCache = { at: Date.now(), provider: accountProvider, banks };
+  return banks;
+}
+
+function tidy(rows: { code?: unknown; name?: unknown; active?: unknown }[]): BankOption[] {
+  const seen = new Set<string>();
+  const out: BankOption[] = [];
+  for (const row of rows) {
+    if (row.active === false) continue;
+    const code = String(row.code ?? "").trim();
+    const name = String(row.name ?? "").trim();
+    if (code === "" || name === "") continue;
+    /* Both lists carry rows that repeat a code: Paystack has five, the NIP list
+       eleven. Some are one bank spelled two ways, some are genuinely two banks
+       sharing a code upstream. Either way the pair resolves identically, so the
+       key is code AND name and the reader can find whichever name they know. */
+    const key = `${code}|${name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ code, name });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function paystackBanks(): Promise<BankOption[]> {
   const body = (await ask(`${PAYSTACK}/bank?currency=NGN&perPage=100`, {
     headers: { accept: "application/json" },
   })) as { status?: boolean; data?: { code: string; name: string; active?: boolean }[] } | null;
+  if (!body || body.status !== true || !Array.isArray(body.data)) return [];
+  return tidy(body.data);
+}
 
-  if (!body || body.status !== true || !Array.isArray(body.data)) {
-    // A missing list is not worth a 500: the join form falls back to a plain
-    // bank-name field and the account is taken unverified.
-    return bankCache?.banks ?? [];
-  }
+async function nipBanks(): Promise<BankOption[]> {
+  const body = (await ask(NIP_LIST, { headers: { accept: "application/json" } })) as
+    | { code: string; name: string; active?: boolean }[]
+    | { data?: { code: string; name: string; active?: boolean }[] }
+    | null;
+  const rows = Array.isArray(body) ? body : (body?.data ?? []);
+  if (!Array.isArray(rows)) return [];
+  return tidy(rows);
+}
 
-  const banks = body.data
-    .filter((row) => row.active !== false)
-    .map((row) => ({ code: row.code, name: row.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  bankCache = { at: Date.now(), banks };
-  return banks;
+/**
+ * A code stored before the list moved, translated for Kora.
+ *
+ * Only the fintechs need it: their Paystack codes are proprietary and Kora
+ * refuses them outright. Everything else is a CBN code both sides already
+ * agree on, so it passes through untouched. Without this, every marketer who
+ * signed up banking with Opay or Kuda would fail to verify forever, with no
+ * sign of why.
+ */
+const NIP_FOR_PAYSTACK: Record<string, string> = {
+  "999992": "100004", // Opay
+  "999991": "100033", // PalmPay
+  "50211": "090267", // Kuda
+  "50515": "090405", // Moniepoint
+  "50126": "090325", // Sparkle
+  "50823": "090328", // Carbon
+  "100004": "100004", // already NIP, left so the map reads as the whole story
+};
+
+function forKora(bankCode: string): string {
+  return NIP_FOR_PAYSTACK[bankCode] ?? bankCode;
 }
 
 /* ══════════════════════════════════════════════════════════════ RESOLVING ══ */
@@ -165,6 +233,6 @@ export async function resolveAccount(
   const name =
     accountProvider === "paystack"
       ? await viaPaystack(db, accountNumber, bankCode)
-      : await viaKora(accountNumber, bankCode);
+      : await viaKora(accountNumber, forKora(bankCode));
   return name === null ? null : { accountName: name, verifiedAt: Date.now() };
 }

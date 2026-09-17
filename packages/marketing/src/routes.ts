@@ -382,8 +382,10 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
 
   routes.get("/public/marketing/banks", async (c) => {
     const db = await currentDb(c);
-    const banks = await listBanks();
-    c.header("cache-control", "public, max-age=3600");
+    const banks = await listBanks(db);
+    /* Private, not public: the list now depends on which provider this site has
+       chosen, so a shared cache could hand one site another's codes. */
+    c.header("cache-control", "private, max-age=3600");
     return c.json({ banks, checked: (await providerState(db)).ready });
   });
 
@@ -664,7 +666,24 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         { path: "accountNumber", message: "an account number is ten digits" },
       ]);
     }
-    const resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
+    /*
+     * A check that found nothing is an ANSWER and has to reach the screen.
+     *
+     * Saving succeeds either way, on purpose: refusing to store an account over
+     * a failed name check would lock somebody out of being paid. But the caller
+     * gets `checked` back, because the bug this replaces was a button that spun,
+     * returned 200, and left the card reading "Not checked" with nothing said.
+     */
+    let resolved: { accountName: string; verifiedAt: number } | null = null;
+    let reachable = true;
+    try {
+      resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
+    } catch {
+      // The provider is down or refused. Different from "no such account", and
+      // the marketer must not be told their own details are wrong.
+      reachable = false;
+    }
+
     const bank: MarketerBank = {
       bankCode: body.bankCode,
       bankName: body.bankName,
@@ -683,7 +702,15 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         actorName: marketer.displayName,
       });
     }
-    return c.json({ marketer: after });
+    return c.json({
+      marketer: after,
+      checked: resolved !== null,
+      detail: resolved
+        ? ""
+        : reachable
+          ? "That number and bank did not match any account. Check both and try again."
+          : "The bank check is not answering right now. Your account is saved; try again shortly.",
+    });
   });
 
   routes.get("/marketing/team", requireAuth(), async (c) => {

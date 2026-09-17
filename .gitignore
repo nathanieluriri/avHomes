@@ -279,6 +279,9 @@ new file*
 
 # Video review artifacts: snapshots, frame captures and renders are reproducible
 videos/_captures/
+# Critic output from a QA run: one machine's verdict on one build, regenerated
+# by re-running videos/_tools/qa.cjs. The job files beside them ARE committed.
+videos/_tools/qa-critic-*.json
 videos/*/snapshots/
 videos/*/renders/
 videos/*/assets/.frames/

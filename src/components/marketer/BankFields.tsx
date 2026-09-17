@@ -88,13 +88,19 @@ export function BankFields({
             placeholder="Type your bank's name"
             loading={banks.loading}
             invalid={showErrors && value.bankName.trim() === ""}
-            value={value.bankCode}
-            options={list.map((bank) => ({ value: bank.code, label: bank.name }))}
+            /* Code AND name. Two banks can share a code upstream, and keying
+               the selection on the code alone made picking the second one
+               display the first one's name. */
+            value={value.bankCode === "" ? "" : `${value.bankCode}|${value.bankName}`}
+            options={list.map((bank) => ({
+              value: `${bank.code}|${bank.name}`,
+              label: bank.name,
+            }))}
             emptyText="No bank by that name. Check the spelling, or try a shorter word."
             onPick={(choice) =>
               onChange({
                 ...value,
-                bankCode: choice?.value ?? "",
+                bankCode: choice ? choice.value.split("|")[0]! : "",
                 bankName: choice?.label ?? "",
               })
             }
