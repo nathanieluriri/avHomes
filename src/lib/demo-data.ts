@@ -76,6 +76,7 @@ type PropertySeed = Omit<
   | "seoTitle"
   | "seoDescription"
   | "previousSlugs"
+  | "mapUrl"
 > &
   Partial<
     Pick<
@@ -789,6 +790,9 @@ function toProperty(seed: PropertySeed): Property {
     seoTitle: "",
     seoDescription: "",
     previousSlugs: [],
+    // No fixture carries a pin, so the map falls back to the address, which is
+    // exactly what a real listing with no link does.
+    mapUrl: "",
     agentUserId: null,
     createdAt: published,
     updatedAt: published,

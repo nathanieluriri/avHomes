@@ -53,6 +53,8 @@ export interface PropertyDoc {
   location: string;
   city: string;
   address: string;
+  /** Absent on every row written before a listing could carry a map link. */
+  mapUrl?: string;
   bedrooms: number;
   bathrooms: number;
   areaSqft: number;
@@ -138,6 +140,7 @@ export function toProperty(doc: PropertyDoc): Property {
     location: doc.location,
     city: doc.city,
     address: doc.address,
+    mapUrl: doc.mapUrl ?? "",
     bedrooms: doc.bedrooms,
     bathrooms: doc.bathrooms,
     areaSqft: doc.areaSqft,

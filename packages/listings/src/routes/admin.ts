@@ -39,6 +39,8 @@ import {
   PUBLIC_PROPERTY_STATUSES,
   isEstate,
   listingPublishBlockers,
+  MAP_LINK_MAX,
+  mapLinkRefusal,
   minStayUnit,
   moneyRefusalMessage,
   normalizeAmenities,
@@ -54,6 +56,7 @@ import {
 } from "@avhomes/contracts";
 import { requireAdmin, requireAuth } from "@avhomes/identity";
 import { assertAuthorized } from "../authorize";
+import { expandMapLink } from "../maps";
 import {
   LISTING_KINDS,
   TRANSITIONS,
@@ -138,6 +141,9 @@ const PatchBody = z
     location: str().max(200),
     city: str().max(120),
     address: str().max(300),
+    /* Checked for shape below, not here: a refusal has to name Google Maps and
+       say where the Share button is, which a length ceiling cannot. */
+    mapUrl: str().max(MAP_LINK_MAX),
     bedrooms: z.number().int().min(0).max(100),
     bathrooms: z.number().int().min(0).max(100),
     areaSqft: z.number().int().min(0).max(10_000_000),
@@ -427,6 +433,21 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     }
 
     if (patch.amenities !== undefined) patch.amenities = normalizeAmenities(patch.amenities);
+
+    /*
+     * The map link is checked, then FOLLOWED once, then stored.
+     *
+     * Refused rather than silently dropped: an operator who pasted the wrong
+     * thing has to be told, because a saved-and-ignored link reads as a map
+     * that never appears. Expanded because the Share button hands out
+     * `maps.app.goo.gl/XXXX`, which names no place until something follows it,
+     * and the public listing page is the wrong place to be making that request.
+     */
+    if (body.patch.mapUrl !== undefined) {
+      const refusal = mapLinkRefusal(body.patch.mapUrl);
+      if (refusal) throw new BadRequestError("mapUrl", [{ path: "mapUrl", message: refusal }]);
+      patch.mapUrl = await expandMapLink(body.patch.mapUrl);
+    }
 
     // A new web address keeps the old one as a redirect, so nothing already shared breaks.
     if (body.patch.slug !== undefined) {

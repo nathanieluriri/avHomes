@@ -22,7 +22,10 @@ import {
   formatPriceShort,
   formatSqm,
   isEstate,
+  isShortMapLink,
   listingPublishBlockers,
+  mapEmbedSrc,
+  mapLinkRefusal,
   minStayUnit,
   moneyRefusalMessage,
   moveInTotalMinor,
@@ -147,6 +150,8 @@ type Draft = {
   location: string;
   city: string;
   address: string;
+  /** As pasted. The server follows a share link and stores what it lands on. */
+  mapUrl: string;
   bedrooms: number;
   bathrooms: number;
   areaSqft: number;
@@ -205,6 +210,7 @@ function toDraft(p: Property): Draft {
     location: p.location,
     city: p.city,
     address: p.address,
+    mapUrl: p.mapUrl,
     bedrooms: p.bedrooms,
     bathrooms: p.bathrooms,
     areaSqft: p.areaSqft,
@@ -261,6 +267,7 @@ function draftToProperty(saved: Property, d: Draft): Property {
     location: d.location,
     city: d.city,
     address: d.address,
+    mapUrl: d.mapUrl,
     bedrooms: derived ? derived.bedrooms : d.bedrooms,
     bathrooms: derived ? derived.bathrooms : d.bathrooms,
     areaSqft: d.areaSqft,
@@ -622,6 +629,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
           location: draft.location,
           city: draft.city,
           address: draft.address,
+          mapUrl: draft.mapUrl.trim(),
           // An estate's bedrooms and bathrooms are derived too, and it has no
           // parking, area or year built of its own, so those keep what is stored.
           ...(fields.rooms && {
@@ -1137,6 +1145,9 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 />
               </Field>
             </div>
+            <div className="sm:col-span-2">
+              <MapLinkField value={draft.mapUrl} onChange={(next) => set("mapUrl", next)} />
+            </div>
           </Card>
 
           {(fields.rooms || fields.area || fields.yearBuilt) && (
@@ -1377,5 +1388,71 @@ function PropertyEditor({ initial }: { initial: Property }) {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * The Google Maps link, and the map it turns into.
+ *
+ * Optional, and it earns its place on the screen by SHOWING what it produced:
+ * a link pasted into a box is unverifiable until a buyer opens the listing, and
+ * the failure mode of that is a map of the wrong street on a live page. The
+ * frame below renders the same embed the site will, from the same function.
+ *
+ * The one thing it cannot preview is a share link that has not been saved yet.
+ * `maps.app.goo.gl/XXXX` names no place until something follows it, and the
+ * server is what follows it, so the field says so rather than drawing an empty
+ * frame or a map of somewhere else.
+ */
+function MapLinkField({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const refusal = mapLinkRefusal(value);
+  const src = refusal ? null : mapEmbedSrc(value);
+  const unexpanded = !refusal && src === null && isShortMapLink(value);
+
+  return (
+    /* The frame sits OUTSIDE the field, under its hint rather than between the
+       box and the sentence explaining it. Field renders its hint last, so a
+       preview passed as a child puts the instructions below the map they
+       produced, which reads as a caption on the map. */
+    <div>
+      <Field
+        label="Google Maps link"
+        hint="Optional. Open the place in Google Maps, tap Share, copy the link, and paste it here. The listing page draws a map from it."
+        as="group"
+      >
+        <input
+          className={inputClass}
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="https://maps.app.goo.gl/..."
+          aria-invalid={refusal !== null}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {refusal && (
+          <p role="alert" className="mt-1 text-[12px] leading-snug text-red-700">
+            {refusal}
+          </p>
+        )}
+        {unexpanded && (
+          <p className="mt-1 text-[12px] leading-snug text-slate-600">
+            That is a share link. Save, and it is followed once so the map can open on the pin.
+          </p>
+        )}
+      </Field>
+      {src && (
+        <div className="mt-2 overflow-hidden rounded-lg border border-mist-200">
+          <iframe
+            src={src}
+            title="Where this listing is"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            className="block h-44 w-full"
+          />
+        </div>
+      )}
+    </div>
   );
 }

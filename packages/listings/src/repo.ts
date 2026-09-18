@@ -275,6 +275,7 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     location: "",
     city: "",
     address: "",
+    mapUrl: "",
     bedrooms: 0,
     bathrooms: 0,
     areaSqft: 0,

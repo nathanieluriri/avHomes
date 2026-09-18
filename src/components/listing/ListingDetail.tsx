@@ -4,6 +4,8 @@ import type { Property } from "@/lib/types";
 import {
   BUILD_STAGE_LABELS,
   estateSummary,
+  listingMapEmbedSrc,
+  mapDirectionsHref,
   formatPrice,
   isEstate,
   listingLabel,
@@ -19,6 +21,7 @@ import EstateOptions from "@/components/listing/EstateOptions";
 import PaymentPlanCard from "@/components/listing/PaymentPlanCard";
 import { RentTerms } from "@/components/listing/ListingFacts";
 import { EnquiryOptionProvider } from "@/components/listing/EnquiryOption";
+import LocationMap from "@/components/listing/LocationMap";
 import { availabilityLine } from "@/components/listing/estate-text";
 
 /**
@@ -32,9 +35,11 @@ export default function ListingDetail({ property, similar }: { property: Propert
   // A sold out estate already says so in the chip above the title.
   const heroAvailability = summary && !summary.soldOut ? availabilityLine(summary) : null;
   const titleDocument = property.listingType === "sale" ? property.titleDocument : null;
-  const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    property.address
-  )}`;
+  /* The operator's own pin when the listing carries one, and the address
+     search it has always used when it does not. Both come from the same file
+     the console's editor previews with, so what they saw is what ships. */
+  const mapsHref = mapDirectionsHref(property);
+  const mapSrc = listingMapEmbedSrc(property);
 
   return (
     <>
@@ -191,6 +196,8 @@ export default function ListingDetail({ property, similar }: { property: Propert
                   <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
                     {property.address}
                   </p>
+
+                  {mapSrc && <LocationMap src={mapSrc} address={property.address} />}
 
                   <a
                     href={mapsHref}

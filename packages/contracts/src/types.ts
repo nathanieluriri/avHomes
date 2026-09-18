@@ -203,6 +203,11 @@ export interface Property {
   location: string;
   city: string;
   address: string;
+  /**
+   * The Google Maps link an operator pasted, expanded from a share link on
+   * save. Empty means none, and the site falls back to searching the address.
+   */
+  mapUrl: string;
   bedrooms: number;
   bathrooms: number;
   areaSqft: number;
