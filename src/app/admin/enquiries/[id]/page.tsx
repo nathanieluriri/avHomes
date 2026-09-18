@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ArrowUpRight, Inbox, Mail, Phone } from "lucide-react";
 import {
   ENQUIRY_STATUSES,
+  formatPhone,
   type Enquiry,
   type EnquiryStatus,
 } from "@avhomes/contracts";
@@ -217,7 +218,7 @@ function EnquiryDetail({ initial }: { initial: Enquiry }) {
                     className="flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 text-[13px] text-wine-700 transition-colors hover:bg-wine-50 sm:min-h-0 sm:gap-2 sm:py-1.5"
                   >
                     <Phone className="h-4 w-4 shrink-0 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
-                    <span className="truncate">{enquiry.phone}</span>
+                    <span className="truncate">{formatPhone(enquiry.phone)}</span>
                   </a>
                 )}
               </div>

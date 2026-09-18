@@ -24,6 +24,7 @@ import {
   PrimaryButton,
   Skeleton,
   Stepper,
+  PhoneField,
   inputCls,
 } from "./ui";
 import { ApiError, api } from "@/lib/admin/client";
@@ -289,15 +290,16 @@ export function JoinFlow({ code }: { code: string }) {
                 />
               </Field>
 
-              <Field label="Phone" error={badPhone ? "Put in a phone number we can call." : undefined}>
-                <input
-                  type="tel"
-                  inputMode="tel"
+              <Field
+                label="Phone"
+                error={badPhone ? "Put in a phone number we can call." : undefined}
+                as="group"
+              >
+                <PhoneField
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  autoComplete="tel"
-                  placeholder="0803 000 0000"
-                  className={`m-num ${inputCls} ${badPhone ? "m-bad" : ""}`}
+                  onChange={setPhone}
+                  aria-label="Phone"
+                  invalid={badPhone}
                 />
               </Field>
 

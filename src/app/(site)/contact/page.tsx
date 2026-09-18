@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import ContactForm from "@/components/ContactForm";
+import { formatPhone } from "@avhomes/contracts";
 import { getSiteSettings, whatsappHref } from "@/lib/data";
 
 export const metadata: Metadata = {
@@ -88,7 +89,7 @@ export default async function ContactPage() {
                           href={`tel:${site.contactPhone.replace(/\s+/g, "")}`}
                           className="mt-0.5 block text-sm text-muted-foreground transition-colors hover:text-wine-600"
                         >
-                          {site.contactPhone}
+                          {formatPhone(site.contactPhone)}
                         </a>
                       </div>
                     </div>

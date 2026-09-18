@@ -21,6 +21,7 @@ import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { toApiError } from "@/lib/admin/marketing";
 import { SaveBar } from "@/components/admin/SaveBar";
+import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import {
   Card,
   CardHead,
@@ -28,6 +29,7 @@ import {
   Field,
   PageColumns,
   PageHeader,
+  PhoneField,
   Skeleton,
   Switch,
   inputClass,
@@ -410,12 +412,11 @@ function CommissionEditor({
               label="Smallest payout"
               hint="A balance under this is carried into the next month instead of being sent. 0 pays every balance."
             >
-              <input
-                className={inputClass}
-                inputMode="numeric"
-                value={draft.minPayout}
-                onChange={(event) => set("minPayout", event.target.value)}
-              />
+              {/* An amount, so it is grouped as one. This box holds figures in
+                  the hundreds of thousands and read as an unbroken run of
+                  digits, which is the field where a misplaced zero costs the
+                  most and is hardest to see. */}
+              <MoneyInput value={draft.minPayout} onChange={(raw) => set("minPayout", raw)} />
             </Field>
 
             <Field
@@ -514,14 +515,9 @@ function CommissionEditor({
             <Field
               label="Support phone"
               hint="Printed on the sign up page and in the app's help sheet. Leave it empty and neither shows a number."
+              as="group"
             >
-              <input
-                className={inputClass}
-                inputMode="tel"
-                value={draft.supportPhone}
-                placeholder="+234 801 234 5678"
-                onChange={(event) => set("supportPhone", event.target.value)}
-              />
+              <PhoneField value={draft.supportPhone} onChange={(next) => set("supportPhone", next)} />
             </Field>
           </Card>
         </div>

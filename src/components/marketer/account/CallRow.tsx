@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight, Phone } from "lucide-react";
+import { formatPhone } from "@avhomes/contracts";
 import { AppLink, StatRow } from "../ui";
 
 /**
@@ -28,7 +29,7 @@ export function CallRow({ phone }: { phone: string }) {
       <span className="shrink-0">{badge}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] font-semibold text-m-text">Call AV Homes</span>
-        <span className="m-num mt-0.5 block truncate text-[13px] text-m-muted">{phone}</span>
+        <span className="m-num mt-0.5 block truncate text-[13px] text-m-muted">{formatPhone(phone)}</span>
       </span>
       <ChevronRight className="h-4 w-4 shrink-0 text-m-faint" aria-hidden />
     </AppLink>

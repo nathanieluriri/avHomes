@@ -26,6 +26,7 @@ import {
   SectionLabel,
   Skeleton,
   StatRow,
+  PhoneField,
   inputCls,
   type ChipTone,
 } from "@/components/marketer/ui";
@@ -286,16 +287,8 @@ function DetailsForm({
           />
         </Field>
 
-        <Field label="Phone">
-          <input
-            type="tel"
-            inputMode="tel"
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            autoComplete="tel"
-            placeholder="0803 000 0000"
-            className={`m-num ${inputCls}`}
-          />
+        <Field label="Phone" as="group">
+          <PhoneField value={phone} onChange={setPhone} aria-label="Phone" />
         </Field>
 
         <Field label="State" hint="Where you mostly work.">

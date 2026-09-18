@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { readReferral } from "@/lib/referral";
+import { PhoneInput } from "@/components/PhoneInput";
 
 const fieldClass =
   "mt-2 w-full rounded-xl border border-mist-200 bg-white px-4 py-3 text-sm text-plum-950 outline-none transition-colors placeholder:text-slate-500 focus:border-wine-600";
@@ -39,6 +40,11 @@ export default function ContactForm({
 }) {
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
+  /* The one controlled field on an otherwise uncontrolled form. The phone field
+     composes a country and a number into one stored value, so it cannot be read
+     off the DOM the way a text box can; it writes a hidden input under the same
+     name and `FormData` below picks it up unchanged. */
+  const [phone, setPhone] = useState("");
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,6 +112,7 @@ export default function ContactForm({
         setState("idle");
         return;
       }
+      setPhone("");
       setState("sent");
     } catch {
       setError("We could not reach the server. Please check your connection or email us directly.");
@@ -176,13 +183,13 @@ export default function ContactForm({
           <label htmlFor="phone" className={labelClass}>
             Phone number
           </label>
-          <input
+          <PhoneInput
             id="phone"
             name="phone"
-            type="tel"
-            autoComplete="tel"
-            placeholder="+234 800 000 0000"
+            value={phone}
+            onChange={setPhone}
             className={fieldClass}
+            inputClassName="text-sm text-plum-950 placeholder:text-slate-500"
           />
         </div>
         <div>

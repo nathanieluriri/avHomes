@@ -7,6 +7,7 @@ import { BadgeCheck, UsersRound } from "lucide-react";
 import {
   DEAL_STATUS_LABEL,
   formatMoney,
+  formatPhone,
   payMonthLabel,
   type Deal,
   type LedgerLine,
@@ -306,7 +307,7 @@ function MarketerScreen({ initial }: { initial: MarketerDetail }) {
             <CardHead title="Profile" />
             <DefinitionList>
               <DRow label="Email">{marketer.email || "Not given"}</DRow>
-              <DRow label="Phone">{marketer.phone || "Not given"}</DRow>
+              <DRow label="Phone">{formatPhone(marketer.phone) || "Not given"}</DRow>
               <DRow label="State">{marketer.state || "Not given"}</DRow>
               <DRow label="Code">{marketer.code}</DRow>
               <DRow label="Console account">{marketer.isAdmin ? "Yes" : "No"}</DRow>

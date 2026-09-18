@@ -6,12 +6,14 @@ import {
   useId,
   useRef,
   useState,
+  type ComponentProps,
   type ComponentType,
   type CSSProperties,
   type ReactNode,
 } from "react";
 import { ChevronRight } from "lucide-react";
 import { ApiError } from "@/lib/admin/client";
+import { PhoneInput } from "@/components/PhoneInput";
 
 /**
  * The console's component set.
@@ -682,6 +684,28 @@ export function Field({
  */
 export const inputClass =
   "w-full rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-plum-950 outline-none transition-colors placeholder:text-slate-550 focus:border-wine-500";
+
+/**
+ * `inputClass` for a field that is not ONE control.
+ *
+ * The phone field holds a country picker and a number in the same frame, so the
+ * frame belongs to the wrapper and the input inside it is transparent. Same
+ * border, same radius, same padding and the same focus colour, reached through
+ * `focus-within` because the thing being focused is a child.
+ */
+export const inputWrapClass =
+  "w-full rounded-lg border border-mist-200 bg-white px-3 py-2 text-[13px] text-plum-950 transition-colors focus-within:border-wine-500";
+
+/** The console's phone field. One line, so no screen has to restate the frame. */
+export function PhoneField(props: Omit<ComponentProps<typeof PhoneInput>, "className" | "inputClassName">) {
+  return (
+    <PhoneInput
+      {...props}
+      className={inputWrapClass}
+      inputClassName="text-[13px] text-plum-950 placeholder:text-slate-550"
+    />
+  );
+}
 
 /** The in-row variant: a select sitting inside a table cell or a list row. */
 export const inputClassCompact =

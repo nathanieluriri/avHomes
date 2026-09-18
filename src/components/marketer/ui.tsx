@@ -6,12 +6,14 @@ import {
   useId,
   useRef,
   useState,
+  type ComponentProps,
   type CSSProperties,
   type ReactNode,
 } from "react";
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { DEAL_STATUS_LABEL, minorUnitsFor, type DealStatus } from "@avhomes/contracts";
 import { ApiError } from "@/lib/admin/client";
+import { PhoneInput } from "@/components/PhoneInput";
 import { useMediaQuery } from "@/lib/admin/hooks";
 import { isAppPath } from "@/lib/marketer/api";
 
@@ -434,6 +436,30 @@ export function Spin() {
  * make room for an icon with `pl-11`.
  */
 export const inputCls = "m-field w-full rounded-[14px] px-3.5 py-3 outline-none";
+
+/**
+ * The app's phone field: `inputCls` on the frame, the shared picker inside it.
+ *
+ * `m-field` already styles on `:focus-within`, so a composite in this frame
+ * lights up the same way a plain box does. The colours come from m.css rather
+ * than from the console's palette, which is the only difference between this
+ * and the console's own wrapper.
+ */
+export function PhoneField({
+  invalid = false,
+  ...props
+}: Omit<ComponentProps<typeof PhoneInput>, "className" | "inputClassName"> & {
+  /** Said with the same `m-bad` fill every other refused field in this app uses. */
+  invalid?: boolean;
+}) {
+  return (
+    <PhoneInput
+      {...props}
+      className={`${inputCls} flex ${invalid ? "m-bad" : ""}`}
+      inputClassName="text-m-text placeholder:text-m-faint"
+    />
+  );
+}
 
 /**
  * `as="group"` for a field whose control is not one input: a bank picker, a set

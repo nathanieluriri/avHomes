@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Phone, RefreshCw, Send } from "lucide-react";
-import { formatMoney, type Deal, type DealShare } from "@avhomes/contracts";
+import { formatMoney, formatPhone, type Deal, type DealShare } from "@avhomes/contracts";
 import { AppShell, useMarketer, useReportBlock } from "@/components/marketer/AppShell";
 import {
   DealStatusChip,
@@ -441,7 +441,7 @@ function Facts({ view }: { view: DealView }) {
       {mine && deal.buyerPhone !== "" && (
         <Fact label="Buyer phone">
           <a href={`tel:${deal.buyerPhone.replace(/\s/gu, "")}`} className="m-link m-num">
-            {deal.buyerPhone}
+            {formatPhone(deal.buyerPhone)}
           </a>
         </Fact>
       )}

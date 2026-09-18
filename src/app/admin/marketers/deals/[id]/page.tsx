@@ -9,6 +9,7 @@ import { Handshake, TriangleAlert } from "lucide-react";
 import {
   DEAL_STATUS_LABEL,
   formatMoney,
+  formatPhone,
   moneyRefusalMessage,
   parseMajor,
   plainMajor,
@@ -19,7 +20,8 @@ import {
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { dateTime, fullDate } from "@/lib/admin/format";
-import { DEAL_TONE, groupDigits, toApiError } from "@/lib/admin/marketing";
+import { DEAL_TONE, toApiError } from "@/lib/admin/marketing";
+import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import {
   Badge,
   Button,
@@ -139,7 +141,6 @@ function DealScreen({ initial }: { initial: DealDetail }) {
 
   function commitAmount() {
     const parsed = parseMajor(amountText, deal.currency);
-    if (parsed.ok && parsed.minor >= 1) setAmountText(groupDigits(plainMajor(parsed.minor, deal.currency)));
     if (!parsed.ok) {
       setAmountRefusal(moneyRefusalMessage(parsed.reason, deal.currency));
       return;
@@ -150,7 +151,8 @@ function DealScreen({ initial }: { initial: DealDetail }) {
     }
     setAmountRefusal(null);
     setAmountMinor(parsed.minor);
-    // Normalised, so "60,000,000" comes back as the number that will be sent.
+    // Normalised, so what is on screen is the number that will be sent. The
+    // grouping is `MoneyInput`'s job and happens as it is typed.
     setAmountText(plainMajor(parsed.minor, deal.currency));
   }
 
@@ -240,12 +242,13 @@ function DealScreen({ initial }: { initial: DealDetail }) {
               : "Correct it if the receipt says something else. The split below follows."
           }
         >
-          <input
-            className={inputClass}
-            inputMode="numeric"
+          {/* Grouped while it is typed, like every other amount in the console.
+              This one decides what several people are paid, and it read as an
+              unbroken run of eight digits. */}
+          <MoneyInput
             value={amountText}
             disabled={settled}
-            onChange={(event) => setAmountText(event.target.value)}
+            onChange={setAmountText}
             onBlur={commitAmount}
           />
         </Field>
@@ -428,7 +431,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
               {deal.listingLocation && <DRow label="Location">{deal.listingLocation}</DRow>}
               <DRow label="Kind">{deal.listingType === "rent" ? "Rental" : "Sale"}</DRow>
               <DRow label="Buyer">{deal.buyerName || "Not given"}</DRow>
-              <DRow label="Buyer phone">{deal.buyerPhone || "Not given"}</DRow>
+              <DRow label="Buyer phone">{formatPhone(deal.buyerPhone) || "Not given"}</DRow>
               <DRow label="Marketer">
                 <Link
                   href={`/admin/marketers/${deal.reporterId}`}

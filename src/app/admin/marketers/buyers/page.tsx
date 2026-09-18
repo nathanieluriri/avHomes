@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserRoundSearch } from "lucide-react";
 import {
   LEAD_STATE_LABEL,
+  formatPhone,
   leadWantLine,
   type Lead,
   type LeadState,
@@ -84,7 +85,7 @@ export default function BuyersPage() {
       header: "Buyer",
       primary: true,
       thumb: false,
-      render: (lead) => <IdCell title={lead.buyerName} meta={lead.buyerPhone} />,
+      render: (lead) => <IdCell title={lead.buyerName} meta={formatPhone(lead.buyerPhone)} />,
     },
     {
       key: "wants",

@@ -45,6 +45,7 @@ import {
   Segmented,
   Skeleton,
   Stepper,
+  PhoneField,
   inputCls,
 } from "@/components/marketer/ui";
 import { ApiError, api } from "@/lib/admin/client";
@@ -416,15 +417,16 @@ function DealFacts(props: FactsProps & { currency: string }) {
         />
       </Field>
 
-      <Field label="Buyer phone" hint="Helps the office confirm it. You can leave it out.">
-        <input
-          type="tel"
-          inputMode="tel"
+      <Field
+        label="Buyer phone"
+        hint="Helps the office confirm it. You can leave it out."
+        as="group"
+      >
+        <PhoneField
           value={props.buyerPhone}
-          onChange={(event) => props.setBuyerPhone(event.target.value)}
-          placeholder="0803 000 0000"
+          onChange={props.setBuyerPhone}
           autoComplete="off"
-          className={`m-num ${inputCls}`}
+          aria-label="Buyer phone"
         />
       </Field>
 

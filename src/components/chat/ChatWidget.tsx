@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ChevronRight, Loader2, MessageSquare, Send, X } from "lucide-react";
 import type { EnquiryThread } from "@avhomes/contracts";
+import { PhoneInput } from "@/components/PhoneInput";
 import { newThreadDraftKey, useChat } from "@/lib/chat/provider";
 import type { Identity, StoredThread } from "@/lib/chat/store";
 
@@ -364,7 +365,7 @@ function StartForm() {
           <Field label="Email" name="email" type="email" defaultValue={chat.identity?.email} />
           {/* Required here and optional on the contact form: a live conversation
               that goes quiet needs a second way back. */}
-          <Field label="Phone" name="phone" type="tel" defaultValue={chat.identity?.phone} />
+          <PhoneField label="Phone" name="phone" defaultValue={chat.identity?.phone} />
           <label className="block">
             <span className="block text-[12px] font-semibold text-plum-950">
               What would you like to know?
@@ -520,6 +521,40 @@ function Field({
         className="mt-1 w-full rounded-xl border border-mist-200 px-3 py-2 text-[13px] text-plum-950 outline-none transition-colors focus:border-wine-600"
       />
     </label>
+  );
+}
+
+/**
+ * The same field with a country picker in it.
+ *
+ * `defaultValue` rather than a value, to match the three boxes above it: this
+ * form is read through `FormData` on submit and holds no state of its own. The
+ * seed is whatever the visitor gave last time, which is already E.164 if they
+ * gave it here.
+ */
+function PhoneField({
+  label,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  defaultValue?: string;
+}) {
+  const [value, setValue] = useState(defaultValue ?? "");
+  return (
+    <div>
+      <span className="block text-[12px] font-semibold text-plum-950">{label}</span>
+      <PhoneInput
+        required
+        name={name}
+        value={value}
+        onChange={setValue}
+        aria-label={label}
+        className="mt-1 rounded-xl border border-mist-200 px-3 py-2 transition-colors focus-within:border-wine-600"
+        inputClassName="text-[13px] text-plum-950"
+      />
+    </div>
   );
 }
 

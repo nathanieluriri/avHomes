@@ -25,6 +25,7 @@ import {
   Note,
   PrimaryButton,
   Segmented,
+  PhoneField,
   inputCls,
 } from "@/components/marketer/ui";
 import { ApiError, api } from "@/lib/admin/client";
@@ -255,16 +256,15 @@ function Fields({
           label="Their phone number"
           hint="We call this number. Make sure they are expecting us."
           error={bad("buyerPhone") ? refusal!.message : ""}
+          as="group"
         >
-          <input
+          <PhoneField
             value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            type="tel"
-            inputMode="tel"
-            placeholder="0803 000 0000"
+            onChange={setPhone}
             autoComplete="off"
             aria-invalid={bad("buyerPhone") || undefined}
-            className={`${inputCls} ${bad("buyerPhone") ? "m-bad" : ""}`}
+            aria-label="Their phone number"
+            invalid={bad("buyerPhone")}
           />
         </Field>
 

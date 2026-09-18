@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { formatPhone } from "@avhomes/contracts";
 import { shortDate } from "@/lib/admin/format";
 import type { DealRowData } from "@/lib/marketer/api";
 import { Money, Skeleton, StatusPill } from "./ui";
@@ -83,7 +84,7 @@ export function DealRow({ deal }: { deal: DealRowData }) {
                 <>
                   {" "}
                   <a href={`tel:${deal.buyerPhone}`} className="m-num font-semibold text-wine-700">
-                    {deal.buyerPhone}
+                    {formatPhone(deal.buyerPhone)}
                   </a>
                 </>
               )}

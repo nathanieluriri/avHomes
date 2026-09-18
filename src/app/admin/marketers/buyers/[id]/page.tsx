@@ -12,6 +12,7 @@ import {
   LEAD_STATE_HINT,
   LEAD_STATE_LABEL,
   formatMoney,
+  formatPhone,
   isLeadOpen,
   leadWantLine,
   moneyRefusalMessage,
@@ -23,7 +24,8 @@ import {
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { dateTime } from "@/lib/admin/format";
-import { LEAD_TONE, groupDigits, toApiError } from "@/lib/admin/marketing";
+import { LEAD_TONE, toApiError } from "@/lib/admin/marketing";
+import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import {
   Badge,
   Button,
@@ -217,7 +219,7 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
             <DRow label="Phone">
               <a href={`tel:${lead.buyerPhone}`} className="inline-flex items-center gap-1.5 underline">
                 <Phone className="h-3.5 w-3.5" aria-hidden="true" />
-                {lead.buyerPhone}
+                {formatPhone(lead.buyerPhone)}
               </a>
             </DRow>
             <DRow label="Looking for">{leadWantLine(lead)}</DRow>
@@ -334,13 +336,11 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
                   "The commission is worked out from this. It creates an approved deal."
                 }
               >
-                <input
-                  value={amount}
-                  onChange={(event) => setAmount(groupDigits(event.target.value))}
-                  inputMode="decimal"
-                  placeholder="80,000,000"
-                  className={inputClass}
-                />
+                {/* The shared amount box: it groups as it is typed AND puts the
+                    caret back where it was, which grouping on its own does not.
+                    Editing the middle of a figure used to throw the cursor to
+                    the end on the keystroke that added a comma. */}
+                <MoneyInput value={amount} onChange={setAmount} placeholder="80,000,000" />
               </Field>
               {lead.listingId === null && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">

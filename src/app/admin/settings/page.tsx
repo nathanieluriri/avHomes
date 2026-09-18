@@ -25,6 +25,7 @@ import {
   IconButton,
   PageColumns,
   PageHeader,
+  PhoneField,
   Skeleton,
   inputClass,
 } from "@/components/admin/ui";
@@ -261,13 +262,14 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
               site with no phone number reads better than a site with a fake one.
             </p>
 
-            <Field label="Phone" hint="Shown on the contact page as a tap-to-call link.">
-              <input
-                className={inputClass}
-                inputMode="tel"
+            <Field
+              label="Phone"
+              hint="Shown on the contact page as a tap-to-call link."
+              as="group"
+            >
+              <PhoneField
                 value={draft.contactPhone}
-                placeholder="+234 801 234 5678"
-                onChange={(event) => set("contactPhone", event.target.value)}
+                onChange={(next) => set("contactPhone", next)}
               />
             </Field>
 
@@ -281,16 +283,17 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
               />
             </Field>
 
+            {/* `wa.me` wants bare digits and the field speaks E.164, so the
+                plus is dropped on the way in and put back on the way out.
+                Picking the country is the same act here as anywhere else. */}
             <Field
               label="WhatsApp"
-              hint="Country code first. Most property conversations here start on WhatsApp."
+              hint="Most property conversations here start on WhatsApp."
+              as="group"
             >
-              <input
-                className={inputClass}
-                inputMode="tel"
-                value={draft.whatsappNumber}
-                placeholder="2348012345678"
-                onChange={(event) => set("whatsappNumber", toWhatsappDigits(event.target.value))}
+              <PhoneField
+                value={draft.whatsappNumber === "" ? "" : `+${toWhatsappDigits(draft.whatsappNumber)}`}
+                onChange={(next) => set("whatsappNumber", toWhatsappDigits(next))}
               />
             </Field>
           </Card>

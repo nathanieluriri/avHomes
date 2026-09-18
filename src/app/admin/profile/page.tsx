@@ -16,6 +16,7 @@ import {
   Field,
   PageColumns,
   PageHeader,
+  PhoneField,
   Skeleton,
   inputClass,
 } from "@/components/admin/ui";
@@ -226,18 +227,18 @@ function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () =>
                 onChange={(event) => set("title", event.target.value)}
               />
             </Field>
-            <Field label="Phone" hint="Shown on listings you own. Never shown in a chat.">
-              {/* `tel` on both counts. The value is digits, a plus and spaces,
-                  so the alphabetic keyboard is slower and a source of typos in a
-                  number that goes out on public listings, and the autofill token
-                  lets a phone offer the one the account already knows. */}
-              <input
-                className={inputClass}
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
+            {/* `as="group"`: the country picker and the number are two controls
+                in one frame, and a <label> wrapping both sends every tap on its
+                own padding to whichever it finds first. */}
+            <Field
+              label="Phone"
+              hint="Shown on listings you own. Never shown in a chat."
+              as="group"
+            >
+              <PhoneField
+                autoComplete="tel-national"
                 value={draft.phone}
-                onChange={(event) => set("phone", event.target.value)}
+                onChange={(next) => set("phone", next)}
               />
             </Field>
           </Card>
