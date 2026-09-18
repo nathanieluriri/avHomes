@@ -41,6 +41,16 @@
   --m-bad-fg: #ff9a9a;
   --m-bad-bg: #3f1519;
 
+  /* Money has a DIRECTION, and it is not the same axis as a status.
+     --m-good-fg colours "Approved"; these colour an amount. Sharing one token
+     means the day somebody retunes the approved green they silently retune
+     every credit in the app. Never the only signal: an amount also carries a
+     sign, and its row carries the words Money In or Money Out. */
+  --m-in-fg: #5fd3a3;
+  --m-in-bg: #102c22;
+  --m-out-fg: #ff8a8a;
+  --m-out-bg: #3a1417;
+
   --m-sheet: #1f1216;
   --m-track: #0e0709;
   --m-thumb: #36232a;
@@ -49,7 +59,10 @@
   --m-skel-hi: rgb(255 255 255 / 0.07);
   /* A dark card's edge is light, not shadow: a hairline and a lit top lip. */
   --m-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.05), inset 0 0 0 1px rgb(255 255 255 / 0.04);
-  --m-drop: 0 18px 36px -26px rgb(0 0 0 / 0.95);
+  /* Flat app: nothing casts. A dark surface is told apart by its fill and its
+     hairline, never by a blur underneath it. Kept as a no-op rather than
+     deleted so no rule that names it silently becomes invalid. */
+  --m-drop: 0 0 0 0 transparent;
 
   --m-tab-h: 3rem;
   --m-sheet-r: 1.75rem;
@@ -80,14 +93,19 @@
   --m-bad-fg: #991b1b;
   --m-bad-bg: #fee2e2;
 
+  --m-in-fg: #047857;
+  --m-in-bg: #ecfdf5;
+  --m-out-fg: #b91c1c;
+  --m-out-bg: #fef2f2;
+
   --m-sheet: #ffffff;
   --m-track: #f1f5f9;
   --m-thumb: #ffffff;
   --m-press: #fbf4f6;
   --m-skel: #f1f5f9;
   --m-skel-hi: rgb(255 255 255 / 0.85);
-  --m-edge: 0 0 0 1px rgb(44 27 31 / 0.05), 0 1px 2px 0 rgb(44 27 31 / 0.05);
-  --m-drop: 0 8px 24px -20px rgb(44 27 31 / 0.5);
+  --m-edge: 0 0 0 1px rgb(44 27 31 / 0.08);
+  --m-drop: 0 0 0 0 transparent;
 
   color-scheme: light;
 }
@@ -147,8 +165,20 @@ html:has(.m-app) > body {
     --m-lift: var(--m-tab-h);
   }
 
+  /* The orb stands 1.63rem out of the bar (31% of 5.25rem) and carries a 5px
+     socket ring on top of that, so 2rem left about five device pixels between
+     it and the last card. Descenders on the final line of text were touching
+     the glass. */
   .m-shell--nav {
-    --m-reserve: calc(var(--m-bar-h) + var(--safe-b) + 2rem);
+    --m-reserve: calc(var(--m-bar-h) + var(--safe-b) + 3.25rem);
+  }
+
+  /* A form's pinned controls cover the foot of the body exactly like the nav
+     does, and nothing was reserving for them: the last card on a long form was
+     sliced in half and could not be scrolled into view at all. The bar is
+     0.75rem + a 44px control + 0.75rem, plus a gap. */
+  .m-shell--bar {
+    --m-reserve: calc(5.5rem + var(--safe-b));
   }
 
   /* ═══ HERO ═══════════════════════════════════════════════════════════════
@@ -239,7 +269,6 @@ html:has(.m-app) > body {
     background:
       radial-gradient(60% 140% at 100% 0%, rgb(255 72 132 / 0.26) 0%, transparent 70%),
       linear-gradient(162deg, #5a1024 0%, #7a1631 100%);
-    box-shadow: 0 10px 22px -16px rgb(0 0 0 / 0.95);
     pointer-events: none;
     opacity: 0;
     transition: opacity 160ms ease;
@@ -261,7 +290,9 @@ html:has(.m-app) > body {
     background:
       radial-gradient(60% 140% at 100% 0%, rgb(255 72 132 / 0.26) 0%, transparent 70%),
       linear-gradient(162deg, #5a1024 0%, #7a1631 100%);
-    box-shadow: 0 12px 26px -18px rgb(0 0 0 / 0.95);
+    /* A hairline, not a blur: the bar is fixed over scrolling content and still
+       has to end somewhere visible. */
+    box-shadow: inset 0 -1px 0 0 rgb(255 255 255 / 0.1);
     opacity: 0;
     transform: translateY(-100%);
     visibility: hidden;
@@ -377,9 +408,7 @@ html:has(.m-app) > body {
     padding-bottom: var(--safe-b);
     border-radius: 1.625rem 1.625rem 0 0;
     background: linear-gradient(180deg, #2b1a1f 0%, #1c1014 100%);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.08),
-      0 -18px 40px -18px rgb(0 0 0 / 0.9);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.08);
   }
 
   .m-nav__row {
@@ -421,7 +450,6 @@ html:has(.m-app) > body {
 
   .m-nav__item[data-on="true"] svg {
     color: #ff9db3;
-    filter: drop-shadow(0 0 7px rgb(255 110 150 / 0.55));
   }
 
   /* The orb stands out of the bar: centred in the row, then lifted until the
@@ -451,9 +479,7 @@ html:has(.m-app) > body {
     z-index: -1;
     inset: 12.5%;
     border-radius: 999px;
-    box-shadow:
-      0 0 0 5px #2a191e,
-      0 12px 32px 0 rgb(212 79 117 / 0.62);
+    box-shadow: 0 0 0 5px #2a191e;
   }
 
   .m-orb:active {
@@ -466,9 +492,7 @@ html:has(.m-app) > body {
   }
 
   .m-orb--locked::before {
-    box-shadow:
-      0 0 0 5px #2a191e,
-      0 10px 24px 0 rgb(0 0 0 / 0.55);
+    box-shadow: 0 0 0 5px #2a191e;
   }
 
   .m-orb__lock {
@@ -477,7 +501,6 @@ html:has(.m-app) > body {
     display: grid;
     place-items: center;
     color: #ffffff;
-    filter: drop-shadow(0 1px 2px rgb(20 2 8 / 0.6));
   }
 
   /* The ambient sheen: a band of light crosses the glass every few seconds. */
@@ -529,9 +552,7 @@ html:has(.m-app) > body {
     padding: 0.5rem 0.625rem calc(var(--safe-b) + 0.625rem);
     border-radius: 2rem 2rem 0 0;
     background: linear-gradient(180deg, #27171c 0%, #1b0f13 100%);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.09),
-      0 -24px 60px -24px rgb(0 0 0 / 0.95);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.09);
     animation: m-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
@@ -599,11 +620,12 @@ html:has(.m-app) > body {
     background:
       radial-gradient(70% 45% at 50% 100%, rgb(194 74 107 / 0.2) 0%, transparent 100%),
       radial-gradient(circle at 50% 26%, #3a2630 0%, #23151b 58%, #180d11 100%);
+    /* The insets stay: they are the dish the 3D icon sits in, which is form
+       rather than decoration. What goes is the drop underneath it. */
     box-shadow:
       inset 0 1.5px 0 0 rgb(255 255 255 / 0.12),
       inset 0 -10px 18px -8px rgb(0 0 0 / 0.5),
-      0 0 0 1px rgb(255 255 255 / 0.03),
-      0 12px 22px -14px rgb(0 0 0 / 1);
+      0 0 0 1px rgb(255 255 255 / 0.03);
     transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease;
   }
 
@@ -619,8 +641,7 @@ html:has(.m-app) > body {
   .m-menu__item[aria-current="page"] .m-menu__dot {
     box-shadow:
       inset 0 0 0 2px rgb(255 143 163 / 0.75),
-      inset 0 -10px 18px -6px rgb(0 0 0 / 0.55),
-      0 0 22px -6px rgb(255 110 150 / 0.5);
+      inset 0 -10px 18px -6px rgb(0 0 0 / 0.55);
   }
 
   .m-menu__label {
@@ -671,8 +692,7 @@ html:has(.m-app) > body {
     box-shadow:
       inset 0 1px 0 0 rgb(255 255 255 / 0.22),
       inset 0 -6px 12px -4px rgb(20 2 8 / 0.5),
-      0 0 0 5px #1d1115,
-      0 10px 26px -6px rgb(194 74 107 / 0.45);
+      0 0 0 5px #1d1115;
     animation: m-turn-in 240ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
     transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -771,14 +791,39 @@ html:has(.m-app) > body {
   .m-card {
     border-radius: 1.25rem;
     background: var(--m-card);
-    box-shadow: var(--m-edge), var(--m-drop);
+    box-shadow: var(--m-edge);
   }
 
   .m-card--lg {
     border-radius: 1.5rem;
   }
 
-  /* ═══ BUTTONS ════════════════════════════════════════════════════════════ */
+  /* ═══ BUTTONS ════════════════════════════════════════════════════════════
+     The console's key, rendered for a dark ground.
+
+     The console draws a button as a physical key: a dark hairline under a light
+     one, three stacked inset shadows that no border can say, because a border
+     is the same on all four sides and the whole effect is an edge lit from
+     above. That construction is the thing worth having, and it is what this
+     app took. The console's FILLS are not, and copying them was the mistake:
+     its ghost is white because its ground is mist, and a white plate on near
+     black plum is not the same button, it is a lamp.
+
+     console.css already says this about its one dark surface, where a disabled
+     grey plate had to be swapped for a translucent white because grey on plum
+     came out BRIGHTER than the wine it was replacing. The same reading applies
+     to every key here.
+
+     So the bevel inverts and nothing else does. The lit lip moves to the top
+     and becomes white at 14%; the dark mass moves under the bottom edge; the
+     fill is the app's own raised plum, a step up from the card it sits on. The
+     press is still the bevel turning over, and the disabled plate is still
+     flat, one grey for every variant, because a raised edge on a control that
+     will not answer is a lie in the one state that has to be plain.
+
+     THE WINE KEY IS THE CONSOLE'S, UNCHANGED, down to the shadow alphas. A
+     saturated fill takes the same bevel on any ground, which is what the
+     console's own comment on `.c-bevel-primary` predicted. */
   .m-btn {
     position: relative;
     display: inline-flex;
@@ -789,96 +834,145 @@ html:has(.m-app) > body {
     font-weight: 600;
     white-space: nowrap;
     user-select: none;
+    background-clip: padding-box;
     transition:
-      transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
       background-color 140ms ease,
       box-shadow 140ms ease,
-      filter 140ms ease;
+      color 140ms ease;
   }
 
-  .m-btn:active {
-    transform: scale(0.97);
-  }
+  /* The dark ground's bevel: light on top, dark underneath, the console's three
+     shadows with the lamp moved to the other side.
 
-  .m-btn:disabled,
-  .m-btn[aria-disabled="true"] {
-    pointer-events: none;
-    background: var(--m-raised);
-    color: var(--m-faint);
-    box-shadow: none;
-    text-shadow: none;
-    filter: none;
-  }
-
-  /* Wine glass: a lit top lip, a darker foot, and a press that sinks. */
-  .m-btn--primary {
-    color: #ffffff;
-    background: linear-gradient(180deg, #c24a6b 0%, #8a2342 100%);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 214 226 / 0.45),
-      inset 0 -1px 0 0 rgb(45 6 18 / 0.4),
-      0 10px 22px -12px rgb(194 74 107 / 0.8);
-    text-shadow: 0 1px 0 rgb(70 12 30 / 0.35);
-  }
-
-  .m-btn--primary:active {
-    transform: translateY(1px) scale(0.985);
-    background: linear-gradient(180deg, #a83c5b 0%, #761c38 100%);
-    box-shadow:
-      inset 0 2px 7px 0 rgb(40 5 16 / 0.5),
-      0 4px 10px -8px rgb(194 74 107 / 0.6);
-  }
-
-  .m-btn--secondary {
-    color: var(--m-text);
-    background: var(--m-raised);
-    box-shadow:
-      inset 0 0 0 1px var(--m-line),
-      inset 0 1px 0 0 rgb(255 255 255 / 0.04);
-  }
-
-  .m-btn--secondary:active {
-    background: var(--m-line);
-  }
-
-  .m-paper .m-btn--secondary {
-    background: #ffffff;
-  }
-
-  .m-paper .m-btn--secondary:active {
-    background: var(--m-press);
-  }
-
+     THE GLARE IS THE ONE THING THE CONSOLE DOES NOT HAVE AND THIS GROUND NEEDS,
+     and it is the difference between a live key and a dead one. On mist, a
+     white plate IS the lit face and the hairlines only draw its edge. On plum
+     there is no lit face for them to draw around, so the button has to catch
+     the light itself, the way the report orb does: bright across the top, gone
+     by the middle, and a faint bounce off the bottom lip. Without it a raised
+     plum plate and the flat plate below read as the same control, which is
+     exactly the thing a disabled state is supposed to be alone in saying. */
+  .m-btn--secondary,
+  .m-btn--danger,
   .m-btn--quiet {
-    color: var(--m-act-fg);
-    background: var(--m-act-bg);
+    background-image: linear-gradient(
+      rgb(255 255 255 / 0.17) 0%,
+      rgb(255 255 255 / 0.06) 44%,
+      rgb(255 255 255 / 0) 64%,
+      rgb(255 255 255 / 0.04) 100%
+    );
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.2) inset,
+      0 0 0 1px rgb(255 255 255 / 0.1) inset,
+      0 -1px 0 1px rgb(0 0 0 / 0.55) inset;
   }
 
-  .m-btn--quiet:active {
-    filter: brightness(1.18);
+  /* Over a saturated fill the ring is the fill's own shadow rather than a
+     named colour, so one bevel serves the wine, the green and any later one. */
+  .m-btn--primary,
+  .m-btn--whatsapp {
+    color: #ffffff;
+    box-shadow:
+      0 -1px 0 1px rgb(6 20 48 / 0.3) inset,
+      0 0 0 1px rgb(6 20 48 / 0.42) inset,
+      0 0.5px 0 1.5px rgb(255 255 255 / 0.3) inset;
   }
 
-  .m-paper .m-btn--quiet:active {
-    filter: brightness(0.96);
+  /* One pressed face for every variant, as the console has it: the lit lip goes
+     out, the shadow moves inside the top edge, and the key sits in its own
+     well. It replaces the old scale(0.97), so nothing here moves any more. The
+     tint is the console's navy rather than black, because a black well on the
+     wine reads as a hole and on the plum reads as nothing.
+
+     `.m-glass` is exempt: the hero tier is flat by design, and a well cut into
+     it would give the header's quietest control the loudest press. */
+  .m-btn:not(.m-glass):active:not(:disabled) {
+    background-image: none;
+    box-shadow:
+      0 2px 3px 0 rgb(6 20 48 / 0.45) inset,
+      0 0 0 1px rgb(6 20 48 / 0.4) inset;
   }
 
-  .m-btn--danger {
-    color: var(--m-bad-fg);
-    background: transparent;
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--m-bad-fg) 38%, transparent);
+  /* HOVER IS GATED ON A REAL POINTER, which the console does not have to do
+     and this app does. A bare :hover on a touchscreen sticks after the tap
+     that opened the next screen, so the button left behind stays lit until
+     something else is touched. */
+  @media (hover: hover) {
+    .m-btn:hover:not(:disabled) {
+      background-color: var(--m-btn-hover);
+    }
   }
 
-  .m-btn--danger:active {
-    background: var(--m-bad-bg);
+  .m-btn--primary {
+    --m-btn-hover: var(--wine-700);
+    background: var(--wine-600);
   }
 
   .m-btn--whatsapp {
-    color: #ffffff;
+    --m-btn-hover: #047857;
     background: #059669;
   }
 
-  .m-btn--whatsapp:active {
-    background: #047857;
+  /* The second tier is a step up from the card, not a hole in it: raised plum
+     on a plum card, separated by the lip rather than by brightness. */
+  .m-btn--secondary {
+    --m-btn-hover: var(--m-line);
+    background-color: var(--m-raised);
+    color: var(--m-text);
+  }
+
+  /* The console's danger: the ordinary key with a red label, not a red button.
+     The red fill is reserved for the second press of a confirm, and nothing in
+     this app arms one yet. */
+  .m-btn--danger {
+    --m-btn-hover: var(--m-bad-bg);
+    background-color: var(--m-raised);
+    color: var(--m-bad-fg);
+  }
+
+  /* The third tier, and the console's own accent pair read for this ground: a
+     wine wash under wine-pink text, for an action that is real but is not the
+     one the screen is for. It keeps the same bevel, so it is the same key in a
+     quieter colour rather than a different kind of control. */
+  .m-btn--quiet {
+    --m-btn-hover: var(--m-heads-bg);
+    background-color: var(--m-act-bg);
+    color: var(--m-act-fg);
+  }
+
+  /* ═══ THE PAPER SCREENS ══════════════════════════════════════════════════
+     A screen drawn in `.m-paper` has the console's ground, so it gets the
+     console's key back, byte for byte: white plate, plum label, the dark
+     hairline under the light one, mist on hover. */
+  .m-paper .m-btn--secondary,
+  .m-paper .m-btn--danger {
+    --m-btn-hover: var(--mist-50);
+    background-color: #ffffff;
+    background-image: none;
+    box-shadow:
+      0 -1px 0 0 rgb(11 36 83 / 0.16) inset,
+      0 0 0 1px rgb(11 36 83 / 0.13) inset,
+      0 0.5px 0 1.5px #ffffff inset;
+  }
+
+  .m-paper .m-btn--secondary {
+    color: var(--plum-950);
+  }
+
+  .m-paper .m-btn--danger {
+    --m-btn-hover: #fef2f2;
+    color: #b91c1c;
+  }
+
+  .m-paper .m-btn--quiet {
+    --m-btn-hover: var(--wine-100);
+    background-color: var(--wine-50);
+    background-image: none;
+    color: var(--wine-700);
+    box-shadow:
+      0 -1px 0 0 rgb(11 36 83 / 0.16) inset,
+      0 0 0 1px rgb(11 36 83 / 0.13) inset,
+      0 0.5px 0 1.5px #ffffff inset;
   }
 
   /* ═══ FIELDS ═════════════════════════════════════════════════════════════ */
@@ -1089,16 +1183,12 @@ html:has(.m-app) > body {
     transform: translateX(calc(var(--m-seg-index) * 100%));
     border-radius: 999px;
     background: var(--m-thumb);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.07),
-      0 1px 3px 0 rgb(0 0 0 / 0.35);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.07);
     transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .m-paper .m-seg__ind {
-    box-shadow:
-      0 0 0 1px rgb(44 27 31 / 0.05),
-      0 1px 3px 0 rgb(44 27 31 / 0.16);
+    box-shadow: 0 0 0 1px rgb(44 27 31 / 0.12);
   }
 
   /* `min-width: 0` plus the clip keep a long label inside its third. */
@@ -1208,9 +1298,7 @@ html:has(.m-app) > body {
     border-radius: 1.75rem 1.75rem 0 0;
     background: var(--m-sheet);
     color: var(--m-text);
-    box-shadow:
-      inset 0 1px 0 0 rgb(255 255 255 / 0.07),
-      0 -20px 50px -20px rgb(0 0 0 / 0.85);
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.07);
     animation: m-rise 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
@@ -1331,9 +1419,7 @@ html:has(.m-app) > body {
     border-radius: 1.375rem;
     color: #ffffff;
     background: var(--m-card);
-    box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.07),
-      0 18px 30px -24px rgb(0 0 0 / 1);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
   }
 
   /* Dark from the left, where the words are, so the photo still shows on the
@@ -1377,7 +1463,6 @@ html:has(.m-app) > body {
     top: 0.625rem;
     right: 0.625rem;
     z-index: -1;
-    filter: drop-shadow(0 12px 16px rgb(0 0 0 / 0.35));
   }
 
   .m-update__cta {
@@ -1390,13 +1475,41 @@ html:has(.m-app) > body {
     border-radius: 999px;
     background: #ffffff;
     color: #7a2140;
-    box-shadow: 0 8px 16px -10px rgb(0 0 0 / 0.7);
     font-size: 12.5px;
     font-weight: 700;
   }
 
   .m-update--empty {
     min-height: 7.25rem;
+  }
+
+  /* ═══ SUCCESS BURST ══════════════════════════════════════════════════════
+     The badge lands before the confetti leaves it, so the burst reads as
+     caused by the mark rather than as decoration that happens to be nearby.
+     The overshoot is what makes it feel struck rather than faded in. */
+  .m-burst {
+    position: relative;
+    display: block;
+    animation: m-burst-in 380ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  }
+
+  /* Reduced motion gets the mark with no growth and no particles at all. */
+  .m-burst--still {
+    animation: none;
+  }
+
+  @keyframes m-burst-in {
+    0% {
+      transform: scale(0.2);
+      opacity: 0;
+    }
+    60% {
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 
   /* ═══ ALERT CARDS ════════════════════════════════════════════════════════ */
@@ -1411,7 +1524,7 @@ html:has(.m-app) > body {
     padding: 0.75rem 0.875rem 0.875rem 1rem;
     border-radius: 1.375rem;
     background: var(--m-card);
-    box-shadow: var(--m-edge), var(--m-drop);
+    box-shadow: var(--m-edge);
   }
 
   /* ═══ WIDE SCREENS ═══════════════════════════════════════════════════════
@@ -1422,7 +1535,7 @@ html:has(.m-app) > body {
       width: 100%;
       max-width: 30rem;
       margin-inline: auto;
-      box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 40px 90px -40px rgb(0 0 0 / 0.9);
+      box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
     }
 
     .m-nav,
@@ -1446,6 +1559,39 @@ html:has(.m-app) > body {
   }
 }
 
+/* ═══ DISABLED ═════════════════════════════════════════════════════════════════
+   A DISABLED BUTTON IS FLAT: no glare, no edge, no lift, no press, one plate
+   for every variant. The console's rule and the console's reasoning, which is that a
+   raised edge on a control that will not answer is a lie told in the one state
+   where the interface most needs to be plain, and that three greyed variants
+   are three chances to read one of them as still live.
+
+   The plate is `--m-raised`, so it is the console's own `--mist-100` on a
+   paper screen and a dead plum plate on the dark one. The console's grey would
+   have been the brightest thing on a dark screen, which is the failure mode
+   console.css already names on its own dark save bar.
+
+   THE LABEL DROPS TO 18% of the screen's own text colour, which is below the
+   contrast floor on purpose and is the one place in the app where that is
+   right: this is not text anybody has to read, it is the shape of a word
+   saying which control is out of service. Anything comfortable to read is
+   legible enough to look live.
+
+   IT IS UNLAYERED, and that is the same cascade fact the rest of this file
+   turns on: the button rules above sit in `components`, below Tailwind's
+   utilities, so a call site passing `bg-*` or `text-*` beats them. Here that
+   would light a dead control up. Unlayered, nothing can. */
+.m-btn:disabled,
+.m-btn[aria-disabled="true"] {
+  pointer-events: none;
+  background-color: var(--m-raised);
+  background-image: none;
+  color: color-mix(in oklab, var(--m-text) 18%, transparent);
+  box-shadow: none;
+  text-shadow: none;
+  filter: none;
+}
+
 /* ═══ REDUCED MOTION ═════════════════════════════════════════════════════════
    Every animation here decorates a screen that is already correct without it,
    so all of it goes, delays included: a staggered item that keeps its delay
@@ -1467,8 +1613,6 @@ html:has(.m-app) > body {
   }
 
   .m-press:active,
-  .m-btn:active,
-  .m-btn--primary:active,
   .m-orb:active,
   .m-menu__item:active .m-menu__dot,
   .m-menu__close:active {

@@ -35,7 +35,11 @@ import {
   type AppEnv,
 } from "@avhomes/core";
 import {
+  ACCOUNT_PROVIDERS,
   DEAL_KINDS,
+  LEAD_STATES,
+  LEAD_NOTE_MAX,
+  LEAD_NOTE_MIN,
   MARKETER_STATUSES,
   MARKETING_UPDATE_STATUSES,
   MARKETING_UPDATE_TONES,
@@ -49,7 +53,10 @@ import {
   previewEarning,
   ratesRefusal,
   updateRefusal,
+  leadRefusal,
+  namesMatch,
   type Deal,
+  type Lead,
   type Marketer,
   type MarketerBank,
   type MarketingSettings,
@@ -68,8 +75,24 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "@avhomes/identity";
-import { listBanks, paystackConfigured, resolveAccount } from "./bank";
-import { readMarketingSettings, writeMarketingSettings } from "./settings";
+import { listBanks, providerState, resolveAccount } from "./bank";
+import {
+  createLead,
+  getLead,
+  getLeadFor,
+  leadCounts,
+  listLeads,
+  moveLead,
+  noteOnLead,
+  winLead,
+  withShares,
+} from "./leads";
+import {
+  paystackKeySaved,
+  readMarketingSettings,
+  writeMarketingSettings,
+  writePaystackKey,
+} from "./settings";
 import { toMarketingUpdate } from "./schema";
 import {
   alertsFor,
@@ -111,6 +134,7 @@ import {
   reviewDeal,
   saveUpdate,
   setMarketerStatus,
+  statementFor,
   teamFor,
   updateMarketerBank,
   updateMarketerProfile,
@@ -249,6 +273,70 @@ function assertUpdate(update: Parameters<typeof updateRefusal>[0]): void {
   if (refusal) throw new BadRequestError(refusal.message, [refusal]);
 }
 
+/* Trimmed before the length check, so a note of spaces is not four characters. */
+const MoveBody = z
+  .object({
+    to: z.enum(LEAD_STATES),
+    reason: str().trim().max(120),
+    note: str().trim().min(LEAD_NOTE_MIN).max(LEAD_NOTE_MAX),
+  })
+  .strict();
+
+const LeadNoteBody = z
+  .object({ note: str().trim().min(LEAD_NOTE_MIN).max(LEAD_NOTE_MAX) })
+  .strict();
+
+const LeadBody = z
+  .object({
+    buyerName: str().trim().min(2).max(160),
+    buyerPhone: str().trim().min(7).max(40),
+    listingId: str().max(64).nullable().default(null),
+    listingTitle: str().max(300).default(""),
+    /* Which options inside an estate. Snapshotted by the client from the
+       listing it just read, and capped: an estate is twenty prototypes at the
+       very most (PROTOTYPES_MAX), so a body claiming more is not a real buyer. */
+    wantUnits: z
+      .array(
+        z
+          .object({
+            key: str().max(64),
+            name: str().max(160),
+            priceMinor: z.number().int().min(0).default(0),
+          })
+          .strict(),
+      )
+      .max(20)
+      .default([]),
+    wantKind: z.enum(DEAL_KINDS).nullable().default(null),
+    wantArea: str().trim().max(160).default(""),
+    wantBudgetMinor: z.number().int().min(0).default(0),
+    brief: str().trim().max(600).default(""),
+  })
+  .strict();
+
+const WinBody = z
+  .object({
+    listingId: str().max(64),
+    listingTitle: str().max(300),
+    listingLocation: str().max(200).default(""),
+    listingEstate: str().max(200).default(""),
+    listingType: z.enum(DEAL_KINDS),
+    unitKey: str().max(80).default(""),
+    amountMinor: z.number().int().min(1),
+    closedOn: z.number().int().min(0).default(0),
+    reason: str().trim().max(120),
+    note: str().trim().min(LEAD_NOTE_MIN).max(LEAD_NOTE_MAX),
+  })
+  .strict();
+
+const LeadQuery = z
+  .object({
+    state: z.enum(LEAD_STATES).optional(),
+    q: str().trim().max(120).default(""),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+  })
+  .strict();
+
 const SettingsBody = z
   .object({
     saleRates: z.array(z.number()).length(3).optional(),
@@ -261,6 +349,11 @@ const SettingsBody = z
     blockSelfDeals: z.boolean().optional(),
     minPayoutMinor: z.number().int().min(0).optional(),
     supportPhone: str().max(40).optional(),
+    accountProvider: z.enum(ACCOUNT_PROVIDERS).optional(),
+    /* The key is write-only. Absent leaves what is saved alone, because the
+       form posts every field on every save and can never prefill this one.
+       null is how an admin clears it deliberately. */
+    paystackKey: str().max(200).nullable().optional(),
   })
   .strict();
 
@@ -279,7 +372,7 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
       open: settings.joinOpen,
       supportPhone: settings.supportPhone,
       rates: settings.saleRates,
-      bankCheck: paystackConfigured(),
+      bankCheck: (await providerState(db)).ready,
       referrer:
         referrer && referrer.status === "active"
           ? { code: referrer.code, displayName: referrer.displayName }
@@ -288,9 +381,12 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
   });
 
   routes.get("/public/marketing/banks", async (c) => {
-    const banks = await listBanks();
-    c.header("cache-control", "public, max-age=3600");
-    return c.json({ banks, checked: paystackConfigured() });
+    const db = await currentDb(c);
+    const banks = await listBanks(db);
+    /* Private, not public: the list now depends on which provider this site has
+       chosen, so a shared cache could hand one site another's codes. */
+    c.header("cache-control", "private, max-age=3600");
+    return c.json({ banks, checked: (await providerState(db)).ready });
   });
 
   /** The name on an account, so nobody signs up with a typo for a bank account. */
@@ -303,7 +399,7 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
     }
     const db = await currentDb(c);
     await limit(db, `bankcheck:${clientIp(c)}`, 20, JOIN_WINDOW_MS);
-    const resolved = await resolveAccount(body.accountNumber, body.bankCode);
+    const resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
     return c.json({ accountName: resolved?.accountName ?? "", checked: resolved !== null });
   });
 
@@ -342,7 +438,7 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
           { path: "bank.accountNumber", message: "an account number is ten digits" },
         ]);
       }
-      const resolved = await resolveAccount(body.bank.accountNumber, body.bank.bankCode);
+      const resolved = await resolveAccount(db, body.bank.accountNumber, body.bank.bankCode);
       bank = {
         bankCode: body.bank.bankCode,
         bankName: body.bank.bankName,
@@ -494,7 +590,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const db = await currentDb(c);
     const marketer = await currentMarketer(db, c);
     const settings = await readMarketingSettings(db);
-    const bankCheck = paystackConfigured();
+    const bankCheck = (await providerState(db)).ready;
     const [balance, team, alerts] = await Promise.all([
       balanceFor(db, marketer.id, settings.currency),
       teamFor(db, marketer.id),
@@ -519,7 +615,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const marketer = await currentMarketer(db, c);
     const settings = await readMarketingSettings(db);
     return c.json({
-      items: await alertsFor(db, marketer, settings, { bankCheck: paystackConfigured() }),
+      items: await alertsFor(db, marketer, settings, { bankCheck: (await providerState(db)).ready }),
     });
   });
 
@@ -570,7 +666,24 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         { path: "accountNumber", message: "an account number is ten digits" },
       ]);
     }
-    const resolved = await resolveAccount(body.accountNumber, body.bankCode);
+    /*
+     * A check that found nothing is an ANSWER and has to reach the screen.
+     *
+     * Saving succeeds either way, on purpose: refusing to store an account over
+     * a failed name check would lock somebody out of being paid. But the caller
+     * gets `checked` back, because the bug this replaces was a button that spun,
+     * returned 200, and left the card reading "Not checked" with nothing said.
+     */
+    let resolved: { accountName: string; verifiedAt: number } | null = null;
+    let reachable = true;
+    try {
+      resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
+    } catch {
+      // The provider is down or refused. Different from "no such account", and
+      // the marketer must not be told their own details are wrong.
+      reachable = false;
+    }
+
     const bank: MarketerBank = {
       bankCode: body.bankCode,
       bankName: body.bankName,
@@ -589,7 +702,15 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         actorName: marketer.displayName,
       });
     }
-    return c.json({ marketer: after });
+    return c.json({
+      marketer: after,
+      checked: resolved !== null,
+      detail: resolved
+        ? ""
+        : reachable
+          ? "That number and bank did not match any account. Check both and try again."
+          : "The bank check is not answering right now. Your account is saved; try again shortly.",
+    });
   });
 
   routes.get("/marketing/team", requireAuth(), async (c) => {
@@ -700,6 +821,112 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     return c.json(dealView(deal, marketer.id));
   });
 
+  /* ═══ BUYERS ════════════════════════════════════════════════════════════ */
+
+  /** One lead, with this marketer's share on it. Same shape the list returns. */
+  async function one(db: Db, lead: Lead, marketerId: string) {
+    const [row] = await withShares(db, [lead], marketerId);
+    return row;
+  }
+
+  /** Everyone this marketer handed over, newest movement first. */
+  routes.get("/marketing/leads", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const page = await listLeads(db, { reporterId: marketer.id, limit: 100 });
+    const items = await withShares(db, page.items, marketer.id);
+    return c.json({ items, total: page.total });
+  });
+
+  routes.post("/marketing/leads", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    assertActive(marketer);
+    const body = await readJson(c, LeadBody);
+    const refusal = leadRefusal(body);
+    if (refusal) throw new BadRequestError(refusal.message, [refusal]);
+
+    const settings = await readMarketingSettings(db);
+    const lead = await createLead(db, marketer, body, settings);
+    auditEntityId(c, lead.id);
+
+    if (deps.notify) {
+      await deps.notify(db, {
+        kind: "marketing-deal",
+        title: `${marketer.displayName} logged a buyer`,
+        body: `${lead.buyerName}. Reach them and move it along.`,
+        href: `/admin/marketers/buyers/${lead.id}`,
+        actorId: marketer.userId,
+        actorName: marketer.displayName,
+      });
+    }
+    return c.json(await one(db, lead, marketer.id), 201);
+  });
+
+  /** Theirs, or the 404 a missing id gets. Somebody else's buyer is not their business. */
+  routes.get("/marketing/leads/:id", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const id = pathParam(c, "id");
+    const lead = await getLeadFor(db, id, marketer.id);
+    if (!lead) throw new NotFoundError(`lead ${id}`);
+    return c.json(await one(db, lead, marketer.id));
+  });
+
+  /**
+   * The marketer closing their own buyer.
+   *
+   * Only `lost`, and `moveLead` enforces that rather than trusting this route:
+   * the rule belongs next to the write, where the admin path cannot route
+   * around it either.
+   */
+  routes.post("/marketing/leads/:id/state", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    assertActive(marketer);
+    const id = pathParam(c, "id");
+    const found = await getLeadFor(db, id, marketer.id);
+    if (!found) throw new NotFoundError(`lead ${id}`);
+
+    const body = await readJson(c, MoveBody);
+    const lead = await moveLead(db, id, body.to, body, {
+      id: marketer.id,
+      name: marketer.displayName,
+      side: "marketer",
+    });
+    auditEntityId(c, lead.id);
+
+    if (deps.notify) {
+      await deps.notify(db, {
+        kind: "marketing-deal",
+        title: `${marketer.displayName} closed a buyer`,
+        body: `${lead.buyerName}. ${body.reason}.`,
+        href: `/admin/marketers/buyers/${lead.id}`,
+        actorId: marketer.userId,
+        actorName: marketer.displayName,
+      });
+    }
+    return c.json(await one(db, lead, marketer.id));
+  });
+
+  routes.post("/marketing/leads/:id/note", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    assertActive(marketer);
+    const id = pathParam(c, "id");
+    const found = await getLeadFor(db, id, marketer.id);
+    if (!found) throw new NotFoundError(`lead ${id}`);
+
+    const body = await readJson(c, LeadNoteBody);
+    const lead = await noteOnLead(db, id, body.note, {
+      id: marketer.id,
+      name: marketer.displayName,
+      side: "marketer",
+    });
+    auditEntityId(c, lead.id);
+    return c.json(await one(db, lead, marketer.id));
+  });
+
   routes.get("/marketing/money", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const marketer = await currentMarketer(db, c);
@@ -717,6 +944,16 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       issueWindowDays: settings.issueWindowDays,
       month: payMonth(Date.now()),
     });
+  });
+
+  /** Every money event, for the history screen. Filtered on the client: a
+      marketer's statement is small enough that a round trip per filter tap
+      would be slower than the filter itself. */
+  routes.get("/marketing/statement", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const items = await statementFor(db, marketer.id, 400);
+    return c.json({ items, joinedAt: marketer.joinedAt });
   });
 
   routes.post("/marketing/issues", requireAuth(), async (c) => {
@@ -833,7 +1070,14 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
 
   routes.get("/admin/marketing/settings", requireAuth(), async (c) => {
     const db = await currentDb(c);
-    return c.json({ settings: await readMarketingSettings(db), bankCheck: paystackConfigured() });
+    const [settings, provider, keySaved] = await Promise.all([
+      readMarketingSettings(db),
+      providerState(db),
+      paystackKeySaved(db),
+    ]);
+    // The key itself never leaves the server; the console only needs to know
+    // whether one is saved so it can say so and offer to replace it.
+    return c.json({ settings, bankCheck: provider.ready, paystackKeySaved: keySaved });
   });
 
   routes.patch("/admin/marketing/settings", requireAuth(), async (c) => {
@@ -845,8 +1089,11 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
       const refusal = ratesRefusal(value);
       if (refusal) throw new BadRequestError(key, [{ path: key, message: refusal }]);
     }
-    const settings = await writeMarketingSettings(db, body as Partial<MarketingSettings>);
-    return c.json({ settings });
+    const { paystackKey, ...rest } = body;
+    if (paystackKey !== undefined) await writePaystackKey(db, paystackKey);
+    const settings = await writeMarketingSettings(db, rest as Partial<MarketingSettings>);
+    const [provider, keySaved] = await Promise.all([providerState(db), paystackKeySaved(db)]);
+    return c.json({ settings, bankCheck: provider.ready, paystackKeySaved: keySaved });
   });
 
   routes.get("/admin/marketing/marketers", requireAuth(), async (c) => {
@@ -916,6 +1163,55 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
     return c.json(page);
   });
 
+  /**
+   * Check a marketer's bank account, now, from the console.
+   *
+   * THE ACCOUNT RESOLVING IS THE VERIFICATION. Whether the returned name looks
+   * like the marketer's name is reported and never enforced: a wife's account,
+   * a business name, a middle name nobody uses and a bank that puts the surname
+   * first are all ordinary, and refusing those would send an admin back to
+   * typing names by hand. So the name is saved either way and the console shows
+   * both, with `matches` as advice.
+   */
+  routes.post("/admin/marketing/marketers/:id/verify-bank", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const id = pathParam(c, "id");
+    const marketer = await findMarketerById(db, id);
+    if (!marketer) throw new NotFoundError(`marketer ${id}`);
+    if (!marketer.bank) {
+      throw new PreconditionFailedError("no_bank", {
+        detail: "This marketer has not added a bank account yet.",
+      });
+    }
+
+    const resolved = await resolveAccount(db, marketer.bank.accountNumber, marketer.bank.bankCode);
+    if (!resolved) {
+      return c.json({
+        marketer,
+        found: false,
+        matches: false,
+        accountName: "",
+        detail: "That account number and bank did not match any account.",
+      });
+    }
+
+    const bank: MarketerBank = {
+      ...marketer.bank,
+      accountName: resolved.accountName,
+      verifiedAt: resolved.verifiedAt,
+    };
+    const after = await updateMarketerBank(db, marketer.id, bank);
+    auditEntityId(c, marketer.id);
+
+    return c.json({
+      marketer: after,
+      found: true,
+      accountName: resolved.accountName,
+      matches: namesMatch(resolved.accountName, marketer.displayName),
+      detail: "",
+    });
+  });
+
   routes.get("/admin/marketing/deals/:id", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const id = pathParam(c, "id");
@@ -961,6 +1257,91 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
     const body = await readJson(c, z.object({ reason: str().max(400).default("") }).strict());
     const deal = await cancelDeal(db, id, body.reason, { id: user.id, name: user.displayName });
     return c.json({ deal });
+  });
+
+  /* ═══ BUYERS ════════════════════════════════════════════════════════════ */
+
+  routes.get("/admin/marketing/leads", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const query = readQuery(c, LeadQuery);
+    const [page, counts] = await Promise.all([
+      listLeads(db, { limit: query.limit, q: query.q, ...(query.state ? { state: query.state } : {}) }),
+      leadCounts(db),
+    ]);
+    return c.json({ items: page.items, total: page.total, counts });
+  });
+
+  routes.get("/admin/marketing/leads/:id", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const id = pathParam(c, "id");
+    const lead = await getLead(db, id);
+    if (!lead) throw new NotFoundError(`lead ${id}`);
+    return c.json(lead);
+  });
+
+  /**
+   * Any state but `won`, which needs an amount and goes through `convert`.
+   *
+   * Leaving `won` un-mints the money, and `moveLead` does that by cancelling the
+   * deal rather than by deleting anything: the marketer keeps a readable history
+   * and a clawback line if they had already been paid.
+   */
+  routes.post("/admin/marketing/leads/:id/state", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const before = await getLead(db, id);
+    if (!before) throw new NotFoundError(`lead ${id}`);
+    auditBefore(c, before as unknown as Record<string, unknown>);
+
+    const body = await readJson(c, MoveBody);
+    const lead = await moveLead(db, id, body.to, body, {
+      id: user.id,
+      name: user.displayName,
+      side: "admin",
+    });
+    auditEntityId(c, lead.id);
+    return c.json(lead);
+  });
+
+  routes.post("/admin/marketing/leads/:id/note", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const body = await readJson(c, LeadNoteBody);
+    const lead = await noteOnLead(db, id, body.note, {
+      id: user.id,
+      name: user.displayName,
+      side: "admin",
+    });
+    auditEntityId(c, lead.id);
+    return c.json(lead);
+  });
+
+  /** They bought. Mints the deal, approves it, and the ledger does the rest. */
+  routes.post("/admin/marketing/leads/:id/convert", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const before = await getLead(db, id);
+    if (!before) throw new NotFoundError(`lead ${id}`);
+    auditBefore(c, before as unknown as Record<string, unknown>);
+
+    const reporter = await findMarketerById(db, before.reporterId);
+    if (!reporter) throw new NotFoundError(`marketer ${before.reporterId}`);
+
+    const body = await readJson(c, WinBody);
+    const settings = await readMarketingSettings(db);
+    const { lead, dealId } = await winLead(
+      db,
+      id,
+      { ...body, closedOn: body.closedOn || Date.now() },
+      reporter,
+      { id: user.id, name: user.displayName, side: "admin" },
+      settings,
+    );
+    auditEntityId(c, lead.id);
+    return c.json({ lead, dealId });
   });
 
   routes.get("/admin/marketing/pay-runs", requireAuth(), async (c) => {

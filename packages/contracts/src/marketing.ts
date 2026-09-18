@@ -129,6 +129,8 @@ export interface Deal {
   reporterId: string;
   reporterName: string;
   reporterCode: string;
+  /** The potential buyer this grew out of, when it did. */
+  leadId: string | null;
   status: DealStatus;
   /** Admin's one line when the deal was refused or sent back. */
   reason: string;
@@ -407,6 +409,55 @@ export type CommissionRates = [number, number, number];
 export const RENT_BASES = ["upfront", "period"] as const;
 export type RentBasis = (typeof RENT_BASES)[number];
 
+/**
+ * Who answers "what name is on this account number".
+ *
+ * Kora needs no key and is what this site runs on today. Paystack needs a free
+ * key and is the one to be on: Kora's resolve endpoint is reachable without
+ * auth because of a hole in their middleware rather than because it is offered,
+ * so it can close with no notice. Swapping is one field on the settings screen,
+ * deliberately, so the day it closes is a settings change and not a deploy.
+ */
+export const ACCOUNT_PROVIDERS = ["kora", "paystack"] as const;
+export type AccountProvider = (typeof ACCOUNT_PROVIDERS)[number];
+
+export const ACCOUNT_PROVIDER_LABEL: Record<AccountProvider, string> = {
+  kora: "Kora",
+  paystack: "Paystack",
+};
+
+/**
+ * Do these two names plausibly belong to the same person?
+ *
+ * Deliberately loose, and never an equality test. A real answer from a Nigerian
+ * bank looks like `URIRI  NATHANIEL ELO OGHENE`: two spaces in the middle, the
+ * surname first, and middle names the account holder never types. Comparing
+ * that to "Nathaniel Uriri" with `===` fails every time, so the check is how
+ * many words the two share.
+ *
+ * This is ADVICE, not a gate. The account resolving at all is the thing that
+ * stops money going to a typo; whether the name matches is for a human to look
+ * at, because a wife's account, a business name and a middle name nobody uses
+ * are all legitimate and all fail a strict check.
+ */
+export function namesMatch(bankName: string, personName: string): boolean {
+  const words = (value: string) =>
+    new Set(
+      value
+        .toLowerCase()
+        .replace(/[^a-z\s]/gu, " ")
+        .split(/\s+/u)
+        .filter((word) => word.length > 1),
+    );
+  const bank = words(bankName);
+  const person = words(personName);
+  if (person.size === 0 || bank.size === 0) return false;
+  let shared = 0;
+  for (const word of person) if (bank.has(word)) shared += 1;
+  // Two shared words, or every word of a single-word name.
+  return shared >= Math.min(2, person.size);
+}
+
 export interface MarketingSettings {
   /** Rates for a sale. Level 1 is the person who closed it. */
   saleRates: CommissionRates;
@@ -431,6 +482,12 @@ export interface MarketingSettings {
   currency: string;
   /** Shown on the marketer's sign up page and in the app's help sheet. */
   supportPhone: string;
+  /**
+   * Who checks bank account names. The KEY is not on this type on purpose: this
+   * shape goes to the browser, and a secret that is one `console.log` from a
+   * screenshot is not a secret. The server reads the key separately.
+   */
+  accountProvider: AccountProvider;
   updatedAt: number;
 }
 
@@ -446,6 +503,7 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   minPayoutMinor: 0,
   currency: DEFAULT_CURRENCY,
   supportPhone: "",
+  accountProvider: "kora",
   updatedAt: 0,
 };
 
@@ -577,4 +635,304 @@ export function ratesRefusal(rates: readonly number[]): string | null {
   const total = rates.reduce((sum, rate) => sum + rate, 0);
   if (total > 100) return "The three rates add up to more than the whole deal.";
   return null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════ LEADS ══ */
+
+/**
+ * Somebody a marketer thinks will buy, handed to AV Homes to close.
+ *
+ * A lead is not a deal and must not become one. A deal records an outcome: one
+ * decision, one reason, one reviewer. A lead records a process that moves over
+ * months, and the value of the record is the sequence rather than the current
+ * value. So the storage here is a timeline, and `state` is only the last event's
+ * destination, kept flat so a list query need not read the array.
+ */
+export const LEAD_STATES = [
+  "new",
+  "contacted",
+  "meeting",
+  "viewed",
+  "offer",
+  "won",
+  "lost",
+] as const;
+export type LeadState = (typeof LEAD_STATES)[number];
+
+/** Plain words on both sides. Nobody is shown the word the database uses. */
+export const LEAD_STATE_LABEL: Record<LeadState, string> = {
+  new: "Logged",
+  contacted: "We called them",
+  meeting: "Meeting booked",
+  viewed: "They viewed",
+  offer: "Talking price",
+  won: "Bought",
+  lost: "Closed",
+};
+
+/** One line for a list row, where the label alone is too terse to act on. */
+export const LEAD_STATE_HINT: Record<LeadState, string> = {
+  new: "Waiting for AV Homes to reach them",
+  contacted: "Someone has spoken to them",
+  meeting: "A viewing is on the calendar",
+  viewed: "They have seen the property",
+  offer: "Terms are being agreed",
+  won: "They bought. Your commission is on its way",
+  lost: "This one is over",
+};
+
+/** Live states, in pipeline order. A lead outside these is finished. */
+export const LEAD_OPEN_STATES = ["new", "contacted", "meeting", "viewed", "offer"] as const;
+
+export function isLeadOpen(state: LeadState): boolean {
+  return (LEAD_OPEN_STATES as readonly LeadState[]).includes(state);
+}
+
+/**
+ * The chips offered for each destination.
+ *
+ * A chip is filterable data and the note beside it is what a human reads months
+ * later. Both are required, including when the chip looks self-explanatory:
+ * making the note conditional optimises for the tap and throws away the only
+ * part with real information in it.
+ */
+export const LEAD_REASONS: Record<LeadState, readonly string[]> = {
+  new: ["Logged by marketer"],
+  contacted: ["Reached them", "Left a message", "Wrong number"],
+  meeting: ["They picked a date", "We offered dates", "Rescheduled"],
+  viewed: ["Inspection done", "They came alone", "Agent showed them"],
+  offer: ["They made an offer", "We sent terms", "Negotiating price"],
+  won: ["Paid in full", "Deposit taken", "Papers signed"],
+  lost: [
+    "Went quiet",
+    "Bought elsewhere",
+    "Price too high",
+    "Not ready yet",
+    "Wrong details",
+    "Other",
+  ],
+};
+
+export const LEAD_NOTE_MIN = 4;
+export const LEAD_NOTE_MAX = 400;
+
+/** One move. Appended, never edited, the discipline the ledger already keeps. */
+export interface LeadEvent {
+  at: number;
+  from: LeadState;
+  to: LeadState;
+  bySide: "marketer" | "admin";
+  byName: string;
+  /** The chip they picked. Empty on a note that moved nothing. */
+  reason: string;
+  /** Their own words. Never empty: that is the point of the feature. */
+  note: string;
+}
+
+/**
+ * One option inside an estate the buyer is interested in.
+ *
+ * An estate listing is not a house, it is a development with several designs
+ * inside it: a 2 bed, a 4 bed, a bare plot. Picking the estate alone tells an
+ * admin almost nothing, so a buyer interested in an estate picks which options,
+ * plural, because "the 3 bed or the 4 bed depending on price" is what people
+ * actually say.
+ *
+ * The name and price are SNAPSHOTS. A developer renaming a prototype or moving
+ * its price next year must not rewrite what a buyer asked about in July.
+ */
+export interface LeadUnit {
+  /** The prototype's own id on the listing. */
+  key: string;
+  name: string;
+  priceMinor: number;
+}
+
+export interface Lead {
+  id: string;
+  buyerName: string;
+  buyerPhone: string;
+  /** Set when the buyer already has a property in mind. */
+  listingId: string | null;
+  /** Snapshot, so a renamed listing cannot rewrite a settled lead. */
+  listingTitle: string;
+  /** Which options inside an estate. Empty for a listing that is one home. */
+  wantUnits: LeadUnit[];
+  /** What they want when no listing is picked. */
+  wantKind: DealKind | null;
+  wantArea: string;
+  wantBudgetMinor: number;
+  currency: string;
+  /** What the marketer wrote when they logged it. */
+  brief: string;
+  reporterId: string;
+  reporterName: string;
+  reporterCode: string;
+  state: LeadState;
+  /**
+   * The whole history, oldest first. Both sides render this same array: there is
+   * no admin-private note, because the moment one exists the marketer's copy
+   * stops being the history.
+   */
+  events: LeadEvent[];
+  /** The deal a win minted, or null. Survives a reversal so the thread is readable. */
+  dealId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** What the app's list draws, with this marketer's share once it is won. */
+export interface LeadRow extends Lead {
+  myShareMinor: number;
+}
+
+/** A marketer may only close their own lead, and only while it is still live. */
+export function marketerMayMove(state: LeadState, to: LeadState): boolean {
+  return to === "lost" && isLeadOpen(state);
+}
+
+/** Everything a state change is refused for, checked the same way on both sides. */
+export function leadMoveRefusal(move: {
+  from: LeadState;
+  to: LeadState;
+  reason: string;
+  note: string;
+}): { path: string; message: string } | null {
+  if (move.from === move.to) {
+    return { path: "to", message: `This is already ${LEAD_STATE_LABEL[move.to].toLowerCase()}.` };
+  }
+  if (!(LEAD_REASONS[move.to] ?? []).includes(move.reason)) {
+    return { path: "reason", message: "Pick a reason for the change." };
+  }
+  const note = move.note.trim();
+  if (note.length < LEAD_NOTE_MIN) {
+    return { path: "note", message: "Say what happened, in your own words." };
+  }
+  if (note.length > LEAD_NOTE_MAX) {
+    return { path: "note", message: `Keep it under ${LEAD_NOTE_MAX} characters.` };
+  }
+  return null;
+}
+
+/** A lead needs a person, and needs to say what that person wants. */
+export function leadRefusal(lead: {
+  buyerName: string;
+  buyerPhone: string;
+  listingId: string | null;
+  wantArea: string;
+  wantBudgetMinor: number;
+}): { path: string; message: string } | null {
+  if (lead.buyerName.trim() === "") {
+    return { path: "buyerName", message: "Who is the buyer?" };
+  }
+  if (!/^[0-9+\s()-]{7,20}$/u.test(lead.buyerPhone.trim())) {
+    return { path: "buyerPhone", message: "Add a phone number we can reach them on." };
+  }
+  const hasWant = lead.wantArea.trim() !== "" || lead.wantBudgetMinor > 0;
+  if (!lead.listingId && !hasWant) {
+    return {
+      path: "wantArea",
+      message: "Pick a property, or say where they want it and roughly their budget.",
+    };
+  }
+  return null;
+}
+
+/** "Lekki, about ₦80,000,000" or the listing's own name. For a one line row. */
+export function leadWantLine(lead: Lead): string {
+  if (lead.listingTitle.trim() !== "") {
+    const units = lead.wantUnits ?? [];
+    if (units.length === 1) return `${lead.listingTitle} · ${units[0]!.name}`;
+    if (units.length > 1) return `${lead.listingTitle} · ${units.length} options`;
+    return lead.listingTitle;
+  }
+  const area = lead.wantArea.trim();
+  const budget =
+    lead.wantBudgetMinor > 0 ? `about ${formatMoney(lead.wantBudgetMinor, lead.currency)}` : "";
+  return [area, budget].filter(Boolean).join(", ") || "No details yet";
+}
+
+/* ════════════════════════════════════════════════════ TRANSACTION HISTORY ══ */
+
+/**
+ * One row of the marketer's statement.
+ *
+ * `/m/money` deliberately keeps earnings and payments apart, because merged
+ * without labels they read as double counting. The history screen merges them
+ * because a statement is what it is, and pays for that by naming every row's
+ * kind: "Commission earned" and "Paid to your bank" are two sides of the same
+ * naira and a reader must never have to work that out from the amount alone.
+ */
+export const TX_KINDS = ["earning", "payout", "clawback", "adjustment"] as const;
+export type TxKind = (typeof TX_KINDS)[number];
+
+/* Short on purpose. The row already says Money In or Money Out beside this and
+   carries a settlement chip under it, and at 360px the longer wording truncated
+   mid-word on most rows. */
+export const TX_KIND_LABEL: Record<TxKind, string> = {
+  earning: "Commission",
+  payout: "Paid to your bank",
+  clawback: "Taken back",
+  adjustment: "Adjustment",
+};
+
+/**
+ * Whether the money in a row is real yet.
+ *
+ * Machine readable, because three of these rows look identical if only the
+ * amount is drawn, and one of them is money the marketer will never receive.
+ * The words shown come from TX_STATE_LABEL; a screen must not switch on them.
+ */
+export const TX_STATES = ["waiting", "sending", "settled", "cancelled"] as const;
+export type TxState = (typeof TX_STATES)[number];
+
+export const TX_STATE_LABEL: Record<TxState, string> = {
+  waiting: "Waiting",
+  sending: "On the way",
+  settled: "Paid",
+  cancelled: "Cancelled",
+};
+
+export interface Transaction {
+  id: string;
+  at: number;
+  /** Signed, from the marketer's side. Negative is money leaving them. */
+  amountMinor: number;
+  currency: string;
+  kind: TxKind;
+  /** The deal, or the month of the pay run. */
+  title: string;
+  /** Has this money actually arrived, or is it a promise, or is it off? */
+  state: TxState;
+  /** Plain words for `state`. Never switched on. */
+  status: string;
+  reference: string;
+  dealId: string | null;
+  payRunId: string | null;
+  /** "Wema Bank 4493", for a payout. Empty otherwise. */
+  bankLabel: string;
+  /**
+   * For an earning already carried by a payout: that payout in words, such as
+   * "August 2026". This is the line that stops a statement reading as being
+   * paid twice, so it is data rather than something a screen infers.
+   */
+  carriedBy: string;
+  note: string;
+}
+
+/** Money In is everything arriving; Money Out is what was taken back. */
+export type TxDirection = "in" | "out";
+
+/**
+ * Which way a row points, or null when it points nowhere.
+ *
+ * A cancelled line is the null case and that is the whole reason this function
+ * exists. It still carries a positive amount, because it is the record of a
+ * commission that WAS awarded, so reading the sign alone puts it under Money In
+ * beside real earnings and tells the marketer they have money they do not have.
+ * Nothing was taken back either, so it is not Money Out. It is neither.
+ */
+export function txDirection(tx: { amountMinor: number; state: TxState }): TxDirection | null {
+  if (tx.state === "cancelled") return null;
+  return tx.amountMinor < 0 ? "out" : "in";
 }

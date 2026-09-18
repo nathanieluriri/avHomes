@@ -1050,13 +1050,15 @@ function PropertyEditor({ initial }: { initial: Property }) {
           {fields.prototypes && (
             <Card>
               <CardHead title="Options" />
-              <PrototypeTable
-                rows={draft.prototypes}
-                onChange={(rows) => set("prototypes", rows)}
-                currency={draft.currency}
-                readOnly={trashed}
-              />
-              <div className="mt-4 border-t border-mist-200 pt-4">
+              <div data-spotlight="listing-options">
+                <PrototypeTable
+                  rows={draft.prototypes}
+                  onChange={(rows) => set("prototypes", rows)}
+                  currency={draft.currency}
+                  readOnly={trashed}
+                />
+              </div>
+              <div className="mt-4 border-t border-mist-200 pt-4" data-spotlight="listing-payment-plan">
                 <PaymentPlanFields
                   value={draft.paymentPlan}
                   onChange={(patch) => setDraft((d) => ({ ...d, paymentPlan: { ...d.paymentPlan, ...patch } }))}

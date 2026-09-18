@@ -38,7 +38,7 @@ export function HeroArt({ children }: { children: ReactNode }) {
 export function HeroHint({ children, art = true }: { children: ReactNode; art?: boolean }) {
   return (
     <p
-      className={`mt-1.5 max-w-[24rem] text-[14px] leading-relaxed text-white/75 ${art ? "pr-[5.5rem]" : ""}`}
+      className={`mt-1.5 max-w-[24rem] text-[14px] leading-relaxed text-white/88 ${art ? "pr-[5.5rem]" : ""}`}
     >
       {children}
     </p>

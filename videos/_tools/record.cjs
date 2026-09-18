@@ -304,6 +304,30 @@ function marketingFixtures(ownerId, props) {
   const july = deals.find((d) => d.id === "deal_maitama_let");
   addLines(july, "paid", JULY_ID, july.reviewedAt);
 
+  /* A deal that fell through after the money went out, so the history screen
+     has a real Money Out row and the red half of the palette is exercised by
+     something rather than only described. Negative, pointing at the line it
+     reverses, which is how the ledger takes money back. */
+  const reversed = ledger.find((l) => l.marketerId === "mkt_av0001" && l.status === "paid");
+  if (reversed) {
+    ledger.push({
+      id: "ledg_clawback_01",
+      marketerId: reversed.marketerId,
+      dealId: reversed.dealId,
+      level: reversed.level,
+      kind: "clawback",
+      amountMinor: -Math.abs(reversed.amountMinor),
+      currency: "NGN",
+      status: "earned",
+      payRunId: null,
+      reversesId: reversed.id,
+      note: "The sale fell through after the buyer's bank pulled the mortgage.",
+      dealTitle: reversed.dealTitle,
+      createdAt: ago(9),
+      updatedAt: ago(9),
+    });
+  }
+
   const totalFor = (id, runId = RUN_ID) =>
     ledger.filter((l) => l.payRunId === runId && l.marketerId === id).reduce((sum, l) => sum + l.amountMinor, 0);
   const payItem = (id, status, at, reference) => {
@@ -486,9 +510,74 @@ function marketingFixtures(ownerId, props) {
     publishedAt: ago(2 + i * 4),
   }));
 
+  /* One buyer per state, so both surfaces have a real row for every tab and the
+     timeline has more than one entry to draw. Adaeze (the root) logged them,
+     because she is who the app signs in as. */
+  const lead = ({ id, name, phone, listingId = null, listingTitle = "", area = "", budget = 0, kind = "sale", state, at, events }) => ({
+    id,
+    buyerName: name,
+    buyerPhone: phone,
+    listingId,
+    listingTitle,
+    wantKind: kind,
+    wantArea: area,
+    wantBudgetMinor: budget,
+    currency: "NGN",
+    brief: events[0].note,
+    reporterId: "mkt_av0001",
+    reporterName: "Adaeze Vincent",
+    reporterCode: "AV-0001",
+    state,
+    events,
+    dealId: state === "won" ? "deal_ikoyi_won" : null,
+    createdAt: ago(at),
+    updatedAt: events[events.length - 1].at,
+  });
+  const ev = (from, to, side, byName, reason, note, at) => ({ at: ago(at), from, to, bySide: side, byName, reason, note });
+
+  const leads = [
+    lead({ id: "lead_ifeoma", name: "Ifeoma Nwosu", phone: "0803 114 2277", area: "Lekki Phase 1", budget: kobo(85_000_000), state: "new", at: 1,
+      events: [ev("new", "new", "marketer", "Adaeze Vincent", "Logged by marketer", "My cousin. Relocating from Abuja in March, has the cash ready.", 1)] }),
+    lead({ id: "lead_seyi", name: "Seyi Adeleke", phone: "0805 662 1190", area: "Ikoyi", budget: kobo(210_000_000), state: "contacted", at: 6,
+      events: [
+        ev("new", "new", "marketer", "Adaeze Vincent", "Logged by marketer", "Works at a bank on the island. Wants something close to the office.", 6),
+        ev("new", "contacted", "admin", "Tunde Balogun", "Reached them", "Spoke to him this morning. Sending three Ikoyi options tonight.", 4),
+      ] }),
+    lead({ id: "lead_grace", name: "Grace Obi", phone: "0806 445 7781", listingId: "prop_chevron", listingTitle: "Chevron Drive Townhouse", state: "meeting", at: 11,
+      events: [
+        ev("new", "new", "marketer", "Adaeze Vincent", "Logged by marketer", "She saw the Chevron Drive townhouse on the site and asked me about it.", 11),
+        ev("new", "contacted", "admin", "Tunde Balogun", "Reached them", "Called her, she is serious. Asked about the payment plan.", 9),
+        ev("contacted", "meeting", "admin", "Tunde Balogun", "They picked a date", "Viewing booked for Saturday at 11. She is bringing her husband.", 3),
+      ] }),
+    lead({ id: "lead_musa", name: "Musa Bello", phone: "0807 220 4412", listingId: "prop_oniru", listingTitle: "Oniru Beachfront Apartment", kind: "rent", state: "offer", at: 21,
+      events: [
+        ev("new", "new", "marketer", "Adaeze Vincent", "Logged by marketer", "Old colleague. His lease ends in April and he wants Oniru.", 21),
+        ev("new", "contacted", "admin", "Tunde Balogun", "Reached them", "Reached him on WhatsApp. Sent the Oniru listing.", 19),
+        ev("contacted", "meeting", "admin", "Tunde Balogun", "We offered dates", "He picked Thursday evening.", 15),
+        ev("meeting", "viewed", "admin", "Tunde Balogun", "Inspection done", "Came with his wife. They liked it, asked about the service charge.", 12),
+        ev("viewed", "offer", "admin", "Tunde Balogun", "They made an offer", "Offered sixteen million for the year. Waiting on the landlord.", 5),
+      ] }),
+    lead({ id: "lead_amaka", name: "Amaka Eze", phone: "0808 337 9021", listingId: "prop_ikoyi", listingTitle: "Ikoyi Glass House", state: "won", at: 54,
+      events: [
+        ev("new", "new", "marketer", "Adaeze Vincent", "Logged by marketer", "She runs a logistics company and has been looking in Ikoyi for months.", 54),
+        ev("new", "contacted", "admin", "Tunde Balogun", "Reached them", "Very keen. Booked her in for the Ikoyi house.", 50),
+        ev("contacted", "meeting", "admin", "Tunde Balogun", "They picked a date", "Saturday morning viewing.", 44),
+        ev("meeting", "viewed", "admin", "Tunde Balogun", "Inspection done", "Loved it. Asked us to hold it for a week.", 40),
+        ev("viewed", "offer", "admin", "Tunde Balogun", "They made an offer", "Full asking price, wants to close this month.", 30),
+        ev("offer", "won", "admin", "Tunde Balogun", "Paid in full", "Payment cleared this morning. Papers signed at the office.", 21),
+      ] }),
+    lead({ id: "lead_dele", name: "Dele Fashola", phone: "0809 551 3308", area: "Ajah", budget: kobo(45_000_000), state: "lost", at: 38,
+      events: [
+        ev("new", "new", "marketer", "Adaeze Vincent", "Logged by marketer", "Friend from church. Looking around Ajah, budget is tight.", 38),
+        ev("new", "contacted", "admin", "Tunde Balogun", "Left a message", "Called twice, no answer. Left a voice note.", 33),
+        ev("contacted", "lost", "marketer", "Adaeze Vincent", "Not ready yet", "I saw him on Sunday. He has put off buying until next year.", 26),
+      ] }),
+  ];
+
   return {
     marketers,
     deals,
+    leads,
     ledger,
     payRuns,
     issues,
@@ -508,6 +597,7 @@ function marketingFixtures(ownerId, props) {
       minPayoutMinor: 0,
       currency: "NGN",
       supportPhone: "+234 801 234 5678",
+      accountProvider: "kora",
       updatedAt: ago(30),
     },
   };
@@ -561,7 +651,12 @@ function mockApi(S) {
         address: "",
         city: "",
         location: "",
-        type: "",
+        // The kind is chosen beside the name, and an estate opens a different
+        // form, so the answer has to survive the round trip.
+        type: b.type || "",
+        prototypes: [],
+        paymentPlan: null,
+        buildStage: null,
         amenities: [],
         images: [],
         priceMinor: 0,
@@ -687,6 +782,12 @@ function marketingApi(S) {
     const d = new Date(at);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   };
+  /** "September 2026" from "2026-09", as @avhomes/contracts spells it. */
+  const payMonthLabel = (month) => {
+    const [year, mon] = month.split("-");
+    const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    return `${names[Number(mon) - 1] || month} ${year || ""}`.trim();
+  };
   const mkt = (id) => M.marketers.find((p) => p.id === id) || null;
   const me = () => mkt(M.rootId);
   const kids = (id) => M.marketers.filter((p) => p.parentId === id);
@@ -695,7 +796,7 @@ function marketingApi(S) {
   const issue = (id) => M.issues.find((i) => i.id === id) || null;
   const hit = (row, q) =>
     q === "" ||
-    [row.listingTitle, row.reporterName, row.reporterCode, row.buyerName, row.displayName, row.code, row.email]
+    [row.listingTitle, row.reporterName, row.reporterCode, row.buyerName, row.buyerPhone, row.displayName, row.code, row.email]
       .filter(Boolean)
       .some((field) => field.toLowerCase().includes(q.toLowerCase()));
 
@@ -785,6 +886,70 @@ function marketingApi(S) {
           bankLabel: item.bank ? `${item.bank.bankName} ${item.bank.accountNumber.slice(-4)}` : "",
         };
       });
+  }
+
+  /* ═══ BUYERS ═══════════════════════════════════════════════════════════ */
+
+  const leadOf = (id) => M.leads.find((l) => l.id === id) || null;
+
+  /** What the marketer earned on a won lead, the way `withShares` works it out. */
+  const withShare = (lead) => {
+    const row = lead.dealId ? deal(lead.dealId) : null;
+    const share = row && row.status === "approved" ? (row.shares || []).find((x) => x.marketerId === lead.reporterId) : null;
+    return { ...lead, myShareMinor: share ? share.amountMinor : 0 };
+  };
+
+  /** Appends to the timeline and sets state from it, the one write leads.ts allows. */
+  function moveLead(lead, to, reason, note, side, byName) {
+    lead.events.push({ at: now(), from: lead.state, to, bySide: side, byName, reason: reason || "", note });
+    lead.state = to;
+    lead.updatedAt = now();
+    return lead;
+  }
+
+  /** Ledger lines and real payouts merged, newest first, as `statementFor` does. */
+  function statementOf(id) {
+    const state = { earned: "waiting", scheduled: "sending", paid: "settled", void: "cancelled" };
+    const word = { waiting: "Waiting", sending: "On the way", settled: "Paid", cancelled: "Cancelled" };
+    const pays = payHistoryOf(id);
+    const monthOfRun = new Map(pays.map((p) => [p.payRunId, payMonthLabel(p.month)]));
+    const paidRuns = new Set(pays.filter((p) => p.status === "paid").map((p) => p.payRunId));
+    const rows = ledgerOf(id, 400).map((l) => ({
+      id: l.id,
+      at: l.createdAt,
+      amountMinor: l.amountMinor,
+      currency: l.currency,
+      kind: l.kind === "clawback" ? "clawback" : l.kind === "adjust" ? "adjustment" : "earning",
+      title: l.dealTitle || (l.kind === "adjust" ? "Adjustment" : "Commission"),
+      state: state[l.status],
+      status: word[state[l.status]],
+      reference: l.id,
+      dealId: l.dealId || null,
+      payRunId: l.payRunId || null,
+      bankLabel: "",
+      carriedBy: l.payRunId && paidRuns.has(l.payRunId) ? (monthOfRun.get(l.payRunId) || "") : "",
+      note: l.note || "",
+    }));
+    for (const pay of pays) {
+      if (pay.status !== "paid" || !pay.paidAt) continue;
+      rows.push({
+        id: `${pay.payRunId}:${id}`,
+        at: pay.paidAt,
+        amountMinor: pay.totalMinor,
+        currency: pay.currency,
+        kind: "payout",
+        title: `${payMonthLabel(pay.month)} payout`,
+        state: "settled",
+        status: "Paid",
+        reference: pay.reference,
+        dealId: null,
+        payRunId: pay.payRunId,
+        bankLabel: pay.bankLabel,
+        carriedBy: "",
+        note: "",
+      });
+    }
+    return rows.sort((a, b) => b.at - a.at);
   }
 
   function counts() {
@@ -1083,6 +1248,42 @@ function marketingApi(S) {
       issueWindowDays: M.settings.issueWindowDays,
       month: payMonth(now()),
     })],
+    /* ═══ BUYERS ═══════════════════════════════════════════════════════════ */
+    ["GET", /^\/api\/marketing\/leads$/, () => {
+      const items = M.leads.filter((l) => l.reporterId === M.rootId).map(withShare);
+      return { items, total: items.length };
+    }],
+    ["POST", /^\/api\/marketing\/leads$/, (m, u, b) => {
+      const row = {
+        id: "lead_new_" + now().toString(36),
+        buyerName: b.buyerName,
+        buyerPhone: b.buyerPhone,
+        listingId: b.listingId || null,
+        listingTitle: b.listingTitle || "",
+        // Which options inside an estate, snapshotted as `createLead` does.
+        wantUnits: b.wantUnits || [],
+        wantKind: b.wantKind || null,
+        wantArea: b.wantArea || "",
+        wantBudgetMinor: b.wantBudgetMinor || 0,
+        currency: "NGN",
+        brief: b.brief || "",
+        reporterId: M.rootId,
+        reporterName: me().displayName,
+        reporterCode: me().code,
+        state: "new",
+        events: [{ at: now(), from: "new", to: "new", bySide: "marketer", byName: me().displayName, reason: "Logged by marketer", note: b.brief || "Logged a potential buyer." }],
+        dealId: null,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      M.leads.unshift(row);
+      return withShare(row);
+    }],
+    ["GET", /^\/api\/marketing\/leads\/([^/?]+)$/, (m) => withShare(leadOf(m[1]))],
+    ["POST", /^\/api\/marketing\/leads\/([^/]+)\/state$/, (m, u, b) => withShare(moveLead(leadOf(m[1]), b.to, b.reason, b.note, "marketer", me().displayName))],
+    ["POST", /^\/api\/marketing\/leads\/([^/]+)\/note$/, (m, u, b) => withShare(moveLead(leadOf(m[1]), leadOf(m[1]).state, "", b.note, "marketer", me().displayName))],
+    ["GET", /^\/api\/marketing\/statement$/, () => ({ items: statementOf(M.rootId), joinedAt: me().joinedAt })],
+
     ["GET", /^\/api\/marketing\/issues$/, () => ({ items: M.issues.filter((i) => i.marketerId === M.rootId) })],
     ["POST", /^\/api\/marketing\/issues$/, (m, u, b) => {
       const p = me();
@@ -1175,7 +1376,23 @@ function marketingApi(S) {
 
     /* ───────────────────────────────────────────────────────────── admin ── */
     ["GET", /^\/api\/admin\/marketing\/counts$/, () => ({ counts: counts() })],
-    ["GET", /^\/api\/admin\/marketing\/settings$/, () => ({ settings: M.settings, bankCheck: true })],
+    ["GET", /^\/api\/admin\/marketing\/settings$/, () => ({ settings: M.settings, bankCheck: true, paystackKeySaved: false })],
+    /* The console's one-tap account check. Answers the way the real provider
+       does: a name back, and whether it looks like the marketer's. */
+    ["POST", /^\/api\/admin\/marketing\/marketers\/([^/]+)\/verify-bank$/, (m) => {
+      const p = mkt(m[1]);
+      if (!p || !p.bank) return { found: false, matches: false, accountName: "", detail: "This marketer has not added a bank account yet." };
+      const shares = (a, b) => {
+        const w = (v) => new Set(String(v).toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter((x) => x.length > 1));
+        const A = w(a), B = w(b);
+        let n = 0;
+        for (const x of B) if (A.has(x)) n += 1;
+        return n >= Math.min(2, B.size);
+      };
+      const name = p.bank.accountName || `${p.displayName.toUpperCase()}`;
+      p.bank = { ...p.bank, accountName: name, verifiedAt: now() };
+      return { marketer: p, found: true, accountName: name, matches: shares(name, p.displayName), detail: "" };
+    }],
     ["PATCH", /^\/api\/admin\/marketing\/settings$/, (m, u, b) => {
       Object.assign(M.settings, b, { updatedAt: now() });
       return { settings: M.settings };
@@ -1213,6 +1430,21 @@ function marketingApi(S) {
         alsoClaimed: alsoClaimed(row),
         rates: M.settings,
       };
+    }],
+    ["GET", /^\/api\/admin\/marketing\/leads\/([^/?]+)$/, (m) => leadOf(m[1])],
+    ["GET", /^\/api\/admin\/marketing\/leads$/, (m, u) => {
+      const state = u.searchParams.get("state");
+      const q = u.searchParams.get("q") || "";
+      const counts = {};
+      for (const l of M.leads) counts[l.state] = (counts[l.state] || 0) + 1;
+      const items = M.leads.filter((l) => (!state || l.state === state) && hit(l, q));
+      return { items, total: items.length, counts };
+    }],
+    ["POST", /^\/api\/admin\/marketing\/leads\/([^/]+)\/state$/, (m, u, b) => moveLead(leadOf(m[1]), b.to, b.reason, b.note, "admin", S.owner.displayName)],
+    ["POST", /^\/api\/admin\/marketing\/leads\/([^/]+)\/convert$/, (m, u, b) => {
+      const row = leadOf(m[1]);
+      row.dealId = "deal_from_" + row.id;
+      return { lead: moveLead(row, "won", b.reason, b.note, "admin", S.owner.displayName), dealId: row.dealId };
     }],
     ["GET", /^\/api\/admin\/marketing\/deals$/, (m, u) => {
       const status = u.searchParams.get("status");

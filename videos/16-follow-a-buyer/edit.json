@@ -1,0 +1,55 @@
+{
+  "segments": [
+    [6.1, 62.1, 1]
+  ],
+  "captions": [
+    {
+      "at": 6.3,
+      "until": 14.2,
+      "title": "Marketers, then Buyers",
+      "line": "New means a marketer sent them in and nobody has called yet."
+    },
+    {
+      "at": 14.4,
+      "until": 21.4,
+      "title": "Read what the marketer wrote",
+      "line": "Their own words, and the same list they read on their phone."
+    },
+    {
+      "at": 21.6,
+      "until": 25.9,
+      "title": "Pick the move",
+      "line": "The commonest next step is already chosen, and the line under it says what it means."
+    },
+    {
+      "at": 26.0,
+      "until": 32.8,
+      "title": "A reason and words, both required",
+      "line": "Pick why, then say what happened. The marketer reads both."
+    },
+    {
+      "at": 33.0,
+      "until": 38.8,
+      "title": "It lands on their phone",
+      "line": "The move joins the history the moment you press it."
+    },
+    {
+      "at": 38.95,
+      "until": 49.6,
+      "title": "Move it along again",
+      "line": "Called, then meeting booked. Every move needs its own reason."
+    },
+    {
+      "at": 49.84,
+      "until": 53.2,
+      "title": "Nothing is overwritten",
+      "line": "Six months later it still says who did what, and why."
+    },
+    {
+      "at": 53.43,
+      "until": 62.0,
+      "title": "She has left New",
+      "line": "Bought is the end of the line: it creates the deal and pays the marketer."
+    }
+  ]
+}

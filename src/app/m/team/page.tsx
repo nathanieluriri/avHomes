@@ -96,7 +96,7 @@ function TeamHero({ team }: { team: TeamRead }) {
       <dl className="m-glass mt-4 grid grid-cols-3 divide-x divide-white/15 rounded-[18px] py-3">
         {LEVELS.map((level, index) => (
           <div key={level.value} className="flex flex-col-reverse items-center px-1 text-center">
-            <dt className="mt-1 text-[12px] font-medium leading-tight text-white/75">{level.label}</dt>
+            <dt className="mt-1 text-[12px] font-medium leading-tight text-white/88">{level.label}</dt>
             <dd className="m-num text-[26px] font-bold leading-none tracking-[-0.02em]">
               {levels[index]}
             </dd>

@@ -146,6 +146,12 @@
   --color-m-muted: var(--m-muted);
   --color-m-faint: var(--m-faint);
   --color-m-link: var(--m-link);
+  /* Money's direction. Separate from the status roles above on purpose: these
+     colour an amount, --m-good-fg colours a verdict. */
+  --color-m-in: var(--m-in-fg);
+  --color-m-in-bg: var(--m-in-bg);
+  --color-m-out: var(--m-out-fg);
+  --color-m-out-bg: var(--m-out-bg);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);

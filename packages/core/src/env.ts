@@ -31,8 +31,11 @@ export interface Env {
   MAIL_FROM: string;
   /** Where a new enquiry is announced. Empty means "do not send". */
   ENQUIRY_NOTIFY_TO: string;
-  /** Paystack, used only to read the name on a marketer's bank account.
-   *  Empty means the account is taken as typed and marked unchecked. */
+  /**
+   * UNUSED. The bank-check provider and its key live in marketing settings now,
+   * so an admin can change them without a deploy. Kept only so an existing
+   * .env does not fail to parse; nothing reads it.
+   */
   PAYSTACK_SECRET_KEY: string;
   NODE_ENV: string;
 }

@@ -72,6 +72,16 @@ export const TUTORIALS: readonly Tutorial[] = [
     ["listings", "media"],
     false,
   ),
+  // `media` for the photos: an estate's own gallery, and a render per option.
+  entry(
+    "list-an-estate",
+    "List an estate",
+    "One listing that holds every house and plot inside it, each with its own price.",
+    129,
+    "/admin/properties",
+    ["listings", "media"],
+    false,
+  ),
   entry(
     "log-a-change",
     "Log a change for the developer",
@@ -98,6 +108,16 @@ export const TUTORIALS: readonly Tutorial[] = [
     "/admin/posts",
     ["content", "media"],
     true,
+  ),
+  // Before the deals, because a buyer becomes one: this is where the money starts.
+  entry(
+    "follow-a-buyer",
+    "Follow up a buyer",
+    "A marketer sent somebody in. Call them, then move them along the line.",
+    64,
+    "/admin/marketers/buyers",
+    ["marketing"],
+    false,
   ),
   entry(
     "check-a-deal",

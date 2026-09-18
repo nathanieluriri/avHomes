@@ -297,8 +297,28 @@ export function AppShell({
   };
 
   const hasTab = tab !== undefined && tab !== null && tab !== false;
-  const shell = `m-shell ${hasTab ? "m-shell--tab" : ""} ${nav ? "m-shell--nav" : ""}`;
   const home = variant === "home";
+
+  /*
+   * A BACK BUTTON AND THE BOTTOM BAR ARE THE SAME JOB, SO A SCREEN GETS ONE.
+   *
+   * The bar carried Home, the report orb and Menu on every screen in the app,
+   * including screens that already had a chevron in the hero pointing at where
+   * they came from. That is two navigations stacked on one screen, and the bar
+   * is the more expensive one: it is fixed, it eats 4rem plus the orb's rise at
+   * the foot of every list, and it offers Home from a screen that is one tap
+   * from Home anyway.
+   *
+   * So the rule is structural rather than a prop each screen remembers to pass:
+   * once a screen can go back, the way out is the chevron, and the bar belongs
+   * to the screens that have no way out because they are the top of the tree.
+   */
+  const canGoBack = Boolean(back || onBack);
+  const bar = canGoBack ? null : nav;
+
+  const shell = `m-shell ${hasTab ? "m-shell--tab" : ""} ${bar ? "m-shell--nav" : ""} ${
+    bottomBar ? "m-shell--bar" : ""
+  }`;
   const toDo = alertCount ?? me.data?.alertCount ?? 0;
 
   return (
@@ -342,7 +362,7 @@ export function AppShell({
                   {title}
                 </h1>
                 {hint && (
-                  <p className="mt-1.5 max-w-[24rem] text-[14px] leading-relaxed text-white/75">
+                  <p className="mt-1.5 max-w-[24rem] text-[14px] leading-relaxed text-white/88">
                     {hint}
                   </p>
                 )}
@@ -375,9 +395,9 @@ export function AppShell({
 
           {bottomBar}
 
-          {nav && (
+          {bar && (
             <NavBar
-              active={nav}
+              active={bar}
               alertCount={toDo}
               reportBlock={reportBlockedReason(me.data)}
               supportPhone={me.data?.supportPhone ?? ""}
@@ -432,7 +452,7 @@ export function AuthShell({
           <Lockup size="tall" />
           <h1 className="mt-7 text-[28px] font-bold leading-tight tracking-[-0.02em]">{title}</h1>
           {hint && (
-            <p className="mt-2 max-w-[22rem] text-[14px] leading-relaxed text-white/75">{hint}</p>
+            <p className="mt-2 max-w-[22rem] text-[14px] leading-relaxed text-white/88">{hint}</p>
           )}
         </header>
         <main className="m-body m-paper px-4 pt-6">{children}</main>

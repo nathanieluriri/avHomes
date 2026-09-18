@@ -30,6 +30,7 @@ const ENTITY_NOUN: Record<AuditEntity, string> = {
   auth: "sign-in",
   marketer: "marketer",
   deal: "deal",
+  lead: "potential buyer",
   payrun: "pay run",
   update: "marketer update",
   unknown: "record",
@@ -52,6 +53,7 @@ export const ENTITY_FILTER_LABEL: Record<AuditEntity, string> = {
   auth: "Sign-in",
   marketer: "Marketers",
   deal: "Deals",
+  lead: "Potential buyers",
   payrun: "Pay runs",
   update: "Marketer updates",
   unknown: "Other",
@@ -181,6 +183,7 @@ const OWN_PAGE: Partial<Record<AuditEntity, string>> = {
   property: "/admin/properties",
   post: "/admin/posts",
   enquiry: "/admin/enquiries",
+  lead: "/admin/marketers/buyers",
 };
 
 /**
@@ -204,6 +207,7 @@ const ENTITY_SCREEN: Partial<Record<AuditEntity, { href: string; label: string }
   stat: { href: "/admin", label: "the dashboard" },
   settings: { href: "/admin/settings", label: "the settings screen" },
   update: { href: "/admin/marketers/updates", label: "the updates screen" },
+  lead: { href: "/admin/marketers/buyers", label: "the buyers screen" },
 };
 
 /** Where the console shows this record, and what the link should call it. */

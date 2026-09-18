@@ -13,16 +13,19 @@ export function Amount({
   minor,
   currency = "NGN",
   size = "md",
+  kobo = false,
   className = "",
 }: {
   minor: number;
   currency?: string;
   size?: MoneySize;
+  /** The exact figure, kobo and all. A receipt sets it; a scannable list does not. */
+  kobo?: boolean;
   className?: string;
 }) {
   const [hidden] = useMoneyHidden();
   if (hidden) return <HiddenMoney className={`m-money--${size} ${className}`} />;
-  return <Money minor={minor} currency={currency} size={size} className={className} />;
+  return <Money minor={minor} currency={currency} size={size} kobo={kobo} className={className} />;
 }
 
 /** A take-back: a true minus sign and the bad tone, so it never reads as money coming in. */
@@ -42,6 +45,51 @@ export function NegativeAmount({
       </span>
       <span className="sr-only">minus </span>
       <Amount minor={Math.abs(minor)} currency={currency} size={size} />
+    </span>
+  );
+}
+
+/**
+ * An amount that says which way it went.
+ *
+ * Three signals, not one. Colour is the fastest to read and the one that fails
+ * first: about one man in twelve cannot separate this green from this red, and
+ * nobody can in a greyscale screenshot. So the sign is real text and the
+ * direction is spelled out for a screen reader, and the row beside this carries
+ * the words "Money In" or "Money Out". Colour is the accelerator, never the
+ * carrier.
+ */
+export function DirectedAmount({
+  minor,
+  currency = "NGN",
+  size = "md",
+  kobo = false,
+  plain = false,
+  className = "",
+}: {
+  /** Signed. Negative is money leaving the marketer. */
+  minor: number;
+  currency?: string;
+  size?: MoneySize;
+  /** The exact figure. A receipt shows kobo; a list rounds to the naira. */
+  kobo?: boolean;
+  /** No colour, for money that was cancelled and went neither way. */
+  plain?: boolean;
+  className?: string;
+}) {
+  const out = minor < 0;
+  const tone = plain
+    ? ""
+    : out
+      ? "text-(color:--m-out-fg)"
+      : "text-(color:--m-in-fg)";
+  return (
+    <span className={`whitespace-nowrap ${tone} ${className}`}>
+      <span aria-hidden className="m-money mr-px">
+        {out ? "−" : "+"}
+      </span>
+      <span className="sr-only">{out ? "minus " : "plus "}</span>
+      <Amount minor={Math.abs(minor)} currency={currency} size={size} kobo={kobo} />
     </span>
   );
 }

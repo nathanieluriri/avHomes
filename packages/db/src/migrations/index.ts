@@ -10,6 +10,8 @@ import { migration0008 } from "./0008_audit";
 import { migration0009 } from "./0009_estates_and_terms";
 import { migration0010 } from "./0010_tutorial_progress";
 import { migration0011 } from "./0011_marketing";
+import { migration0012 } from "./0012_leads";
+import { migration0013 } from "./0013_ledger_reversal";
 
 /**
  * The ordered list. Append only, and never renumber a tag that has shipped:
@@ -31,4 +33,6 @@ export const MIGRATIONS: readonly Migration[] = [
   migration0009,
   migration0010,
   migration0011,
+  migration0012,
+  migration0013,
 ];

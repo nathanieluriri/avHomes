@@ -1287,10 +1287,6 @@ export function OrbMark({ plus = false, ...props }: IconProps & { plus?: boolean
         <filter id={k.id("soft")} filterUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80">
           <feGaussianBlur stdDeviation="1.1" />
         </filter>
-        <radialGradient id={k.id("glow")} gradientUnits="userSpaceOnUse" cx="32" cy="32.5" r="31.5">
-          <stop offset="0.7" stopColor={WINE.light} stopOpacity="0.55" />
-          <stop offset="1" stopColor={WINE.light} stopOpacity="0" />
-        </radialGradient>
         <radialGradient id={k.id("glass")} cx="0.44" cy="0.4" r="0.66" fx="0.34" fy="0.26">
           <stop offset="0" stopColor="#ffd7e1" />
           <stop offset="0.3" stopColor={WINE.light} />
@@ -1303,7 +1299,8 @@ export function OrbMark({ plus = false, ...props }: IconProps & { plus?: boolean
           <stop offset="1" stopColor={LILAC.base} stopOpacity="0.6" />
         </linearGradient>
       </defs>
-      <circle cx="32" cy="32" r="31.5" fill={k.url("glow")} />
+      {/* The halo that used to ring this sphere is gone with every other glow in
+          the app. The glass keeps its own shading, which is form, not light spilling. */}
       <circle cx="32" cy="32" r="24" fill={k.url("glass")} />
       <circle cx="32" cy="32" r="24" fill={k.url("lilac")} />
       <g filter={k.url("soft")} fill="none" strokeLinecap="round">

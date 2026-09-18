@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Percent } from "lucide-react";
 import {
+  ACCOUNT_PROVIDERS,
+  ACCOUNT_PROVIDER_LABEL,
   RENT_BASES,
   formatMoney,
   minorUnitsFor,
@@ -13,6 +15,7 @@ import {
   type CommissionRates,
   type MarketingSettings,
   type RentBasis,
+  type AccountProvider,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
@@ -65,6 +68,9 @@ interface Draft {
   /** Major units, because that is what the field asks for. */
   minPayout: string;
   supportPhone: string;
+  accountProvider: AccountProvider;
+  /** Always blank on load: the saved key is never sent to the browser. */
+  paystackKey: string;
 }
 
 function toDraft(settings: MarketingSettings): Draft {
@@ -79,8 +85,24 @@ function toDraft(settings: MarketingSettings): Draft {
     blockSelfDeals: settings.blockSelfDeals,
     minPayout: plainMajor(settings.minPayoutMinor, settings.currency),
     supportPhone: settings.supportPhone,
+    accountProvider: settings.accountProvider,
+    paystackKey: "",
   };
 }
+
+interface SettingsResponse {
+  settings: MarketingSettings;
+  /** Whether the chosen provider can actually run a check right now. */
+  bankCheck: boolean;
+  paystackKeySaved: boolean;
+}
+
+const PROVIDER_BLURB: Record<AccountProvider, string> = {
+  kora:
+    "No key needed, and it answers in well under a second. It is reachable without credentials because of a gap in Kora's own auth rather than because they offer it free, so treat it as temporary and keep a Paystack key ready.",
+  paystack:
+    "Free, documented and 1500 checks a minute. Needs a secret key from your Paystack dashboard, under Settings then API Keys.",
+};
 
 const BASIS: Record<RentBasis, { label: string; blurb: string }> = {
   upfront: {
@@ -96,8 +118,8 @@ const BASIS: Record<RentBasis, { label: string; blurb: string }> = {
 };
 
 export default function CommissionPage() {
-  const { data, error, loading, reload } = useAsync<{ settings: MarketingSettings }>(
-    (signal) => api.get<{ settings: MarketingSettings }>("/admin/marketing/settings", signal),
+  const { data, error, loading, reload } = useAsync<SettingsResponse>(
+    (signal) => api.get<SettingsResponse>("/admin/marketing/settings", signal),
     [],
   );
 
@@ -132,12 +154,19 @@ export default function CommissionPage() {
   }
   if (!data) return null;
 
-  return <CommissionEditor initial={data.settings} />;
+  return <CommissionEditor initial={data.settings} hasKey={data.paystackKeySaved} />;
 }
 
-function CommissionEditor({ initial }: { initial: MarketingSettings }) {
+function CommissionEditor({
+  initial,
+  hasKey,
+}: {
+  initial: MarketingSettings;
+  hasKey: boolean;
+}) {
   const [saved, setSaved] = useState<MarketingSettings>(initial);
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
+  const [keySaved, setKeySaved] = useState(hasKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -182,9 +211,12 @@ function CommissionEditor({ initial }: { initial: MarketingSettings }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.patch<{ settings: MarketingSettings }>(
+      const res = await api.patch<SettingsResponse>(
         "/admin/marketing/settings",
         {
+          accountProvider: draft.accountProvider,
+          // Absent leaves the saved key alone; this form can never prefill it.
+          ...(draft.paystackKey.trim() === "" ? {} : { paystackKey: draft.paystackKey.trim() }),
           saleRates: sale,
           rentRates: rent,
           rentBasis: draft.rentBasis,
@@ -199,6 +231,7 @@ function CommissionEditor({ initial }: { initial: MarketingSettings }) {
       );
       setSaved(res.settings);
       setDraft(toDraft(res.settings));
+      setKeySaved(res.paystackKeySaved);
     } catch (err) {
       setError(toApiError(err));
     } finally {
@@ -418,6 +451,62 @@ function CommissionEditor({ initial }: { initial: MarketingSettings }) {
               label="Block a marketer buying through themselves"
               description="Refuses a deal whose buyer phone is the marketer's own number."
             />
+          </Card>
+
+          <Card className="space-y-4">
+            <CardHead title="Checking bank accounts" />
+            <p className="text-[12.5px] text-slate-600">
+              Who answers &ldquo;what name is on this account number&rdquo;. This lives here rather
+              than in the deployment so it can be changed without a release.
+            </p>
+
+            <Field label="Provider" as="group">
+              <div className="flex gap-1.5">
+                {ACCOUNT_PROVIDERS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => set("accountProvider", option)}
+                    aria-pressed={draft.accountProvider === option}
+                    className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition ${
+                      draft.accountProvider === option
+                        ? "bg-wine-700 text-white"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    {ACCOUNT_PROVIDER_LABEL[option]}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <p className="text-[12.5px] leading-relaxed text-slate-600">
+              {PROVIDER_BLURB[draft.accountProvider]}
+            </p>
+
+            <Field
+              label="Paystack secret key"
+              hint={
+                keySaved
+                  ? "A key is saved. Type a new one to replace it, or leave this empty to keep it."
+                  : "Starts with sk_live_ or sk_test_. Only needed when Paystack is the provider."
+              }
+            >
+              <input
+                className={inputClass}
+                type="password"
+                autoComplete="off"
+                value={draft.paystackKey}
+                placeholder={keySaved ? "A key is saved" : "sk_live_..."}
+                onChange={(event) => set("paystackKey", event.target.value)}
+              />
+            </Field>
+
+            {draft.accountProvider === "paystack" && !keySaved && draft.paystackKey.trim() === "" && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+                Paystack is selected with no key saved, so account checks will not run and new
+                marketers will be taken with their account unchecked.
+              </p>
+            )}
           </Card>
 
           <Card className="space-y-4">

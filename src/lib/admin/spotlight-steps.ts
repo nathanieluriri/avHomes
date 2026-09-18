@@ -13,6 +13,7 @@
 
 export const SPOTLIGHT_TOUR_IDS = [
   "add-a-listing",
+  "list-an-estate",
   "log-a-change",
   "reply-to-an-enquiry",
   "write-a-journal-post",
@@ -20,6 +21,7 @@ export const SPOTLIGHT_TOUR_IDS = [
   "pay-your-marketers",
   "set-commission-rates",
   "sort-a-payment-problem",
+  "follow-a-buyer",
 ] as const;
 
 export type SpotlightTourId = (typeof SPOTLIGHT_TOUR_IDS)[number];
@@ -205,6 +207,99 @@ const addAListing: SpotlightTour = {
       page: LISTING,
       title: "Publish when ready",
       body: "When it reads right, press Publish. That's the whole flow.",
+      bodyWhen: {
+        anchor: "listing-blockers",
+        body: "Publish unlocks once the list below is clear. Fill those in, save, then press Publish. That's the whole flow.",
+      },
+      advance: "manual",
+      final: true,
+    },
+  ],
+};
+
+/**
+ * An estate is a development, not a house, so it is listed differently: no
+ * single price, a table of options, and a payment plan. This walks the parts
+ * that only an estate has and leaves the rest to `add-a-listing`.
+ */
+const listAnEstate: SpotlightTour = {
+  id: "list-an-estate",
+  title: "List an estate",
+  start: LISTINGS,
+  record: { noun: "estate", draft: "listing-draft", notDraft: "listing-not-draft" },
+  steps: [
+    {
+      anchor: "new-listing",
+      page: LISTINGS,
+      title: "Start the estate",
+      body: "An estate is one listing that holds every house and plot inside it. Press New listing.",
+      advance: "click",
+    },
+    {
+      anchor: "new-listing-form",
+      page: LISTINGS,
+      title: "Press Estate, then name it",
+      body: "Estate rather than Home is the whole fork: it opens a different form. Name the development, not one house in it, then press Create.",
+      advance: "route",
+      route: LISTING,
+      binds: true,
+    },
+    {
+      anchor: "listing-deal",
+      page: LISTING,
+      title: "Type is already Estate Land",
+      body: "It came from the choice you just made, and it is what brings in the options table and the payment plan. There is no Sale or Rent switch here: an estate is sold, not let. Rent belongs to the single home types in this list.",
+      advance: "manual",
+    },
+    {
+      anchor: "listing-options",
+      page: LISTING,
+      title: "Add every option",
+      body: "One row per thing a buyer can pick: a bungalow, a duplex, an apartment, or a plot. The chips add a row of that shape, Enter in a price adds the next one, and a plot needs no name because its size is its name.",
+      advance: "manual",
+      placement: "left",
+    },
+    {
+      anchor: "listing-payment-plan",
+      page: LISTING,
+      title: "Spread the balance",
+      body: "Deposit up front, the rest over so many months. The example under it uses your cheapest option, so you see the real monthly figure before you save.",
+      advance: "manual",
+      placement: "left",
+    },
+    {
+      anchor: "listing-location",
+      page: LISTING,
+      title: "Say where it is",
+      body: "City, area and street. Publishing needs the city and the address.",
+      advance: "manual",
+    },
+    {
+      anchor: "image-library",
+      page: LISTING,
+      title: "Add photos",
+      body: "Press Choose from library. Renders are fine for an off-plan estate, and each option can carry its own picture in the table above.",
+      advance: "click",
+    },
+    {
+      anchor: "savebar-save",
+      page: LISTING,
+      title: "Save the draft",
+      body: "Press Save. Nothing is public yet.",
+      whenNotDraft: {
+        title: "Save your changes",
+        body: "Press Save. This estate is no longer a draft, so if it is live the site changes straight away.",
+      },
+      advance: "click",
+      placement: "top",
+      skipIfMissing: true,
+    },
+    {
+      anchor: "listing-publish",
+      also: ["listing-blockers"],
+      page: LISTING,
+      title: "Publish when ready",
+      body: "The estate's price is worked out from its options, so it reads as a from price on the site. When it looks right, press Publish. That's the whole flow.",
       bodyWhen: {
         anchor: "listing-blockers",
         body: "Publish unlocks once the list below is clear. Fill those in, save, then press Publish. That's the whole flow.",
@@ -683,8 +778,79 @@ const sortAPaymentProblem: SpotlightTour = {
   ],
 };
 
+const BUYERS = "/admin/marketers/buyers";
+const BUYER = "/admin/marketers/buyers/*";
+
+/**
+ * A marketer handed over somebody who might buy. This is the console side of
+ * that: read what they wrote, call the person, and record the move in words the
+ * marketer will read on their phone.
+ */
+const followABuyer: SpotlightTour = {
+  id: "follow-a-buyer",
+  title: "Follow up a buyer",
+  start: BUYERS,
+  steps: [
+    {
+      anchor: "buyer-row",
+      page: BUYERS,
+      title: "Open a new buyer",
+      body: "New means a marketer sent them in and nobody has called yet. Open this one.",
+      advance: "route",
+      route: BUYER,
+      detour: {
+        anchor: "buyer-find-new",
+        title: "Find a new buyer",
+        body: "Choose New to see the buyers nobody has picked up yet.",
+      },
+      none: {
+        anchor: "buyer-none",
+        title: "Everybody has been picked up",
+        body: "No buyer is waiting for a first call. Try this again when a marketer sends one in.",
+      },
+    },
+    {
+      anchor: "buyer-timeline",
+      page: BUYER,
+      title: "Read what the marketer wrote",
+      body: "Oldest at the bottom. This is the whole history, and it is the same list they read on their phone: there is no private note anywhere on this screen.",
+      advance: "manual",
+    },
+    {
+      anchor: "buyer-move",
+      page: BUYER,
+      title: "Pick the move",
+      body: "Where they have got to after your call: We called them, Meeting booked, They viewed, Talking price, Bought or Closed.",
+      advance: "manual",
+    },
+    {
+      anchor: "buyer-reason",
+      page: BUYER,
+      title: "Say why",
+      body: "One of these is required. The list changes with the move, so the reason always fits it.",
+      advance: "manual",
+    },
+    {
+      anchor: "buyer-note",
+      page: BUYER,
+      title: "Write what happened",
+      body: "A few plain words. The marketer reads this, and it is what keeps them sending you people.",
+      advance: "input",
+    },
+    {
+      anchor: "buyer-save",
+      page: BUYER,
+      title: "Move it along",
+      body: "This writes the move and the words onto their phone straight away. Bought is the end of the line: it creates an approved deal and pays the marketer their commission. That's the whole flow.",
+      advance: "manual",
+      final: true,
+    },
+  ],
+};
+
 export const SPOTLIGHT_TOURS: Record<SpotlightTourId, SpotlightTour> = {
   "add-a-listing": addAListing,
+  "list-an-estate": listAnEstate,
   "log-a-change": logAChange,
   "reply-to-an-enquiry": replyToAnEnquiry,
   "write-a-journal-post": writeAJournalPost,
@@ -692,6 +858,7 @@ export const SPOTLIGHT_TOURS: Record<SpotlightTourId, SpotlightTour> = {
   "pay-your-marketers": payYourMarketers,
   "set-commission-rates": setCommissionRates,
   "sort-a-payment-problem": sortAPaymentProblem,
+  "follow-a-buyer": followABuyer,
 };
 
 export function isSpotlightTourId(value: string | null | undefined): value is SpotlightTourId {

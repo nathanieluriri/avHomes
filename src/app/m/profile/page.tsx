@@ -30,7 +30,13 @@ import {
   type ChipTone,
 } from "@/components/marketer/ui";
 import { ApiError, api } from "@/lib/admin/client";
-import { initials, type MarketerResponse, type MeResponse } from "@/lib/marketer/api";
+import {
+  initials,
+  type BankSaved,
+  type MarketerResponse,
+  type MeResponse,
+} from "@/lib/marketer/api";
+import { forgetAccount } from "@/lib/marketer/last-account";
 import { NIGERIAN_STATES } from "@/lib/marketer/states";
 
 /**
@@ -154,6 +160,8 @@ function AccountReady({ me, reload }: { me: MeResponse; reload: () => void }) {
   const bankSpot = useSpotlight(hash === "#bank" ? "bank" : null, "start");
   // Held here, not in the form: the reload after a save remounts the form and would wipe it.
   const [saved, setSaved] = useState(false);
+  // Same reason. A failed name check has to outlive the remount that follows it.
+  const [bankMissed, setBankMissed] = useState("");
   const savedTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(savedTimer.current), []);
 
@@ -196,7 +204,11 @@ function AccountReady({ me, reload }: { me: MeResponse; reload: () => void }) {
             key={`bank-${marketer.updatedAt}`}
             bank={marketer.bank}
             bankCheck={me.bankCheck}
-            onSaved={reload}
+            missed={bankMissed}
+            onSaved={(detail) => {
+              setBankMissed(detail);
+              reload();
+            }}
           />
         </div>
       </section>
@@ -332,12 +344,15 @@ function DetailsForm({
 function BankCard({
   bank,
   bankCheck,
+  missed,
   onSaved,
 }: {
   bank: MarketerBank | null;
   /** False when this site cannot check a name at all, so checking again would change nothing. */
   bankCheck: boolean;
-  onSaved: () => void;
+  /** Why the last check found nothing, from the parent so a remount cannot wipe it. */
+  missed: string;
+  onSaved: (missed: string) => void;
 }) {
   const [draft, setDraft] = useState<BankDraft>({
     bankCode: bank?.bankCode ?? "",
@@ -348,7 +363,6 @@ function BankCard({
   const [showErrors, setShowErrors] = useState(false);
   const [busy, setBusy] = useState<"save" | "check" | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-
   async function put(next: BankDraft, why: "save" | "check") {
     if (!bankReady(next)) {
       setShowErrors(true);
@@ -358,13 +372,16 @@ function BankCard({
     setError(null);
     try {
       // Saving an account runs the bank's name check again on the server.
-      await api.put<MarketerResponse>("/marketing/me/bank", {
+      const res = await api.put<BankSaved>("/marketing/me/bank", {
         bankCode: next.bankCode,
         bankName: next.bankName,
         accountNumber: next.accountNumber,
       });
       setEditing(false);
-      onSaved();
+      /* The card is keyed on `updatedAt`, so this remounts it. The reason a
+         check found nothing therefore has to go UP, or it dies with the
+         component that learned it. */
+      onSaved(res.checked ? "" : res.detail);
     } catch (err) {
       setError(toApiError(err));
     }
@@ -407,6 +424,7 @@ function BankCard({
             </Note>
           )}
           {error && <ErrorNote error={error} />}
+          {missed !== "" && <Note tone="bad">{missed}</Note>}
           {!checked && bankCheck && (
             <PrimaryButton
               busy={busy === "check"}
@@ -506,6 +524,9 @@ function SignOutButton() {
       // A logout the server did not hear is still a logout here: the next
       // screen asks for the session again and bounces if it is still alive.
     }
+    // The name comes off the phone too. Signing out and still being greeted by
+    // name is the opposite of what somebody handing over their phone wants.
+    forgetAccount();
     router.replace("/m/sign-in");
   }
 

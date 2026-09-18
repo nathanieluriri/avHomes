@@ -87,6 +87,7 @@ const NESTED_ENTITY_BY_SEGMENT: Record<string, Record<string, AuditEntity>> = {
   marketing: {
     marketers: "marketer",
     deals: "deal",
+    leads: "lead",
     "pay-runs": "payrun",
     updates: "update",
   },

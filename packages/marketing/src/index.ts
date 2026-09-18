@@ -14,7 +14,13 @@ export {
   type RecentListing,
 } from "./routes";
 
-export { readMarketingSettings, writeMarketingSettings } from "./settings";
+export {
+  paystackKeySaved,
+  readMarketingSettings,
+  readPaystackKey,
+  writeMarketingSettings,
+  writePaystackKey,
+} from "./settings";
 
 export {
   balanceFor,
@@ -28,15 +34,40 @@ export {
   marketingCounts,
   reconcile,
   rootMarketer,
+  statementFor,
   teamFor,
   type MarketingCounts,
   type TeamSummary,
 } from "./repo";
 
-export { listBanks, paystackConfigured, resolveAccount, type BankOption } from "./bank";
+export {
+  listBanks,
+  providerState,
+  resolveAccount,
+  type BankOption,
+  type ProviderState,
+} from "./bank";
+
+export {
+  createLead,
+  getLead,
+  getLeadFor,
+  leadCounts,
+  listLeads,
+  moveLead,
+  noteOnLead,
+  openLeadCount,
+  winLead,
+  withShares,
+  type LeadActor,
+  type LeadInput,
+  type LeadListQuery,
+  type WinInput,
+} from "./leads";
 
 export {
   toDeal,
+  toLead,
   toLedgerLine,
   toMarketer,
   toMarketingUpdate,
@@ -44,6 +75,7 @@ export {
   toPayRun,
   type DealDoc,
   type IssueDoc,
+  type LeadDoc,
   type LedgerDoc,
   type MarketerDoc,
   type PayRunDoc,

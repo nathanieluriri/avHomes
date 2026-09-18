@@ -1,0 +1,21 @@
+[
+  {
+    "name": "console-tutorials",
+    "path": "/admin/tutorials",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 2000, "shot": "catalogue" },
+      { "scroll": 500, "wait": 600, "shot": "catalogue-scrolled" },
+      { "click": "::-p-text(List an estate)", "wait": 2500, "shot": "estate-open" }
+    ]
+  },
+  {
+    "name": "m-help",
+    "path": "/m/help",
+    "viewport": "phone",
+    "steps": [
+      { "wait": 2000, "shot": "topics" },
+      { "click": "::-p-text(Log a buyer)", "wait": 2500, "shot": "buyer-open" }
+    ]
+  }
+]

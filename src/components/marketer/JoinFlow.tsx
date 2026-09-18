@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, type ComponentType } from "react";
 import { ChevronLeft, Phone } from "lucide-react";
-import { AuthFrame, OtherDoor, PasswordInput } from "./account/AuthFrame";
+import { AuthDoor, DoorTitle, OtherDoor, PasswordInput } from "./account/AuthFrame";
 import { BankFields, EMPTY_BANK, bankReady, type BankDraft } from "./BankFields";
 import {
   IconBank,
@@ -29,6 +29,7 @@ import {
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import type { JoinInfo, MarketerResponse } from "@/lib/marketer/api";
+import { rememberAccount } from "@/lib/marketer/last-account";
 import { NIGERIAN_STATES } from "@/lib/marketer/states";
 
 /**
@@ -150,6 +151,7 @@ export function JoinFlow({ code }: { code: string }) {
           : {}),
       });
       // The join route issues the session, so the app is already signed in.
+      rememberAccount({ name: displayName.trim(), email: email.trim() });
       router.replace("/m");
     } catch (err) {
       setError(toApiError(err));
@@ -159,10 +161,15 @@ export function JoinFlow({ code }: { code: string }) {
 
   if (info.data && !info.data.open) {
     return (
-      <AuthFrame
-        title="Not taking new people right now"
-        hint="Sign ups are paused for a while. Everybody already in keeps working."
-        tab="Sign ups are paused"
+      <AuthDoor
+        back="/m/sign-in"
+        head={
+          <DoorTitle
+            title="Not taking new people right now"
+            hint="Sign ups are paused for a while. Everybody already in keeps working."
+          />
+        }
+        foot={<OtherDoor question="Already have an account?" href="/m/sign-in" action="Sign in" />}
       >
         <Card className="m-card--lg">
           <div className="flex items-center gap-3.5">
@@ -185,31 +192,37 @@ export function JoinFlow({ code }: { code: string }) {
             </ButtonLink>
           )}
         </Card>
-        <OtherDoor question="Already have an account?" href="/m/sign-in" action="Sign in" />
-      </AuthFrame>
+      </AuthDoor>
     );
   }
 
   const referrer = info.data?.referrer ?? null;
 
   return (
-    <AuthFrame
-      title="Earn on every home"
-      hint="Bring a buyer or a tenant to AV Homes, and take a share of the deal."
-      tab="Create your account"
-      hero={
-        <ul className="mt-5 grid grid-cols-3 gap-2.5" aria-label="What joining means">
-          {PROMISES.map(({ Icon, short }) => (
-            <li
-              key={short}
-              className="m-glass flex flex-col items-center gap-1 rounded-[18px] px-1.5 pb-2.5 pt-2 text-center"
-            >
-              <Icon size={44} />
-              <span className="text-[12px] font-semibold leading-tight">{short}</span>
-            </li>
-          ))}
-        </ul>
+    <AuthDoor
+      back="/m/sign-in"
+      head={
+        <>
+          <DoorTitle
+            title="Earn on every home"
+            hint="Bring a buyer or a tenant to AV Homes, and take a share of the deal."
+          />
+          {/* On the flat ground these are raised cards, not glass: there is no
+              wine behind them for a translucent tile to lift. */}
+          <ul className="mt-5 grid grid-cols-3 gap-2.5" aria-label="What joining means">
+            {PROMISES.map(({ Icon, short }) => (
+              <li
+                key={short}
+                className="flex flex-col items-center gap-1 rounded-[18px] bg-m-card px-1.5 pb-2.5 pt-2 text-center"
+              >
+                <Icon size={44} />
+                <span className="text-[12px] font-semibold leading-tight text-m-text">{short}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       }
+      foot={<OtherDoor question="Already have an account?" href="/m/sign-in" action="Sign in" />}
     >
       <div className="space-y-5">
         {code !== "" && info.loading && <Skeleton className="h-[92px]" radius="24px" />}
@@ -412,8 +425,7 @@ export function JoinFlow({ code }: { code: string }) {
         )}
       </div>
 
-      <OtherDoor question="Already have an account?" href="/m/sign-in" action="Sign in" />
-    </AuthFrame>
+    </AuthDoor>
   );
 }
 

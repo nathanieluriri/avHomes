@@ -9,6 +9,7 @@ import { VideoSheet } from "@/components/marketer/VideoSheet";
 import { CallRow } from "@/components/marketer/account/CallRow";
 import {
   IconCheckBadge,
+  IconHandshake,
   IconHelp,
   IconInvite,
   IconMoney,
@@ -49,6 +50,7 @@ import {
 const TOPIC_ICON: Partial<Record<TutorialId, ComponentType<IconProps>>> = {
   "report-a-deal": IconReport,
   "invite-and-earn": IconInvite,
+  "log-a-buyer": IconHandshake,
 };
 
 /** How the money moves, in the order it moves. */

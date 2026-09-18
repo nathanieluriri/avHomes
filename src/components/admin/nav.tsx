@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   TriangleAlert,
   UserRoundCheck,
+  UserRoundSearch,
   Users,
   UsersRound,
   type LucideIcon,
@@ -194,6 +195,13 @@ export const NAV: readonly NavItem[] = [
     icon: UsersRound,
     domain: "marketing",
     children: [
+      {
+        href: "/admin/marketers/buyers",
+        label: "Buyers",
+        hint: "People marketers introduced, and where each one has got to",
+        icon: UserRoundSearch,
+        domain: "marketing",
+      },
       {
         href: "/admin/marketers/deals",
         label: "Deals",

@@ -11,9 +11,10 @@ import {
   MARKETER_TONE,
   bankLine,
   joinedOn,
+  toApiError,
   type MarketingCounts,
 } from "@/lib/admin/marketing";
-import { Badge, ButtonLink, EmptyState, ErrorNote, PageHeader } from "@/components/admin/ui";
+import { Badge, Button, ButtonLink, EmptyState, ErrorNote, PageHeader } from "@/components/admin/ui";
 import { DataTable, IdCell, TableToolbar, type Column } from "@/components/admin/DataTable";
 
 /**
@@ -39,6 +40,83 @@ interface MarketerPage {
   total: number;
 }
 
+/** What `POST /verify-bank` answers. `matches` is advice, never a gate. */
+interface CheckResult {
+  found: boolean;
+  matches: boolean;
+  accountName: string;
+  detail: string;
+}
+
+/**
+ * The bank column, and the one-tap check.
+ *
+ * THE ACCOUNT RESOLVING IS THE VERIFICATION. A name that does not look like the
+ * marketer's is reported and nothing more: a wife's account, a business name, a
+ * bank that leads with the surname and a middle name nobody types are all
+ * ordinary. So a mismatch shows both names and leaves the decision with whoever
+ * is reading, rather than refusing an account that is perfectly correct.
+ */
+function BankCell({
+  marketer,
+  result,
+  busy,
+  onCheck,
+}: {
+  marketer: Marketer;
+  result?: CheckResult;
+  busy: boolean;
+  onCheck: () => void;
+}) {
+  if (!marketer.bank) return <Badge tone="amber">No bank account</Badge>;
+
+  const verified = marketer.bank.verifiedAt !== null;
+
+  return (
+    <span className="block min-w-0">
+      <span className="block truncate text-slate-600">{bankLine(marketer.bank)}</span>
+
+      {marketer.bank.accountName !== "" && (
+        <span className="block truncate text-[12px] text-slate-600">
+          {marketer.bank.accountName}
+        </span>
+      )}
+
+      <span className="mt-1 flex flex-wrap items-center gap-1.5">
+        {verified ? (
+          <Badge tone="green">Verified</Badge>
+        ) : (
+          <Badge tone="amber">Unverified</Badge>
+        )}
+
+        {result && !result.found && <Badge tone="red">Not found</Badge>}
+        {result?.found && !result.matches && <Badge tone="amber">Different name</Badge>}
+
+        {!verified && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={onCheck}
+            title="Check this account with the bank"
+          >
+            {busy ? "Checking..." : "Verify"}
+          </Button>
+        )}
+      </span>
+
+      {result && !result.found && result.detail !== "" && (
+        <span className="mt-1 block text-[12px] text-red-700">{result.detail}</span>
+      )}
+      {result?.found && !result.matches && (
+        <span className="mt-1 block text-[12px] text-amber-800">
+          The bank says {result.accountName}. Saved anyway: check it is the account they meant.
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function MarketersPage() {
   const [status, setStatus] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -62,7 +140,40 @@ export default function MarketersPage() {
     [],
   );
 
+  /* What each check came back with, keyed by marketer. Held here rather than
+     folded into the row so a re-fetch of the list does not wipe the answer the
+     admin is still reading. */
+  const [checks, setChecks] = useState<Record<string, CheckResult>>({});
+  const [checking, setChecking] = useState<string | null>(null);
+
+  async function check(marketer: Marketer) {
+    if (!marketer.bank) return;
+    setChecking(marketer.id);
+    try {
+      const res = await api.post<CheckResult>(
+        `/admin/marketing/marketers/${marketer.id}/verify-bank`,
+        {},
+      );
+      setChecks((was) => ({ ...was, [marketer.id]: res }));
+      // The row itself carries verifiedAt, so the list has to catch up.
+      if (res.found) reload();
+    } catch (err) {
+      setChecks((was) => ({
+        ...was,
+        [marketer.id]: {
+          found: false,
+          matches: false,
+          accountName: "",
+          detail: toApiError(err).message,
+        },
+      }));
+    } finally {
+      setChecking(null);
+    }
+  }
+
   const rows = data?.items ?? [];
+  const unchecked = rows.filter((row) => row.bank && row.bank.verifiedAt === null).length;
 
   const columns: Column<Marketer>[] = [
     {
@@ -104,12 +215,14 @@ export default function MarketersPage() {
       key: "bank",
       header: "Bank",
       mobile: "tablet",
-      render: (marketer) =>
-        marketer.bank ? (
-          <span className="text-slate-600">{bankLine(marketer.bank)}</span>
-        ) : (
-          <Badge tone="amber">No bank account</Badge>
-        ),
+      render: (marketer) => (
+        <BankCell
+          marketer={marketer}
+          result={checks[marketer.id]}
+          busy={checking === marketer.id}
+          onCheck={() => void check(marketer)}
+        />
+      ),
     },
     {
       key: "joined",
@@ -154,6 +267,18 @@ export default function MarketersPage() {
       {error && (
         <div className="mb-4">
           <ErrorNote error={error} onRetry={reload} />
+        </div>
+      )}
+
+      {unchecked > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+          <ShieldCheck className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            {unchecked === 1
+              ? "One marketer's bank account has never been checked."
+              : `${unchecked} marketers' bank accounts have never been checked.`}{" "}
+            Verify in the Bank column to ask the bank whose name is on the account.
+          </span>
         </div>
       )}
 

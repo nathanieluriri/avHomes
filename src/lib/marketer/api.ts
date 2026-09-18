@@ -11,6 +11,7 @@ import type {
   CommissionRates,
   Deal,
   DealShare,
+  LeadRow,
   LedgerLine,
   Marketer,
   MarketerAlert,
@@ -19,6 +20,7 @@ import type {
   MarketingUpdate,
   PayIssue,
   TeamMember,
+  Transaction,
 } from "@avhomes/contracts";
 
 /** `GET /api/marketing/me`. The whole app's opening read. */
@@ -92,6 +94,19 @@ export interface MoneyResponse {
   month: string;
 }
 
+/** `GET /api/marketing/leads`. Potential buyers this marketer handed over. */
+export interface LeadsResponse {
+  items: LeadRow[];
+  total: number;
+}
+
+/** `GET /api/marketing/statement`. Every money event, newest first. */
+export interface StatementResponse {
+  items: Transaction[];
+  /** The account's first day, so the date picker offers nothing before it. */
+  joinedAt: number;
+}
+
 export interface TeamResponse {
   levels: [number, number, number];
   members: TeamMember[];
@@ -132,6 +147,13 @@ export interface ResolvedAccount {
 
 export interface MarketerResponse {
   marketer: Marketer;
+}
+
+/** `PUT /api/marketing/me/bank`. Says whether the name check actually ran. */
+export interface BankSaved extends MarketerResponse {
+  checked: boolean;
+  /** Why it did not, in the marketer's own words. Empty when it did. */
+  detail: string;
 }
 
 /** Up to two letters for the avatar. Falls back to the first letter of a code. */

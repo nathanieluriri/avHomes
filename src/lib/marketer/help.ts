@@ -63,6 +63,20 @@ const WRITTEN: readonly Written[] = [
     ],
   },
   {
+    id: "log-a-buyer",
+    title: "Log a buyer",
+    problem: "Know somebody who wants to buy? Hand them over and still get paid.",
+    steps: [
+      { title: "Open Buyers", line: "Tap Menu at the bottom right, then Buyers." },
+      { title: "Tap the plus", line: "Top right of the screen. It opens one short form." },
+      { title: "Their name and number", line: "We call this number, so make sure they are expecting us." },
+      { title: "Search the property", line: "Type a few letters of what they liked. Leave it out if they have not picked one." },
+      { title: "Tick the options", line: "An estate holds several houses and plots. Tick every one they are interested in, not just one." },
+      { title: "Send it to us", line: "We call them, book the viewing and close it. You watch every step here." },
+      { title: "You are paid the same", line: "If they buy, you earn the commission you would have earned closing it yourself." },
+    ],
+  },
+  {
     id: "invite-and-earn",
     title: "Invite people and earn",
     problem: "Share your link, and earn a slice of every deal your people close.",
