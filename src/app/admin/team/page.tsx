@@ -6,6 +6,7 @@ import {
   ROLE_INFO,
   canAssign,
   canManage,
+  isConsoleRole,
   type AssignableRole,
   type AuthUser,
   type Role,
@@ -214,6 +215,25 @@ function PersonRow({
 }) {
   const [pending, setPending] = useState<AssignableRole | null>(null);
   const staged = pending && pending !== user.role ? pending : null;
+  /*
+   * A picker is only offered for a role the picker can SHOW.
+   *
+   * `<select>` with a value no `<option>` carries does not sit blank: the
+   * browser falls back to the first option and the row then states, in a
+   * control, a role the person does not hold. That is how a marketer's card
+   * read "Developer" while their badge said Marketer, and the fix was one
+   * scroll away from being committed.
+   *
+   * Marketers no longer reach this list at all and an owner was already
+   * excluded, so this is the wall behind both rather than a case that fires:
+   * anything the list cannot represent gets its badge and no control.
+   */
+  const rerollable = (ASSIGNABLE_ROLES as readonly Role[]).includes(user.role);
+  /* A marketer is not a colleague in the console, and these routes now refuse
+     to treat one as a colleague. The list no longer returns them, so this is
+     the wall behind that: a row this screen cannot act on gets its badge and
+     no buttons, rather than two that answer 412. */
+  const consoleMember = isConsoleRole(user.role);
 
   return (
     <li className="flex flex-col gap-3 border-b border-mist-100 px-4 py-4 last:border-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
@@ -242,7 +262,7 @@ function PersonRow({
           {user.disabledAt ? "disabled" : ROLE_INFO[user.role].label}
         </Badge>
 
-        {manageable && user.role !== "owner" && (
+        {manageable && consoleMember && rerollable && (
           /* `inputClassCompact`, not `inputClass` plus overrides. The old
              `${inputClass} w-auto py-1 text-xs` set two values for three
              properties, and Tailwind v4 sorts its own output, so the rendered
@@ -278,6 +298,7 @@ function PersonRow({
         )}
 
         {manageable &&
+          consoleMember &&
           user.id !== actor?.id &&
           /* Enable is not destructive and asks nothing. Disable locks a
              colleague out of the console the moment it lands, with no undo

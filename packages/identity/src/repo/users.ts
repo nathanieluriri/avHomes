@@ -249,12 +249,32 @@ export async function countActiveOwners(db: Db): Promise<number> {
 }
 
 /**
+ * Who the caller is asking about.
+ *
+ * `console` is the team: the accounts that hold a role in the admin. `all` adds
+ * the marketers, who are accounts here but are not colleagues in the console,
+ * and is for the audit trail's actor picker, where a marketer who reported a
+ * deal is a name somebody needs to filter by.
+ */
+export type UserScope = "console" | "all";
+
+/**
  * Unpaginated by design. Accounts exist only by invite, one at a time. An
  * instance with enough of them to page is one where something has gone wrong.
+ *
+ * That sentence stopped being true when the marketer app opened its own door:
+ * marketers sign themselves up, there can be hundreds of them, and they are
+ * users rows like any other. `console` is the DEFAULT because the screens that
+ * read this endpoint are about console membership, and a list that quietly
+ * grows by self-signup is the wrong list to hand a role picker.
  */
-export async function listUsers(db: Db): Promise<Omit<TeamUser, "listingCount" | "postCount">[]> {
+export async function listUsers(
+  db: Db,
+  scope: UserScope = "console",
+): Promise<Omit<TeamUser, "listingCount" | "postCount">[]> {
+  const filter = scope === "console" ? { role: { $ne: "marketer" as const } } : {};
   const docs = await users(db)
-    .find({}, { projection: TEAM_PROJECTION, sort: { createdAt: 1 } })
+    .find(filter, { projection: TEAM_PROJECTION, sort: { createdAt: 1 } })
     .toArray();
   return docs.map((doc) => ({
     ...toAuthUser(doc),

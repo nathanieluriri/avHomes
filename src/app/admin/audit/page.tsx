@@ -91,8 +91,17 @@ export default function AuditPage() {
   );
   const lastAt = latest.data?.items[0]?.at ?? null;
 
+  /*
+   * `scope=all`, so the picker keeps the marketers.
+   *
+   * The endpoint answers with console members by default, which is what the
+   * team screen wants and the wrong list here: the trail records every
+   * authenticated write, marketers report deals through their own app, and a
+   * filter that cannot name them is a filter that cannot answer "what did this
+   * person change".
+   */
   const users = useAsync<{ items: TeamUser[] }>(
-    (signal) => api.get<{ items: TeamUser[] }>("/admin/users", signal),
+    (signal) => api.get<{ items: TeamUser[] }>("/admin/users?scope=all", signal),
     [],
   );
 
