@@ -15,11 +15,14 @@ const MAP = {
   "06-pay-your-marketers": "pay-your-marketers",
   "07-set-commission-rates": "set-commission-rates",
   "10-sort-a-payment-problem": "sort-a-payment-problem",
+  "15-list-an-estate": "list-an-estate",
+  "16-follow-a-buyer": "follow-a-buyer",
   "08-report-a-deal-iphone": "report-a-deal",
   "09-invite-and-earn-iphone": "invite-and-earn",
   "11-share-a-listing-iphone": "share-a-listing",
   "12-send-more-proof-iphone": "send-more-proof",
   "13-join-as-a-marketer-iphone": "join-as-a-marketer",
+  "14-log-a-buyer-iphone": "log-a-buyer",
 };
 
 // The closing card of each video, so its text has an HTML twin too (see compose.cjs).
@@ -32,6 +35,9 @@ const OUTRO = {
   "pay-your-marketers": { title: "Now try it yourself", line: "Press Try it now. A walkthrough guides you on the real screen, step by step." },
   "set-commission-rates": { title: "Now try it yourself", line: "Press Try it now. A walkthrough guides you on the real screen, step by step." },
   "sort-a-payment-problem": { title: "Now try it yourself", line: "Press Try it now. A walkthrough guides you on the real screen, step by step." },
+  "list-an-estate": { title: "Now try it yourself", line: "Press Try it now. A walkthrough guides you on the real screen, step by step." },
+  "follow-a-buyer": { title: "Now try it yourself", line: "Press Try it now. A walkthrough guides you on the real screen, step by step." },
+  "log-a-buyer": { title: "Now send us one person", line: "Menu, then Buyers, then the + at the top. We do the calls. You are paid the same commission." },
   "report-a-deal": { title: "Now report yours", line: "Tap the round + in the middle of the bar. We check the proof, then the money is yours." },
   "invite-and-earn": { title: "Now bring someone in", line: "Send your link to one person this week. When they close a home, you earn from it too." },
   "share-a-listing": { title: "Now share a home", line: "Open Listings from the Menu and tap Share. An enquiry from your link names you." },

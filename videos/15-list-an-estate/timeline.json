@@ -1,0 +1,117 @@
+{
+  "footageDuration": 120.84,
+  "captions": [
+    {
+      "at": 6.4,
+      "until": 10.2,
+      "title": "Start with New listing",
+      "line": "An estate is one listing that holds every house and plot inside it.",
+      "start": 0.2,
+      "end": 4
+    },
+    {
+      "at": 10.34,
+      "until": 17.9,
+      "title": "Press Estate, then name it",
+      "line": "Estate rather than Home opens a different form. Name the development, not one house in it.",
+      "start": 4.14,
+      "end": 11.7
+    },
+    {
+      "at": 17.99,
+      "until": 27.6,
+      "title": "Tagline and description",
+      "line": "What the whole place is, in one line and one paragraph.",
+      "start": 11.79,
+      "end": 19.18
+    },
+    {
+      "at": 27.7,
+      "until": 35.4,
+      "title": "No Sale or Rent here",
+      "line": "An estate is sold, not let. Off-plan and the title document say what stage it is at.",
+      "start": 19.26,
+      "end": 25.95
+    },
+    {
+      "at": 35.56,
+      "until": 39,
+      "title": "One row per option",
+      "line": "A chip adds a row of that shape, and a row is one thing a buyer can pick.",
+      "start": 26.09,
+      "end": 29.09
+    },
+    {
+      "at": 39.18,
+      "until": 50.2,
+      "title": "Name it, size it, price it",
+      "line": "A two bedroom bungalow, then a three. Enter moves the caret on.",
+      "start": 29.24,
+      "end": 40.26
+    },
+    {
+      "at": 50.35,
+      "until": 78.1,
+      "title": "Duplexes, apartments, a terrace",
+      "line": "The same three fields every time. Enter in a price adds the next size up.",
+      "start": 40.41,
+      "end": 55.83
+    },
+    {
+      "at": 78.29,
+      "until": 90.8,
+      "title": "A plot needs no name",
+      "line": "Its size is its name, and the chip puts the caret straight in the square metres.",
+      "start": 55.93,
+      "end": 64.56
+    },
+    {
+      "at": 90.94,
+      "until": 95,
+      "title": "The price nobody typed",
+      "line": "From 6.8 million, worked out from the cheapest option below.",
+      "start": 64.66,
+      "end": 68.72
+    },
+    {
+      "at": 95.19,
+      "until": 105.7,
+      "title": "Spread the balance",
+      "line": "Deposit up front, the rest over so many months. The example uses your cheapest option.",
+      "start": 68.91,
+      "end": 79.42
+    },
+    {
+      "at": 105.81,
+      "until": 113.6,
+      "title": "Where it is",
+      "line": "Publishing needs the city and the address.",
+      "start": 79.53,
+      "end": 85.52
+    },
+    {
+      "at": 113.74,
+      "until": 125.4,
+      "title": "Photos, then save",
+      "line": "Renders are fine for an off-plan estate, and each option can carry its own.",
+      "start": 85.63,
+      "end": 97.29
+    },
+    {
+      "at": 127.2,
+      "until": 142.2,
+      "title": "Publish it",
+      "line": "Then Preview: the site itself, rendering what you just typed. Nothing there is public.",
+      "start": 96.94,
+      "end": 111.94
+    },
+    {
+      "at": 142.34,
+      "until": 151,
+      "title": "Ten options, one page",
+      "line": "Each with its price and its monthly figure, under one from price.",
+      "start": 112.08,
+      "end": 120.74
+    }
+  ]
+}

@@ -6,7 +6,9 @@ import { Check, X } from "lucide-react";
 import {
   ESTATE_TYPE,
   formatMoney,
+  formatSqm,
   leadRefusal,
+  prototypeLabel,
   type DealKind,
   type EstatePrototype,
   type LeadUnit,
@@ -456,7 +458,15 @@ function UnitPicker({
         ? chosen.filter((unit) => unit.key !== prototype.id)
         : [
             ...chosen,
-            { key: prototype.id, name: prototype.name, priceMinor: prototype.priceMinor },
+            /* `prototypeLabel`, not `name`. A plot is normally left unnamed, so
+               its name is "" and the row would say nothing: an admin reading
+               "Which one sold" would get a blank chip. The label falls back to
+               "500 sqm plot", which is what the estate calls it everywhere else. */
+            {
+              key: prototype.id,
+              name: prototypeLabel(prototype),
+              priceMinor: prototype.priceMinor,
+            },
           ],
     );
   }
@@ -474,6 +484,19 @@ function UnitPicker({
         {listing.prototypes.map((prototype) => {
           const on = keys.has(prototype.id);
           const gone = !prototype.available;
+          const label = prototypeLabel(prototype);
+          const spec =
+            prototype.kind === "plot"
+              ? prototype.sizeSqm > 0
+                ? `${formatSqm(prototype.sizeSqm)} plot`
+                : "Plot"
+              : `${prototype.bedrooms} bed`;
+          /* A plot is normally left unnamed, so its label IS "500 sqm plot" and
+             a second line saying the same thing is noise. Dropped when the two
+             match, kept when the option carries a name of its own. */
+          const detail = [spec === label ? "" : spec, gone ? "Sold out" : ""]
+            .filter(Boolean)
+            .join(" · ");
           return (
             <li key={prototype.id} className="border-b border-m-line last:border-0">
               <label
@@ -497,14 +520,11 @@ function UnitPicker({
 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14.5px] font-semibold text-m-text">
-                    {prototype.name}
+                    {label}
                   </span>
-                  <span className="block truncate text-[12.5px] text-m-muted">
-                    {prototype.kind === "plot"
-                      ? `${prototype.sizeSqm > 0 ? `${prototype.sizeSqm} sqm ` : ""}plot`
-                      : `${prototype.bedrooms} bed`}
-                    {gone ? " · Sold out" : ""}
-                  </span>
+                  {detail !== "" && (
+                    <span className="block truncate text-[12.5px] text-m-muted">{detail}</span>
+                  )}
                 </span>
 
                 {prototype.priceMinor > 0 && (

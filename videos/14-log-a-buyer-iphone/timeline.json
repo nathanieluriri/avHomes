@@ -1,0 +1,77 @@
+{
+  "footageDuration": 53.55,
+  "captions": [
+    {
+      "at": 0.4,
+      "until": 8.8,
+      "title": "Menu, then Buyers",
+      "line": "Everyone you have sent us, and where each one has got to.",
+      "start": 0.1,
+      "end": 8.5
+    },
+    {
+      "at": 9.05,
+      "until": 12.4,
+      "title": "Tap the plus",
+      "line": "Top right. One short form, not a stepper.",
+      "start": 8.75,
+      "end": 12.1
+    },
+    {
+      "at": 12.6,
+      "until": 19.6,
+      "title": "Their name and number",
+      "line": "We call this number, so make sure they are expecting us.",
+      "start": 12.3,
+      "end": 19.3
+    },
+    {
+      "at": 19.81,
+      "until": 27.4,
+      "title": "Find what they liked",
+      "line": "Type a few letters. Leave it out if they have not picked one yet.",
+      "start": 19.51,
+      "end": 27.1
+    },
+    {
+      "at": 27.61,
+      "until": 33,
+      "title": "An estate needs one more answer",
+      "line": "Which one inside it. Tick every option they asked about, not just one.",
+      "start": 27.31,
+      "end": 32.7
+    },
+    {
+      "at": 33.1,
+      "until": 37.6,
+      "title": "Sold out stays on the list",
+      "line": "It is shown, not hidden. Somebody asking for the one that is gone is worth knowing.",
+      "start": 32.8,
+      "end": 37.3
+    },
+    {
+      "at": 37.72,
+      "until": 42.6,
+      "title": "Anything we should know",
+      "line": "Optional, and the most useful thing on the form.",
+      "start": 37.42,
+      "end": 42.3
+    },
+    {
+      "at": 42.76,
+      "until": 50.8,
+      "title": "Send it to AV Homes",
+      "line": "We call them, book the viewing and close it.",
+      "start": 42.46,
+      "end": 50.5
+    },
+    {
+      "at": 50.9,
+      "until": 53.8,
+      "title": "Watch every step here",
+      "line": "Every move comes with the reason for it, in our own words.",
+      "start": 50.6,
+      "end": 53.5
+    }
+  ]
+}

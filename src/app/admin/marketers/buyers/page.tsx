@@ -63,6 +63,12 @@ export default function BuyersPage() {
 
   const rows = data?.items ?? [];
 
+  /* The follow-a-buyer walkthrough opens the first buyer nobody has called, and
+     says so when there is none. Never while loading: the rows held over from the
+     last tab are not new buyers. */
+  const settled = !loading && !error && Boolean(data);
+  const tutorialRow = settled && tab === "new" ? rows[0] : undefined;
+
   /* The open tab counts what it is showing. Every other tab shows its own total
      only while nothing is narrowing it: a number that disagrees with the rows
      under it is worse than no number at all. */
@@ -139,6 +145,8 @@ export default function BuyersPage() {
         rows={rows}
         rowKey={(lead) => lead.id}
         hrefFor={(lead) => `/admin/marketers/buyers/${lead.id}`}
+        rowSpotlight={(lead) => (lead === tutorialRow ? "buyer-row" : undefined)}
+        spotlight={settled && tab === "new" && query === "" && rows.length === 0 ? "buyer-none" : undefined}
         loading={loading}
         toolbar={
           <TableToolbar
@@ -150,6 +158,7 @@ export default function BuyersPage() {
                 count: countFor(option.value),
               })),
               onChange: (value) => setTab(value as LeadState | "all"),
+              spotlight: tab !== "new" ? { value: "new", name: "buyer-find-new" } : undefined,
             }}
             search={{
               value: searchInput,

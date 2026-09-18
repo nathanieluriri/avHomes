@@ -651,7 +651,12 @@ function mockApi(S) {
         address: "",
         city: "",
         location: "",
-        type: "",
+        // The kind is chosen beside the name, and an estate opens a different
+        // form, so the answer has to survive the round trip.
+        type: b.type || "",
+        prototypes: [],
+        paymentPlan: null,
+        buildStage: null,
         amenities: [],
         images: [],
         priceMinor: 0,
@@ -1255,6 +1260,8 @@ function marketingApi(S) {
         buyerPhone: b.buyerPhone,
         listingId: b.listingId || null,
         listingTitle: b.listingTitle || "",
+        // Which options inside an estate, snapshotted as `createLead` does.
+        wantUnits: b.wantUnits || [],
         wantKind: b.wantKind || null,
         wantArea: b.wantArea || "",
         wantBudgetMinor: b.wantBudgetMinor || 0,

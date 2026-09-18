@@ -1,0 +1,100 @@
+{
+  "segments": [
+    [6.2, 17.99, 1],
+    [17.99, 27.7, 1.3],
+    [27.7, 39.18, 1.15],
+    [39.18, 50.35, 1],
+    [50.35, 78.29, 1.8],
+    [78.29, 90.94, 1.45],
+    [90.94, 105.81, 1],
+    [105.81, 113.74, 1.3],
+    [113.74, 125.5, 1],
+    [127.2, 151.1, 1]
+  ],
+  "captions": [
+    {
+      "at": 6.4,
+      "until": 10.2,
+      "title": "Start with New listing",
+      "line": "An estate is one listing that holds every house and plot inside it."
+    },
+    {
+      "at": 10.34,
+      "until": 17.9,
+      "title": "Press Estate, then name it",
+      "line": "Estate rather than Home opens a different form. Name the development, not one house in it."
+    },
+    {
+      "at": 17.99,
+      "until": 27.6,
+      "title": "Tagline and description",
+      "line": "What the whole place is, in one line and one paragraph."
+    },
+    {
+      "at": 27.7,
+      "until": 35.4,
+      "title": "No Sale or Rent here",
+      "line": "An estate is sold, not let. Off-plan and the title document say what stage it is at."
+    },
+    {
+      "at": 35.56,
+      "until": 39.0,
+      "title": "One row per option",
+      "line": "A chip adds a row of that shape, and a row is one thing a buyer can pick."
+    },
+    {
+      "at": 39.18,
+      "until": 50.2,
+      "title": "Name it, size it, price it",
+      "line": "A two bedroom bungalow, then a three. Enter moves the caret on."
+    },
+    {
+      "at": 50.35,
+      "until": 78.1,
+      "title": "Duplexes, apartments, a terrace",
+      "line": "The same three fields every time. Enter in a price adds the next size up."
+    },
+    {
+      "at": 78.29,
+      "until": 90.8,
+      "title": "A plot needs no name",
+      "line": "Its size is its name, and the chip puts the caret straight in the square metres."
+    },
+    {
+      "at": 90.94,
+      "until": 95.0,
+      "title": "The price nobody typed",
+      "line": "From 6.8 million, worked out from the cheapest option below."
+    },
+    {
+      "at": 95.19,
+      "until": 105.7,
+      "title": "Spread the balance",
+      "line": "Deposit up front, the rest over so many months. The example uses your cheapest option."
+    },
+    {
+      "at": 105.81,
+      "until": 113.6,
+      "title": "Where it is",
+      "line": "Publishing needs the city and the address."
+    },
+    {
+      "at": 113.74,
+      "until": 125.4,
+      "title": "Photos, then save",
+      "line": "Renders are fine for an off-plan estate, and each option can carry its own."
+    },
+    {
+      "at": 127.2,
+      "until": 142.2,
+      "title": "Publish it",
+      "line": "Then Preview: the site itself, rendering what you just typed. Nothing there is public."
+    },
+    {
+      "at": 142.34,
+      "until": 151.0,
+      "title": "Ten options, one page",
+      "line": "Each with its price and its monthly figure, under one from price."
+    }
+  ]
+}

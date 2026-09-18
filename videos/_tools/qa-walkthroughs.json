@@ -1,0 +1,34 @@
+[
+  {
+    "name": "wt-list-an-estate",
+    "path": "/admin/properties?spotlight=list-an-estate",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1600, "shot": "01-start" },
+      { "click": "::-p-xpath(//button[normalize-space()='New listing'])", "wait": 900, "shot": "02-name" },
+      { "click": "::-p-xpath(//div[@role='group'][@aria-label='Kind of listing']//button[normalize-space()='Estate'])", "wait": 500 },
+      { "type": "Idu Grove Estate", "wait": 300 },
+      { "click": "::-p-xpath(//form//button[@type='submit'])", "wait": 3000, "shot": "03-type" },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "04-options" },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "05-plan" },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "06-where" },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "07-photos" }
+    ]
+  },
+  {
+    "name": "wt-follow-a-buyer",
+    "path": "/admin/marketers/buyers?spotlight=follow-a-buyer",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 1600, "shot": "01-row" },
+      { "click": "::-p-text(Ifeoma Nwosu)", "wait": 2500, "shot": "02-timeline" },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1000, "shot": "03-move" },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1000, "shot": "04-reason" },
+      { "click": "::-p-xpath(//button[normalize-space()='Reached them'])", "wait": 600 },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1000, "shot": "05-note" },
+      { "click": "::-p-xpath(//label[.//span[normalize-space()='What happened']]//textarea)", "wait": 300 },
+      { "type": "Called her this morning, viewing booked for Saturday.", "wait": 500 },
+      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "06-move-it" }
+    ]
+  }
+]

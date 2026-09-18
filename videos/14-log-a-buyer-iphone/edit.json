@@ -1,0 +1,61 @@
+{
+  "segments": [
+    [0.3, 53.85, 1]
+  ],
+  "captions": [
+    {
+      "at": 0.4,
+      "until": 8.8,
+      "title": "Menu, then Buyers",
+      "line": "Everyone you have sent us, and where each one has got to."
+    },
+    {
+      "at": 9.05,
+      "until": 12.4,
+      "title": "Tap the plus",
+      "line": "Top right. One short form, not a stepper."
+    },
+    {
+      "at": 12.6,
+      "until": 19.6,
+      "title": "Their name and number",
+      "line": "We call this number, so make sure they are expecting us."
+    },
+    {
+      "at": 19.81,
+      "until": 27.4,
+      "title": "Find what they liked",
+      "line": "Type a few letters. Leave it out if they have not picked one yet."
+    },
+    {
+      "at": 27.61,
+      "until": 33.0,
+      "title": "An estate needs one more answer",
+      "line": "Which one inside it. Tick every option they asked about, not just one."
+    },
+    {
+      "at": 33.1,
+      "until": 37.6,
+      "title": "Sold out stays on the list",
+      "line": "It is shown, not hidden. Somebody asking for the one that is gone is worth knowing."
+    },
+    {
+      "at": 37.72,
+      "until": 42.6,
+      "title": "Anything we should know",
+      "line": "Optional, and the most useful thing on the form."
+    },
+    {
+      "at": 42.76,
+      "until": 50.8,
+      "title": "Send it to AV Homes",
+      "line": "We call them, book the viewing and close it."
+    },
+    {
+      "at": 50.9,
+      "until": 53.8,
+      "title": "Watch every step here",
+      "line": "Every move comes with the reason for it, in our own words."
+    }
+  ]
+}

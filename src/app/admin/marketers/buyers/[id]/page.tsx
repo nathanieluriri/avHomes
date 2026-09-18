@@ -87,7 +87,7 @@ export default function BuyerDetailPage() {
       />
 
       <PageColumns asideWidth="22rem" asideFirstOnMobile aside={<Controls lead={data} onDone={reload} />}>
-        <Card>
+        <Card spotlight="buyer-timeline">
           <CardHead title="What has happened" />
           <p className="mb-4 text-[12.5px] text-slate-600">
             The marketer reads this exact list on their phone, word for word.
@@ -264,7 +264,7 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
           A reason and a note are required. The marketer reads both.
         </p>
         <div className="space-y-3">
-          <Field label="Move to">
+          <Field label="Move to" spotlight="buyer-move">
             <select
               value={to}
               onChange={(event) => {
@@ -358,7 +358,7 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
             </p>
           )}
 
-          <Field label="Why" as="group">
+          <Field label="Why" as="group" spotlight="buyer-reason">
             <div className="flex flex-wrap gap-1.5">
               {(to === "" ? [] : (LEAD_REASONS[to] ?? [])).map((option: string) => (
                 <button
@@ -378,7 +378,11 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
             </div>
           </Field>
 
-          <Field label="What happened" hint={`At least ${LEAD_NOTE_MIN} characters. The marketer reads this.`}>
+          <Field
+            label="What happened"
+            hint={`At least ${LEAD_NOTE_MIN} characters. The marketer reads this.`}
+            spotlight="buyer-note"
+          >
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -391,7 +395,12 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
 
           {error && <ErrorNote error={error} />}
 
-          <Button onClick={() => void move()} disabled={!ready || busy} className="w-full">
+          <Button
+            onClick={() => void move()}
+            disabled={!ready || busy}
+            className="w-full"
+            spotlight="buyer-save"
+          >
             {busy
               ? "Saving..."
               : winning

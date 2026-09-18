@@ -59,6 +59,18 @@ const META = {
     sub: "A marketer says their money never arrived. Answer it, then close it.",
     outro: "try",
   },
+  "15-list-an-estate": {
+    eyebrow: "Tutorial",
+    title: ["Listing an", "estate"],
+    sub: "One listing, ten things a buyer can pick: houses, apartments and plots.",
+    outro: "try",
+  },
+  "16-follow-a-buyer": {
+    eyebrow: "Tutorial",
+    title: ["Following up", "a buyer"],
+    sub: "A marketer sent somebody in. Call them, then move them along the line.",
+    outro: "try",
+  },
   // Portrait, for the marketer app. There is no console walkthrough on a
   // marketer's phone, so the closing card says what to do in the app instead.
   "08-report-a-deal": {

@@ -55,6 +55,14 @@ const META = {
       p: "Your own invite code is on your home screen.<br />Report your first deal with the round <b>+</b>.",
     },
   },
+  "14-log-a-buyer-iphone": {
+    title: ["Logging a", "buyer"],
+    sub: "Know somebody who wants to buy? Hand them over and still get paid.",
+    close: {
+      h: ["Now send us", "one person."],
+      p: "Menu, then <b>Buyers</b>, then the <b>+</b> at the top.<br />We do the calls. You are paid the same commission.",
+    },
+  },
 };
 
 // Apple's bezel, scaled once to 822x1680 (section 12). Gitignored: Apple's license bars redistributing it.
