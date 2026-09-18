@@ -210,7 +210,10 @@ function toDraft(p: Property): Draft {
     location: p.location,
     city: p.city,
     address: p.address,
-    mapUrl: p.mapUrl,
+    /* Coalesced, because a listing read through an API that predates the field
+       carries no `mapUrl` at all, and an input handed undefined stops being
+       controlled. */
+    mapUrl: p.mapUrl ?? "",
     bedrooms: p.bedrooms,
     bathrooms: p.bathrooms,
     areaSqft: p.areaSqft,

@@ -25,15 +25,33 @@ const HOST_PATTERNS: readonly RegExp[] = [
   /^goo\.gl$/u,
 ];
 
+/**
+ * Every entry point below takes a value that MAY NOT BE THERE, and that is not
+ * defensive programming for its own sake.
+ *
+ * A Vercel build fetches its own production alias for data, which is still the
+ * PREVIOUS deployment while the new one is being built. So the first build
+ * after a field is added reads an API that has never heard of it, and every
+ * property arrives with `mapUrl` absent rather than empty. `.trim()` on that is
+ * a TypeError inside a server component, which fails the export of one listing
+ * page and takes the whole deployment with it. That is exactly how the first
+ * attempt at this feature died.
+ *
+ * The wire type still promises a string, because the API's own mapper
+ * coalesces. This is the boundary being honest about the one moment the
+ * promise cannot be kept.
+ */
+type MaybeText = string | null | undefined;
+
 /** A share link that names no place until it is followed. */
-export function isShortMapLink(link: string): boolean {
+export function isShortMapLink(link: MaybeText): boolean {
   const url = parse(link);
   if (!url) return false;
   return url.hostname === "maps.app.goo.gl" || url.hostname === "goo.gl";
 }
 
-function parse(raw: string): URL | null {
-  const value = raw.trim();
+function parse(raw: MaybeText): URL | null {
+  const value = (raw ?? "").trim();
   if (value === "") return null;
   try {
     const url = new URL(value);
@@ -53,14 +71,14 @@ function parse(raw: string): URL | null {
  * support conversation everywhere else. Anything else is returned trimmed and
  * judged by `mapLinkRefusal`.
  */
-export function normalizeMapLink(raw: string): string {
-  const value = raw.trim();
+export function normalizeMapLink(raw: MaybeText): string {
+  const value = (raw ?? "").trim();
   const iframe = /<iframe[^>]*\ssrc=["']([^"']+)["']/iu.exec(value);
   return (iframe?.[1] ?? value).trim();
 }
 
 /** The one sentence the form and the API both say when a link is refused. */
-export function mapLinkRefusal(raw: string): string | null {
+export function mapLinkRefusal(raw: MaybeText): string | null {
   const value = normalizeMapLink(raw);
   if (value === "") return null;
   if (value.length > MAP_LINK_MAX) return "That link is too long to store.";
@@ -72,6 +90,13 @@ export function mapLinkRefusal(raw: string): string | null {
 }
 
 export const MAP_LINK_MAX = 2000;
+
+/** As much of a listing as a map needs, and none of it required. */
+export interface MapListing {
+  mapUrl?: MaybeText;
+  address?: MaybeText;
+  city?: MaybeText;
+}
 
 /** `6.4474`, `3.4553`, and the zoom if the link carried one. */
 interface Pin {
@@ -127,7 +152,7 @@ function placeOf(url: URL): string | null {
  * `hl=en` so the map is captioned the same way for every visitor rather than
  * following whatever Google infers about them.
  */
-export function mapEmbedSrc(link: string): string | null {
+export function mapEmbedSrc(link: MaybeText): string | null {
   const url = parse(normalizeMapLink(link));
   if (!url) return null;
 
@@ -157,9 +182,9 @@ export function mapEmbedSrc(link: string): string | null {
  * Google forgives that; a person reading the directions button's destination
  * does not.
  */
-function addressQuery(listing: { address: string; city: string }): string {
-  const address = listing.address.trim();
-  const city = listing.city.trim();
+function addressQuery(listing: MapListing): string {
+  const address = (listing.address ?? "").trim();
+  const city = (listing.city ?? "").trim();
   if (address === "") return city;
   if (city === "" || address.toLowerCase().includes(city.toLowerCase())) return address;
   return `${address}, ${city}`;
@@ -172,7 +197,7 @@ function addressQuery(listing: { address: string; city: string }): string {
  * that could not be expanded still leaves a map of the street somebody typed,
  * which is the same place the Get directions button has always searched for.
  */
-export function listingMapEmbedSrc(listing: { mapUrl: string; address: string; city: string }): string | null {
+export function listingMapEmbedSrc(listing: MapListing): string | null {
   const fromLink = mapEmbedSrc(listing.mapUrl);
   if (fromLink) return fromLink;
   const query = addressQuery(listing);
@@ -187,7 +212,7 @@ export function listingMapEmbedSrc(listing: { mapUrl: string; address: string; c
  * building. The address search is what every listing had before this field
  * existed and is still right for one without it.
  */
-export function mapDirectionsHref(listing: { mapUrl: string; address: string; city: string }): string {
+export function mapDirectionsHref(listing: MapListing): string {
   const link = normalizeMapLink(listing.mapUrl);
   if (parse(link)) return link;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery(listing))}`;

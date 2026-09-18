@@ -277,6 +277,9 @@ ZM 260 Zambia
 ZW 263 Zimbabwe
 `;
 
+/** A stored number, as it actually arrives: a string, null, or not there. */
+type MaybeText = string | null | undefined;
+
 export interface PhoneCountry {
   /** ISO 3166-1 alpha-2, uppercase. The value a picker stores. */
   iso2: string;
@@ -315,9 +318,17 @@ export function phoneCountry(iso2: string): PhoneCountry | null {
   return BY_ISO2.get(iso2.toUpperCase()) ?? null;
 }
 
-/** Digits and nothing else, for comparing two numbers somebody typed differently. */
-export function phoneDigits(value: string): string {
-  return value.replace(/\D/gu, "");
+/**
+ * Digits and nothing else, for comparing two numbers somebody typed
+ * differently.
+ *
+ * Takes a value that may be absent, like every entry point below it. These are
+ * called on records that crossed the wire, where a field is null on one row and
+ * missing entirely on any response an older deployment produced. A phone field
+ * that throws takes the page down with it, and a blank one does not.
+ */
+export function phoneDigits(value: MaybeText): string {
+  return (value ?? "").replace(/\D/gu, "");
 }
 
 /**
@@ -394,9 +405,9 @@ export interface SplitPhone {
  * is the reading least likely to silently move somebody's number to another
  * continent.
  */
-export function splitPhone(value: string, fallbackIso2: string = DEFAULT_PHONE_COUNTRY): SplitPhone {
+export function splitPhone(value: MaybeText, fallbackIso2: string = DEFAULT_PHONE_COUNTRY): SplitPhone {
   const iso2 = phoneCountry(fallbackIso2)?.iso2 ?? DEFAULT_PHONE_COUNTRY;
-  const trimmed = value.trim();
+  const trimmed = (value ?? "").trim();
   if (trimmed === "") return { iso2, national: "" };
 
   const digits = phoneDigits(trimmed);
@@ -414,7 +425,7 @@ export function splitPhone(value: string, fallbackIso2: string = DEFAULT_PHONE_C
 }
 
 /** The two halves back into one stored value. Empty national means empty value. */
-export function joinPhone(iso2: string, national: string): string {
+export function joinPhone(iso2: string, national: MaybeText): string {
   const digits = dropTrunkZero(iso2, phoneDigits(national));
   if (digits === "") return "";
   const country = phoneCountry(iso2);
@@ -430,7 +441,7 @@ export function joinPhone(iso2: string, national: string): string {
  * group, which is not every country's convention and is right far more often
  * than one unbroken run of digits.
  */
-export function groupNational(iso2: string, national: string): string {
+export function groupNational(iso2: string, national: MaybeText): string {
   const digits = phoneDigits(national);
   if (digits === "") return "";
   if (iso2.toUpperCase() === "NG" && digits.length === 10) {
@@ -447,8 +458,8 @@ export function groupNational(iso2: string, national: string): string {
 }
 
 /** "+234 803 000 0000". What a person reads, never what is stored. */
-export function formatPhone(value: string): string {
-  const trimmed = value.trim();
+export function formatPhone(value: MaybeText): string {
+  const trimmed = (value ?? "").trim();
   if (trimmed === "") return "";
   const { iso2, national } = splitPhone(trimmed);
   if (national === "") return trimmed;
@@ -476,7 +487,7 @@ export function formatPhone(value: string): string {
  * does not need: the real validation of a phone number is that somebody answers
  * it.
  */
-export function isPlausiblePhone(value: string): boolean {
+export function isPlausiblePhone(value: MaybeText): boolean {
   const { iso2, national } = splitPhone(value);
   const dial = phoneCountry(iso2)?.dial ?? "";
   return national.length >= 4 && dial.length + national.length <= 15;
