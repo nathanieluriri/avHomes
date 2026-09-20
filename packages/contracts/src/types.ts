@@ -53,8 +53,34 @@ export interface SessionSummary {
 /* ─────────────────────────────── listings ─────────────────────────────── */
 
 /** Lifecycle only. What kind of deal a listing is lives in ListingType, not here. */
-export const PROPERTY_STATUSES = ["draft", "live", "under-offer", "closed", "archived"] as const;
+export const PROPERTY_STATUSES = [
+  "draft",
+  "submitted",
+  "live",
+  "under-offer",
+  "closed",
+  "archived",
+] as const;
 export type PropertyStatus = (typeof PROPERTY_STATUSES)[number];
+
+/**
+ * Whose property this is, which is the only thing the commission rate depends on
+ * besides sale versus rent.
+ *
+ * Deliberately NOT derived from `agentUserId`. An AV Homes agent can list a
+ * partner's property for an owner who holds no account, and a partner account
+ * can only ever hold its own, so the two fields answer different questions.
+ * Collapsing them would make the rate depend on which account typed the listing
+ * in.
+ */
+export const OWNERSHIPS = ["av", "partner"] as const;
+export type Ownership = (typeof OWNERSHIPS)[number];
+
+/** The reader's vocabulary. "Non-AV" is the owner's own word for it. */
+export const OWNERSHIP_LABEL: Record<Ownership, string> = {
+  av: "AV Homes",
+  partner: "Non-AV",
+};
 
 export const PROPERTY_TYPES = [
   "Villa",
@@ -194,6 +220,18 @@ export interface Property {
   priceMinor: number;
   currency: string;
   status: PropertyStatus;
+  /** Whose property this is. Absent on a legacy row, which reads as "av". */
+  ownership: Ownership;
+  /**
+   * The external owner or developer, for grouping stock by where it came from.
+   * Empty when not stated, and meaningless on an `av` listing.
+   */
+  ownerLabel: string;
+  /**
+   * The deal that closed it, so the listing draws its own sale in one read.
+   * Written only by the one flow that closes a listing, never by hand.
+   */
+  closedDealId: string | null;
   listingType: ListingType;
   /** Null on a sale. Absent on a legacy row; see readRentPeriod. */
   rentPeriod: RentPeriod | null;

@@ -17,4 +17,6 @@ export * from "./media";
 export * from "./maps";
 export * from "./phone";
 export * from "./email";
+export * from "./funds";
 export * from "./marketing";
+export * from "./analytics";

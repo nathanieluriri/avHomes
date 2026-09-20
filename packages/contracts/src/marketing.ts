@@ -9,9 +9,16 @@
  *
  * The rates and every other number here are settable from the admin. The values
  * below are only what a site starts with before anyone opens Settings.
+ *
+ * Two of the five shares of a deal go to nobody: a community fund and a prize
+ * pool. Those live in `funds.ts`, because they are not owed to a person and must
+ * not enter the marketer ledger. This file knows their percentages and works out
+ * their amounts; it does not know where the money is kept.
  */
 
+import { DEFAULT_FUND_NAMES, type FundKind } from "./funds";
 import { DEFAULT_CURRENCY, minorUnitsFor } from "./money";
+import { OWNERSHIPS, OWNERSHIP_LABEL, type Ownership } from "./types";
 
 /* ═══════════════════════════════════════════════════════════════ MARKETERS ══ */
 
@@ -98,6 +105,39 @@ export const DEAL_STATUS_LABEL: Record<DealStatus, string> = {
 export const DEAL_KINDS = ["sale", "rent"] as const;
 export type DealKind = (typeof DEAL_KINDS)[number];
 
+/**
+ * Who closed a deal.
+ *
+ * A marketer earns commission. Staff are salaried and earn nothing here, and a
+ * walk-in has nobody to pay at all. All three still feed both funds, and all
+ * three are credited on the leaderboard, because the prize is for the best closer
+ * whoever that turns out to be.
+ */
+export const CLOSER_KINDS = ["marketer", "staff", "direct"] as const;
+export type CloserKind = (typeof CLOSER_KINDS)[number];
+
+export const CLOSER_KIND_LABEL: Record<CloserKind, string> = {
+  marketer: "A marketer",
+  staff: "AV Homes staff",
+  direct: "Walk-in",
+};
+
+/** The one line each option needs beside it, so the choice is made once. */
+export const CLOSER_KIND_HINT: Record<CloserKind, string> = {
+  marketer: "Pays commission up their referral chain.",
+  staff: "No commission. Counts towards their record and the prize.",
+  direct: "Nobody to pay. The funds still take their share.",
+};
+
+/** Where a deal came from, so the network can be told apart from walk-ins. */
+export const DEAL_SOURCES = ["app", "console"] as const;
+export type DealSource = (typeof DEAL_SOURCES)[number];
+
+export const DEAL_SOURCE_LABEL: Record<DealSource, string> = {
+  app: "Reported in the app",
+  console: "Recorded by AV Homes",
+};
+
 /** One person's share of one deal, worked out when the deal was approved. */
 export interface DealShare {
   marketerId: string;
@@ -126,9 +166,30 @@ export interface Deal {
   /** Uploaded receipts, alerts or agreements. At least one is required. */
   proof: string[];
   note: string;
+  /**
+   * Who FILED the report, which for an app deal is the marketer and for a console
+   * deal is the admin who recorded it. `chainFor` walks from here on a marketer
+   * deal, so for one the two ids agree by construction.
+   */
   reporterId: string;
   reporterName: string;
   reporterCode: string;
+  /** Who CLOSED it, which is who the money and the leaderboard follow. */
+  closerKind: CloserKind;
+  /** A marketer id, a user id, or empty for a walk-in. */
+  closerId: string;
+  closerName: string;
+  /** Whose property it was, snapshotted: the rate depended on it. */
+  ownership: Ownership;
+  /**
+   * The cell as applied. Snapshotted with the shares, so an admin changing the
+   * rate table next month never rewrites what a settled deal paid.
+   */
+  split: CommissionSplit;
+  fundShares: FundShare[];
+  /** What AV Homes kept. See splitDeal. */
+  keptMinor: number;
+  source: DealSource;
   /** The potential buyer this grew out of, when it did. */
   leadId: string | null;
   status: DealStatus;
@@ -403,8 +464,65 @@ export function updateRefusal(update: {
 
 /* ════════════════════════════════════════════════════════════════ SETTINGS ══ */
 
-/** Level 1, 2 and 3, as whole or one decimal percents. */
-export type CommissionRates = [number, number, number];
+/**
+ * The five shares of one deal, as whole or one decimal percents.
+ *
+ * Three go to people and two go to funds, and they are one type because they are
+ * one decision: an admin setting the level 1 rate is choosing it against the
+ * other four, and splitting them across two shapes would let the total quietly
+ * pass 100.
+ */
+export interface CommissionSplit {
+  /** The person who closed it. */
+  level1: number;
+  /** Whoever invited them. */
+  level2: number;
+  /** Whoever invited that person. */
+  level3: number;
+  rewardPool: number;
+  foundation: number;
+}
+
+/**
+ * ownership -> deal kind -> the split. Four independently editable cells.
+ *
+ * Selling somebody else's house earns AV Homes a fraction of what selling its own
+ * does, so paying the same commission on both makes third party stock worse the
+ * more of it there is. The matrix is what makes the rate follow the economics.
+ */
+export type CommissionMatrix = Record<Ownership, Record<DealKind, CommissionSplit>>;
+
+export const DEFAULT_COMMISSION_MATRIX: CommissionMatrix = {
+  av: {
+    sale: { level1: 5, level2: 2, level3: 1, rewardPool: 1, foundation: 1 },
+    rent: { level1: 5, level2: 2, level3: 1, rewardPool: 1, foundation: 1 },
+  },
+  partner: {
+    sale: { level1: 2, level2: 1, level3: 0.5, rewardPool: 1, foundation: 1 },
+    rent: { level1: 2, level2: 1, level3: 0.5, rewardPool: 1, foundation: 1 },
+  },
+};
+
+/** The one cell a deal is priced by. */
+export function splitFor(
+  matrix: CommissionMatrix,
+  ownership: Ownership,
+  kind: DealKind,
+): CommissionSplit {
+  return matrix[ownership][kind];
+}
+
+/** The three person levels, nearest first, for the chain walk. */
+export function personRates(split: CommissionSplit): [number, number, number] {
+  return [split.level1, split.level2, split.level3];
+}
+
+/** Everything one cell pays out, for a settings screen that shows its own total. */
+export function splitTotal(split: CommissionSplit): number {
+  return (
+    split.level1 + split.level2 + split.level3 + split.rewardPool + split.foundation
+  );
+}
 
 export const RENT_BASES = ["upfront", "period"] as const;
 export type RentBasis = (typeof RENT_BASES)[number];
@@ -458,10 +576,41 @@ export function namesMatch(bankName: string, personName: string): boolean {
   return shared >= Math.min(2, person.size);
 }
 
+/**
+ * How a person's score is weighted. Editable, and the four are shown with their
+ * running total, because weights that do not sum to 100 make a score out of
+ * something other than 100 and a screen should say so rather than hide it.
+ *
+ * The scoring that reads these is further down, under THE RATING.
+ */
+export interface RatingWeights {
+  value: number;
+  deals: number;
+  conversion: number;
+  speed: number;
+}
+
+export const DEFAULT_RATING_WEIGHTS: RatingWeights = {
+  value: 50,
+  deals: 20,
+  conversion: 20,
+  speed: 10,
+};
+
 export interface MarketingSettings {
-  /** Rates for a sale. Level 1 is the person who closed it. */
-  saleRates: CommissionRates;
-  rentRates: CommissionRates;
+  /**
+   * The four rate cells. See splitFor.
+   *
+   * This replaced a `saleRates`/`rentRates` pair that knew nothing about whose
+   * property a listing was. A document written before the change derives a matrix
+   * on read; see `readMarketingSettings`.
+   */
+  commission: CommissionMatrix;
+  /** Display names for the two funds. Renameable; the keys never change. */
+  rewardPoolName: string;
+  foundationName: string;
+  /** How a person's score is weighted. Shown with its breakdown, never alone. */
+  rating: RatingWeights;
   /**
    * What a rent commission is a percentage of. `upfront` is everything the
    * tenant paid at move in, which is the usual Nigerian year up front.
@@ -492,8 +641,10 @@ export interface MarketingSettings {
 }
 
 export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
-  saleRates: [5, 2, 1],
-  rentRates: [5, 2, 1],
+  commission: DEFAULT_COMMISSION_MATRIX,
+  rewardPoolName: DEFAULT_FUND_NAMES.reward,
+  foundationName: DEFAULT_FUND_NAMES.foundation,
+  rating: DEFAULT_RATING_WEIGHTS,
   rentBasis: "upfront",
   issueWindowDays: 14,
   payCutoffDay: 25,
@@ -526,22 +677,49 @@ export interface SplitLine {
   amountMinor: number;
 }
 
+/** One fund's cut of one deal, worked out at the same moment as the people's. */
+export interface FundShare {
+  fund: FundKind;
+  rate: number;
+  amountMinor: number;
+}
+
+export interface DealSplit {
+  people: SplitLine[];
+  funds: FundShare[];
+  /** What AV Homes keeps: the remainder, a paused upline's share included. */
+  keptMinor: number;
+}
+
 /**
- * Who earns what on one deal.
+ * Who earns what on one deal, and what the two funds take.
  *
  * `chain` is the person who closed it, then their referrer, then theirs. A
  * paused or banned person earns nothing and their share is not handed up the
  * chain: AV Homes keeps it. Rounding is down to the minor unit, because paying
  * a fraction of a kobo is not a thing a bank transfer can do.
+ *
+ * `keptMinor` is new and it is the reason this replaced `splitCommission`. The
+ * remainder was always there and was always invisible, so "what did AV Homes
+ * keep" had no answer. Being the subtraction of everything paid out rather than
+ * its own percentage is what makes it exact: every share plus kept is the deal.
+ *
+ * Fund shares accrue even when `chain` is empty. The rule is a percentage of
+ * every transaction, not of every commission, so a walk-in sale with nobody to
+ * pay still feeds both funds.
  */
-export function splitCommission(
+export function splitDeal(
   amountMinor: number,
-  rates: CommissionRates,
+  split: CommissionSplit,
   chain: readonly (ChainMember | null)[],
-): SplitLine[] {
-  const out: SplitLine[] = [];
-  if (!Number.isFinite(amountMinor) || amountMinor <= 0) return out;
+): DealSplit {
+  const people: SplitLine[] = [];
+  const funds: FundShare[] = [];
+  if (!Number.isFinite(amountMinor) || amountMinor <= 0) {
+    return { people, funds, keptMinor: 0 };
+  }
 
+  const rates = personRates(split);
   for (let i = 0; i < 3; i++) {
     const member = chain[i];
     if (!member || member.status !== "active") continue;
@@ -549,7 +727,7 @@ export function splitCommission(
     if (rate <= 0) continue;
     const amount = Math.floor((amountMinor * rate) / 100);
     if (amount <= 0) continue;
-    out.push({
+    people.push({
       marketerId: member.id,
       marketerName: member.name,
       code: member.code,
@@ -558,16 +736,39 @@ export function splitCommission(
       amountMinor: amount,
     });
   }
-  return out;
+
+  const fundRates: readonly (readonly [FundKind, number])[] = [
+    ["reward", split.rewardPool],
+    ["foundation", split.foundation],
+  ];
+  for (const [fund, rate] of fundRates) {
+    if (!Number.isFinite(rate) || rate <= 0) continue;
+    const amount = Math.floor((amountMinor * rate) / 100);
+    if (amount <= 0) continue;
+    funds.push({ fund, rate, amountMinor: amount });
+  }
+
+  const out =
+    people.reduce((total, line) => total + line.amountMinor, 0) +
+    funds.reduce((total, share) => total + share.amountMinor, 0);
+  return { people, funds, keptMinor: amountMinor - out };
 }
 
-/** What one marketer would earn on a listing at a given price, for the app. */
-export function previewEarning(
-  amountMinor: number,
-  rates: CommissionRates,
-): number {
+// TODO(test): a paused level 2 leaves its share in keptMinor and does not promote
+// level 3 into level 2's rate.
+// TODO(test): both funds accrue when the chain is empty, which is a direct sale.
+// TODO(test): keptMinor plus every people and fund share equals amountMinor exactly.
+
+/**
+ * What one marketer would earn closing this, at this price, on this property.
+ *
+ * Takes the whole cell rather than a rate, so the app cannot accidentally quote
+ * an AV Homes number on a Non-AV listing: picking the cell is the caller's one
+ * decision and `splitFor` is the only way to make it.
+ */
+export function previewEarning(amountMinor: number, split: CommissionSplit): number {
   if (!Number.isFinite(amountMinor) || amountMinor <= 0) return 0;
-  return Math.floor((amountMinor * (rates[0] ?? 0)) / 100);
+  return Math.floor((amountMinor * split.level1) / 100);
 }
 
 /** `2026-09` for the month a timestamp falls in, in the server's own zone. */
@@ -625,17 +826,165 @@ export function isNuban(value: string): boolean {
   return /^[0-9]{10}$/u.test(value);
 }
 
-/** Rates must be percentages that cannot pay out more than the deal is worth. */
-export function ratesRefusal(rates: readonly number[]): string | null {
-  if (rates.length !== 3) return "Three rates are needed: level 1, 2 and 3.";
-  for (const rate of rates) {
-    if (!Number.isFinite(rate) || rate < 0 || rate > 100) return "A rate is between 0 and 100.";
-    if (Math.round(rate * 10) !== rate * 10) return "A rate can have one decimal place at most.";
+/** The wording for each share, shared by the settings grid and every refusal. */
+export const SHARE_LABEL = {
+  level1: "Direct",
+  level2: "Upline 1",
+  level3: "Upline 2",
+  rewardPool: "Reward pool",
+  foundation: "Foundation",
+} as const satisfies Record<keyof CommissionSplit, string>;
+
+/** The five shares in the order every screen draws them. */
+export const SHARE_KEYS = [
+  "level1",
+  "level2",
+  "level3",
+  "rewardPool",
+  "foundation",
+] as const satisfies readonly (keyof CommissionSplit)[];
+
+/**
+ * Five shares that cannot pay out more than the deal is worth.
+ *
+ * The ceiling is on the TOTAL, not on each share, which is the whole change from
+ * the three-rate version: with two more shares in the sum, five legal
+ * percentages can still add up to more than the deal.
+ */
+export function splitRefusal(split: CommissionSplit): string | null {
+  for (const key of SHARE_KEYS) {
+    const rate = split[key];
+    const label = SHARE_LABEL[key];
+    if (!Number.isFinite(rate)) return `${label} must be a number.`;
+    if (rate < 0) return `${label} cannot be negative.`;
+    if (rate > 100) return `${label} is more than the whole deal.`;
+    if (Math.round(rate * 10) !== rate * 10) {
+      return `${label} can have one decimal place at most.`;
+    }
   }
-  const total = rates.reduce((sum, rate) => sum + rate, 0);
-  if (total > 100) return "The three rates add up to more than the whole deal.";
+  if (splitTotal(split) > 100) {
+    return "Those five shares add up to more than the deal is worth.";
+  }
   return null;
 }
+
+/** Every cell, named, so a settings save says which row is wrong. */
+export function matrixRefusal(matrix: CommissionMatrix): string | null {
+  for (const ownership of OWNERSHIPS) {
+    for (const kind of DEAL_KINDS) {
+      const refusal = splitRefusal(matrix[ownership][kind]);
+      if (refusal) return `${OWNERSHIP_LABEL[ownership]} ${kind}: ${refusal}`;
+    }
+  }
+  return null;
+}
+
+// TODO(test): five shares of 30 each are individually legal and refused together.
+// TODO(test): matrixRefusal names the ownership and kind of the offending cell.
+
+/* ══════════════════════════════════════════════════════════════ THE RATING ══ */
+
+/* The weights themselves live up in SETTINGS, beside the rate matrix, because
+   that is what they are. What follows is the scoring. */
+
+export const RATING_WEIGHT_LABEL: Record<keyof RatingWeights, string> = {
+  value: "Value closed",
+  deals: "Deals closed",
+  conversion: "Leads won",
+  speed: "Speed",
+};
+
+/** What one person did in the period, as the rating needs it. */
+export interface RatingInput {
+  valueMinor: number;
+  deals: number;
+  /** Leads they handed over that reached a decision, won or lost. */
+  leadsDecided: number;
+  leadsWon: number;
+  /** Median days from lead created to deal closed. 0 when they had none. */
+  medianDays: number;
+}
+
+/** The best in the period, so a score is relative to a real person, not a guess. */
+export interface RatingTops {
+  valueMinor: number;
+  deals: number;
+}
+
+export interface RatingBreakdown {
+  value: number;
+  deals: number;
+  conversion: number;
+  speed: number;
+  /** The sum of the four above. */
+  score: number;
+}
+
+/** Thirty days from lead to close scores full marks; ninety scores nothing. */
+const SPEED_FLOOR_DAYS = 30;
+const SPEED_CEILING_DAYS = 90;
+
+/**
+ * A score with its parts, worked out on every read and never stored.
+ *
+ * The same reasoning as the marketer alerts: a stored score outlives the thing it
+ * describes, and the first time it disagrees with the table beside it nobody
+ * believes either. The breakdown is returned rather than just the total because a
+ * score nobody can take apart is a score nobody accepts.
+ *
+ * An input a person has no data for scores 0 on that part rather than being
+ * excluded from it. Dropping the part and rescaling would quietly reward somebody
+ * for handling no leads at all.
+ */
+export function ratePerson(
+  input: RatingInput,
+  weights: RatingWeights,
+  tops: RatingTops,
+): RatingBreakdown {
+  const share = (value: number, top: number) => (top > 0 ? Math.min(1, value / top) : 0);
+  const clamp = (value: number) => Math.max(0, Math.min(1, value));
+  const round = (value: number) => Math.round(value * 10) / 10;
+
+  const parts = {
+    value: round(weights.value * share(input.valueMinor, tops.valueMinor)),
+    deals: round(weights.deals * share(input.deals, tops.deals)),
+    conversion: round(
+      input.leadsDecided > 0 ? weights.conversion * (input.leadsWon / input.leadsDecided) : 0,
+    ),
+    speed: round(
+      input.medianDays > 0
+        ? weights.speed *
+            clamp(
+              (SPEED_CEILING_DAYS - input.medianDays) / (SPEED_CEILING_DAYS - SPEED_FLOOR_DAYS),
+            )
+        : 0,
+    ),
+  };
+  return {
+    ...parts,
+    score: round(parts.value + parts.deals + parts.conversion + parts.speed),
+  };
+}
+
+/** The weights total, for the settings screen to show beside the four inputs. */
+export function ratingWeightTotal(weights: RatingWeights): number {
+  return weights.value + weights.deals + weights.conversion + weights.speed;
+}
+
+export function ratingWeightsRefusal(weights: RatingWeights): string | null {
+  for (const key of ["value", "deals", "conversion", "speed"] as const) {
+    const weight = weights[key];
+    if (!Number.isFinite(weight) || weight < 0) {
+      return `${RATING_WEIGHT_LABEL[key]} cannot be negative.`;
+    }
+  }
+  if (ratingWeightTotal(weights) <= 0) return "At least one weight has to be above zero.";
+  return null;
+}
+
+// TODO(test): the period's top performer scores the full value and deals weights.
+// TODO(test): somebody with leads and no wins scores 0 on conversion, not excluded.
+// TODO(test): score never exceeds ratingWeightTotal.
 
 /* ═══════════════════════════════════════════════════════════════════ LEADS ══ */
 
