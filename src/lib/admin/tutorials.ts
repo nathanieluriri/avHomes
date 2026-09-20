@@ -157,6 +157,35 @@ export const TUTORIALS: readonly Tutorial[] = [
     ["marketing"],
     false,
   ),
+  /* The money screens. `media` on the first because the proof is uploaded in the
+     sheet, and `marketing` on all three because every figure they show is one. */
+  entry(
+    "record-a-sale",
+    "Record a sale",
+    "A house sold. Take it off the market, with the amount and the proof on the record.",
+    52,
+    "/admin/properties",
+    ["listings", "media", "marketing"],
+    false,
+  ),
+  entry(
+    "read-the-money",
+    "Read where the money went",
+    "What you transacted, who was paid out of it, and what AV Homes kept.",
+    47,
+    "/admin/analytics",
+    ["analytics", "marketing"],
+    false,
+  ),
+  entry(
+    "spend-the-fund",
+    "Spend the community fund",
+    "A share of every deal goes in. Pay some out, and leave a receipt behind it.",
+    53,
+    "/admin/analytics/wallets",
+    ["analytics", "marketing", "media"],
+    false,
+  ),
 ];
 
 export function tutorialsFor(role: Role): Tutorial[] {

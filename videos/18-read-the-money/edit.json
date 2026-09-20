@@ -1,0 +1,55 @@
+{
+  "segments": [
+    [2.9, 41.9, 1]
+  ],
+  "captions": [
+    {
+      "at": 3.3,
+      "until": 10.9,
+      "title": "Analytics",
+      "line": "Six pages, each answering one question. This one answers what the business did."
+    },
+    {
+      "at": 11.5,
+      "until": 14.4,
+      "title": "What you transacted",
+      "line": "Every recorded deal in the window. The period is written under every figure on these pages."
+    },
+    {
+      "at": 14.9,
+      "until": 18.3,
+      "title": "And what AV Homes kept",
+      "line": "What is left after every share. This number did not exist before, and it is usually the one worth watching."
+    },
+    {
+      "at": 18.8,
+      "until": 22.5,
+      "title": "Whose property it was",
+      "line": "AV Homes earns far more on its own stock, so its own and everybody else's are priced separately."
+    },
+    {
+      "at": 23.1,
+      "until": 26.7,
+      "title": "The two funds",
+      "line": "A share of every deal goes to a prize for the best seller and a fund for the community."
+    },
+    {
+      "at": 27.2,
+      "until": 30.9,
+      "title": "Every deal, one by one",
+      "line": "Transactions lists what was recorded. Filter by whose property, sale or rent, and who closed it."
+    },
+    {
+      "at": 31.5,
+      "until": 37.1,
+      "title": "Open one to see the split",
+      "line": "Who closed it and their rate, then each upline, then both funds, then what AV Homes kept."
+    },
+    {
+      "at": 37.7,
+      "until": 41.7,
+      "title": "It adds back up to the sale",
+      "line": "The last line is the check. If the shares ever stopped adding up, you would see it here."
+    }
+  ]
+}

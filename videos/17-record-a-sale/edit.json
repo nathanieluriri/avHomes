@@ -1,0 +1,63 @@
+{
+  "segments": [
+    [1.4, 31.4, 1],
+    [31.4, 42.6, 1.9],
+    [49.4, 58.1, 1]
+  ],
+  "captions": [
+    {
+      "at": 1.7,
+      "until": 7.9,
+      "title": "Open the listing that sold",
+      "line": "Listings, then the property. Everything about the sale starts on its own screen."
+    },
+    {
+      "at": 8.4,
+      "until": 12.6,
+      "title": "Record the sale",
+      "line": "It sits in the status picker, and it says up front what it will ask you for."
+    },
+    {
+      "at": 13.0,
+      "until": 15.8,
+      "title": "This one is AV Homes' own",
+      "line": "Whose property it is decides what the sale pays out, so the sheet says which."
+    },
+    {
+      "at": 16.2,
+      "until": 20.5,
+      "title": "What it actually sold for",
+      "line": "The asking price is already there. This one went for 158 million, not the 165 it was listed at."
+    },
+    {
+      "at": 20.9,
+      "until": 27.2,
+      "title": "Who closed it",
+      "line": "A marketer is paid up their referral chain. Staff and walk-ins are not, and both funds still take their share either way."
+    },
+    {
+      "at": 27.7,
+      "until": 31.2,
+      "title": "Who bought it",
+      "line": "The name and number are what make the record traceable a year from now."
+    },
+    {
+      "at": 31.7,
+      "until": 42.4,
+      "title": "The proof",
+      "line": "A receipt, a bank alert, or the signed agreement. At least one, and the form will not go on without it."
+    },
+    {
+      "at": 49.7,
+      "until": 55.3,
+      "title": "Record it and close the listing",
+      "line": "One button, because it does both: the money goes on the record and the house comes off the market."
+    },
+    {
+      "at": 55.7,
+      "until": 58.0,
+      "title": "Closed, with proof behind it",
+      "line": "If it falls through, cancel the deal: the commission reverses and both funds give their share back."
+    }
+  ]
+}
