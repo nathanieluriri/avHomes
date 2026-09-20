@@ -1,0 +1,9 @@
+{
+  "name": "avhomes-tutorial-19-spend-the-fund",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npx --yes hyperframes@0.8.33 check",
+    "render": "npx --yes hyperframes@0.8.33 render"
+  }
+}

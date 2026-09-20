@@ -131,16 +131,27 @@ module.exports = {
     await sleep(1200);
     if (DRY) await a.shot("proof");
 
-    /* Scrolled into view first. The sheet's footer is pinned, so an element that is
-       technically in view can still sit under it, and the take would hold on a
-       breakdown nobody can read. */
     a.mark("split");
-    await a.scrollBy(240, 600);
-    await sleep(400);
     await a.moveTo(SPLIT, 900);
     await sleep(500);
     await a.click(SPLIT, 200);
-    await sleep(3600);
+    await sleep(700);
+    /*
+     * Scroll the SHEET, not the page.
+     *
+     * `a.scrollBy` moves the window, and the breakdown lives inside the sheet's own
+     * scroll container, so the page scrolled while the five shares stayed under the
+     * pinned footer. The first take held four seconds on a caption promising shares
+     * nobody could see, which is the failure "show the outcome" exists to catch.
+     */
+    await a.tab.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      const body = dialog
+        ? [...dialog.querySelectorAll("*")].find((el) => el.scrollHeight > el.clientHeight + 40)
+        : null;
+      if (body) body.scrollTo({ top: body.scrollHeight, behavior: "smooth" });
+    });
+    await sleep(3200);
     if (DRY) await a.shot("split");
 
     a.mark("confirm");

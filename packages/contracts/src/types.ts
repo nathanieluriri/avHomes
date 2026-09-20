@@ -745,6 +745,10 @@ export const TUTORIAL_IDS = [
   "set-commission-rates",
   "sort-a-payment-problem",
   "follow-a-buyer",
+  // The money screens: recording what sold, reading where it went, spending a fund.
+  "record-a-sale",
+  "read-the-money",
+  "spend-the-fund",
 ] as const;
 export type TutorialId = (typeof TUTORIAL_IDS)[number];
 

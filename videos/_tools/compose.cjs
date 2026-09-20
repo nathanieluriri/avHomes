@@ -71,6 +71,24 @@ const META = {
     sub: "A marketer sent somebody in. Call them, then move them along the line.",
     outro: "try",
   },
+  "17-record-a-sale": {
+    eyebrow: "Tutorial",
+    title: ["Recording", "a sale"],
+    sub: "A house sold. Take it off the market, with the amount and the proof on the record.",
+    outro: "try",
+  },
+  "18-read-the-money": {
+    eyebrow: "Tutorial",
+    title: ["Where the", "money went"],
+    sub: "What you transacted, who was paid out of it, and what AV Homes kept.",
+    outro: "try",
+  },
+  "19-spend-the-fund": {
+    eyebrow: "Tutorial",
+    title: ["Spending the", "community fund"],
+    sub: "A share of every deal goes in. Pay some out, and leave a receipt behind it.",
+    outro: "try",
+  },
   // Portrait, for the marketer app. There is no console walkthrough on a
   // marketer's phone, so the closing card says what to do in the app instead.
   "08-report-a-deal": {

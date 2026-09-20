@@ -1,0 +1,57 @@
+{
+  "segments": [
+    [3.4, 29.1, 1],
+    [29.1, 39.0, 1.9],
+    [39.0, 53.3, 1]
+  ],
+  "captions": [
+    {
+      "at": 3.8,
+      "until": 8.4,
+      "title": "The two funds",
+      "line": "A share of every recorded deal goes into each, whoever closed it and whether or not anybody earned commission."
+    },
+    {
+      "at": 8.9,
+      "until": 14.4,
+      "title": "What the Foundation holds",
+      "line": "Held now, all time. A balance is the sum of its history, never a stored number."
+    },
+    {
+      "at": 15.0,
+      "until": 19.5,
+      "title": "Record a payment out",
+      "line": "This is the only way money leaves it. The prize pool is different: that leaves through an award."
+    },
+    {
+      "at": 20.0,
+      "until": 22.8,
+      "title": "How much",
+      "line": "It will not take more than the fund holds. A negative balance would be the fund claiming it gave away money it never had."
+    },
+    {
+      "at": 23.3,
+      "until": 28.9,
+      "title": "What it paid for",
+      "line": "Write what a reader needs a year from now. Not \"project\"."
+    },
+    {
+      "at": 29.4,
+      "until": 38.8,
+      "title": "The receipt",
+      "line": "At least one. Money leaving needs evidence, the same rule a recorded sale follows."
+    },
+    {
+      "at": 40.2,
+      "until": 45.4,
+      "title": "Record it",
+      "line": "The balance drops by exactly that amount."
+    },
+    {
+      "at": 45.9,
+      "until": 53.1,
+      "title": "And the history says why",
+      "line": "The payment sits at the top, carrying what it paid for and who recorded it. Nothing here is ever edited."
+    }
+  ]
+}
