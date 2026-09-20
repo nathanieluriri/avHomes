@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 import { Check } from "lucide-react";
-import type { CommissionRates } from "@avhomes/contracts";
+/** The three person levels, nearest first, as `personRates` returns them. */
+type LevelRates = readonly [number, number, number];
 
 /**
  * Small pieces the team, invite, listings, account and help screens share and
@@ -15,7 +16,7 @@ export function pct(rate: number): string {
   return `${Number.isInteger(rate) ? rate : rate.toFixed(1)}%`;
 }
 
-export function sameRates(a: CommissionRates, b: CommissionRates): boolean {
+export function sameRates(a: LevelRates, b: LevelRates): boolean {
   return a.every((rate, i) => rate === b[i]);
 }
 

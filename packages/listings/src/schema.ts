@@ -9,6 +9,7 @@ import {
   type ListingType,
   type PaymentPlan,
   type PriceChange,
+  type Ownership,
   type Property,
   type PropertyStatus,
   type PropertyType,
@@ -39,6 +40,10 @@ export interface PropertyDoc {
   priceMinor: number;
   currency: string;
   status: PropertyStatus;
+  /** Optional: 0015 backfills it, and absence reads as "av". */
+  ownership?: Ownership;
+  ownerLabel?: string;
+  closedDealId?: string | null;
   listingType: ListingType;
   /**
    * Optional, unlike Property's. Legacy rows carry none of these three: a row
@@ -132,6 +137,11 @@ export function toProperty(doc: PropertyDoc): Property {
     priceMinor: doc.priceMinor,
     currency: doc.currency,
     status: doc.status,
+    /* A listing that predates the field is AV Homes' own, which is what every
+       listing on the site was when it was written. */
+    ownership: doc.ownership ?? "av",
+    ownerLabel: doc.ownerLabel ?? "",
+    closedDealId: doc.closedDealId ?? null,
     listingType: doc.listingType,
     rentPeriod: readRentPeriod(doc.rentPeriod, doc.listingType),
     fees: normalizeFees(doc.fees ?? []),

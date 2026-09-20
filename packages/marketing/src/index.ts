@@ -10,6 +10,7 @@ export {
   marketingPublicRoutes,
   marketingAppRoutes,
   marketingAdminRoutes,
+  type ListingFacts,
   type MarketingDeps,
   type RecentListing,
 } from "./routes";
@@ -23,22 +24,37 @@ export {
 } from "./settings";
 
 export {
+  approvedDealIds,
   balanceFor,
+  cancelDeal,
   chainFor,
   createMarketer,
+  reviewDeal,
+  findClosers,
   findMarketerByCode,
   findMarketerById,
   findMarketerByUser,
   listDeals,
   listMarketers,
   marketingCounts,
+  previewSplit,
   reconcile,
+  recordSale,
   rootMarketer,
+  settledAwaitingClose,
   statementFor,
   teamFor,
+  type CloserInput,
+  type FundAccrual,
+  type FundReversal,
   type MarketingCounts,
+  type RecordSaleInput,
+  type SaleListing,
   type TeamSummary,
 } from "./repo";
+
+/** Paying a marketer a quarterly prize. Handed to @avhomes/funds as a callback. */
+export { creditAdjustment } from "./repo";
 
 export {
   listBanks,

@@ -8,10 +8,14 @@
  */
 
 import type {
+  CloserKind,
+  CommissionSplit,
   Deal,
   DealKind,
   DealShare,
+  DealSource,
   DealStatus,
+  FundShare,
   IssueMessage,
   IssueStatus,
   Lead,
@@ -27,6 +31,7 @@ import type {
   MarketingUpdate,
   MarketingUpdateStatus,
   MarketingUpdateTone,
+  Ownership,
   PayIssue,
   PayItemStatus,
   PayRun,
@@ -73,6 +78,22 @@ export interface DealDoc {
   reporterId: string;
   reporterName: string;
   reporterCode: string;
+  /** All optional on the stored type: 0015 backfills them, and `split` never is. */
+  closerKind?: CloserKind;
+  closerId?: string;
+  closerName?: string;
+  ownership?: Ownership;
+  /**
+   * Absent on a deal settled before the matrix existed.
+   *
+   * Deliberately not backfilled: that deal's `shares` already record what was
+   * paid and at what rate, and inventing the cell behind them would assert a rate
+   * table that did not exist. `toDeal` rebuilds one from the shares instead.
+   */
+  split?: CommissionSplit;
+  fundShares?: FundShare[];
+  keptMinor?: number;
+  source?: DealSource;
   leadId: string | null;
   status: DealStatus;
   reason: string;
@@ -217,6 +238,26 @@ export function toMarketer(doc: MarketerDoc): Marketer {
   };
 }
 
+/**
+ * The cell a pre-matrix deal was priced by, rebuilt from what it actually paid.
+ *
+ * The rates on the shares are real: they were snapshotted at approval. The two
+ * fund shares are ZERO rather than the current default, because that deal did not
+ * feed the funds and claiming it did would put money in a wallet that never
+ * received any. A missing level reads as 0 for the same reason: the deal paid
+ * nothing there, whatever the reason was.
+ */
+function splitFromShares(shares: readonly DealShare[]): CommissionSplit {
+  const rateAt = (level: 1 | 2 | 3) => shares.find((share) => share.level === level)?.rate ?? 0;
+  return {
+    level1: rateAt(1),
+    level2: rateAt(2),
+    level3: rateAt(3),
+    rewardPool: 0,
+    foundation: 0,
+  };
+}
+
 export function toDeal(doc: DealDoc): Deal {
   return {
     id: doc._id,
@@ -235,6 +276,16 @@ export function toDeal(doc: DealDoc): Deal {
     reporterId: doc.reporterId,
     reporterName: doc.reporterName ?? "",
     reporterCode: doc.reporterCode ?? "",
+    /* A deal written before the closer existed was filed in the app by the
+       marketer who closed it, which was the only way one could exist. */
+    closerKind: doc.closerKind ?? "marketer",
+    closerId: doc.closerId ?? doc.reporterId,
+    closerName: doc.closerName ?? doc.reporterName ?? "",
+    ownership: doc.ownership ?? "av",
+    split: doc.split ?? splitFromShares(doc.shares ?? []),
+    fundShares: doc.fundShares ?? [],
+    keptMinor: doc.keptMinor ?? 0,
+    source: doc.source ?? "app",
     leadId: doc.leadId ?? null,
     status: doc.status,
     reason: doc.reason ?? "",

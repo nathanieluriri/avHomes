@@ -7,7 +7,14 @@
  * permissions page.
  */
 
-export type Role = "owner" | "developer" | "agent" | "editor" | "support" | "marketer";
+export type Role =
+  | "owner"
+  | "developer"
+  | "agent"
+  | "editor"
+  | "support"
+  | "marketer"
+  | "partner";
 
 /**
  * A domain is a whole area of the admin, not a verb. Read/write splits are the
@@ -28,6 +35,15 @@ export interface RoleInfo {
   tagline: string;
   description: string;
   grants: "all" | readonly Domain[];
+  /**
+   * Every read is narrowed to records this account owns.
+   *
+   * One flag, read by one function, because a scope enforced per handler is a
+   * scope that is missing from the handler somebody adds next month. It changes
+   * what a domain grant MEANS rather than which domains are granted, which is
+   * why it is not expressible as a domain.
+   */
+  scoped?: true;
 }
 
 export const ROLE_INFO: Record<Role, RoleInfo> = {
@@ -74,17 +90,29 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
        which the domain gate leaves alone, and holds no admin surface at all. */
     grants: [],
   },
+  partner: {
+    label: "Partner lister",
+    tagline: "Their own property, their own numbers",
+    description:
+      "Lists property they own, uploads its photography and watches how it performs. Sees only their own listings, and a listing goes live once AV Homes approves it.",
+    /* Real console domains, narrowed by `scoped` rather than by a smaller grant.
+       A partner genuinely uses the listing editor and the image library; what
+       differs is which records those surfaces are allowed to return. */
+    grants: ["listings", "media", "analytics"],
+    scoped: true,
+  },
 };
 
 /**
  * Every role an API caller may hand out. `owner` is never mintable, and neither
- * is `marketer`: that one is minted by signing up in the marketer app, and
- * handing it to a console account would take that person's console away.
+ * is `marketer` or `partner`: those are minted by signing up in the marketer app
+ * and by an admin approving a partner application, and handing either to a
+ * console account would take that person's console away.
  */
 export const ASSIGNABLE_ROLES = ["developer", "agent", "editor", "support"] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
-export const ALL_ROLES = ["owner", ...ASSIGNABLE_ROLES, "marketer"] as const;
+export const ALL_ROLES = ["owner", ...ASSIGNABLE_ROLES, "marketer", "partner"] as const;
 
 export function isRole(value: string): value is Role {
   return (ALL_ROLES as readonly string[]).includes(value);
@@ -99,6 +127,18 @@ export function hasDomain(role: Role, domain: Domain): boolean {
 /** Does this role belong in the console at all? A marketer does not. */
 export function isConsoleRole(role: Role): boolean {
   return role !== "marketer";
+}
+
+/**
+ * Does this role see only the records it owns?
+ *
+ * Read by `authorize()` for one record and by every list query's filter. Those
+ * are two places rather than one because a per-record answer cannot narrow a
+ * query, and fetching a page only to drop most of it returns short pages that
+ * look like the end of the list.
+ */
+export function isScopedRole(role: Role): boolean {
+  return ROLE_INFO[role]?.scoped === true;
 }
 
 /** The full-access tier requireAdmin() reads. "Owner or developer", once. */

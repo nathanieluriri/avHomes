@@ -15,6 +15,7 @@ import { firstImage } from "@/components/MediaFrame";
 import { isVideoUrl } from "@avhomes/contracts";
 import JsonLd from "@/components/JsonLd";
 import ListingDetail from "@/components/listing/ListingDetail";
+import { ListingPulse } from "@/components/SitePulse";
 
 export async function generateStaticParams() {
   const properties = await getProperties();
@@ -225,6 +226,9 @@ export default async function PropertyPage({
     <>
       <JsonLd data={listingJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
+      {/* The id, not the slug: a slug changes when a title does, and the counter
+          has to keep pointing at the same property across a rename. */}
+      <ListingPulse id={property.id} />
       <ListingDetail property={property} similar={similar} />
     </>
   );

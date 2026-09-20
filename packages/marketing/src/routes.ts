@@ -43,25 +43,32 @@ import {
   MARKETER_STATUSES,
   MARKETING_UPDATE_STATUSES,
   MARKETING_UPDATE_TONES,
+  OWNERSHIPS,
   RENT_BASES,
   UPDATE_BODY_MAX,
   UPDATE_LINK_LABEL_MAX,
   UPDATE_LINK_MAX,
   UPDATE_TITLE_MAX,
   isNuban,
+  matrixRefusal,
   payMonth,
+  personRates,
   previewEarning,
-  ratesRefusal,
+  splitFor,
   updateRefusal,
   leadRefusal,
   namesMatch,
+  type CommissionMatrix,
   type Deal,
+  type DealKind,
   type Lead,
   type Marketer,
   type MarketerBank,
   type MarketingSettings,
   type MarketingUpdate,
   type NotificationInput,
+  type Ownership,
+  type PropertyStatus,
 } from "@avhomes/contracts";
 import {
   burnPasswordTime,
@@ -126,8 +133,13 @@ import {
   marketingCounts,
   openIssue,
   payHistoryFor,
-  previewShares,
+  previewSplit,
   reconcile,
+  recordSale,
+  findClosers,
+  settledAwaitingClose,
+  type FundAccrual,
+  type FundReversal,
   replyToIssue,
   resolveIssue,
   resubmitDeal,
@@ -161,6 +173,14 @@ export interface RecentListing {
   /** The first photo, never a video, or empty. */
   imageUrl: string;
   publishedAt: number;
+  /**
+   * Whose property it is.
+   *
+   * Carried into the app so a Non-AV card can show the smaller number it really
+   * pays. A marketer choosing what to push should see the real figure before they
+   * spend a week on it, which is the whole reason this field exists.
+   */
+  ownership: Ownership;
 }
 
 export interface MarketingDeps {
@@ -177,6 +197,47 @@ export interface MarketingDeps {
    * Injected, because this package may not read the listings package's collection.
    */
   recentListings?: (db: Db, sinceMs: number, limit: number) => Promise<RecentListing[]>;
+  /**
+   * What a listing actually is, resolved SERVER SIDE by id.
+   *
+   * This exists so `ownership` is never taken from a request body. A marketer
+   * reporting a deal posts a listing snapshot, and if the class of property came
+   * from that snapshot then claiming `av` on somebody else's house would be a
+   * 5% commission instead of 2%, chosen by the person being paid. Resolving it
+   * here is the difference between a rate and a request.
+   *
+   * Null when the listing does not exist, which the caller treats as a refusal
+   * rather than a default.
+   */
+  listingFacts?: (db: Db, listingId: string) => Promise<ListingFacts | null>;
+  /**
+   * Where a settled deal's fund shares go, and how they come back.
+   *
+   * Injected because @avhomes/funds owns those collections. Defaulted to a no-op
+   * rather than left undefined, so a route reads as one path: a deployment that
+   * somehow builds the app without funds still settles deals, and the missing
+   * accrual is what `reconcile` reports rather than a crash mid-settlement.
+   */
+  accrue?: FundAccrual;
+  reverseFunds?: FundReversal;
+  /** Closes a listing once its sale is recorded. Owned by @avhomes/listings. */
+  closeListing?: (
+    db: Db,
+    input: { listingId: string; dealId: string; actorId: string; actorName: string },
+  ) => Promise<void>;
+}
+
+/** The listing facts marketing needs and may not read for itself. */
+export interface ListingFacts {
+  id: string;
+  ownership: Ownership;
+  title: string;
+  location: string;
+  estate: string;
+  listingType: DealKind;
+  priceMinor: number;
+  currency: string;
+  status: PropertyStatus;
 }
 
 /* ═══════════════════════════════════════════════════════════════════ BODIES ══ */
@@ -337,10 +398,81 @@ const LeadQuery = z
   })
   .strict();
 
+/** One rate cell: the three people and the two funds. */
+const SplitBody = z
+  .object({
+    level1: z.number(),
+    level2: z.number(),
+    level3: z.number(),
+    rewardPool: z.number(),
+    foundation: z.number(),
+  })
+  .strict();
+
+/** ownership then kind, both required when the matrix is sent at all. */
+const MatrixBody = z
+  .object({
+    av: z.object({ sale: SplitBody, rent: SplitBody }).strict(),
+    partner: z.object({ sale: SplitBody, rent: SplitBody }).strict(),
+  })
+  .strict();
+
+/**
+ * Who closed a sale, as a discriminated union rather than three optional fields.
+ *
+ * A marketer id that is only meaningful when `kind` says so is a field somebody
+ * fills in for a walk-in, and the union refuses that shape outright.
+ */
+const CloserBody = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("marketer"), marketerId: str().max(40) }).strict(),
+  z
+    .object({ kind: z.literal("staff"), userId: str().max(40), name: str().max(120) })
+    .strict(),
+  z.object({ kind: z.literal("direct") }).strict(),
+]);
+
+const SalePreviewBody = z
+  .object({
+    listingId: str().max(40),
+    kind: z.enum(DEAL_KINDS),
+    amountMinor: z.number().int().min(0),
+    closer: CloserBody,
+  })
+  .strict();
+
+const RecordSaleBody = z
+  .object({
+    listingId: str().max(40),
+    unitKey: str().max(80).default(""),
+    kind: z.enum(DEAL_KINDS),
+    amountMinor: z.number().int().positive(),
+    buyerName: str().max(120),
+    buyerPhone: str().max(40).default(""),
+    closedOn: z.number().int().min(0).default(0),
+    /* At least one. `recordSaleRefusal` says the same thing in words the sheet
+       renders, and this is the shape check behind it. */
+    proof: z.array(str().max(500)).min(1).max(10),
+    note: str().max(400).default(""),
+    closer: CloserBody,
+    /** Settling a deal that was already reported, rather than recording a new one. */
+    dealId: str().max(40).nullable().optional(),
+  })
+  .strict();
+
 const SettingsBody = z
   .object({
-    saleRates: z.array(z.number()).length(3).optional(),
-    rentRates: z.array(z.number()).length(3).optional(),
+    commission: MatrixBody.optional(),
+    rewardPoolName: str().max(40).optional(),
+    foundationName: str().max(40).optional(),
+    rating: z
+      .object({
+        value: z.number().min(0).max(100),
+        deals: z.number().min(0).max(100),
+        conversion: z.number().min(0).max(100),
+        speed: z.number().min(0).max(100),
+      })
+      .strict()
+      .optional(),
     rentBasis: z.enum(RENT_BASES).optional(),
     issueWindowDays: z.number().int().min(1).max(90).optional(),
     payCutoffDay: z.number().int().min(1).max(28).optional(),
@@ -371,7 +503,10 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
     return c.json({
       open: settings.joinOpen,
       supportPhone: settings.supportPhone,
-      rates: settings.saleRates,
+      /* The sign-up page's headline number. AV Homes' own sale rate, which is the
+         best case and the honest one to advertise: a Non-AV listing pays less and
+         the app says so on the listing itself. */
+      rates: personRates(splitFor(settings.commission, "av", "sale")),
       bankCheck: (await providerState(db)).ready,
       referrer:
         referrer && referrer.status === "active"
@@ -582,8 +717,23 @@ function listingCard(listing: RecentListing): MarketingUpdate {
   };
 }
 
+/**
+ * The fallbacks for the fund ports.
+ *
+ * A no-op rather than a throw, deliberately. These are called AFTER a deal is
+ * settled and its ledger lines are written; throwing here would turn a
+ * misconfigured deployment into a half-settled deal, which is the worst of the
+ * available outcomes. A missing accrual is what `reconcile` exists to report.
+ */
+const noAccrual: FundAccrual = async () => {};
+const noReversal: FundReversal = async () => 0;
+
 export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
+  /* Only the reversal, because nothing a marketer does from the app settles money:
+     they report a deal and an admin approves it. Leaving a lead is the one write
+     here that can un-mint a settled one. */
+  const reverseFunds = deps.reverseFunds ?? noReversal;
 
   /** Everything the app's home screen needs, in one read. */
   routes.get("/marketing/me", requireAuth(), async (c) => {
@@ -600,7 +750,14 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       marketer,
       balance,
       levels: team.levels,
-      rates: { sale: settings.saleRates, rent: settings.rentRates },
+      /* Both ownership classes, because the app now shows a different number on a
+         Non-AV listing and the team screen explains where both come from. */
+      rates: {
+        sale: personRates(splitFor(settings.commission, "av", "sale")),
+        rent: personRates(splitFor(settings.commission, "av", "rent")),
+        partnerSale: personRates(splitFor(settings.commission, "partner", "sale")),
+        partnerRent: personRates(splitFor(settings.commission, "partner", "rent")),
+      },
       supportPhone: settings.supportPhone,
       bankCheck,
       isAdmin: currentUser(c).role !== "marketer",
@@ -745,11 +902,23 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     await currentMarketer(db, c);
     const body = await readJson(
       c,
-      z.object({ amountMinor: z.number().int().min(0), listingType: z.enum(DEAL_KINDS) }).strict(),
+      z
+        .object({
+          amountMinor: z.number().int().min(0),
+          listingType: z.enum(DEAL_KINDS),
+          /* Defaults to AV Homes when the caller does not say, because every
+             listing was AV Homes' own before this field existed and an old app
+             build must not start quoting the smaller Non-AV number by accident. */
+          ownership: z.enum(OWNERSHIPS).optional(),
+        })
+        .strict(),
     );
     const settings = await readMarketingSettings(db);
-    const rates = body.listingType === "rent" ? settings.rentRates : settings.saleRates;
-    return c.json({ amountMinor: previewEarning(body.amountMinor, rates), rate: rates[0] });
+    const cell = splitFor(settings.commission, body.ownership ?? "av", body.listingType);
+    return c.json({
+      amountMinor: previewEarning(body.amountMinor, cell),
+      rate: cell.level1,
+    });
   });
 
   routes.post("/marketing/deals", requireAuth(), async (c) => {
@@ -760,10 +929,16 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const settings = await readMarketingSettings(db);
 
     const claim = await claimOn(db, body.listingId, body.unitKey);
+    /*
+     * Whose property it is comes from the LISTING, never from `body`. See
+     * `listingFacts`: taking it from the snapshot the app posted would let the
+     * person being paid choose their own rate.
+     */
+    const facts = deps.listingFacts ? await deps.listingFacts(db, body.listingId) : null;
     const deal = await createDeal(
       db,
       marketer,
-      { ...body, currency: settings.currency },
+      { ...body, currency: settings.currency, ownership: facts?.ownership ?? "av" },
       settings,
     );
     auditEntityId(c, deal.id);
@@ -889,11 +1064,14 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     if (!found) throw new NotFoundError(`lead ${id}`);
 
     const body = await readJson(c, MoveBody);
-    const lead = await moveLead(db, id, body.to, body, {
-      id: marketer.id,
-      name: marketer.displayName,
-      side: "marketer",
-    });
+    const lead = await moveLead(
+      db,
+      id,
+      body.to,
+      body,
+      { id: marketer.id, name: marketer.displayName, side: "marketer" },
+      reverseFunds,
+    );
     auditEntityId(c, lead.id);
 
     if (deps.notify) {
@@ -1060,8 +1238,10 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
 
 /* No deps: everything the console does here is a database write. The app's
    own routes are the ones that have to tell somebody. */
-export function marketingAdminRoutes(): Hono<AppEnv> {
+export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
+  const accrue = deps.accrue ?? noAccrual;
+  const reverseFunds = deps.reverseFunds ?? noReversal;
 
   routes.get("/admin/marketing/counts", requireAuth(), async (c) => {
     const db = await currentDb(c);
@@ -1083,11 +1263,14 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
   routes.patch("/admin/marketing/settings", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const body = await readJson(c, SettingsBody);
-    for (const key of ["saleRates", "rentRates"] as const) {
-      const value = body[key];
-      if (!value) continue;
-      const refusal = ratesRefusal(value);
-      if (refusal) throw new BadRequestError(key, [{ path: key, message: refusal }]);
+    if (body.commission) {
+      /* One refusal over the whole matrix, naming the cell. Five shares that are
+         each legal can still add up past the deal, which is exactly the case the
+         old three-rate check could not see. */
+      const refusal = matrixRefusal(body.commission as CommissionMatrix);
+      if (refusal) {
+        throw new BadRequestError("commission", [{ path: "commission", message: refusal }]);
+      }
     }
     const { paystackKey, ...rest } = body;
     if (paystackKey !== undefined) await writePaystackKey(db, paystackKey);
@@ -1218,10 +1401,27 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
     const deal = await getDeal(db, id);
     if (!deal) throw new NotFoundError(`deal ${id}`);
     const settings = await readMarketingSettings(db);
-    const [shares, other] = await Promise.all([
+    const [split, other] = await Promise.all([
+      /* A settled deal reports what it actually paid; an unsettled one reports
+         what it WOULD pay at today's rates, which is the number an admin is about
+         to approve. Never both, and the screen labels which it is showing. */
       deal.status === "approved"
-        ? Promise.resolve(deal.shares)
-        : previewShares(db, deal, deal.amountMinor, settings),
+        ? Promise.resolve({
+            people: deal.shares,
+            funds: deal.fundShares,
+            keptMinor: deal.keptMinor,
+          })
+        : previewSplit(
+            db,
+            {
+              closerKind: deal.closerKind,
+              closerId: deal.closerId,
+              ownership: deal.ownership,
+              kind: deal.listingType,
+              amountMinor: deal.amountMinor,
+            },
+            settings,
+          ),
       listDeals(db, { limit: 5, q: "" }).then((page) =>
         page.items.filter(
           (row) =>
@@ -1232,7 +1432,129 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
         ),
       ),
     ]);
-    return c.json({ deal, shares, alsoClaimed: other, rates: settings });
+    return c.json({
+      deal,
+      split,
+      /* Kept as `shares` too, so the screen's existing reader does not break on a
+         deploy where the page has not shipped yet. */
+      shares: split.people,
+      alsoClaimed: other,
+      rates: settings,
+      fundNames: { reward: settings.rewardPoolName, foundation: settings.foundationName },
+    });
+  });
+
+  /* ═══ RECORDING A SALE ═══════════════════════════════════════════════════ */
+
+  /**
+   * The closer picker's search. Code or name, at most eight.
+   *
+   * Two characters minimum, so an empty box does not return the whole network.
+   */
+  routes.get("/admin/marketing/closers", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const q = readQuery(c, z.object({ q: str().max(80).default("") }).strict());
+    return c.json({ closers: await findClosers(db, q.q) });
+  });
+
+  /**
+   * What the sale would pay, before anything is written.
+   *
+   * The sheet's live breakdown reads this on every amount and closer change, so
+   * the number somebody confirms is the number the server would produce. It
+   * writes nothing.
+   */
+  routes.post("/admin/marketing/sales/preview", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const body = await readJson(c, SalePreviewBody);
+    const settings = await readMarketingSettings(db);
+    const facts = deps.listingFacts ? await deps.listingFacts(db, body.listingId) : null;
+    if (!facts) throw new NotFoundError(`listing ${body.listingId}`);
+    const split = await previewSplit(
+      db,
+      {
+        closerKind: body.closer.kind,
+        closerId: body.closer.kind === "marketer" ? body.closer.marketerId : "",
+        ownership: facts.ownership,
+        kind: body.kind,
+        amountMinor: body.amountMinor,
+      },
+      settings,
+    );
+    return c.json({
+      split,
+      ownership: facts.ownership,
+      currency: settings.currency,
+      fundNames: { reward: settings.rewardPoolName, foundation: settings.foundationName },
+    });
+  });
+
+  /**
+   * The ONE door from live to closed.
+   *
+   * Two writes in sequence, in one handler, and the ordering is the point: the
+   * deal and its money first, then the listing. A crash between them leaves a
+   * recorded sale on a listing that still says live, which the admin alert names
+   * and this same route finishes on a retry. The other order would take a
+   * property off the market with no record of who sold it or for how much, which
+   * is the exact hole this whole flow exists to close.
+   *
+   * `closeListing` is a port: this package may not write another's collection.
+   */
+  routes.post("/admin/marketing/sales", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const body = await readJson(c, RecordSaleBody);
+    const settings = await readMarketingSettings(db);
+
+    const facts = deps.listingFacts ? await deps.listingFacts(db, body.listingId) : null;
+    if (!facts) throw new NotFoundError(`listing ${body.listingId}`);
+
+    const deal = await recordSale(
+      db,
+      {
+        listingId: body.listingId,
+        unitKey: body.unitKey,
+        kind: body.kind,
+        amountMinor: body.amountMinor,
+        currency: settings.currency,
+        buyerName: body.buyerName,
+        buyerPhone: body.buyerPhone,
+        closedOn: body.closedOn || Date.now(),
+        proof: body.proof,
+        note: body.note,
+        closer: body.closer,
+        dealId: body.dealId ?? null,
+        actorId: user.id,
+        actorName: user.displayName,
+      },
+      settings,
+      {
+        ownership: facts.ownership,
+        title: facts.title,
+        location: facts.location,
+        estate: facts.estate,
+      },
+      accrue,
+    );
+    auditEntityId(c, deal.id);
+
+    if (deps.closeListing) {
+      await deps.closeListing(db, {
+        listingId: body.listingId,
+        dealId: deal.id,
+        actorId: user.id,
+        actorName: user.displayName,
+      });
+    }
+
+    return c.json({ deal }, 201);
+  });
+
+  /** Approved deals whose listing has not been closed yet. Feeds the alert. */
+  routes.get("/admin/marketing/awaiting-close", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    return c.json({ deals: await settledAwaitingClose(db, 20) });
   });
 
   routes.post("/admin/marketing/deals/:id/review", requireAuth(), async (c) => {
@@ -1246,6 +1568,7 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
       id,
       { ...body, actorId: user.id, actorName: user.displayName },
       settings,
+      accrue,
     );
     return c.json({ deal });
   });
@@ -1255,7 +1578,13 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
     const user = currentUser(c);
     const id = pathParam(c, "id");
     const body = await readJson(c, z.object({ reason: str().max(400).default("") }).strict());
-    const deal = await cancelDeal(db, id, body.reason, { id: user.id, name: user.displayName });
+    const deal = await cancelDeal(
+      db,
+      id,
+      body.reason,
+      { id: user.id, name: user.displayName },
+      reverseFunds,
+    );
     return c.json({ deal });
   });
 
@@ -1295,11 +1624,14 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
     auditBefore(c, before as unknown as Record<string, unknown>);
 
     const body = await readJson(c, MoveBody);
-    const lead = await moveLead(db, id, body.to, body, {
-      id: user.id,
-      name: user.displayName,
-      side: "admin",
-    });
+    const lead = await moveLead(
+      db,
+      id,
+      body.to,
+      body,
+      { id: user.id, name: user.displayName, side: "admin" },
+      reverseFunds,
+    );
     auditEntityId(c, lead.id);
     return c.json(lead);
   });
@@ -1332,13 +1664,21 @@ export function marketingAdminRoutes(): Hono<AppEnv> {
 
     const body = await readJson(c, WinBody);
     const settings = await readMarketingSettings(db);
+    /* Whose property it is comes from the listing, not the body, for the same
+       reason a reported deal's does: it decides the commission. */
+    const facts = deps.listingFacts ? await deps.listingFacts(db, body.listingId) : null;
     const { lead, dealId } = await winLead(
       db,
       id,
-      { ...body, closedOn: body.closedOn || Date.now() },
+      {
+        ...body,
+        closedOn: body.closedOn || Date.now(),
+        ownership: facts?.ownership ?? "av",
+      },
       reporter,
       { id: user.id, name: user.displayName, side: "admin" },
       settings,
+      accrue,
     );
     auditEntityId(c, lead.id);
     return c.json({ lead, dealId });

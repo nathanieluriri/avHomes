@@ -77,6 +77,9 @@ const NEW_KINDS = [
 
 const STATUS_TONE: Record<PropertyStatus, Tone> = {
   draft: "amber",
+  /* Amber like a draft rather than green: it is waiting on somebody, and a queue
+     is read by colour before it is read by word. */
+  submitted: "amber",
   live: "green",
   "under-offer": "wine",
   closed: "neutral",
@@ -798,6 +801,7 @@ function estateSpec(s: EstateSummary, prototypes: readonly EstatePrototype[]): s
 
 const STATUS_PHRASE: Record<PropertyStatus, { is: string; among: (plural: string) => string }> = {
   draft: { is: "is a draft", among: () => "drafts" },
+  submitted: { is: "is waiting for AV Homes", among: () => "listings in review" },
   live: { is: "is live", among: (plural) => `live ${plural}` },
   "under-offer": { is: "is under offer", among: (plural) => `${plural} under offer` },
   closed: { is: "is closed", among: (plural) => `closed ${plural}` },

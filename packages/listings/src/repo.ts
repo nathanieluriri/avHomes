@@ -21,6 +21,7 @@ import {
   PUBLIC_PROPERTY_STATUSES,
   isEstate,
   type ListingType,
+  type Ownership,
   type Page,
   type PriceChange,
   type Property,
@@ -252,6 +253,14 @@ export interface CreatePropertyArgs {
   type?: PropertyType | undefined;
   agentUserId: string | null;
   agent: PropertyDoc["agent"];
+  /**
+   * Whose property it is. Decided by the ROUTE, not by the form: a partner
+   * account can only ever create partner property, and the route forces it
+   * rather than trusting a field somebody could flip to earn a bigger
+   * commission on the sale.
+   */
+  ownership?: Ownership;
+  ownerLabel?: string;
 }
 
 export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<Property> {
@@ -267,6 +276,9 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     priceMinor: 0,
     currency: DEFAULT_CURRENCY,
     status: "draft",
+    ownership: args.ownership ?? "av",
+    ownerLabel: args.ownerLabel ?? "",
+    closedDealId: null,
     // Required by the validator: moderate validation checks every insert, and
     // an insert with no listingType fails it outright. Also the only deal an
     // estate can be, so a new estate needs nothing further here.
@@ -307,10 +319,25 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
   return toProperty(doc);
 }
 
+/**
+ * `closedDealId` is omitted alongside `status`, and for the same reason.
+ *
+ * Both are written only by the recorded-sale flow. The route's body schema is
+ * strict and does not list it either, so this is the second of two locks; the
+ * type is the one a future route inherits by accident.
+ */
 export type PropertyPatch = Partial<
   Omit<
     PropertyDoc,
-    "_id" | "status" | "priceHistory" | "createdAt" | "updatedAt" | "publishedAt" | "deletedAt" | "revision"
+    | "_id"
+    | "status"
+    | "closedDealId"
+    | "priceHistory"
+    | "createdAt"
+    | "updatedAt"
+    | "publishedAt"
+    | "deletedAt"
+    | "revision"
   >
 >;
 
@@ -401,7 +428,9 @@ export type LifecycleOp =
   | "close"
   | "archive"
   | "unarchive"
-  | "restore";
+  | "restore"
+  | "submit"
+  | "sendBack";
 
 interface Transition {
   to: PropertyStatus;
@@ -412,17 +441,35 @@ interface Transition {
 }
 
 export const TRANSITIONS: Record<LifecycleOp, Transition> = {
-  publish: { to: "live", from: ["draft", "archived"], trashed: false },
+  /* `submitted` publishes too, because approving a partner's listing IS
+     publishing it: one op, one set of rules, one publish check. */
+  publish: { to: "live", from: ["draft", "submitted", "archived"], trashed: false },
   unpublish: { to: "draft", from: ["live", "under-offer"], trashed: false },
   markOffer: { to: "under-offer", from: ["live"], trashed: false },
   // Under offer and closed both need a way back to live, or a collapsed deal
   // forces an agent to lie about the listing's state.
   relist: { to: "live", from: ["under-offer", "closed"], trashed: false },
+  /*
+   * `close` is reachable ONLY through the recorded-sale flow, which supplies the
+   * amount, the buyer, the proof and who closed it. The op stays in this table
+   * because the transition rules are one table, and the route that performs it is
+   * the only caller. Nothing in the editor posts it on its own.
+   */
   close: { to: "closed", from: ["live", "under-offer"], trashed: false },
-  archive: { to: "archived", from: ["draft", "live", "under-offer", "closed"], trashed: false },
+  archive: {
+    to: "archived",
+    from: ["draft", "submitted", "live", "under-offer", "closed"],
+    trashed: false,
+  },
   unarchive: { to: "draft", from: ["archived"], trashed: false },
   // Whatever status a trashed row holds, being in the trash is the whole test.
   restore: { to: "draft", from: PROPERTY_STATUSES, trashed: true },
+  /* A partner hands a listing over. Staff can do it too, on their behalf, which
+     is what makes the review queue usable when somebody phones their listing in. */
+  submit: { to: "submitted", from: ["draft"], trashed: false },
+  /* Staff hand it back with a reason. Not a refusal: the listing stays theirs and
+     the reason is what they need to fix. */
+  sendBack: { to: "draft", from: ["submitted"], trashed: false },
 };
 
 const OP_PHRASES: Record<LifecycleOp, string> = {
@@ -434,10 +481,13 @@ const OP_PHRASES: Record<LifecycleOp, string> = {
   archive: "archived",
   unarchive: "unarchived",
   restore: "restored",
+  submit: "sent for review",
+  sendBack: "sent back for changes",
 };
 
 const STATUS_PHRASES: Record<PropertyStatus, string> = {
   draft: "A draft",
+  submitted: "A listing waiting for AV Homes",
   live: "A live listing",
   "under-offer": "A listing under offer",
   closed: "A closed listing",
@@ -505,6 +555,108 @@ export async function transitionProperty(
     throw new StaleWriteError("property", current.revision, reread.revision, toProperty(reread));
   }
   return toProperty(after);
+}
+
+/**
+ * Close a listing because its sale has been recorded.
+ *
+ * The ONLY writer of `status: "closed"` together with `closedDealId`, and the
+ * only way a listing reaches `closed` at all: the `close` lifecycle op is
+ * reachable from no route of its own. That is what makes "a closed listing has a
+ * deal with proof behind it" true by construction rather than by everyone
+ * remembering.
+ *
+ * NO revision check, deliberately, and it is the one write in this file without
+ * one. It runs immediately after the sale is recorded, from the same handler, and
+ * a CAS failure there would leave money recorded against a listing that is still
+ * live with nothing to retry from. The concurrent-edit risk it gives up is an
+ * operator saving a description in the same second, which loses nothing: this
+ * write touches four fields and none of them is editable in the form.
+ */
+export async function closeWithSale(
+  db: Db,
+  input: { listingId: string; dealId: string },
+): Promise<Property | null> {
+  const now = Date.now();
+  const after = await properties(db).findOneAndUpdate(
+    { _id: input.listingId },
+    {
+      $set: {
+        status: "closed",
+        closedDealId: input.dealId,
+        featured: false,
+        updatedAt: now,
+      },
+      $inc: { revision: 1 },
+    },
+    { returnDocument: "after" },
+  );
+  return after ? toProperty(after) : null;
+}
+
+/** The reverse, for a deal that fell through. Back to live, and the link cleared. */
+export async function reopenFromSale(db: Db, listingId: string): Promise<Property | null> {
+  const now = Date.now();
+  const after = await properties(db).findOneAndUpdate(
+    { _id: listingId, status: "closed" },
+    { $set: { status: "live", closedDealId: null, updatedAt: now }, $inc: { revision: 1 } },
+    { returnDocument: "after" },
+  );
+  return after ? toProperty(after) : null;
+}
+
+/**
+ * What marketing needs to know about a listing, and may not read for itself.
+ *
+ * The `listingFacts` port. It returns `ownership` above all: that is the field
+ * that decides a commission, and resolving it here is what stops it being taken
+ * from a request body.
+ */
+export async function listingFacts(
+  db: Db,
+  listingId: string,
+): Promise<{
+  id: string;
+  ownership: Ownership;
+  title: string;
+  location: string;
+  estate: string;
+  listingType: ListingType;
+  priceMinor: number;
+  currency: string;
+  status: PropertyStatus;
+} | null> {
+  const doc = await properties(db).findOne(
+    { _id: listingId },
+    {
+      projection: {
+        _id: 1,
+        ownership: 1,
+        title: 1,
+        location: 1,
+        city: 1,
+        listingType: 1,
+        priceMinor: 1,
+        currency: 1,
+        status: 1,
+        type: 1,
+      },
+    },
+  );
+  if (!doc) return null;
+  return {
+    id: doc._id,
+    ownership: doc.ownership ?? "av",
+    title: doc.title ?? "",
+    location: doc.location ?? "",
+    /* An estate's own name is its title; a unit inside one carries the estate in
+       `location`. The deal snapshot wants whichever names the development. */
+    estate: isEstate(doc.type) ? (doc.title ?? "") : "",
+    listingType: doc.listingType,
+    priceMinor: doc.priceMinor ?? 0,
+    currency: doc.currency ?? DEFAULT_CURRENCY,
+    status: doc.status,
+  };
 }
 
 /**

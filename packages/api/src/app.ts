@@ -11,8 +11,10 @@ import {
   type Mailer,
 } from "@avhomes/core";
 import { getDb, type Db } from "@avhomes/db";
-import { isVideoUrl } from "@avhomes/contracts";
+import { isVideoUrl, type FundKind } from "@avhomes/contracts";
 import {
+  applicationAdminRoutes,
+  applicationPublicRoutes,
   authRoutes,
   clerkRoutes,
   passwordRoutes,
@@ -21,7 +23,13 @@ import {
   teamRoutes,
 } from "@avhomes/identity";
 import { auditRoutes, auditTrail } from "@avhomes/audit";
-import { listProperties, listingsAdminRoutes, listingsPublicRoutes } from "@avhomes/listings";
+import {
+  closeWithSale,
+  listProperties,
+  listingFacts,
+  listingsAdminRoutes,
+  listingsPublicRoutes,
+} from "@avhomes/listings";
 import { contentAdminRoutes, contentPublicRoutes } from "@avhomes/content";
 import {
   cloudinaryStorage,
@@ -41,9 +49,13 @@ import {
   marketingAdminRoutes,
   marketingAppRoutes,
   marketingPublicRoutes,
+  readMarketingSettings,
+  type MarketingDeps,
   type RecentListing,
 } from "@avhomes/marketing";
+import { accrueForDeal, fundsRoutes, reverseForDeal } from "@avhomes/funds";
 import { dashboardRoutes } from "./dashboard";
+import { analyticsConsoleRoutes } from "./analytics";
 import { healthRoutes } from "./health";
 import { tutorialsRoutes } from "./tutorials";
 import { developerNotifier, notificationsRoutes } from "./notifications";
@@ -115,6 +127,9 @@ async function recentListings(db: Db, sinceMs: number, limit: number): Promise<R
       city: property.city,
       imageUrl: property.images.find((url) => !isVideoUrl(url)) ?? "",
       publishedAt: property.publishedAt ?? sinceMs,
+      /* So the app's card can quote what this listing really pays rather than AV
+         Homes' own rate on somebody else's house. */
+      ownership: property.ownership,
     }));
 }
 
@@ -130,6 +145,44 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   const mailer = deps.mailer ?? resendMailer();
   const notify = developerNotifier(mailer);
+
+  /*
+   * The funds' display names, which an admin can rename and which live in
+   * marketing's settings document.
+   *
+   * A port rather than an import, for the rule that holds the whole layout up:
+   * @avhomes/funds may not know @avhomes/marketing exists. A renameable label is
+   * a thin reason to cross that line, and crossing it thinly is how a layout
+   * stops being one.
+   */
+  const fundNames = async (db: Db): Promise<Record<FundKind, string>> => {
+    const settings = await readMarketingSettings(db);
+    return { reward: settings.rewardPoolName, foundation: settings.foundationName };
+  };
+
+  /*
+   * THE CROSSINGS THE MONEY PATH NEEDS, all one-directional, all wired here
+   * because this is the only file allowed to know both halves of a seam.
+   *
+   *   marketing -> funds      a settled deal's two fund shares, and their reversal
+   *   marketing -> listings   whose property it is, and closing it once sold
+   *   funds     -> marketing  crediting a prize winner through the pay run
+   *
+   * `listingFacts` is the load-bearing one. It is how `ownership` reaches a
+   * commission calculation without ever passing through a request body, which is
+   * what stops the person being paid from choosing their own rate.
+   */
+  const marketingPorts = {
+    accrue: accrueForDeal,
+    reverseFunds: reverseForDeal,
+    listingFacts,
+    closeListing: async (
+      db: Db,
+      input: { listingId: string; dealId: string; actorId: string; actorName: string },
+    ) => {
+      await closeWithSale(db, { listingId: input.listingId, dealId: input.dealId });
+    },
+  } satisfies Partial<MarketingDeps>;
 
   /*
    * The image store, chosen by configuration rather than by which token happens
@@ -301,6 +354,9 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * WRITES one, which is a different thing and is safe above the gate.
    */
   app.route(API_PREFIX, marketingPublicRoutes());
+  /* Applying to list property. A public MUTATION, so it sits here rather than in
+     the cacheable /public/* router, the same placement the enquiry intake has. */
+  app.route(API_PREFIX, applicationPublicRoutes({ mailer }));
 
   /* ═════════════════ 9. session, the domain gate, then the audit trail ═════════ */
 
@@ -328,6 +384,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, passwordRoutes());
 
   app.route(API_PREFIX, teamRoutes({ mailer }));
+  app.route(API_PREFIX, applicationAdminRoutes({ mailer }));
   /*
    * BEFORE listingsAdminRoutes, deliberately. Its second route, GET
    * /admin/properties/:id/history, sits on a path listingsAdminRoutes also
@@ -354,8 +411,22 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   /* The marketer app first, then the console's side of the same feature. The
      app's routes are the only admin-tier surface a marketer role can reach,
      which is why they live under /api/marketing and not /api/admin. */
-  app.route(API_PREFIX, marketingAppRoutes({ storage, sniff: sniffImage, notify, recentListings }));
-  app.route(API_PREFIX, marketingAdminRoutes());
+  app.route(
+    API_PREFIX,
+    marketingAppRoutes({
+      storage,
+      sniff: sniffImage,
+      notify,
+      recentListings,
+      ...marketingPorts,
+    }),
+  );
+  app.route(API_PREFIX, marketingAdminRoutes({ notify, ...marketingPorts }));
+  /* The funds sit beside marketing because that is what feeds them, and they take
+     their display names from marketing's settings as a port rather than an
+     import: a renameable label is not a reason for one feature package to know
+     another. */
+  app.route(API_PREFIX, fundsRoutes({ names: fundNames }));
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
   app.route(API_PREFIX, notificationsRoutes());
@@ -368,6 +439,10 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * existing route.
    */
   app.route(API_PREFIX, dashboardRoutes());
+  /* Beside the dashboard, and last for the same reason: both mount under the
+     `/admin` prefix the feature routers already use, registered after them, where
+     a collision is this router losing rather than shadowing an existing route. */
+  app.route(API_PREFIX, analyticsConsoleRoutes());
   app.route(API_PREFIX, healthRoutes());
 
   return app;

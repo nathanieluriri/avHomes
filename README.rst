@@ -70,6 +70,8 @@ Package                       Holds
 ``@avhomes/media``            The image library and its storage port
                               (Cloudinary, Vercel Blob, or a local folder).
 ``@avhomes/enquiries``        Contact intake and the inbox.
+``@avhomes/funds``            The two pots that belong to nobody: a community fund
+                              and a quarterly prize. Append only, like the ledger.
 ``@avhomes/audit``            The audit middleware, its collection and reader.
 ``@avhomes/api``              ``createApp()``: the composition root.
 ============================  ================================================
@@ -340,3 +342,71 @@ the reasoning attached, is in ``packages/api/src/TESTS.todo.ts``. Three items in
 it are marked ``TODO(verify)`` because they cannot be covered by a suite at all:
 they need a real deployment, and pretending otherwise is how the blind spot
 forms.
+
+Money
+=====
+
+Every naira that moves is a record with proof behind it, split five ways by a rule
+that knows whose property it was.
+
+.. code-block:: text
+
+   AV Homes' own    5 / 2 / 1   + 1 pool + 1 foundation   = 10%
+   Somebody else's  2 / 1 / 0.5 + 1 pool + 1 foundation   = 5.5%
+
+Four editable cells, over ownership and sale-versus-rent. Three shares go to
+people, up the referral chain, and two go to pots that belong to nobody: a prize
+for the quarter's best seller and a community fund. Both are renameable, and both
+accrue on **every** recorded deal, including a walk-in that pays no commission at
+all.
+
+Three rules hold it up, and each one is enforced in code rather than remembered:
+
+1. **One door to closed.** A listing reaches ``closed`` only through the
+   record-a-sale flow, which requires the amount, the buyer, proof and who closed
+   it. The bare lifecycle route refuses ``close``, so "a closed listing has a deal
+   with evidence behind it" is true by construction.
+2. **Money already recorded is never edited.** ``marketing_ledger`` and
+   ``fund_ledger`` are both append only. A cancelled deal adds negative rows; a
+   balance is always a sum, so a lost write can make a fund poorer than its history
+   (visible, fixable) and never richer (neither).
+3. **The rate never comes from a request body.** ``ownership`` is resolved from the
+   listing through the ``listingFacts`` port, because taking it from the payload
+   would let the person being paid choose their own rate.
+
+The two funds are their own package rather than rows in the marketer ledger:
+``reconcile()`` proves that collection balances against what marketers are owed,
+and a row in it with no person behind it would break the one check the money side
+must never hide.
+
+Analytics
+=========
+
+Six pages under ``/admin/analytics``, gated on the ``analytics`` domain, with money
+blocks rendering only for roles that also hold ``marketing``. A partner account
+reads the same pages narrowed to its own listings by one ``scopeFor`` that every
+query applies.
+
+Five rules bind every screen there. They are a contract for whoever adds the
+seventh page, and they come from ``PulseStrip``, which got this right first:
+
+1. **One question per page**, in the heading. At most four stat tiles above the
+   fold.
+2. **Progressive detail.** A row expands or a chart opens on request, never both at
+   once, and the choice is remembered for the browser session only.
+3. **Scope beside the number, rendered on the device.** A tooltip does not exist on
+   a touch screen, so a figure defined only in a ``title`` attribute is undefined
+   for half the readers.
+4. **No trend without two measured windows.** With nothing to compare against a
+   tile says so rather than dividing by zero and drawing an arrow.
+5. **The five-way split is collapsed by default** everywhere it appears.
+
+``MiniChart`` draws one series at a time, and that is measured rather than
+preferred: the wine ramp's steps score a normal-vision Delta E of 7.7 against each
+other, where 15 is the floor below which full-colour readers cannot tell a pair
+apart. A second series gets a second chart.
+
+Per-listing view counts live in ``listing_views``, one row per listing per day,
+holding no IP and no path. The site layout's beacon owns sessions and page views;
+the listing page sends its own with ``only: "listing"``, so one arrival is never
+counted as two page views.

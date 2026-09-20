@@ -11,16 +11,31 @@ import type { Db } from "mongodb";
 import { COLLECTIONS, collection } from "@avhomes/db";
 import {
   ACCOUNT_PROVIDERS,
+  DEAL_KINDS,
+  DEFAULT_COMMISSION_MATRIX,
   DEFAULT_MARKETING_SETTINGS,
+  DEFAULT_RATING_WEIGHTS,
+  OWNERSHIPS,
   type AccountProvider,
-  type CommissionRates,
+  type CommissionMatrix,
+  type CommissionSplit,
   type MarketingSettings,
+  type RatingWeights,
 } from "@avhomes/contracts";
 
 const DOC_ID = "marketing";
 
 interface SettingsDoc extends Partial<MarketingSettings> {
   _id: string;
+  /**
+   * The rate pair this document held before the matrix existed.
+   *
+   * Kept on the stored type, and nowhere on `MarketingSettings`, because it is
+   * read exactly once: to derive a matrix for a site that has not saved settings
+   * since the upgrade. Nothing writes it again.
+   */
+  saleRates?: unknown;
+  rentRates?: unknown;
   /**
    * The Paystack secret key, when an admin has pasted one in.
    *
@@ -40,10 +55,81 @@ function rows(db: Db) {
   return collection<SettingsDoc>(db, COLLECTIONS.settings);
 }
 
-function rates(value: unknown, fallback: CommissionRates): CommissionRates {
-  if (!Array.isArray(value) || value.length !== 3) return fallback;
-  const out = value.map((entry) => (typeof entry === "number" && Number.isFinite(entry) ? entry : 0));
-  return [out[0] ?? 0, out[1] ?? 0, out[2] ?? 0];
+function num(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/** One cell, field by field, so a document missing a share still answers. */
+function split(value: unknown, fallback: CommissionSplit): CommissionSplit {
+  if (!value || typeof value !== "object") return fallback;
+  const raw = value as Partial<Record<keyof CommissionSplit, unknown>>;
+  return {
+    level1: num(raw.level1, fallback.level1),
+    level2: num(raw.level2, fallback.level2),
+    level3: num(raw.level3, fallback.level3),
+    rewardPool: num(raw.rewardPool, fallback.rewardPool),
+    foundation: num(raw.foundation, fallback.foundation),
+  };
+}
+
+/**
+ * The four rate cells, derived from the legacy pair when this document predates
+ * the matrix.
+ *
+ * The stored `saleRates` and `rentRates` were AV Homes' OWN rates, because
+ * partner property did not exist as a concept when they were written, so they
+ * become the `av` row and `partner` takes the defaults. Both funds take the
+ * default 1, which is the rule the owner set.
+ *
+ * Derived rather than migrated in 0015 on purpose: a settings document is one
+ * row read on nearly every marketing request, and coalescing on read is the rule
+ * this file already holds for every other field. A backfill would also have to
+ * guess for a site that legitimately wants different partner rates, and the next
+ * save from the settings screen writes the real matrix either way.
+ */
+function commission(doc: SettingsDoc): CommissionMatrix {
+  const d = DEFAULT_COMMISSION_MATRIX;
+  if (doc.commission) {
+    const stored = doc.commission;
+    const out = {} as CommissionMatrix;
+    for (const ownership of OWNERSHIPS) {
+      const row = {} as Record<(typeof DEAL_KINDS)[number], CommissionSplit>;
+      for (const kind of DEAL_KINDS) {
+        row[kind] = split(stored[ownership]?.[kind], d[ownership][kind]);
+      }
+      out[ownership] = row;
+    }
+    return out;
+  }
+
+  const legacy = (pair: unknown, fallback: CommissionSplit): CommissionSplit => {
+    if (!Array.isArray(pair) || pair.length !== 3) return fallback;
+    return {
+      level1: num(pair[0], fallback.level1),
+      level2: num(pair[1], fallback.level2),
+      level3: num(pair[2], fallback.level3),
+      rewardPool: d.av.sale.rewardPool,
+      foundation: d.av.sale.foundation,
+    };
+  };
+  return {
+    av: {
+      sale: legacy(doc.saleRates, d.av.sale),
+      rent: legacy(doc.rentRates, d.av.rent),
+    },
+    partner: d.partner,
+  };
+}
+
+function weights(value: unknown, fallback: RatingWeights): RatingWeights {
+  if (!value || typeof value !== "object") return fallback;
+  const raw = value as Partial<Record<keyof RatingWeights, unknown>>;
+  return {
+    value: num(raw.value, fallback.value),
+    deals: num(raw.deals, fallback.deals),
+    conversion: num(raw.conversion, fallback.conversion),
+    speed: num(raw.speed, fallback.speed),
+  };
 }
 
 export async function readMarketingSettings(db: Db): Promise<MarketingSettings> {
@@ -51,8 +137,10 @@ export async function readMarketingSettings(db: Db): Promise<MarketingSettings> 
   if (!doc) return DEFAULT_MARKETING_SETTINGS;
   const d = DEFAULT_MARKETING_SETTINGS;
   return {
-    saleRates: rates(doc.saleRates, d.saleRates),
-    rentRates: rates(doc.rentRates, d.rentRates),
+    commission: commission(doc),
+    rewardPoolName: doc.rewardPoolName?.trim() || d.rewardPoolName,
+    foundationName: doc.foundationName?.trim() || d.foundationName,
+    rating: weights(doc.rating, DEFAULT_RATING_WEIGHTS),
     rentBasis: doc.rentBasis ?? d.rentBasis,
     issueWindowDays: doc.issueWindowDays ?? d.issueWindowDays,
     payCutoffDay: doc.payCutoffDay ?? d.payCutoffDay,
@@ -107,8 +195,10 @@ export async function writePaystackKey(db: Db, key: string | null): Promise<void
 
 /** Only these may be written, whatever the body carries. */
 const WRITABLE = [
-  "saleRates",
-  "rentRates",
+  "commission",
+  "rewardPoolName",
+  "foundationName",
+  "rating",
   "rentBasis",
   "issueWindowDays",
   "payCutoffDay",

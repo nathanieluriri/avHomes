@@ -10,6 +10,8 @@ import {
   FEE_KINDS_FOR,
   HOME_AMENITY_SUGGESTIONS,
   LISTING_TYPES,
+  OWNERSHIPS,
+  OWNERSHIP_LABEL,
   PROPERTY_TYPES,
   RENT_PERIODS,
   TITLE_DOCUMENTS,
@@ -42,6 +44,7 @@ import {
   type FeeKind,
   type ListingFee,
   type ListingType,
+  type Ownership,
   type Property,
   type PropertyType,
   type RentPeriod,
@@ -57,6 +60,7 @@ import { AmenityPicker } from "@/components/admin/listing/AmenityPicker";
 import { NumberField } from "@/components/admin/listing/NumberInput";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import { PreviewSheet } from "@/components/admin/listing/PreviewSheet";
+import { RecordSale } from "@/components/admin/RecordSale";
 import { SearchListing } from "@/components/admin/listing/SearchListing";
 import {
   PaymentPlanFields,
@@ -169,6 +173,9 @@ type Draft = {
   seoDescription: string;
   /** The URL handle as typed. Blank on a listing that has never had one. */
   handle: string;
+  /** Whose property it is, which decides what a closed deal pays. */
+  ownership: Ownership;
+  ownerLabel: string;
 };
 
 /**
@@ -235,6 +242,8 @@ function toDraft(p: Property): Draft {
     seoTitle: p.seoTitle,
     seoDescription: p.seoDescription,
     handle: p.slug ?? "",
+    ownership: p.ownership,
+    ownerLabel: p.ownerLabel,
   };
 }
 
@@ -381,10 +390,27 @@ const LIFECYCLE: readonly { op: string; label: string; description: string; tone
   },
   {
     op: "close",
-    label: "Mark closed",
-    description: "Sold or let; the deal is done",
+    label: "Record the sale",
+    /* Says what it will ASK FOR, not just what it does. This is the one move that
+       opens a form rather than flipping a status, and an operator who expects a
+       one-tap change should learn that before they tap. */
+    description: "Sold or let. Needs the amount, the buyer and proof",
     tone: "neutral",
     when: (p) => (p.status === "live" || p.status === "under-offer") && !isEstate(p.type),
+  },
+  {
+    op: "submit",
+    label: "Send for review",
+    description: "Hand it to AV Homes to publish",
+    tone: "amber",
+    when: (p) => p.deletedAt === null && p.status === "draft",
+  },
+  {
+    op: "sendBack",
+    label: "Send back for changes",
+    description: "Return it to the lister as a draft",
+    tone: "amber",
+    when: (p) => p.status === "submitted",
   },
   {
     op: "unpublish",
@@ -464,6 +490,8 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  /** The record-a-sale sheet, which is the only path from live to closed. */
+  const [recordingSale, setRecordingSale] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // A failed load leaves `history.data` null, and the panel below stays
@@ -660,6 +688,10 @@ function PropertyEditor({ initial }: { initial: Property }) {
           minStay: fields.rentTerms ? draft.rentTerms.minStay : null,
           seoTitle: draft.seoTitle.trim(),
           seoDescription: draft.seoDescription.trim(),
+          ownership: draft.ownership,
+          /* Cleared on AV Homes' own stock: an owner name left behind after
+             switching back would claim somebody else owns a house AV Homes does. */
+          ownerLabel: draft.ownership === "partner" ? draft.ownerLabel.trim() : "",
           // Only a real change. Blank keeps what is stored, or leaves publish to make one.
           ...(handleChanged && { slug: toHandle(draft.handle) }),
         },
@@ -693,6 +725,19 @@ function PropertyEditor({ initial }: { initial: Property }) {
   }, []);
 
   async function transition(op: string) {
+    /*
+     * CLOSING IS NOT A STATUS MOVE, so it does not go through this function.
+     *
+     * The server refuses `close` on the lifecycle route outright. It happens
+     * through the record-a-sale sheet, which collects the amount, the buyer, the
+     * proof and who closed it, and then closes the listing itself. Intercepting
+     * here rather than hiding the option keeps the control where an operator
+     * already looks for it.
+     */
+    if (op === "close") {
+      setRecordingSale(true);
+      return;
+    }
     setBusy(true);
     setSaveError(null);
     try {
@@ -874,6 +919,36 @@ function PropertyEditor({ initial }: { initial: Property }) {
         <PreviewSheet property={draftToProperty(property, draft)} onClose={() => setPreviewOpen(false)} />
       )}
 
+      {/*
+        The one door to closed. It records the deal, the commission, both funds and
+        then closes the listing, so this screen re-reads the record afterwards
+        rather than assuming what changed.
+      */}
+      <RecordSale
+        open={recordingSale}
+        onOpenChange={setRecordingSale}
+        listing={{
+          id: property.id,
+          title: property.title,
+          ownership: property.ownership,
+          listingType: property.listingType,
+          priceMinor: property.priceMinor,
+          currency: property.currency,
+        }}
+        onDone={() => {
+          setRecordingSale(false);
+          /* Re-read rather than guess. The sale wrote a status, a closedDealId and
+             a revision, and the next save has to quote that revision. Adopting a
+             fresh record is the same thing `transition` does and for the same
+             reason: no form field is touched, so nothing unsaved is at risk. */
+          void api
+            .get<{ property: Property }>(`/admin/properties/${property.id}`)
+            .then((res) => setProperty(res.property))
+            .catch(() => {});
+        }}
+      />
+
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* READ-ONLY IN THE TRASH. A disabled fieldset disables its form
             controls and nothing else: the gallery's tile drag and file drop are
@@ -934,6 +1009,45 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 </div>
               )}
             </div>
+
+            {/*
+              WHOSE PROPERTY, beside sale or rent because it changes the money by
+              exactly as much. The hint names the consequence rather than
+              describing the field, since the consequence is the only reason an
+              operator needs to get this right.
+            */}
+            <Field
+              label="Whose property is this"
+              as="group"
+              hint={
+                draft.ownership === "av"
+                  ? "AV Homes' own stock, so it pays the full commission."
+                  : "Somebody else's, so it pays a smaller commission. Name the owner below."
+              }
+            >
+              <Segmented
+                options={OWNERSHIPS.map((value) => ({
+                  value,
+                  label: OWNERSHIP_LABEL[value],
+                }))}
+                value={draft.ownership}
+                onChange={(value) => set("ownership", value)}
+              />
+            </Field>
+
+            {draft.ownership === "partner" && (
+              <Field
+                label="Whose it is"
+                hint="The owner or developer, for grouping where stock comes from. Optional."
+              >
+                <input
+                  className={inputClass}
+                  value={draft.ownerLabel}
+                  onChange={(event) => set("ownerLabel", event.target.value)}
+                  placeholder="Ade Properties Ltd"
+                />
+              </Field>
+            )}
 
             {hiddenNotice && <p className="text-xs text-amber-700">{hiddenNotice}</p>}
 

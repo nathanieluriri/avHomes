@@ -12,7 +12,9 @@ import {
   formatPhone,
   moneyRefusalMessage,
   parseMajor,
+  personRates,
   plainMajor,
+  splitFor,
   type Deal,
   type DealShare,
   type MarketingSettings,
@@ -219,7 +221,12 @@ function DealScreen({ initial }: { initial: DealDetail }) {
   const canReview =
     deal.status === "pending" || deal.status === "info" || deal.status === "rejected";
 
-  const todaysRates = deal.listingType === "rent" ? initial.rates.rentRates : initial.rates.saleRates;
+  /* The cell this deal would be priced by TODAY, read by the deal's own ownership
+     rather than by a single rate table: a Non-AV property pays less, and an admin
+     approving one needs to see the number they are actually approving. */
+  const todaysRates = personRates(
+    splitFor(initial.rates.commission, deal.ownership, deal.listingType),
+  );
 
   /*
    * A VARIABLE, not a nested component. Declaring `function Aside()` inside

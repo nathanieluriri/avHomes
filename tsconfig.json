@@ -30,6 +30,7 @@
       "@avhomes/audience": ["./packages/audience/src/index.ts"],
       "@avhomes/audit": ["./packages/audit/src/index.ts"],
       "@avhomes/marketing": ["./packages/marketing/src/index.ts"],
+      "@avhomes/funds": ["./packages/funds/src/index.ts"],
       "@avhomes/api": ["./packages/api/src/index.ts"]
     }
   },

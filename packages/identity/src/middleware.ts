@@ -182,6 +182,20 @@ const RULES: readonly Rule[] = [
   { prefix: "/api/admin/marketing", domain: "marketing", subtree: true },
   { prefix: "/api/admin/users", domain: "team" },
   { prefix: "/api/admin/invites", domain: "team" },
+  /* Somebody outside AV Homes asking to list property. `team`, because approving
+     one mints an account, which is exactly what the team domain governs. */
+  { prefix: "/api/admin/applications", domain: "team" },
+  /* The analytics section. Gated on `analytics`, which agent and support already
+     hold, and each route narrows its own money blocks to callers who also hold
+     `marketing`: the same split `dashboard.ts` makes for its marketing tile. A
+     partner holds `analytics` too and every query there is scoped to its own
+     listings, which is enforced in the handler rather than here, because a prefix
+     rule cannot express "only your own rows". */
+  { prefix: "/api/admin/analytics", domain: "analytics" },
+  /* What is in a community fund and who won a prize are money figures, so they
+     sit with the rest of the money rather than with the counters. */
+  { prefix: "/api/admin/funds", domain: "marketing" },
+  { prefix: "/api/admin/awards", domain: "marketing" },
   { prefix: "/api/admin/", domain: "danger" },
 ];
 

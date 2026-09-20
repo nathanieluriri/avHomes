@@ -140,6 +140,8 @@ export function statusLabel(status: PropertyStatus): string {
   switch (status) {
     case "draft":
       return "Draft";
+    case "submitted":
+      return "In review";
     case "live":
       return "Live";
     case "under-offer":
@@ -158,6 +160,10 @@ export function statusLabel(status: PropertyStatus): string {
  */
 const LISTING_LABELS: Record<PropertyStatus, Record<ListingType, string>> = {
   draft: { sale: "Draft", rent: "Draft" },
+  /* Never reaches the public site: see PUBLIC_PROPERTY_STATUSES. The labels
+     exist because the console draws this map for every status a partner's own
+     listing can hold. */
+  submitted: { sale: "In review", rent: "In review" },
   live: { sale: "For Sale", rent: "For Rent" },
   "under-offer": { sale: "Under Offer", rent: "Let Agreed" },
   closed: { sale: "Sold", rent: "Let" },

@@ -15,6 +15,7 @@
 import type { Db, Filter } from "mongodb";
 import { COLLECTIONS, collection } from "@avhomes/db";
 import {
+  BadRequestError,
   DuplicateError,
   NotFoundError,
   PreconditionFailedError,
@@ -26,12 +27,18 @@ import {
   marketerCode,
   payMonth,
   payMonthLabel,
-  splitCommission,
+  recordSaleRefusal,
+  splitDeal,
+  splitFor,
   type ChainMember,
+  type CloserKind,
   type Deal,
   type DealKind,
   type DealShare,
+  type DealSplit,
   type DealStatus,
+  type FundShare,
+  type Ownership,
   type LedgerLine,
   type LedgerStatus,
   type Marketer,
@@ -420,6 +427,8 @@ export interface DealInput {
   proof: string[];
   note: string;
   closedOn: number;
+  /** Whose property it is, snapshotted from the listing the app posted. */
+  ownership: Ownership;
   /** Set when a won lead minted this deal. */
   leadId?: string | null;
 }
@@ -468,6 +477,19 @@ export async function createDeal(
     reporterId: reporter.id,
     reporterName: reporter.displayName,
     reporterCode: reporter.code,
+    /* A deal filed from the app is always closed by the marketer filing it. The
+       console's own door is `recordSale`, which is where the other two kinds of
+       closer come from. */
+    closerKind: "marketer",
+    closerId: reporter.id,
+    closerName: reporter.displayName,
+    /* Snapshotted off the listing the app posted. `splitFor` reads it at approval,
+       so a listing whose ownership changes afterwards does not reprice a claim
+       that was already filed. */
+    ownership: input.ownership,
+    fundShares: [],
+    keptMinor: 0,
+    source: "app",
     leadId: input.leadId ?? null,
     status: "pending",
     reason: "",
@@ -481,6 +503,270 @@ export async function createDeal(
   };
   await deals(db).insertOne(doc);
   return toDeal(doc);
+}
+
+/* ═════════════════════════════════════════════════════════ RECORDING A SALE ══ */
+
+/** Who closed it, as the one door takes it. */
+export type CloserInput =
+  | { kind: "marketer"; marketerId: string }
+  | { kind: "staff"; userId: string; name: string }
+  | { kind: "direct" };
+
+export interface RecordSaleInput {
+  listingId: string;
+  unitKey: string;
+  kind: DealKind;
+  amountMinor: number;
+  currency: string;
+  buyerName: string;
+  buyerPhone: string;
+  closedOn: number;
+  /** At least one. The refusal is shared with the sheet; see recordSaleRefusal. */
+  proof: string[];
+  note: string;
+  closer: CloserInput;
+  /** The reported deal an admin is settling through this door, when there is one. */
+  dealId: string | null;
+  actorId: string;
+  actorName: string;
+}
+
+/** What the listing contributes. Passed in, because marketing may not read it. */
+export interface SaleListing {
+  ownership: Ownership;
+  title: string;
+  location: string;
+  estate: string;
+}
+
+/**
+ * Record a sale, which is the one way money and a closed listing come into being
+ * together.
+ *
+ * It does NOT close the listing: that write belongs to @avhomes/listings and this
+ * package may not touch its collection. The route calls this, then closes the
+ * listing, and the ordering is readable in that one handler.
+ *
+ * The write order here is the same as `reviewDeal`'s and for the same reasons: the
+ * deal, then the marketer ledger, then the funds, each step leaving a crash
+ * detectable rather than profitable, with `reconcileFunds` naming any deal that
+ * got half way.
+ */
+export async function recordSale(
+  db: Db,
+  input: RecordSaleInput,
+  settings: MarketingSettings,
+  listing: SaleListing,
+  accrue: FundAccrual,
+): Promise<Deal> {
+  const refusal = recordSaleRefusal(input);
+  if (refusal) throw new BadRequestError("sale", [{ path: "sale", message: refusal }]);
+
+  const now = Date.now();
+
+  /*
+   * The readable version of the duplicate claim rule. The partial unique index is
+   * the real guard, and the catch below still handles the race; this exists so the
+   * common case is a sentence rather than a 409 about an index.
+   */
+  if (input.dealId === null) {
+    const existing = await deals(db).findOne({
+      listingId: input.listingId,
+      unitKey: input.unitKey,
+      status: "approved",
+    });
+    if (existing) {
+      throw new PreconditionFailedError("listing_already_settled", {
+        detail: "This listing has already been recorded as sold.",
+      });
+    }
+  }
+
+  /* Resolve the closer to a name and, for a marketer, to the chain that gets
+     paid. Staff and direct have no chain, so no shares and no ledger lines, and
+     both funds still take their share. */
+  let closerId = "";
+  let closerName = "";
+  let chain: (ChainMember | null)[] = [];
+  let reporterCode = "";
+  if (input.closer.kind === "marketer") {
+    const marketer = await findMarketerById(db, input.closer.marketerId);
+    if (!marketer) throw new NotFoundError(`marketer ${input.closer.marketerId}`);
+    closerId = marketer.id;
+    closerName = marketer.displayName;
+    reporterCode = marketer.code;
+    chain = await chainFor(db, marketer.id);
+  } else if (input.closer.kind === "staff") {
+    closerId = input.closer.userId;
+    closerName = input.closer.name;
+  }
+
+  const cell = splitFor(settings.commission, listing.ownership, input.kind);
+  const split = splitDeal(input.amountMinor, cell, chain);
+  const shares = toShares(split);
+
+  const dealId = input.dealId ?? newId("deal", now);
+  const doc: DealDoc = {
+    _id: dealId,
+    listingId: input.listingId,
+    listingTitle: listing.title,
+    listingLocation: listing.location,
+    listingEstate: listing.estate,
+    listingType: input.kind,
+    unitKey: input.unitKey,
+    amountMinor: input.amountMinor,
+    currency: input.currency,
+    buyerName: input.buyerName,
+    buyerPhone: input.buyerPhone,
+    proof: input.proof,
+    note: input.note,
+    /*
+     * The REPORTER is the marketer when one closed it, and the admin otherwise.
+     *
+     * That is what keeps `chainFor(reporterId)` correct everywhere else in this
+     * file: for a marketer deal the two ids agree, and for a staff or direct deal
+     * there is no chain to walk, so nothing walks one from an admin's id.
+     */
+    reporterId: input.closer.kind === "marketer" ? closerId : input.actorId,
+    reporterName: input.closer.kind === "marketer" ? closerName : input.actorName,
+    reporterCode,
+    closerKind: input.closer.kind,
+    closerId,
+    closerName,
+    ownership: listing.ownership,
+    split: cell,
+    fundShares: split.funds,
+    keptMinor: split.keptMinor,
+    source: "console",
+    leadId: null,
+    // Recorded by an admin IS the approval. There is nobody left to review it.
+    status: "approved",
+    reason: "",
+    reviewedBy: input.actorId,
+    reviewedByName: input.actorName,
+    reviewedAt: now,
+    closedOn: input.closedOn || now,
+    shares,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  /*
+   * `_id` and `createdAt` are REMOVED from the `$set` rather than set to undefined.
+   *
+   * Mongo refuses an update that touches `_id` at all, even with undefined, and
+   * refuses a field appearing in both `$set` and `$setOnInsert`. So the two the
+   * insert owns are deleted from the payload instead of overwritten.
+   */
+  const fields: Partial<DealDoc> = { ...doc };
+  delete fields._id;
+  delete fields.createdAt;
+
+  try {
+    /* Upsert on the id, because this door is also how a REPORTED deal gets
+       settled: the admin opens the sheet pre-filled from it and confirms, and that
+       must update the existing row rather than create a second claim on the same
+       listing. */
+    await deals(db).updateOne(
+      { _id: dealId },
+      {
+        $set: fields,
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true },
+    );
+  } catch (err) {
+    if ((err as { code?: number }).code === 11000) {
+      throw new PreconditionFailedError("listing_already_settled", {
+        detail: "Another deal on this listing was approved a moment ago.",
+      });
+    }
+    throw err;
+  }
+
+  if (shares.length > 0) {
+    const lines: LedgerDoc[] = shares.map((share, index) => ({
+      _id: newId("ledg", now + index),
+      marketerId: share.marketerId,
+      dealId,
+      level: share.level,
+      kind: "earn" as const,
+      amountMinor: share.amountMinor,
+      currency: input.currency,
+      status: "earned" as const,
+      payRunId: null,
+      reversesId: null,
+      note: "",
+      dealTitle: listing.title,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    await ledger(db).insertMany(lines);
+  }
+
+  await accrue(db, {
+    dealId,
+    currency: input.currency,
+    shares: split.funds,
+    byName: input.actorName,
+  });
+
+  const after = await deals(db).findOne({ _id: dealId });
+  return toDeal(after as DealDoc);
+}
+
+/**
+ * Approved deals whose listing is not closed yet.
+ *
+ * The source of the admin alert that opens the sale sheet. Returns deal ids and
+ * listing ids only: which of those listings is actually still open is a listings
+ * question, answered by the caller, because this package cannot read that
+ * collection.
+ */
+export async function settledAwaitingClose(
+  db: Db,
+  limit: number,
+): Promise<{ dealId: string; listingId: string; listingTitle: string; reviewedAt: number }[]> {
+  const rows = await deals(db)
+    .find(
+      { status: "approved" },
+      {
+        projection: { _id: 1, listingId: 1, listingTitle: 1, reviewedAt: 1 },
+        sort: { reviewedAt: -1 },
+        limit,
+      },
+    )
+    .toArray();
+  return rows.map((row) => ({
+    dealId: row._id,
+    listingId: row.listingId,
+    listingTitle: row.listingTitle ?? "",
+    reviewedAt: row.reviewedAt ?? row.createdAt,
+  }));
+}
+
+/** Marketers matching a code or a name, for the closer picker. */
+export async function findClosers(db: Db, query: string): Promise<ChainMember[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+  const rows = await marketers(db)
+    .find(
+      {
+        $or: [
+          { code: { $regex: `^${escapeRegex(trimmed)}`, $options: "i" } },
+          { displayName: { $regex: escapeRegex(trimmed), $options: "i" } },
+        ],
+      },
+      { limit: 8, sort: { displayName: 1 } },
+    )
+    .toArray();
+  return rows.map((row) => ({
+    id: row._id,
+    name: row.displayName,
+    code: row.code,
+    status: row.status,
+  }));
 }
 
 export interface DealListQuery {
@@ -577,16 +863,39 @@ export async function resubmitDeal(
   return toDeal(after);
 }
 
-/** What each level would earn if this deal were approved at this amount. */
-export async function previewShares(
+/**
+ * Everyone's share of a deal at a given amount, including the two funds and what
+ * AV Homes keeps.
+ *
+ * The chain is walked from the CLOSER, not the reporter. For an app deal those
+ * are the same marketer, but a console-recorded deal has an admin as its reporter
+ * and walking from them would pay an admin's upline, which is not a thing.
+ */
+export async function previewSplit(
   db: Db,
-  deal: Deal,
-  amountMinor: number,
+  input: {
+    closerKind: CloserKind;
+    closerId: string;
+    ownership: Ownership;
+    kind: DealKind;
+    amountMinor: number;
+  },
   settings: MarketingSettings,
-): Promise<DealShare[]> {
-  const chain = await chainFor(db, deal.reporterId);
-  const rates = deal.listingType === "rent" ? settings.rentRates : settings.saleRates;
-  return splitCommission(amountMinor, rates, chain).map((line) => ({
+): Promise<DealSplit> {
+  const chain =
+    input.closerKind === "marketer" && input.closerId !== ""
+      ? await chainFor(db, input.closerId)
+      : [];
+  return splitDeal(
+    input.amountMinor,
+    splitFor(settings.commission, input.ownership, input.kind),
+    chain,
+  );
+}
+
+/** The share list as a deal stores it, from a computed split. */
+function toShares(split: DealSplit): DealShare[] {
+  return split.people.map((line) => ({
     marketerId: line.marketerId,
     marketerName: line.marketerName,
     code: line.code,
@@ -606,17 +915,48 @@ export interface ReviewInput {
 }
 
 /**
+ * Where a deal's fund shares go. Injected, because @avhomes/funds owns them and
+ * a feature package may not import another.
+ *
+ * Takes `db` first, matching the `notify` port this package already receives, so
+ * the composition root can pass the funds function itself rather than wrapping it
+ * in a closure over a connection it does not have yet.
+ */
+export interface FundAccrual {
+  (
+    db: Db,
+    input: {
+      dealId: string;
+      currency: string;
+      shares: readonly FundShare[];
+      byName: string;
+    },
+  ): Promise<void>;
+}
+
+/** The reverse, for a deal that fell through. Returns how many entries it wrote. */
+export interface FundReversal {
+  (db: Db, input: { dealId: string; byName: string; note: string }): Promise<number>;
+}
+
+/**
  * Settle a deal.
  *
  * Approving is the only place a ledger line is born. The shares are worked out
  * here, from the rates as they stand right now and the chain as it stands right
  * now, and then written onto the deal so the answer never changes again.
+ *
+ * Approving does NOT close the listing. That is a separate decision made by
+ * somebody who knows the property is genuinely off the market, and it raises an
+ * alert rather than moving a status on its own: a status that moved by itself is
+ * a status nobody trusts.
  */
 export async function reviewDeal(
   db: Db,
   id: string,
   input: ReviewInput,
   settings: MarketingSettings,
+  accrue: FundAccrual,
 ): Promise<Deal> {
   const now = Date.now();
   const doc = await deals(db).findOne({ _id: id });
@@ -647,16 +987,15 @@ export async function reviewDeal(
     return toDeal(after as DealDoc);
   }
 
+  /* An app deal's closer is its reporter, and the ownership on the row is what
+     0015 backfilled or what the app's listing snapshot carried. Both are read off
+     the document rather than recomputed, so approving a deal filed last month
+     prices it by the property it was actually about. */
+  const ownership: Ownership = doc.ownership ?? "av";
+  const cell = splitFor(settings.commission, ownership, doc.listingType);
   const chain = await chainFor(db, doc.reporterId);
-  const rates = doc.listingType === "rent" ? settings.rentRates : settings.saleRates;
-  const shares = splitCommission(amountMinor, rates, chain).map((line) => ({
-    marketerId: line.marketerId,
-    marketerName: line.marketerName,
-    code: line.code,
-    level: line.level,
-    rate: line.rate,
-    amountMinor: line.amountMinor,
-  }));
+  const split = splitDeal(amountMinor, cell, chain);
+  const shares = toShares(split);
 
   try {
     await deals(db).updateOne(
@@ -667,6 +1006,13 @@ export async function reviewDeal(
           amountMinor,
           reason: input.reason,
           shares,
+          /* Snapshotted WITH the shares. A rate table edited next month must not
+             be able to rewrite what this deal paid, and storing the cell is what
+             lets a transaction row explain its own numbers a year later. */
+          ownership,
+          split: cell,
+          fundShares: split.funds,
+          keptMinor: split.keptMinor,
           reviewedBy: input.actorId,
           reviewedByName: input.actorName,
           reviewedAt: now,
@@ -705,6 +1051,22 @@ export async function reviewDeal(
     await ledger(db).insertMany(lines);
   }
 
+  /*
+   * The funds LAST, and idempotent on the deal id.
+   *
+   * Last because a crash before it leaves a deal whose marketers are credited and
+   * whose funds are not, which `reconcileFunds` names by deal. The other order
+   * would leave a fund holding money for a deal that never settled, which nothing
+   * would notice. Idempotent because the fix for the first case is to run this
+   * again.
+   */
+  await accrue(db, {
+    dealId: id,
+    currency: doc.currency,
+    shares: split.funds,
+    byName: input.actorName,
+  });
+
   const after = await deals(db).findOne({ _id: id });
   return toDeal(after as DealDoc);
 }
@@ -721,6 +1083,7 @@ export async function cancelDeal(
   id: string,
   reason: string,
   actor: { id: string; name: string },
+  reverse: FundReversal,
 ): Promise<Deal> {
   const now = Date.now();
 
@@ -796,6 +1159,17 @@ export async function cancelDeal(
       );
     }
   }
+
+  /*
+   * The funds give their share back too, and for the same reason the ledger loop
+   * is re-runnable: `reverseForDeal` nets what the deal has already moved, so a
+   * deal reversed once nets to zero and a second call writes nothing.
+   */
+  await reverse(db, {
+    dealId: id,
+    byName: actor.name,
+    note: reason || "Deal cancelled",
+  });
 
   const after = await deals(db).findOne({ _id: id });
   return toDeal(after as DealDoc);
@@ -1721,5 +2095,81 @@ export async function reconcile(db: Db): Promise<{ ok: boolean; problems: string
       );
     }
   }
+
+  /*
+   * Every approved deal's own arithmetic.
+   *
+   * Cheap, and it catches the one thing the ledger check cannot: a deal whose
+   * shares, funds and kept amount no longer add up to what it sold for. That can
+   * only happen if something wrote a deal outside this file, which is the failure
+   * this function exists to refuse to hide.
+   */
+  const settled = await deals(db)
+    .find(
+      { status: "approved" },
+      { projection: { _id: 1, amountMinor: 1, shares: 1, fundShares: 1, keptMinor: 1 } },
+    )
+    .toArray();
+  for (const deal of settled) {
+    const out =
+      (deal.shares ?? []).reduce((total, share) => total + share.amountMinor, 0) +
+      (deal.fundShares ?? []).reduce((total, share) => total + share.amountMinor, 0) +
+      (deal.keptMinor ?? 0);
+    /* A deal settled before the funds existed has no fundShares and a keptMinor of
+       0, so its parts legitimately fall short of the total. Only a deal that
+       claims a kept amount is claiming to be fully accounted for. */
+    if ((deal.keptMinor ?? 0) === 0) continue;
+    if (out !== deal.amountMinor) {
+      problems.push(
+        `deal ${deal._id}: the shares, funds and kept amount total ${out}, the deal is ${deal.amountMinor}.`,
+      );
+    }
+  }
+
   return { ok: problems.length === 0, problems };
+}
+
+/**
+ * Credit a marketer money that did not come from a deal.
+ *
+ * The quarterly prize uses this. An `adjust` line with `level: 0` and no deal is
+ * an ordinary ledger line, so `buildPayRun` carries it into the next payment with
+ * no special case and `reconcile` still balances. That is the whole reason a
+ * marketer winner is paid this way rather than through a second mechanism: the
+ * money arrives by the path that already works.
+ *
+ * Returns the new line's id, which the award stores so the prize and the payment
+ * can be read back as one thing.
+ */
+export async function creditAdjustment(
+  db: Db,
+  input: { marketerId: string; amountMinor: number; note: string; currency: string },
+): Promise<string> {
+  const now = Date.now();
+  const id = newId("ledg", now);
+  await ledger(db).insertOne({
+    _id: id,
+    marketerId: input.marketerId,
+    dealId: null,
+    level: 0,
+    kind: "adjust",
+    amountMinor: input.amountMinor,
+    currency: input.currency,
+    status: "earned",
+    payRunId: null,
+    reversesId: null,
+    note: input.note,
+    dealTitle: input.note,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return id;
+}
+
+/** Every approved deal's id, for the funds' own reconciliation. */
+export async function approvedDealIds(db: Db): Promise<string[]> {
+  const rows = await deals(db)
+    .find({ status: "approved" }, { projection: { _id: 1 } })
+    .toArray();
+  return rows.map((row) => row._id);
 }

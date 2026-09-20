@@ -7,7 +7,13 @@
  */
 export { listingsPublicRoutes } from "./routes/public";
 export { listingsAdminRoutes } from "./routes/admin";
-export { authorize, assertAuthorized, type Action } from "./authorize";
+export {
+  authorize,
+  assertAuthorized,
+  isScopedCaller,
+  scopeFilter,
+  type Action,
+} from "./authorize";
 export {
   listProperties,
   countProperties,
@@ -16,6 +22,9 @@ export {
   getSimilarProperties,
   listTestimonials,
   listSiteStats,
+  closeWithSale,
+  reopenFromSale,
+  listingFacts,
   LISTING_KINDS,
   type ListingKind,
   type ListQuery,

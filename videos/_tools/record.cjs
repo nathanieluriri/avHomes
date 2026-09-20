@@ -589,6 +589,26 @@ function marketingFixtures(ownerId, props) {
     banks: BANKS,
     rootId: "mkt_av0001",
     settings: {
+      /*
+       * The four rate cells, matching DEFAULT_COMMISSION_MATRIX. AV Homes' own
+       * stock takes the seed's rates; somebody else's takes the smaller set,
+       * because the whole point on camera is that the two differ.
+       */
+      commission: {
+        av: {
+          sale: { level1: rates.sale[0], level2: rates.sale[1], level3: rates.sale[2], rewardPool: 1, foundation: 1 },
+          rent: { level1: rates.rent[0], level2: rates.rent[1], level3: rates.rent[2], rewardPool: 1, foundation: 1 },
+        },
+        partner: {
+          sale: { level1: 2, level2: 1, level3: 0.5, rewardPool: 1, foundation: 1 },
+          rent: { level1: 2, level2: 1, level3: 0.5, rewardPool: 1, foundation: 1 },
+        },
+      },
+      rewardPoolName: "Reward Pool",
+      foundationName: "AV Foundation",
+      rating: { value: 50, deals: 20, conversion: 20, speed: 10 },
+      /* Kept so an older screen reading the pair still draws. The real reader
+         derives the matrix from these when a document predates it. */
       saleRates: rates.sale,
       rentRates: rates.rent,
       rentBasis: "upfront",
@@ -768,6 +788,424 @@ function mockApi(S) {
       return { post: p };
     }],
     ...marketingApi(S),
+    ...moneyApi(S),
+  ];
+}
+
+/**
+ * The analytics section, the two funds, and recording a sale.
+ *
+ * Every figure is DERIVED from the same deal fixture the marketing screens use, not
+ * a second set of numbers. A tutorial that shows a transactions list adding up to
+ * one total and an overview tile showing another teaches the reader to distrust
+ * both, and this file is the only place that could have made them disagree.
+ */
+function moneyApi(S) {
+  const M = S.marketing;
+  const DAY = 864e5;
+  const cell = (ownership, kind) => M.settings.commission[ownership][kind];
+  const settled = () => M.deals.filter((d) => d.status === "approved");
+
+  /** A deal's five shares, exactly as splitDeal computes them. */
+  const splitOf = (d) => {
+    const c = cell(d.ownership || "av", d.listingType);
+    const people = (d.shares || []).reduce((s, x) => s + x.amountMinor, 0);
+    const funds = d.fundShares && d.fundShares.length
+      ? d.fundShares
+      : [
+          { fund: "reward", rate: c.rewardPool, amountMinor: Math.floor((d.amountMinor * c.rewardPool) / 100) },
+          { fund: "foundation", rate: c.foundation, amountMinor: Math.floor((d.amountMinor * c.foundation) / 100) },
+        ];
+    const fundTotal = funds.reduce((s, x) => s + x.amountMinor, 0);
+    return { people: d.shares || [], funds, keptMinor: d.amountMinor - people - fundTotal };
+  };
+
+  const names = () => ({ reward: M.settings.rewardPoolName, foundation: M.settings.foundationName });
+
+  /** Both fund balances, summed over the settled deals plus anything paid out. */
+  const balances = () => {
+    const out = { reward: { accrued: 0, paid: 0, entries: 0, lastAt: null }, foundation: { accrued: 0, paid: 0, entries: 0, lastAt: null } };
+    for (const d of settled()) {
+      for (const f of splitOf(d).funds) {
+        out[f.fund].accrued += f.amountMinor;
+        out[f.fund].entries += 1;
+        out[f.fund].lastAt = Math.max(out[f.fund].lastAt || 0, d.closedOn);
+      }
+    }
+    for (const p of M.fundPayouts || []) {
+      out[p.fund].paid += Math.abs(p.amountMinor);
+      out[p.fund].entries += 1;
+      out[p.fund].lastAt = Math.max(out[p.fund].lastAt || 0, p.createdAt);
+    }
+    return ["reward", "foundation"].map((fund) => ({
+      fund,
+      name: names()[fund],
+      currency: "NGN",
+      accruedMinor: out[fund].accrued,
+      paidMinor: out[fund].paid,
+      balanceMinor: out[fund].accrued - out[fund].paid,
+      entries: out[fund].entries,
+      lastAt: out[fund].lastAt,
+    }));
+  };
+
+  /** The window the picker asked for, resolved the way resolvePeriod does. */
+  const period = (key = "30d") => {
+    const now = Date.now();
+    const days = { "7d": 7, "30d": 30, "90d": 90, year: 365, all: 4000, quarter: 90 }[key] ?? 30;
+    const labels = {
+      "7d": "Last 7 days", "30d": "Last 30 days", "90d": "Last 90 days",
+      quarter: "This quarter", year: "This year", all: "All time",
+    };
+    return {
+      key,
+      from: key === "all" ? 0 : now - days * DAY,
+      to: now,
+      label: labels[key] || "Last 30 days",
+      previousFrom: key === "all" ? null : now - days * 2 * DAY,
+    };
+  };
+
+  const inWindow = (p) => settled().filter((d) => d.closedOn >= p.from && d.closedOn < p.to);
+  const dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+  const money = (p) => {
+    const rows = inWindow(p);
+    const zero = () => ({ valueMinor: 0, deals: 0 });
+    const byOwnership = { av: zero(), partner: zero() };
+    const byKind = { sale: zero(), rent: zero() };
+    const byCloser = { marketer: zero(), staff: zero(), direct: zero() };
+    const byDay = new Map();
+    let valueMinor = 0, commissionMinor = 0, keptMinor = 0, rewardMinor = 0, foundationMinor = 0;
+
+    for (const d of rows) {
+      const s = splitOf(d);
+      valueMinor += d.amountMinor;
+      commissionMinor += s.people.reduce((t, x) => t + x.amountMinor, 0);
+      keptMinor += s.keptMinor;
+      for (const f of s.funds) {
+        if (f.fund === "reward") rewardMinor += f.amountMinor;
+        else foundationMinor += f.amountMinor;
+      }
+      const own = d.ownership || "av";
+      byOwnership[own].valueMinor += d.amountMinor;
+      byOwnership[own].deals += 1;
+      byKind[d.listingType].valueMinor += d.amountMinor;
+      byKind[d.listingType].deals += 1;
+      const ck = d.closerKind || "marketer";
+      byCloser[ck].valueMinor += d.amountMinor;
+      byCloser[ck].deals += 1;
+      const key = dayOf(d.closedOn);
+      const found = byDay.get(key) || { valueMinor: 0, deals: 0 };
+      byDay.set(key, { valueMinor: found.valueMinor + d.amountMinor, deals: found.deals + 1 });
+    }
+
+    /* Zero filled, so the bars show the shape of the data rather than the shape of
+       the days that happened to have any. */
+    const series = [];
+    const start = Math.max(p.from, p.to - 180 * DAY);
+    for (let at = start; at < p.to + DAY; at += DAY) {
+      const key = dayOf(at);
+      const found = byDay.get(key);
+      series.push({ day: key, valueMinor: found?.valueMinor ?? 0, deals: found?.deals ?? 0 });
+    }
+
+    const before = settled().filter((d) => p.previousFrom !== null && d.closedOn >= p.previousFrom && d.closedOn < p.from);
+    return {
+      currency: "NGN",
+      valueMinor,
+      deals: rows.length,
+      previousValueMinor: p.previousFrom === null ? null : before.reduce((t, d) => t + d.amountMinor, 0),
+      previousDeals: p.previousFrom === null ? null : before.length,
+      commissionMinor, keptMinor, rewardMinor, foundationMinor,
+      byOwnership, byKind, byCloser, series,
+    };
+  };
+
+  /** The league, grouped by who CLOSED it, the way standingsFor does. */
+  const standings = (p) => {
+    const by = new Map();
+    for (const d of inWindow(p)) {
+      const kind = d.closerKind || "marketer";
+      if (kind === "direct") continue;
+      const id = d.closerId || d.reporterId;
+      const key = `${kind}:${id}`;
+      const found = by.get(key) || { kind, personId: id, name: d.closerName || d.reporterName, code: d.reporterCode || "", deals: 0, valueMinor: 0, score: 0 };
+      found.deals += 1;
+      found.valueMinor += d.amountMinor;
+      by.set(key, found);
+    }
+    return [...by.values()]
+      .sort((a, b) => b.valueMinor - a.valueMinor)
+      .map((row, i) => ({ ...row, rank: i + 1 }));
+  };
+
+  const closers = (q) =>
+    M.marketers
+      .filter((p) => q.length >= 2 && (p.code.toLowerCase().startsWith(q.toLowerCase()) || p.displayName.toLowerCase().includes(q.toLowerCase())))
+      .slice(0, 8)
+      .map((p) => ({ id: p.id, name: p.displayName, code: p.code, status: p.status }));
+
+  return [
+    ["GET", /^\/api\/admin\/analytics\/overview/, (m, u) => {
+      const p = period(new URL(u, "http://x").searchParams.get("period") || "30d");
+      const q = `${new Date().getFullYear()}-Q${Math.floor(new Date().getMonth() / 3) + 1}`;
+      return {
+        period: p,
+        money: money(p),
+        funds: balances(),
+        reward: {
+          quarter: q,
+          label: q,
+          potMinor: balances().find((b) => b.fund === "reward").balanceMinor,
+          currency: "NGN",
+          standings: standings(period("quarter")).slice(0, 10),
+          closable: false,
+          award: null,
+        },
+        pulse: S.pulse || { live: 3, sessions: 1240, previousSessions: 1090, series: [], views: 4820 },
+        listings: {
+          live: S.props.filter((x) => x.status === "live").length,
+          submitted: S.props.filter((x) => x.status === "submitted").length,
+          closedInPeriod: inWindow(p).length,
+        },
+        scoped: false,
+      };
+    }],
+
+    ["GET", /^\/api\/admin\/analytics\/transactions/, (m, u) => {
+      const sp = new URL(u, "http://x").searchParams;
+      const p = period(sp.get("period") || "30d");
+      let rows = inWindow(p);
+      if (sp.get("ownership")) rows = rows.filter((d) => (d.ownership || "av") === sp.get("ownership"));
+      if (sp.get("kind")) rows = rows.filter((d) => d.listingType === sp.get("kind"));
+      if (sp.get("closer")) rows = rows.filter((d) => (d.closerKind || "marketer") === sp.get("closer"));
+      const all = inWindow(p);
+      return {
+        period: p,
+        rows: rows
+          .sort((a, b) => b.closedOn - a.closedOn)
+          .map((d) => {
+            const s = splitOf(d);
+            return {
+              dealId: d.id, closedOn: d.closedOn, listingId: d.listingId,
+              listingTitle: d.listingTitle, ownership: d.ownership || "av",
+              kind: d.listingType, amountMinor: d.amountMinor, currency: "NGN",
+              closerKind: d.closerKind || "marketer", closerName: d.closerName || d.reporterName,
+              source: d.source || "app", status: d.status,
+              shares: s.people, fundShares: s.funds, keptMinor: s.keptMinor,
+              proof: d.proof || [],
+            };
+          }),
+        nextCursor: null,
+        totalValueMinor: all.reduce((t, d) => t + d.amountMinor, 0),
+        totalDeals: all.length,
+        currency: "NGN",
+        fundNames: names(),
+      };
+    }],
+
+    ["GET", /^\/api\/admin\/analytics\/listings/, (m, u) => {
+      const sp = new URL(u, "http://x").searchParams;
+      const p = period(sp.get("period") || "30d");
+      const sold = new Map(inWindow(p).map((d) => [d.listingId, d]));
+      const rows = S.props.slice(0, 20).map((x, i) => {
+        /* Views derived from the id so they are stable between takes: a number that
+           changes every run makes two frames of the same video disagree. */
+        const seed = [...x.id].reduce((t, ch) => t + ch.charCodeAt(0), 0);
+        const views = 40 + (seed % 380);
+        const enquiries = i % 5 === 0 ? 0 : 1 + (seed % 6);
+        const deal = sold.get(x.id);
+        return {
+          listingId: x.id, title: x.title, slug: x.slug ?? null,
+          ownership: x.ownership || "av", status: x.status,
+          priceMinor: x.priceMinor, currency: x.currency || "NGN",
+          views, sessions: Math.round(views * 0.72), enquiries,
+          leads: seed % 3,
+          soldMinor: deal ? deal.amountMinor : null,
+          daysOnMarket: x.publishedAt ? Math.round((Date.now() - x.publishedAt) / DAY) : null,
+        };
+      });
+      const sort = sp.get("sort") || "views";
+      const key = { views: "views", enquiries: "enquiries", leads: "leads", days: "daysOnMarket", price: "priceMinor" }[sort] || "views";
+      return {
+        period: p,
+        rows: [...rows].sort((a, b) => (b[key] ?? -1) - (a[key] ?? -1)),
+        sort,
+        nextCursor: null,
+        ignored: rows.filter((r) => r.views > 0 && r.enquiries === 0).length,
+      };
+    }],
+
+    ["GET", /^\/api\/admin\/analytics\/people/, (m, u) => {
+      const p = period(new URL(u, "http://x").searchParams.get("period") || "30d");
+      const rows = standings(p);
+      const tops = {
+        valueMinor: rows.reduce((t, r) => Math.max(t, r.valueMinor), 0),
+        deals: rows.reduce((t, r) => Math.max(t, r.deals), 0),
+      };
+      const w = M.settings.rating;
+      const round = (n) => Math.round(n * 10) / 10;
+      return {
+        period: p,
+        currency: "NGN",
+        weights: w,
+        rows: rows.map((r) => {
+          const value = round(w.value * (tops.valueMinor > 0 ? r.valueMinor / tops.valueMinor : 0));
+          const deals = round(w.deals * (tops.deals > 0 ? r.deals / tops.deals : 0));
+          /* Two of the four come from leads, and the fixture has none decided in the
+             window, so they score zero and the screen says why. That is the honest
+             shape rather than inventing a conversion nobody earned. */
+          const rating = { value, deals, conversion: 0, speed: 0, score: round(value + deals) };
+          const earned = (M.ledger || [])
+            .filter((l) => l.marketerId === r.personId && l.status !== "void")
+            .reduce((t, l) => t + l.amountMinor, 0);
+          return {
+            kind: r.kind, personId: r.personId, name: r.name, code: r.code,
+            deals: r.deals, valueMinor: r.valueMinor,
+            earnedMinor: r.kind === "staff" ? 0 : earned,
+            leadsDecided: 0, leadsWon: 0, rating,
+          };
+        }),
+      };
+    }],
+
+    ["GET", /^\/api\/admin\/analytics\/traffic/, (m, u) => {
+      const p = period(new URL(u, "http://x").searchParams.get("period") || "30d");
+      return {
+        period: p,
+        pulse: S.pulse || { live: 3, sessions: 1240, previousSessions: 1090, series: [], views: 4820 },
+        top: S.props.slice(0, 8).map((x) => {
+          const seed = [...x.id].reduce((t, ch) => t + ch.charCodeAt(0), 0);
+          const views = 40 + (seed % 380);
+          return { listingId: x.id, title: x.title, views, sessions: Math.round(views * 0.72) };
+        }).sort((a, b) => b.views - a.views),
+      };
+    }],
+
+    ["GET", /^\/api\/admin\/funds$/, () => ({ funds: balances() })],
+
+    ["GET", /^\/api\/admin\/funds\/([^/?]+)\/entries/, (m) => {
+      const fund = m[1];
+      const accruals = settled().flatMap((d) =>
+        splitOf(d).funds
+          .filter((f) => f.fund === fund)
+          .map((f) => ({
+            id: `facc_${fund}_${d.id}`, fund, kind: "accrual",
+            amountMinor: f.amountMinor, currency: "NGN", dealId: d.id, rate: f.rate,
+            awardId: null, note: "", proof: [], byName: "AV Homes",
+            createdAt: d.closedOn, updatedAt: d.closedOn,
+          })),
+      );
+      const payouts = (M.fundPayouts || []).filter((p) => p.fund === fund);
+      return {
+        entries: [...accruals, ...payouts].sort((a, b) => b.createdAt - a.createdAt).slice(0, 20),
+        nextBefore: null,
+      };
+    }],
+
+    ["POST", /^\/api\/admin\/funds\/([^/]+)\/disburse$/, (m, u, b) => {
+      M.fundPayouts = M.fundPayouts || [];
+      const entry = {
+        id: `fund_${Date.now()}`, fund: m[1], kind: "payout",
+        amountMinor: -b.amountMinor, currency: "NGN", dealId: null, rate: 0,
+        awardId: null, note: b.note, proof: b.proof || [],
+        byName: "Adaeze Vincent", createdAt: Date.now(), updatedAt: Date.now(),
+      };
+      M.fundPayouts.unshift(entry);
+      return { entry };
+    }],
+
+    ["GET", /^\/api\/admin\/marketing\/closers/, (m, u) =>
+      ({ closers: closers(new URL(u, "http://x").searchParams.get("q") || "") })],
+
+    ["POST", /^\/api\/admin\/marketing\/sales\/preview$/, (m, u, b) => {
+      const listing = S.props.find((x) => x.id === b.listingId);
+      const ownership = listing?.ownership || "av";
+      const c = cell(ownership, b.kind);
+      const chain = [];
+      if (b.closer.kind === "marketer") {
+        let at = M.marketers.find((p) => p.id === b.closer.marketerId);
+        for (let i = 0; i < 3 && at; i += 1) {
+          chain.push(at);
+          at = at.parentId ? M.marketers.find((p) => p.id === at.parentId) : null;
+        }
+      }
+      const rates = [c.level1, c.level2, c.level3];
+      const people = chain
+        .map((p, i) => ({
+          marketerId: p.id, marketerName: p.displayName, code: p.code,
+          level: i + 1, rate: rates[i],
+          amountMinor: Math.floor((b.amountMinor * rates[i]) / 100),
+        }))
+        .filter((x) => x.amountMinor > 0);
+      const funds = [
+        { fund: "reward", rate: c.rewardPool, amountMinor: Math.floor((b.amountMinor * c.rewardPool) / 100) },
+        { fund: "foundation", rate: c.foundation, amountMinor: Math.floor((b.amountMinor * c.foundation) / 100) },
+      ].filter((x) => x.amountMinor > 0);
+      const out = people.reduce((t, x) => t + x.amountMinor, 0) + funds.reduce((t, x) => t + x.amountMinor, 0);
+      return {
+        split: { people, funds, keptMinor: b.amountMinor - out },
+        ownership,
+        currency: "NGN",
+        fundNames: names(),
+      };
+    }],
+
+    ["POST", /^\/api\/admin\/marketing\/sales$/, (m, u, b) => {
+      const listing = S.props.find((x) => x.id === b.listingId);
+      const ownership = listing?.ownership || "av";
+      const c = cell(ownership, b.kind);
+      const chain = [];
+      if (b.closer.kind === "marketer") {
+        let at = M.marketers.find((p) => p.id === b.closer.marketerId);
+        for (let i = 0; i < 3 && at; i += 1) {
+          chain.push(at);
+          at = at.parentId ? M.marketers.find((p) => p.id === at.parentId) : null;
+        }
+      }
+      const rates = [c.level1, c.level2, c.level3];
+      const shares = chain
+        .map((p, i) => ({
+          marketerId: p.id, marketerName: p.displayName, code: p.code,
+          level: i + 1, rate: rates[i],
+          amountMinor: Math.floor((b.amountMinor * rates[i]) / 100),
+        }))
+        .filter((x) => x.amountMinor > 0);
+      const fundShares = [
+        { fund: "reward", rate: c.rewardPool, amountMinor: Math.floor((b.amountMinor * c.rewardPool) / 100) },
+        { fund: "foundation", rate: c.foundation, amountMinor: Math.floor((b.amountMinor * c.foundation) / 100) },
+      ];
+      const out = shares.reduce((t, x) => t + x.amountMinor, 0) + fundShares.reduce((t, x) => t + x.amountMinor, 0);
+      const deal = {
+        id: b.dealId || `deal_${Date.now()}`,
+        listingId: b.listingId, listingTitle: listing?.title || "",
+        listingLocation: listing?.location || "", listingEstate: "",
+        listingType: b.kind, unitKey: "", amountMinor: b.amountMinor, currency: "NGN",
+        buyerName: b.buyerName, buyerPhone: b.buyerPhone || "",
+        proof: b.proof, note: b.note || "",
+        reporterId: b.closer.kind === "marketer" ? b.closer.marketerId : "usr_owner",
+        reporterName: chain[0]?.displayName || "Adaeze Vincent",
+        reporterCode: chain[0]?.code || "",
+        closerKind: b.closer.kind,
+        closerId: b.closer.kind === "marketer" ? b.closer.marketerId : "",
+        closerName: chain[0]?.displayName || (b.closer.kind === "staff" ? "Adaeze Vincent" : ""),
+        ownership, split: c, fundShares, keptMinor: b.amountMinor - out,
+        source: "console", leadId: null, status: "approved", reason: "",
+        reviewedBy: "usr_owner", reviewedByName: "Adaeze Vincent", reviewedAt: Date.now(),
+        closedOn: b.closedOn || Date.now(), shares,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      };
+      M.deals.unshift(deal);
+      /* The listing closes too, so the screen behind the sheet shows the outcome
+         rather than still claiming to be live. */
+      if (listing) {
+        listing.status = "closed";
+        listing.closedDealId = deal.id;
+        listing.revision = (listing.revision || 1) + 1;
+      }
+      return { deal };
+    }],
   ];
 }
 

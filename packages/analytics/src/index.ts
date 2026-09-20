@@ -55,6 +55,57 @@ function visits(db: Db) {
 }
 
 /**
+ * One listing's count for one UTC day.
+ *
+ * `views` is every arrival. `sessions` is how many distinct visits reached it,
+ * which is the number a funnel wants: one person refreshing a page eleven times
+ * is one interested buyer, not eleven.
+ */
+interface ListingViewDoc {
+  /** `<listingId>:<day>`. */
+  _id: string;
+  listingId: string;
+  day: string;
+  views: number;
+  sessions: number;
+  /** Written only so the TTL index can sweep the row. Never read by the app. */
+  expiresAtDate: Date;
+}
+
+function listingViews(db: Db) {
+  return collection<ListingViewDoc>(db, COLLECTIONS.listingViews);
+}
+
+/**
+ * One listing's count for the day, in one upsert.
+ *
+ * Keyed `<listingId>:<day>`, so there is no read to race and two beacons arriving
+ * together both land. It holds NO PERSON, which keeps the position the visit
+ * collection's own comment sets out: the rate limiter already keys on an IP in its
+ * own collection where a TTL sweeps it within the hour, and repeating that here
+ * would turn a counter into a log of who read what.
+ */
+async function countListingView(
+  db: Db,
+  listingId: string,
+  first: boolean,
+  now: number,
+): Promise<void> {
+  await listingViews(db).updateOne(
+    { _id: `${listingId}:${utcDay(now)}` },
+    {
+      $setOnInsert: {
+        listingId,
+        day: utcDay(now),
+        expiresAtDate: new Date(now + VISIT_TTL_MS),
+      },
+      $inc: { views: 1, sessions: first ? 1 : 0 },
+    },
+    { upsert: true },
+  );
+}
+
+/**
  * What a beacon changes. A heartbeat moves the clock and nothing else, so only
  * an arrival counts as a page view.
  */
@@ -97,6 +148,35 @@ const PulseBody = z
      * failure this whole collection exists to avoid.
      */
     nav: z.boolean().optional(),
+    /**
+     * Which listing this page is, when it is one.
+     *
+     * Bounded and character-restricted for the same reason `sid` is: it becomes
+     * half of a document key. Absent on every page that is not a listing.
+     */
+    listing: str()
+      .min(4)
+      .max(64)
+      .regex(/^[A-Za-z0-9_-]+$/u, "listing")
+      .optional(),
+    /**
+     * True the first time this session sees this listing.
+     *
+     * CLIENT ASSERTED, which is the same trust the client-minted `sid` already
+     * carries and is bounded by the same two rate limiters. The alternative, a
+     * list of seen listings on the visit row, is an unbounded array on a document
+     * written on every single beacon.
+     */
+    first: z.boolean().optional(),
+    /**
+     * Count the listing and leave the visit row alone.
+     *
+     * The site layout's beacon owns sessions and page views, and it cannot know
+     * which listing a page is because the layout wraps every route. So the listing
+     * page sends its own beacon with this set, and the two never both count the
+     * same arrival as a page view.
+     */
+    only: z.literal("listing").optional(),
   })
   .strict();
 
@@ -123,6 +203,16 @@ export function analyticsPublicRoutes(): Hono<AppEnv> {
 
     const now = Date.now();
     const arrived = body.nav === true;
+
+    /*
+     * A listing-only beacon stops here, having counted the listing and touched
+     * nothing else. It is a separate call from the layout's so that one arrival is
+     * never counted as two page views; see `only` on the body.
+     */
+    if (body.only === "listing") {
+      if (body.listing) await countListingView(db, body.listing, body.first === true, now);
+      return c.body(null, 204);
+    }
 
     /*
      * THE UPDATE PATH FIRST, WITHOUT UPSERT, and that split is the whole point.
@@ -215,3 +305,103 @@ export async function sitePulse(db: Db, now: number = Date.now()): Promise<SiteP
     views: current.reduce((total, row) => total + row.views, 0),
   };
 }
+
+/* ═════════════════════════════════════════════════════ PER LISTING COUNTS ══ */
+
+/** UTC `YYYY-MM-DD` for a timestamp, for callers assembling a day range. */
+export function dayOf(ms: number): string {
+  return utcDay(ms);
+}
+
+/**
+ * Views and sessions per listing over a day range, for the listings funnel.
+ *
+ * Takes the ids rather than reading every row in the window, because the funnel is
+ * drawn for a PAGE of listings and this collection holds a row per listing per
+ * day: a month of a busy site is thirty times the catalogue. An empty
+ * `listingIds` returns an empty map rather than everything, which is the safe
+ * direction for a scoped caller whose own list came back empty.
+ */
+export async function listingViewCounts(
+  db: Db,
+  input: { listingIds: readonly string[]; from: string; to: string },
+): Promise<Map<string, { views: number; sessions: number }>> {
+  const out = new Map<string, { views: number; sessions: number }>();
+  if (input.listingIds.length === 0) return out;
+
+  const rows = await listingViews(db)
+    .aggregate<{ _id: string; views: number; sessions: number }>([
+      {
+        $match: {
+          listingId: { $in: [...input.listingIds] },
+          day: { $gte: input.from, $lte: input.to },
+        },
+      },
+      {
+        $group: {
+          _id: "$listingId",
+          views: { $sum: "$views" },
+          sessions: { $sum: "$sessions" },
+        },
+      },
+    ])
+    .toArray();
+
+  for (const row of rows) out.set(row._id, { views: row.views, sessions: row.sessions });
+  return out;
+}
+
+/**
+ * The most looked at listings in a window.
+ *
+ * Returns ids and counts only. Which of those a caller may SEE is answered where
+ * the scope lives, because this package knows nothing about who owns a listing.
+ */
+export async function topViewedListings(
+  db: Db,
+  input: { from: string; to: string; limit: number },
+): Promise<{ listingId: string; views: number; sessions: number }[]> {
+  const rows = await listingViews(db)
+    .aggregate<{ _id: string; views: number; sessions: number }>([
+      { $match: { day: { $gte: input.from, $lte: input.to } } },
+      {
+        $group: {
+          _id: "$listingId",
+          views: { $sum: "$views" },
+          sessions: { $sum: "$sessions" },
+        },
+      },
+      { $sort: { views: -1 } },
+      { $limit: input.limit },
+    ])
+    .toArray();
+  return rows.map((row) => ({
+    listingId: row._id,
+    views: row.views,
+    sessions: row.sessions,
+  }));
+}
+
+/**
+ * One listing's daily views, ZERO FILLED across the window.
+ *
+ * The rule `sitePulse` already holds, for the same reason: a chart drawn from only
+ * the days that saw traffic is a lie about the shape of the data.
+ */
+export async function listingViewSeries(
+  db: Db,
+  input: { listingId: string; days: number; now?: number },
+): Promise<{ day: string; views: number }[]> {
+  const now = input.now ?? Date.now();
+  const days = recentDays(now, input.days);
+  const from = days[0] ?? utcDay(now);
+  const rows = await listingViews(db)
+    .find({ listingId: input.listingId, day: { $gte: from } })
+    .toArray();
+  const byDay = new Map(rows.map((row) => [row.day, row.views]));
+  return days.map((day) => ({ day, views: byDay.get(day) ?? 0 }));
+}
+
+// TODO(test): a heartbeat carrying a listing id increments nothing; only an arrival does.
+// TODO(test): `first` absent leaves sessions alone while views still climbs.
+// TODO(test): listingViewCounts with an empty id list returns an empty map.

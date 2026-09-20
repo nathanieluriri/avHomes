@@ -64,6 +64,45 @@ export default function SitePulse() {
 }
 
 /**
+ * One listing's own counter. Renders nothing.
+ *
+ * A SECOND component rather than a prop on the one above, because that one lives
+ * in the site layout and the layout wraps every route, so it cannot know which
+ * listing a page is. Sending both from one place would mean either the layout
+ * knowing about listings or one arrival counting as two page views.
+ *
+ * It obeys the same consent rule, for the same reason: this is analytics, and the
+ * banner promised it was off until the visitor said yes.
+ */
+export function ListingPulse({ id }: { id: string }) {
+  const [consented, setConsented] = useState(false);
+
+  useEffect(() => {
+    const fromStorage = () => setConsented(readStored(CONSENT_KEY) === "accepted");
+    const fromEvent = (event: Event) => {
+      const choice = (event as CustomEvent<unknown>).detail;
+      if (typeof choice === "string") setConsented(choice === "accepted");
+      else fromStorage();
+    };
+    fromStorage();
+    window.addEventListener(CONSENT_EVENT, fromEvent);
+    window.addEventListener("storage", fromStorage);
+    return () => {
+      window.removeEventListener(CONSENT_EVENT, fromEvent);
+      window.removeEventListener("storage", fromStorage);
+    };
+  }, []);
+
+  /* No heartbeat. "Still on this page" is the session beacon's job; this one
+     answers "how many people reached this listing", which happens once. */
+  useEffect(() => {
+    if (consented) pulse({ arrived: true, listing: id });
+  }, [consented, id]);
+
+  return null;
+}
+
+/**
  * Safari in private mode THROWS on storage rather than returning null, so an
  * unguarded read here would blank the whole site behind an error boundary.
  */
@@ -96,7 +135,29 @@ function sessionId(): string | null {
   }
 }
 
-function pulse({ arrived }: { arrived: boolean }): void {
+const SEEN_PREFIX = "avhomes.seen.";
+
+/**
+ * Is this the first time this visit has reached this listing?
+ *
+ * Remembered per tab beside the session id, so a reader who refreshes a listing
+ * eleven times is one interested buyer rather than eleven. When storage throws it
+ * answers TRUE: a slight over-count of sessions is a better failure than a listing
+ * that silently reports none, and the page-view figure beside it is unaffected
+ * either way.
+ */
+function firstForListing(listing: string): boolean {
+  const key = `${SEEN_PREFIX}${listing}`;
+  try {
+    if (window.sessionStorage.getItem(key)) return false;
+    window.sessionStorage.setItem(key, "1");
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function pulse({ arrived, listing }: { arrived: boolean; listing?: string }): void {
   /*
    * Never from inside a frame. The console's dashboard embeds this page to draw
    * its storefront preview, and a preview the operator is looking at is not a
@@ -107,7 +168,15 @@ function pulse({ arrived }: { arrived: boolean }): void {
 
   const sid = sessionId();
   if (!sid) return;
-  const body = JSON.stringify(arrived ? { sid, nav: true } : { sid });
+  /* `only: "listing"` is what keeps the two beacons from both counting one
+     arrival as a page view. See the route. */
+  const body = JSON.stringify(
+    listing
+      ? { sid, listing, first: firstForListing(listing), only: "listing" }
+      : arrived
+        ? { sid, nav: true }
+        : { sid },
+  );
 
   try {
     /*

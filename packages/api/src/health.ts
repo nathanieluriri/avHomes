@@ -7,6 +7,7 @@ import {
   hasDomain,
   isAdminRole,
   siteAlerts,
+  splitFor,
   visibleAlerts,
   type SiteHealthSnapshot,
 } from "@avhomes/contracts";
@@ -128,8 +129,13 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
     siteStats,
     settings,
     enquiries: { stale },
-    // Level 1 is the rate the person who actually closed the deal earns. Zero
-    // there means the whole split resolves to nothing, whatever 2 and 3 say.
-    marketing: { ...marketing, ratesUnset: marketingSettings.saleRates[0] === 0 },
+    /* Level 1 is the rate the person who actually closed the deal earns. Zero
+       there means the whole split resolves to nothing, whatever the others say.
+       Checked on AV Homes' own sale rate, which is the cell every site uses first
+       and the only one a brand new site is certain to reach. */
+    marketing: {
+      ...marketing,
+      ratesUnset: splitFor(marketingSettings.commission, "av", "sale").level1 === 0,
+    },
   };
 }

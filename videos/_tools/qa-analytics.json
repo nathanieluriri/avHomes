@@ -1,0 +1,67 @@
+[
+  {
+    "name": "analytics-overview",
+    "path": "/admin/analytics",
+    "steps": [
+      { "wait": 2200, "shot": "top" },
+      { "eval": "document.body.innerText.includes('Transacted')" },
+      { "click": "::-p-text(Transacted)", "wait": 900, "shot": "chart-open" },
+      { "scroll": 500, "wait": 400, "shot": "ownership-and-funds" }
+    ]
+  },
+  {
+    "name": "analytics-transactions",
+    "path": "/admin/analytics/transactions",
+    "steps": [
+      { "wait": 2200, "shot": "top" },
+      { "click": "::-p-text(Where this money goes)", "wait": 700, "shot": "split-open" },
+      { "scroll": 500, "wait": 400, "shot": "rows" }
+    ]
+  },
+  {
+    "name": "analytics-listings",
+    "path": "/admin/analytics/listings",
+    "steps": [
+      { "wait": 2200, "shot": "top" },
+      { "click": "::-p-text(Seen, never asked about)", "wait": 900, "shot": "ignored-only" }
+    ]
+  },
+  {
+    "name": "analytics-people",
+    "path": "/admin/analytics/people",
+    "steps": [
+      { "wait": 2200, "shot": "top" },
+      { "click": "::-p-text(How this score is made up)", "wait": 700, "shot": "breakdown" }
+    ]
+  },
+  {
+    "name": "analytics-wallets",
+    "path": "/admin/analytics/wallets",
+    "steps": [
+      { "wait": 2200, "shot": "top" },
+      { "click": "::-p-text(Record a payment out)", "wait": 900, "shot": "spend-sheet" }
+    ]
+  },
+  {
+    "name": "analytics-traffic",
+    "path": "/admin/analytics/traffic",
+    "steps": [
+      { "wait": 2200, "shot": "top" },
+      { "click": "::-p-text(Sessions)", "wait": 900, "shot": "chart-open" }
+    ]
+  },
+  {
+    "name": "commission-grid",
+    "path": "/admin/marketers/settings",
+    "steps": [
+      { "wait": 2200, "shot": "top" },
+      { "scroll": 420, "wait": 400, "shot": "grid" },
+      { "scroll": 500, "wait": 400, "shot": "funds-and-score" }
+    ]
+  },
+  {
+    "name": "partner-applications",
+    "path": "/admin/partners",
+    "steps": [{ "wait": 1800, "shot": "top" }]
+  }
+]
