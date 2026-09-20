@@ -679,8 +679,8 @@ const setCommissionRates: SpotlightTour = {
     {
       anchor: "commission-sale-rates",
       page: COMMISSION,
-      title: "Type the new sale rates",
-      body: "One percentage per level: level 1 closed the deal, level 2 invited them, level 3 invited that person.",
+      title: "Four rows, five shares each",
+      body: "AV Homes' own stock and somebody else's are priced separately, because AV Homes earns far less on a house it does not own. Direct closed the deal, upline 1 invited them, upline 2 invited that person, and the last two go to the funds.",
       advance: "manual",
     },
     {

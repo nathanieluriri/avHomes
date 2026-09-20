@@ -7,21 +7,16 @@
 // see who gets what, and confirms. Ends on the listing reading Closed, which is the
 // outcome. It does not tour the analytics section: that is video 18.
 
-const RAIL = (href) => `::-p-xpath(//*[contains(@class,'c-rail')]//a[@href='${href}'])`;
 const ROW = (name) => `::-p-xpath(//tr[.//*[normalize-space()='${name}']])`;
 const STATUS = "button[aria-label='Listing status']";
 const OPTION = (text) => `::-p-xpath(//div[@role='option'][.//*[normalize-space()='${text}'] or normalize-space()='${text}'])`;
 const SHEET = "::-p-xpath(//h2[normalize-space()='Record the sale'])";
-const FIELD = (label) =>
-  `::-p-xpath(//label[.//span[normalize-space()='${label}']]//input | //div[./span[normalize-space()='${label}']]//input)`;
 const AMOUNT = "::-p-xpath(//label[.//span[normalize-space()='What it sold for']]//input)";
 const BUYER = "::-p-xpath(//label[.//span[normalize-space()='Who bought it']]//input)";
-const CLOSER = (label) => `::-p-xpath(//button[normalize-space()='${label}'])`;
 const SEARCH = "::-p-xpath(//input[@placeholder='Their code or their name'])";
-const PROOF = "::-p-xpath(//div[./span[normalize-space()='The proof']]//button[1])";
+const PROOF = "::-p-xpath(//button[normalize-space()='Choose from library'])";
 const SPLIT = "::-p-xpath(//button[.//span[normalize-space()='What this pays out']])";
 const CONFIRM = "::-p-xpath(//button[starts-with(normalize-space(),'Record it and close')])";
-const CHIP = "::-p-xpath(//*[contains(@class,'c-rail')]/following::*[normalize-space()='Closed'][1])";
 const DRY = process.env.NO_RECORD === "1";
 
 const LISTING = "demo_ikeja-gra-family-house";
@@ -46,20 +41,20 @@ module.exports = {
       await a.goto(p);
       await a.sleep(400);
     }
-    await a.page.evaluate(async () => {
-      const res = await fetch("/api/admin/images?limit=40").then((r) => r.json()).catch(() => null);
-      const urls = (res?.items ?? []).map((i) => i.url).filter(Boolean).slice(0, 40);
-      await Promise.all(
-        urls.map(
-          (src) =>
-            new Promise((done) => {
-              const img = new Image();
-              img.onload = img.onerror = () => done(null);
-              img.src = src;
-            }),
+    await a.tab.evaluate(
+      (urls) =>
+        Promise.all(
+          urls.map(
+            (url) =>
+              new Promise((done) => {
+                const img = new Image();
+                img.onload = img.onerror = done;
+                img.src = url;
+              }),
+          ),
         ),
-      );
-    });
+      a.S.library.map((row) => row.url),
+    );
     await a.sleep(600);
   },
 
@@ -105,7 +100,7 @@ module.exports = {
     a.mark("closer");
     await a.moveTo(SEARCH, 800);
     await sleep(400);
-    await a.type(SEARCH, "AV-0008", 110);
+    await a.clearAndType(SEARCH, "AV-0008", 110);
     await sleep(1400);
     if (DRY) await a.shot("searching");
     await a.click("::-p-xpath(//button[.//span[normalize-space()='Tobi Ajayi']])", 200);
@@ -113,7 +108,7 @@ module.exports = {
     if (DRY) await a.shot("closer");
 
     a.mark("buyer");
-    await a.type(BUYER, "Kemi Adebayo", 70);
+    await a.clearAndType(BUYER, "Kemi Adebayo", 70);
     await sleep(1100);
 
     a.mark("proof");

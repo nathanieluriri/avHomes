@@ -13,7 +13,7 @@ const SPEND = "::-p-xpath(//button[normalize-space()='Record a payment out'])";
 const SHEET = "::-p-xpath(//h2[starts-with(normalize-space(),'Pay out of')])";
 const AMOUNT = "::-p-xpath(//label[.//span[normalize-space()='How much']]//input)";
 const WHAT = "::-p-xpath(//label[.//span[normalize-space()='What it paid for']]//input)";
-const RECEIPT = "::-p-xpath(//div[./span[normalize-space()='The receipt']]//button[1])";
+const RECEIPT = "::-p-xpath(//button[normalize-space()='Choose from library'])";
 const CONFIRM = "::-p-xpath(//button[normalize-space()='Record the payment'])";
 const HISTORY = "::-p-xpath((//button[starts-with(normalize-space(),'The history')])[2])";
 const DRY = process.env.NO_RECORD === "1";
@@ -28,20 +28,20 @@ module.exports = {
     }
     /* The picker opens onto the image library, and forty full size photos on first
        paint froze an earlier take for four seconds. */
-    await a.page.evaluate(async () => {
-      const res = await fetch("/api/admin/images?limit=40").then((r) => r.json()).catch(() => null);
-      const urls = (res?.items ?? []).map((i) => i.url).filter(Boolean).slice(0, 40);
-      await Promise.all(
-        urls.map(
-          (src) =>
-            new Promise((done) => {
-              const img = new Image();
-              img.onload = img.onerror = () => done(null);
-              img.src = src;
-            }),
+    await a.tab.evaluate(
+      (urls) =>
+        Promise.all(
+          urls.map(
+            (url) =>
+              new Promise((done) => {
+                const img = new Image();
+                img.onload = img.onerror = done;
+                img.src = url;
+              }),
+          ),
         ),
-      );
-    });
+      a.S.library.map((row) => row.url),
+    );
     await a.sleep(600);
   },
 
@@ -74,11 +74,11 @@ module.exports = {
     if (DRY) await a.shot("sheet");
 
     a.mark("amount");
-    await a.type(AMOUNT, "2500000", 70);
+    await a.clearAndType(AMOUNT, "2500000", 70);
     await sleep(1200);
 
     a.mark("what");
-    await a.type(WHAT, "Borehole at the primary school in Ajah", 45);
+    await a.clearAndType(WHAT, "Borehole at the primary school in Ajah", 45);
     await sleep(1600);
     if (DRY) await a.shot("typed");
 
