@@ -294,6 +294,16 @@ export const NAV: readonly NavItem[] = [
     domain: "team",
     children: [
       {
+        /* Under Team because approving one mints an account, which is exactly what
+           the team domain governs. A partner is not a teammate, but deciding who
+           gets an account is the same job. */
+        href: "/admin/partners",
+        label: "Partner applications",
+        hint: "People asking to list their own property",
+        icon: UserRoundSearch,
+        domain: "team",
+      },
+      {
         href: "/admin/audit",
         label: "Audit trail",
         hint: "Who changed what, and when",

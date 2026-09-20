@@ -13,6 +13,8 @@ import {
 import { getDb, type Db } from "@avhomes/db";
 import { isVideoUrl, type FundKind } from "@avhomes/contracts";
 import {
+  applicationAdminRoutes,
+  applicationPublicRoutes,
   authRoutes,
   clerkRoutes,
   passwordRoutes,
@@ -349,6 +351,9 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * WRITES one, which is a different thing and is safe above the gate.
    */
   app.route(API_PREFIX, marketingPublicRoutes());
+  /* Applying to list property. A public MUTATION, so it sits here rather than in
+     the cacheable /public/* router, the same placement the enquiry intake has. */
+  app.route(API_PREFIX, applicationPublicRoutes({ mailer }));
 
   /* ═════════════════ 9. session, the domain gate, then the audit trail ═════════ */
 
@@ -376,6 +381,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, passwordRoutes());
 
   app.route(API_PREFIX, teamRoutes({ mailer }));
+  app.route(API_PREFIX, applicationAdminRoutes({ mailer }));
   /*
    * BEFORE listingsAdminRoutes, deliberately. Its second route, GET
    * /admin/properties/:id/history, sits on a path listingsAdminRoutes also

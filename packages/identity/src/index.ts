@@ -43,6 +43,17 @@ export { doorStatus, activeDoor, type AuthDoor, type DoorStatus } from "./door";
 export { authRoutes } from "./routes/auth";
 export { clerkRoutes, passwordRoutes, registerClerkVerifier, type ClerkVerifier } from "./routes/doors";
 export { teamRoutes } from "./routes/team";
+export { applicationAdminRoutes, applicationPublicRoutes } from "./routes/applications";
+export {
+  createApplication,
+  decideApplication,
+  getApplication,
+  listApplications,
+  openApplicationCount,
+  APPLICATION_STATUSES,
+  type ApplicationStatus,
+  type PartnerApplication,
+} from "./repo/applications";
 
 export { limit, clearLimit } from "./repo/ratelimit";
 export {
