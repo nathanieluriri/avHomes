@@ -169,7 +169,8 @@ export default function TransactionsPage() {
                 {row.closerKind === "direct"
                   ? "Walk-in, nobody paid"
                   : `${row.closerName || "Somebody"} (${CLOSER_KIND_LABEL[row.closerKind]})`}
-                <span className="ml-1.5 text-slate-550">{DEAL_SOURCE_LABEL[row.source]}</span>
+                {" · "}
+                <span className="text-slate-550">{DEAL_SOURCE_LABEL[row.source]}</span>
               </p>
 
               <div className="mt-2">

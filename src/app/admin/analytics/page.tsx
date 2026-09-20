@@ -174,8 +174,17 @@ export default function AnalyticsOverviewPage() {
                           {formatMoney(fund.balanceMinor, fund.currency)}
                         </dd>
                       </div>
+                      {/*
+                        "ALL TIME" IS NOT OPTIONAL HERE.
+
+                        A fund balance is what it holds now, which is every deal ever
+                        rather than the window the picker chose. Sitting under a
+                        period picker with no qualifier, it reads as this period's,
+                        and a figure whose label names a different quantity from the
+                        figure is exactly what these pages exist to avoid.
+                      */}
                       <p className="mt-0.5 text-[11px] text-slate-550">
-                        {formatMoney(fund.accruedMinor, fund.currency)} in,{" "}
+                        held now, all time · {formatMoney(fund.accruedMinor, fund.currency)} in,{" "}
                         {formatMoney(fund.paidMinor, fund.currency)} out
                       </p>
                     </div>
