@@ -688,7 +688,9 @@ export async function recordSale(
    * refuses a field appearing in both `$set` and `$setOnInsert`. So the two the
    * insert owns are deleted from the payload instead of overwritten.
    */
-  const { _id: _ignoredId, createdAt: _ignoredCreatedAt, ...fields } = doc;
+  const fields: Partial<DealDoc> = { ...doc };
+  delete fields._id;
+  delete fields.createdAt;
 
   try {
     /* Upsert on the id, because this door is also how a REPORTED deal gets
