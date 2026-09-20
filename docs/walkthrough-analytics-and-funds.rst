@@ -5,8 +5,11 @@ Walkthrough: the money screens
 :Date: 2026-09-20
 :For: whoever runs AV Homes day to day
 
-Three jobs, in the order you will meet them. Each one is a separate video in
-``/admin/tutorials`` once those are cut; this is the same walkthrough in writing.
+Three jobs, in the order you will meet them. Each one is a video in
+``/admin/tutorials``, and each video's **Try it now** hands you a guided
+walkthrough: the console dims everything but the next thing to press and says in
+one line what it is. This is the same ground in writing, for reading away from
+the screen.
 
 .. contents::
    :local:

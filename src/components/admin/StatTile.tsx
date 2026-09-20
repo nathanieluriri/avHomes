@@ -25,6 +25,7 @@ export function StatTile({
   onClick,
   expanded,
   controls,
+  spotlight,
 }: {
   label: string;
   /** Already formatted. This component never decides how money reads. */
@@ -41,6 +42,8 @@ export function StatTile({
   onClick?: () => void;
   expanded?: boolean;
   controls?: string;
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
 }) {
   const body = (
     <>
@@ -62,11 +65,16 @@ export function StatTile({
   );
 
   if (!onClick) {
-    return <div className="min-w-0 rounded-xl bg-white p-3 shadow-card">{body}</div>;
+    return (
+      <div data-spotlight={spotlight} className="min-w-0 rounded-xl bg-white p-3 shadow-card">
+        {body}
+      </div>
+    );
   }
   return (
     <button
       type="button"
+      data-spotlight={spotlight}
       onClick={onClick}
       aria-expanded={expanded}
       aria-controls={controls}

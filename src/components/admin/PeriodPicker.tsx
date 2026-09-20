@@ -13,7 +13,14 @@ import { PERIOD_KEYS, PERIOD_LABEL, isPeriodKey, type PeriodKey } from "@avhomes
  *
  * The filter row sits above the charts, which is where a reader looks for it.
  */
-export function PeriodPicker({ current }: { current: PeriodKey }) {
+export function PeriodPicker({
+  current,
+  spotlight,
+}: {
+  current: PeriodKey;
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
+}) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -29,6 +36,7 @@ export function PeriodPicker({ current }: { current: PeriodKey }) {
     <div
       role="group"
       aria-label="Period"
+      data-spotlight={spotlight}
       /* Scrolls sideways on a phone rather than wrapping to two rows: six short
          chips wrapped mid-row read as two unrelated groups. */
       className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 sm:mx-0 sm:px-0"

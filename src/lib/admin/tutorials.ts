@@ -1,6 +1,7 @@
 import { hasDomain, type Domain, type Role, type TutorialId } from "@avhomes/contracts";
 import { NAV_ITEMS } from "@/components/admin/nav";
 import { ApiError, api } from "@/lib/admin/client";
+import { SPOTLIGHT_TOURS, type SpotlightTourId } from "@/lib/admin/spotlight-steps";
 import { TUTORIAL_MEDIA, TUTORIAL_STEPS, type TutorialStep } from "@/lib/admin/tutorial-steps";
 
 /**
@@ -14,7 +15,8 @@ import { TUTORIAL_MEDIA, TUTORIAL_STEPS, type TutorialStep } from "@/lib/admin/t
  */
 
 export interface Tutorial {
-  id: TutorialId;
+  /** Both, because a card is a video AND the walkthrough it hands you. See `entry`. */
+  id: TutorialId & SpotlightTourId;
   title: string;
   /** The one line that says what the video solves. */
   problem: string;
@@ -30,8 +32,16 @@ export interface Tutorial {
   steps: readonly TutorialStep[];
 }
 
+/*
+ * `id` is BOTH a tutorial and a walkthrough.
+ *
+ * "Try it now" is `?spotlight=<id>`, which the spotlight engine ignores for an id
+ * it has no tour for: three cards once shipped with a button that silently did
+ * nothing. The intersection makes that a compile error instead, which is the only
+ * gate that holds, since nothing in this file is evaluated at build time.
+ */
 function entry(
-  id: TutorialId,
+  id: TutorialId & SpotlightTourId,
   title: string,
   problem: string,
   durationSeconds: number,
@@ -48,6 +58,11 @@ function entry(
   const media = TUTORIAL_MEDIA[id];
   const steps = TUTORIAL_STEPS[id];
   if (!media || !steps) throw new Error(`tutorials: ${id} has no rendered video yet`);
+  // The card and its walkthrough must agree on where they send people.
+  const tour = SPOTLIGHT_TOURS[id];
+  if (tour.start !== tryHref) {
+    throw new Error(`tutorials: ${id} opens ${tryHref}, but its walkthrough starts on ${tour.start}`);
+  }
   return {
     id,
     title,
@@ -193,7 +208,9 @@ export function tutorialsFor(role: Role): Tutorial[] {
 }
 
 export function tryHrefOf(tutorial: Tutorial): string {
-  return `${tutorial.tryHref}?spotlight=${tutorial.id}`;
+  // The tour says what state its first step needs the screen in; the card just opens it.
+  const { startQuery } = SPOTLIGHT_TOURS[tutorial.id];
+  return `${tutorial.tryHref}?${startQuery ? `${startQuery}&` : ""}spotlight=${tutorial.id}`;
 }
 
 /** The step playing at `time`, held through the gaps between captions; -1 before the first. */

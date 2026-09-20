@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChartNoAxesColumn } from "lucide-react";
+import { ChartNoAxesColumn, Receipt } from "lucide-react";
 import {
   OWNERSHIPS,
   OWNERSHIP_LABEL,
@@ -15,7 +15,7 @@ import { useAsync } from "@/lib/admin/hooks";
 import { MiniChart, type ChartPoint } from "@/components/admin/MiniChart";
 import { PeriodPicker, periodFromParams } from "@/components/admin/PeriodPicker";
 import { StatRow, StatTile } from "@/components/admin/StatTile";
-import { Card, CardHead, ErrorNote, EmptyState, Skeleton } from "@/components/admin/ui";
+import { ButtonLink, Card, CardHead, ErrorNote, EmptyState, Skeleton } from "@/components/admin/ui";
 import { PageHeader } from "@/components/admin/ui";
 
 /**
@@ -57,7 +57,7 @@ export default function AnalyticsOverviewPage() {
         icon={ChartNoAxesColumn}
         title="Analytics"
         subtitle="What the business did, and where the money went."
-        actions={<PeriodPicker current={period} />}
+        actions={<PeriodPicker current={period} spotlight="analytics-period" />}
       />
 
       {state.error && (
@@ -89,6 +89,7 @@ export default function AnalyticsOverviewPage() {
               onClick={() => setChartOpen((was) => !was)}
               expanded={chartOpen}
               controls="value-chart"
+              spotlight="analytics-transacted"
             />
             <StatTile
               label="Deals"
@@ -110,6 +111,21 @@ export default function AnalyticsOverviewPage() {
             />
           </StatRow>
 
+          {/* Under the figures, not in the header: each of these four is a sum of
+              individual deals, and a reader who doubts one wants the deals
+              themselves. In the header it would share the actions row with the
+              period chips, which stretch to half a phone's width beside it. */}
+          <div className="mb-4 flex">
+            <ButtonLink
+              href="/admin/analytics/transactions"
+              variant="ghost"
+              spotlight="analytics-transactions-link"
+            >
+              <Receipt className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Every deal behind these
+            </ButtonLink>
+          </div>
+
           {/* On request, never both open at once with the row below. */}
           {chartOpen && (
             <Card className="mb-4" spotlight="analytics-value-chart">
@@ -125,7 +141,7 @@ export default function AnalyticsOverviewPage() {
           )}
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card spotlight="analytics-ownership">
               <CardHead title="Whose property it was" />
               {money.deals === 0 ? (
                 <p className="text-[13px] text-slate-600">No deals in this window.</p>
@@ -163,7 +179,7 @@ export default function AnalyticsOverviewPage() {
             </Card>
 
             {data?.funds && (
-              <Card>
+              <Card spotlight="analytics-funds">
                 <CardHead title="The two funds" />
                 <dl className="space-y-3">
                   {data.funds.map((fund) => (

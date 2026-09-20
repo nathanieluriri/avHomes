@@ -24,6 +24,7 @@ import { MoneyInput } from "./listing/MoneyInput";
 import { Segmented } from "./listing/Segmented";
 import { OwnershipBadge } from "./OwnershipBadge";
 import { SplitBreakdown } from "./SplitBreakdown";
+import { signalSpotlight } from "./spotlight/signal";
 import { Button, ErrorNote, Field, inputClass } from "./ui";
 
 /**
@@ -58,6 +59,18 @@ export function RecordSale(props: Parameters<typeof RecordSaleForm>[0]) {
   return <RecordSaleForm key={`${props.listing.id}:${props.fromDeal?.dealId ?? "new"}`} {...props} />;
 }
 
+/**
+ * Tells a running walkthrough the sheet is up. The step before it sits on the
+ * status picker, which cannot be driven by the tour itself: see `sale-sheet-open`.
+ * A mount, not an effect on `open`, because the wrapper above mounts this fresh
+ * per opening, so it fires exactly once each time.
+ */
+function useReportOpened() {
+  useEffect(() => {
+    signalSpotlight("sale-sheet-open");
+  }, []);
+}
+
 function RecordSaleForm({
   open,
   onOpenChange,
@@ -88,6 +101,7 @@ function RecordSaleForm({
   };
   onDone: () => void;
 }) {
+  useReportOpened();
   const sold = listing.listingType === "sale";
   /*
    * Seeded from the deal being settled, or from the asking price, in the
@@ -276,7 +290,11 @@ function RecordSaleForm({
           </Button>
           {/* The button says what it will DO, both halves of it, because it closes
               a listing as well as recording money and "Submit" would hide that. */}
-          <Button onClick={() => void confirm()} disabled={busy || refusal !== null}>
+          <Button
+            onClick={() => void confirm()}
+            disabled={busy || refusal !== null}
+            spotlight="sale-confirm"
+          >
             {busy
               ? "Recording..."
               : sold
@@ -296,7 +314,7 @@ function RecordSaleForm({
           </p>
         )}
 
-        <div className="flex items-center gap-2">
+        <div data-spotlight="sale-ownership" className="flex items-center gap-2">
           <OwnershipBadge ownership={listing.ownership} />
           <span className="text-[12px] text-slate-600">
             {listing.ownership === "av"
@@ -308,11 +326,12 @@ function RecordSaleForm({
         <Field
           label={sold ? "What it sold for" : "What was paid"}
           hint="Correct the asking price if the final figure was different."
+          spotlight="sale-amount"
         >
           <MoneyInput value={amount} onChange={setAmount} />
         </Field>
 
-        <Field label="Who closed it" as="group">
+        <Field label="Who closed it" as="group" spotlight="sale-closer">
           <Segmented
             value={closerKind}
             onChange={(next) => setCloserKind(next as CloserKind)}
@@ -384,7 +403,7 @@ function RecordSaleForm({
           )}
         </Field>
 
-        <Field label="Who bought it">
+        <Field label="Who bought it" spotlight="sale-buyer">
           <input
             className={inputClass}
             value={buyerName}
@@ -412,9 +431,13 @@ function RecordSaleForm({
           />
         </Field>
 
+        {/* The field, not the picker's own `image-library` button: that anchor
+            also sits on the listing's photos behind this sheet, and the engine
+            takes the first one in the document. */}
         <Field
           label="The proof"
           hint="At least one: a receipt, a bank alert, or the signed agreement."
+          spotlight="sale-proof"
         >
           <ImagePicker value={proof} onChange={setProof} max={8} />
         </Field>

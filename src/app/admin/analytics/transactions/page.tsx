@@ -80,7 +80,7 @@ export default function TransactionsPage() {
         backLabel="Analytics"
         title="Transactions"
         subtitle="Every deal recorded, with the proof behind it."
-        actions={<PeriodPicker current={period} />}
+        actions={<PeriodPicker current={period} spotlight="tx-period" />}
       />
 
       {state.error && (
@@ -110,7 +110,7 @@ export default function TransactionsPage() {
       </StatRow>
 
       {/* Filters in one row above the list, which is where a reader looks. */}
-      <Card className="mb-4">
+      <Card className="mb-4" spotlight="tx-filters">
         <div className="flex flex-wrap gap-2">
           <Filter
             label="Whose property"
@@ -144,6 +144,7 @@ export default function TransactionsPage() {
         </div>
       ) : data && data.rows.length === 0 ? (
         <EmptyState
+          spotlight="tx-none"
           title="No transactions here"
           hint={
             ownership || kind || closer
@@ -153,8 +154,11 @@ export default function TransactionsPage() {
         />
       ) : (
         <div className="space-y-2">
-          {data?.rows.map((row) => (
-            <Card key={row.dealId}>
+          {data?.rows.map((row, index) => (
+            /* The walkthrough opens the first deal, so only that one is anchored:
+               every row carrying the name would put the tour on whichever the
+               engine found first, which is the same row but by accident. */
+            <Card key={row.dealId} spotlight={index === 0 ? "tx-row" : undefined}>
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <h3 className="min-w-0 text-[13px] font-semibold text-plum-950">
                   {row.listingTitle || "A listing"}
@@ -188,6 +192,7 @@ export default function TransactionsPage() {
                   onToggle={() =>
                     setOpenRow((was) => (was === row.dealId ? null : row.dealId))
                   }
+                  spotlight={index === 0 ? "tx-split" : undefined}
                 />
               </div>
 

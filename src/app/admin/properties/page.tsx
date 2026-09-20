@@ -292,6 +292,12 @@ function PropertiesScreen() {
   // Kind is left out: an empty kind with nothing else narrowing it gets its own first-run state below.
   const filtered = tab !== "all" || listingTypeFilter !== "all" || query !== "";
 
+  /* The record-a-sale walkthrough opens the first live listing, and says so when
+     there is none. Only on the Live tab: a listing held over from another tab is
+     not one that can be sold. */
+  const settled = !loading && !error && Boolean(data);
+  const liveRow = settled && tab === "live" ? rows[0] : undefined;
+
   const columns: Column<Property>[] = [
     {
       key: "listing",
@@ -565,6 +571,8 @@ function PropertiesScreen() {
         rows={rows}
         rowKey={(p) => p.id}
         hrefFor={(p) => `/admin/properties/${p.id}`}
+        rowSpotlight={(p) => (p === liveRow ? "listing-live-row" : undefined)}
+        spotlight={settled && tab === "live" && query === "" && rows.length === 0 ? "listing-none-live" : undefined}
         loading={loading}
         toolbar={
           /*
@@ -591,6 +599,7 @@ function PropertiesScreen() {
                 options: TABS,
                 onChange: (value) =>
                   refilter(() => setParam("status", value === "all" ? "" : value)),
+                spotlight: tab !== "live" ? { value: "live", name: "listing-find-live" } : undefined,
               }}
               search={{
                 value: searchInput,
