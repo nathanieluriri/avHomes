@@ -173,6 +173,14 @@ export interface RecentListing {
   /** The first photo, never a video, or empty. */
   imageUrl: string;
   publishedAt: number;
+  /**
+   * Whose property it is.
+   *
+   * Carried into the app so a Non-AV card can show the smaller number it really
+   * pays. A marketer choosing what to push should see the real figure before they
+   * spend a week on it, which is the whole reason this field exists.
+   */
+  ownership: Ownership;
 }
 
 export interface MarketingDeps {

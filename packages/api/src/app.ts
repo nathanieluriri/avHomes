@@ -127,6 +127,9 @@ async function recentListings(db: Db, sinceMs: number, limit: number): Promise<R
       city: property.city,
       imageUrl: property.images.find((url) => !isVideoUrl(url)) ?? "",
       publishedAt: property.publishedAt ?? sinceMs,
+      /* So the app's card can quote what this listing really pays rather than AV
+         Homes' own rate on somebody else's house. */
+      ownership: property.ownership,
     }));
 }
 
