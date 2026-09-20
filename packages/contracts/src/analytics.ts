@@ -9,7 +9,7 @@
  * days, getting something else, and captioning it from the request.
  */
 
-import type { FundBalance, RewardOutlook } from "./funds";
+import type { FundBalance, FundKind, RewardOutlook } from "./funds";
 import type {
   CloserKind,
   DealKind,
@@ -182,6 +182,14 @@ export interface TransactionPage {
   totalValueMinor: number;
   totalDeals: number;
   currency: string;
+  /**
+   * The renameable fund labels.
+   *
+   * On the response rather than looked up by the screen, because a row's breakdown
+   * names both funds and a screen holding its own copy of those strings is a screen
+   * that keeps saying "AV Foundation" after somebody renamed it.
+   */
+  fundNames: Record<FundKind, string>;
 }
 
 /**

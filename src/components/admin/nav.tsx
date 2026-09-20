@@ -1,8 +1,11 @@
 import {
+  Activity,
   Banknote,
   Bell,
   Building2,
+  ChartNoAxesColumn,
   Contact,
+  Eye,
   Gauge,
   GraduationCap,
   Handshake,
@@ -16,12 +19,15 @@ import {
   MailOpen,
   Newspaper,
   PencilRuler,
+  Receipt,
   SlidersHorizontal,
   TriangleAlert,
+  Trophy,
   UserRoundCheck,
   UserRoundSearch,
   Users,
   UsersRound,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { hasDomain, type Domain, type Role } from "@avhomes/contracts";
@@ -106,6 +112,54 @@ export const NAV: readonly NavItem[] = [
     hint: "Every property, including drafts and the trash",
     icon: Building2,
     domain: "listings",
+  },
+  {
+    /* A section rather than one screen, because six pages each answer their own
+       question and a single page answering all six is the overload this whole
+       section is built to avoid. Placed under Listings and above Marketers: it
+       reads what those two produce. */
+    href: "/admin/analytics",
+    label: "Analytics",
+    hint: "Money, listings, people and traffic",
+    icon: ChartNoAxesColumn,
+    domain: "analytics",
+    children: [
+      {
+        href: "/admin/analytics/transactions",
+        label: "Transactions",
+        hint: "Every deal, with its split and its proof",
+        icon: Receipt,
+        domain: "analytics",
+      },
+      {
+        href: "/admin/analytics/listings",
+        label: "Listing performance",
+        hint: "What gets looked at and what lands",
+        icon: Eye,
+        domain: "analytics",
+      },
+      {
+        href: "/admin/analytics/people",
+        label: "People",
+        hint: "Who is closing, marketers and staff",
+        icon: Trophy,
+        domain: "analytics",
+      },
+      {
+        href: "/admin/analytics/wallets",
+        label: "The two funds",
+        hint: "The prize pool and the community fund",
+        icon: Wallet,
+        domain: "analytics",
+      },
+      {
+        href: "/admin/analytics/traffic",
+        label: "Traffic",
+        hint: "Visitors, and the listings they read",
+        icon: Activity,
+        domain: "analytics",
+      },
+    ],
   },
   {
     href: "/admin/enquiries",

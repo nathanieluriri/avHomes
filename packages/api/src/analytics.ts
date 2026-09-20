@@ -479,6 +479,10 @@ export function analyticsConsoleRoutes(): Hono<AppEnv> {
       totalValueMinor: totals[0]?.valueMinor ?? 0,
       totalDeals: totals[0]?.count ?? 0,
       currency: settings.currency,
+      fundNames: {
+        reward: settings.rewardPoolName,
+        foundation: settings.foundationName,
+      },
     };
     return c.json(body);
   });
