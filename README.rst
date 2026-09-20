@@ -287,6 +287,26 @@ One Vercel project. The function pins the Node runtime: password hashing uses
 MongoDB Atlas network access must allow ``0.0.0.0/0``, because serverless
 functions have no stable egress IP. Security rests on SCRAM credentials and TLS.
 
+A build reads the PREVIOUS deployment. Vercel fetches the project's own
+production alias for page data, and that alias still answers from the
+deployment currently live while the new one is being built. So the first build
+after a field is added to anything under ``/api/public/`` reads an API that has
+never heard of it: the value arrives ``undefined`` rather than empty, and one
+TypeError inside a server component ends the export and the deployment with it.
+
+Nothing under ``Verifying`` catches that by itself. CI and a local build both
+run with no environment, so every read falls back to the bundled fixtures in
+``src/lib/data.ts``, and those always carry the field that was just added. It
+has cost two deployments so far: ``mapUrl`` on ``Property``, which took one
+route down, and ``seo`` on settings, which is read in the ``(site)`` layout and
+took every page under it down with it.
+
+A wire type is therefore a promise the API cannot keep for exactly one build.
+Anything ``src/lib/data.ts`` reads from ``/api/public/*`` has to survive its
+field being absent, and the coalescing belongs at that boundary once rather than
+at each call site. Mark the field optional on the wire shape even where it is
+required on the type the site consumes. That gap is the deploy.
+
 Verifying
 =========
 
@@ -303,6 +323,17 @@ exist, so the root layout's ``LayoutProps<"/">`` resolves to nothing and the
 compiler stops at TS2304 before it checks anything real. The script runs
 ``next typegen`` first, which writes those types in a couple of seconds without a
 full build, so the three commands above pass in any order.
+
+All three run with no environment, which is what makes them portable and what
+makes them blind to the deployment note above. After adding a field to anything
+under ``/api/public/``, build once against the live API as well:
+
+.. code-block:: bash
+
+   VERCEL_URL=av-homes.vercel.app npm run build
+
+That feeds the build the same payload the next deployment will be given. It has
+to generate every page. If it throws here, the deploy was going to throw.
 
 There is no test suite yet. The plan for one, in the order that matters and with
 the reasoning attached, is in ``packages/api/src/TESTS.todo.ts``. Three items in
