@@ -8,6 +8,7 @@ import {
   type ClientLogo,
   type Office,
   type ReplyIdentity,
+  type SeoSettings,
   type SiteSettings,
   type SocialPlatform,
 } from "@avhomes/contracts";
@@ -62,6 +63,7 @@ interface Draft {
   offices: Office[];
   clientLogos: ClientLogo[];
   social: Record<SocialPlatform, string>;
+  seo: SeoSettings;
 }
 
 /** Field labels only. What is stored is the whole URL. */
@@ -83,6 +85,7 @@ function toDraft(s: SiteSettings): Draft {
     offices: s.offices,
     clientLogos: s.clientLogos,
     social: s.social,
+    seo: s.seo,
   };
 }
 
@@ -319,6 +322,47 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
                 />
               </Field>
             ))}
+          </Card>
+
+          {/* Sits beside the social profiles rather than in a tab of its own,
+              because it answers the same question they do: where this company
+              appears when somebody goes looking for it. */}
+          <Card className="space-y-4">
+            <CardHead title="Being found in search" />
+            <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
+              Both of these are done at Google and recorded here. What you paste
+              is what the site publishes, so a made up value does not mark the
+              job done, it publishes something that fails.
+            </p>
+
+            <Field
+              label="Google verification code"
+              hint="Search Console hands you an HTML tag when you add the site. Paste the whole tag or just the code inside it. Until this is set, nothing reports which searches reach you."
+            >
+              <input
+                className={inputClass}
+                value={draft.seo.googleVerification}
+                onChange={(event) =>
+                  set("seo", { ...draft.seo, googleVerification: event.target.value })
+                }
+              />
+            </Field>
+
+            <Field
+              label="Google Business Profile"
+              hint="The public link to your map listing. It is what puts a call button and directions beside your name, and it joins the record the site publishes about the company."
+            >
+              <input
+                className={inputClass}
+                type="url"
+                inputMode="url"
+                value={draft.seo.googleBusinessProfileUrl}
+                placeholder="https://maps.app.goo.gl/..."
+                onChange={(event) =>
+                  set("seo", { ...draft.seo, googleBusinessProfileUrl: event.target.value })
+                }
+              />
+            </Field>
           </Card>
 
           <Card className="space-y-4">

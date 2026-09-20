@@ -76,6 +76,9 @@ async function fixtures() {
       offices: [],
       clientLogos: [],
       social: { linkedin: "", instagram: "", facebook: "", x: "" },
+      // Empty, matching a site nobody has listed with Google yet, which is the
+      // state the two search alerts describe.
+      seo: { googleVerification: "", googleBusinessProfileUrl: "" },
       updatedAt: 0,
       revision: 0,
     },

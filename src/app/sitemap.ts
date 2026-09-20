@@ -22,11 +22,13 @@ export const revalidate = 3600;
 /**
  * The crawl map, which did not exist: `/sitemap.xml` answered 404.
  *
- * It matters more here than on most sites. The homepage's featured grid resolves
- * inside a Suspense boundary that bails to client rendering, so the server HTML
- * a crawler receives contains ZERO links to any listing. Without this file there
- * was no path from the front door to a single property, and property search in
- * Nigeria starts in a search engine.
+ * It matters more here than on most sites. The homepage's featured grid used to
+ * resolve inside a Suspense boundary that bailed to client rendering, so the
+ * server HTML a crawler received contained ZERO links to any listing. That
+ * boundary is gone and the grid now renders six of them server side, which is
+ * six out of everything on the market. This file is still the only complete
+ * path from the front door to every property, and property search in Nigeria
+ * starts in a search engine.
  *
  * BUILT FROM THE PUBLIC READS, not from the database, so it can only ever name
  * pages the site would actually serve. `getProperties` returns what

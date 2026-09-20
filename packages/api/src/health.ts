@@ -78,6 +78,7 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
     draft,
     withoutPhotos,
     incomplete,
+    withoutMap,
     published,
     postDrafts,
     testimonials,
@@ -102,6 +103,12 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
       ...onSite,
       $or: [{ priceMinor: { $lte: 0 } }, { address: "" }, { address: { $exists: false } }],
     }),
+    // `mapUrl` post-dates the first listings, so a row written before it is
+    // missing the key rather than holding an empty string. Both are "no link".
+    properties.countDocuments({
+      ...onSite,
+      $or: [{ mapUrl: "" }, { mapUrl: { $exists: false } }],
+    }),
     posts.countDocuments({ status: "published", deletedAt: null }),
     posts.countDocuments({ status: "draft", deletedAt: null }),
     db.collection(COLLECTIONS.testimonials).countDocuments({ deletedAt: null }),
@@ -115,7 +122,7 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
   ]);
 
   return {
-    listings: { publiclyVisible, live, draft, withoutPhotos, incomplete },
+    listings: { publiclyVisible, live, draft, withoutPhotos, incomplete, withoutMap },
     posts: { published, draft: postDrafts },
     testimonials,
     siteStats,

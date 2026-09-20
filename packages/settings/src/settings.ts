@@ -7,6 +7,7 @@ import {
   type ClientLogo,
   type Office,
   type ReplyIdentity,
+  type SeoSettings,
   type SiteSettings,
   type SocialPlatform,
 } from "@avhomes/contracts";
@@ -46,6 +47,7 @@ interface SettingsDoc {
   offices: Office[];
   clientLogos: ClientLogo[];
   social: Record<SocialPlatform, string>;
+  seo: SeoSettings;
   updatedAt: number;
   revision: number;
 }
@@ -78,6 +80,13 @@ const DEFAULTS: SiteSettings = {
     facebook: "",
     x: "https://x.com/_avconstruction",
   },
+  /*
+   * Empty, and empty is load-bearing here in a way it is not for a phone
+   * number. A guessed verification token does not merely look wrong, it is
+   * rejected by Google and leaves the owner reading a meta tag that says the
+   * site is verified when it is not.
+   */
+  seo: { googleVerification: "", googleBusinessProfileUrl: "" },
   updatedAt: 0,
   revision: 0,
 };
@@ -93,6 +102,7 @@ const WRITABLE = [
   "offices",
   "clientLogos",
   "social",
+  "seo",
 ] as const;
 
 function settings(db: Db) {
@@ -114,6 +124,7 @@ export async function readSettings(db: Db): Promise<SiteSettings> {
     offices: doc.offices ?? [],
     clientLogos: doc.clientLogos ?? [],
     social: { ...DEFAULTS.social, ...(doc.social ?? {}) },
+    seo: { ...DEFAULTS.seo, ...(doc.seo ?? {}) },
     updatedAt: doc.updatedAt,
     revision: doc.revision,
   };
@@ -132,6 +143,13 @@ export interface PublicSiteSettings {
   offices: Office[];
   clientLogos: ClientLogo[];
   social: Record<SocialPlatform, string>;
+  /*
+   * Public on purpose, and not an exception to the rule above. A verification
+   * token is meant to be read out of the page head by a crawler, and a Business
+   * Profile URL is a link the site publishes. Neither is a credential: the token
+   * proves nothing without control of the domain it was issued against.
+   */
+  seo: SeoSettings;
 }
 
 export async function readPublicSettings(db: Db): Promise<PublicSiteSettings> {
@@ -143,6 +161,7 @@ export async function readPublicSettings(db: Db): Promise<PublicSiteSettings> {
     offices: s.offices,
     clientLogos: s.clientLogos,
     social: s.social,
+    seo: s.seo,
   };
 }
 
@@ -188,6 +207,44 @@ const socialUrl = z.union([
   str().trim().max(300).regex(/^https:\/\/[^\s]+$/u, "https-url"),
 ]);
 
+/**
+ * The token, whether the owner pasted the token or the whole tag.
+ *
+ * Search Console hands you `<meta name="google-site-verification" content="AbC..." />`
+ * beside a copy button that copies all of it, so refusing that paste is
+ * refusing the exact thing the screen in front of them said to copy. The
+ * unwrap happens on the way in, once, rather than at every surface that has to
+ * render the value back.
+ *
+ * The shape after unwrapping is Google's own: URL-safe base64, no padding.
+ * Validating it is what stops a half-copied tag being stored as a token and
+ * silently failing verification for weeks.
+ */
+const googleVerification = z
+  .union([z.literal(""), str().trim().max(300)])
+  .transform((raw) => {
+    const tag = /content=["']([^"']+)["']/u.exec(raw);
+    return (tag ? tag[1] : raw).trim();
+  })
+  .refine((v) => v === "" || /^[A-Za-z0-9_-]{8,128}$/u.test(v), "verification-token");
+
+const SeoBody = z
+  .object({
+    googleVerification,
+    /* Same https-only rule as a social URL, for the same reason: it is rendered
+       as an outbound link and as a `sameAs` entry on the organisation record. */
+    googleBusinessProfileUrl: socialUrl,
+  })
+  /*
+   * NOT `.partial()`, unlike `social` below it, and the asymmetry is deliberate.
+   * A PATCH replaces the whole sub-object, so a partial send drops the siblings
+   * it did not name. On `social` that loses an icon and somebody notices the
+   * same day. Here it would drop the verification token, and the cost lands
+   * weeks later as an unverified property and a sitemap nobody is reading.
+   * Requiring both fields turns that into a 400 at the moment of the mistake.
+   */
+  .strict();
+
 const OfficeBody = z
   .object({
     label: str().min(1).max(80).trim(),
@@ -225,6 +282,7 @@ const UpdateBody = z
       .partial()
       .strict()
       .optional(),
+    seo: SeoBody.optional(),
   })
   .strict();
 

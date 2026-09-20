@@ -1,6 +1,6 @@
 import { formatMoney, payMonthLabel } from "./marketing";
 import type { Domain } from "./roles";
-import type { ClientLogo, Office } from "./types";
+import type { ClientLogo, Office, SeoSettings } from "./types";
 
 /**
  * What the site is currently getting wrong, said to the person who can fix it.
@@ -81,6 +81,15 @@ export interface SiteHealthSnapshot {
      * a price of zero and nothing else. It gets a URL, a 200 and an index entry.
      */
     incomplete: number;
+    /**
+     * Publicly reachable listings with no pasted Google Maps link.
+     *
+     * Not broken without one: the detail page falls back to searching the
+     * address. It is counted separately because the fallback resolves a street
+     * name and the link resolves the actual gate, and the reader who cannot
+     * tell those apart is the one who has never driven past.
+     */
+    withoutMap: number;
   };
   posts: {
     published: number;
@@ -97,6 +106,8 @@ export interface SiteHealthSnapshot {
     clientLogos: ClientLogo[];
     /** Profile URLs by platform. Empty means that icon is not drawn. */
     social: Record<string, string>;
+    /** The off-site search work. Empty fields are work nobody has done yet. */
+    seo: SeoSettings;
   };
   enquiries: {
     /** New and unanswered for more than two days. */
@@ -270,6 +281,29 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
     });
   }
 
+  /*
+   * THE OFF-SITE SEARCH WORK, and the two checks below are the first in this
+   * file whose fix is mostly done somewhere other than this console.
+   *
+   * They still obey rule 1, because what clears them is a real artifact rather
+   * than a promise: a token Google issues after it accepts the domain, a URL
+   * that resolves only once the map listing is verified. The settings screen is
+   * where that artifact is recorded, and recording it is what puts the tag in
+   * the page head and the link on the organisation record. A "mark as done"
+   * button would have cleared the same alert and changed nothing on the site.
+   */
+  if (settings.seo.googleBusinessProfileUrl.trim() === "") {
+    out.push({
+      id: "no-google-business-profile",
+      severity: "warning",
+      domain: null,
+      title: "You have no Google Business Profile",
+      message:
+        "Searching your name on a phone returns links with no map card, no call button and no directions, and that card is where most local property searches stop. Create the profile with Google, then paste its link here so the site can point at it.",
+      action: { label: "Link your profile", href: "/admin/settings" },
+    });
+  }
+
   {
     const unset = Object.entries(settings.social)
       .filter(([, url]) => url.trim() === "")
@@ -336,6 +370,36 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
           ? `Guides are what people read before they trust an agency with a house, and they are most of what brings a stranger in from a search. You have ${posts.draft} ${plural(posts.draft, "draft", "drafts")} waiting.`
           : "Guides are what people read before they trust an agency with a house, and they are most of what brings a stranger in from a search. Three is enough to stop the page reading as abandoned.",
       action: { label: "Write a post", href: "/admin/posts" },
+    });
+  }
+
+  /*
+   * Advisory rather than warning, by this file's own headings: no visitor
+   * experiences this one. It is the instrument rather than the thing measured,
+   * and it earns its place because a site selling to people who are not in the
+   * country is found almost entirely through search.
+   */
+  if (settings.seo.googleVerification.trim() === "") {
+    out.push({
+      id: "no-search-console",
+      severity: "advisory",
+      domain: null,
+      title: "Search Console is not connected",
+      message:
+        "Nothing tells you which searches reach the site, which pages Google refused to index, or whether it has ever read your sitemap, so every decision about being found is a guess. Verify the site with Google, then paste the code it gives you here.",
+      action: { label: "Paste the code", href: "/admin/settings" },
+    });
+  }
+
+  if (listings.withoutMap > 0) {
+    out.push({
+      id: "listings-without-map",
+      severity: "advisory",
+      domain: "listings",
+      title: `${listings.withoutMap} live ${plural(listings.withoutMap, "listing has", "listings have")} no map link`,
+      message:
+        "The detail page falls back to searching the address, which lands on the street rather than on the gate. Somebody in the country can drive past and check for themselves. Somebody buying from abroad has only what the page shows them.",
+      action: { label: "Add the map links", href: "/admin/properties" },
     });
   }
 

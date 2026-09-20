@@ -470,6 +470,42 @@ export interface ClientLogo {
   imageUrl: string;
 }
 
+/**
+ * The search work that happens off this site, recorded here because the site
+ * has no way to see it.
+ *
+ * EVERY FIELD IS AN ARTIFACT, never a checkbox. A verification token exists
+ * only after Google has accepted that you own the domain, and a Business
+ * Profile URL resolves only once the map listing is verified. Each one is
+ * rendered into a public page, so a value typed here is a value a crawler reads
+ * back, and an invented one fails somewhere visible rather than quietly marking
+ * a chore done.
+ *
+ * That is why these live in settings and not in a to-do list. The alerts in
+ * `site-health.ts` may not describe work the console cannot clear, and this is
+ * the console clearing it.
+ */
+export interface SeoSettings {
+  /**
+   * The `content` of the google-site-verification tag, without the tag around
+   * it. Pasting the whole tag is accepted and unwrapped on save, because that
+   * is what Google's own copy button puts on the clipboard.
+   *
+   * Empty means Search Console has never been connected, so nothing reports
+   * which searches reach the site, which pages failed to index, or whether the
+   * sitemap has ever been read.
+   */
+  googleVerification: string;
+  /**
+   * The public Google Business Profile URL, which is also the agency's entry in
+   * `sameAs` on the organisation record the site publishes.
+   *
+   * Empty means no map result and no knowledge panel, and local property search
+   * mostly starts and finishes there.
+   */
+  googleBusinessProfileUrl: string;
+}
+
 export interface SiteSettings {
   replyIdentity: ReplyIdentity;
   /** The name used when `replyIdentity` is `team`. */
@@ -497,6 +533,8 @@ export interface SiteSettings {
    * same broken promise as the placeholder phone number.
    */
   social: Record<SocialPlatform, string>;
+  /** See SeoSettings. All empty is the shape of a site nobody has listed yet. */
+  seo: SeoSettings;
   updatedAt: number;
   revision: number;
 }

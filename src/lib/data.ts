@@ -5,6 +5,7 @@ import type {
   Page,
   PriceChange,
   Property,
+  SeoSettings,
   SiteStat,
   Testimonial,
 } from "@avhomes/contracts";
@@ -245,6 +246,7 @@ export interface PublicSettings {
   offices: Office[];
   clientLogos: ClientLogo[];
   social: Record<SocialPlatform, string>;
+  seo: SeoSettings;
 }
 
 /**
@@ -263,6 +265,7 @@ const NO_SETTINGS: PublicSettings = {
   offices: [],
   clientLogos: [],
   social: { linkedin: "", instagram: "", facebook: "", x: "" },
+  seo: { googleVerification: "", googleBusinessProfileUrl: "" },
 };
 
 export async function getSiteSettings(): Promise<PublicSettings> {
