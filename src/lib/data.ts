@@ -268,14 +268,36 @@ const NO_SETTINGS: PublicSettings = {
   seo: { googleVerification: "", googleBusinessProfileUrl: "" },
 };
 
+/**
+ * The settings as they arrive, which is not always the settings as typed.
+ *
+ * `seo` is optional HERE and required on `PublicSettings`, and the gap between
+ * those two lines is one deployment. A Vercel build fetches its own PRODUCTION
+ * ALIAS for page data, and that alias still answers from the previous
+ * deployment while the new one is being built, so the first build after a field
+ * is added reads an API that has never heard of it. This is the boundary being
+ * honest about the one moment the wire type cannot hold.
+ *
+ * It has already cost a deployment once, when `mapUrl` was added: see 5165b42.
+ * It is worse for this field than for that one, because the only reader is the
+ * marketing layout, and a TypeError in a layout takes every page under it down
+ * rather than one route.
+ *
+ * CI cannot catch it. The workflow builds with no environment at all, so every
+ * read falls back to the bundled defaults below, which do carry the field.
+ */
+type WireSettings = Omit<PublicSettings, "seo"> & { seo?: Partial<SeoSettings> };
+
 export async function getSiteSettings(): Promise<PublicSettings> {
-  const payload = await apiGet<{ settings: PublicSettings }>(
+  const payload = await apiGet<{ settings: WireSettings }>(
     "/settings",
     { settings: NO_SETTINGS },
     { settings: NO_SETTINGS },
     { revalidate: DETAIL_REVALIDATE, tags: ["settings"] },
   );
-  return payload.settings;
+  // Spread over the defaults rather than substituted for them, so a payload
+  // carrying one of the two fields keeps it and an absent one reads as not set.
+  return { ...payload.settings, seo: { ...NO_SETTINGS.seo, ...payload.settings.seo } };
 }
 
 /** `wa.me/<digits>` with the enquiry already typed, or null when unset. */
