@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { estateSummary, getEstates, getProperties, isEstate, prototypeLabel } from "@/lib/data";
-import { ESTATE_TYPE, ListingType, Property, PropertyStatus, PropertyType } from "@/lib/types";
-import PropertyCard from "@/components/PropertyCard";
+import { estateSummary, getListingUniverse, isEstate, prototypeLabel } from "@/lib/data";
+import { ESTATE_TYPE, ListingType, PropertyStatus, PropertyType } from "@/lib/types";
+import { placesWithStock } from "@/lib/places";
 import CategoryChips from "@/components/CategoryChips";
 import FilterBar from "@/components/FilterBar";
-import Reveal from "@/components/Reveal";
+import ListingGrid from "@/components/ListingGrid";
 
 export const metadata = {
   title: "Property for Sale and Rent in Nigeria | AVHomes",
@@ -57,10 +57,10 @@ export default async function ListingsPage({
   searchParams: Promise<Search>;
 }) {
   const sp = await searchParams;
-  const [latest, estateRows] = await Promise.all([getProperties(), getEstates()]);
-  // The main read is the newest 48 of everything, so estates past it come from their own read.
-  const seen = new Set(latest.map((p) => p.id));
-  const all = [...latest, ...estateRows.filter((p) => !seen.has(p.id))];
+  // The merge of the two reads, shared with the place pages and the sitemap so
+  // none of them can end up knowing about a listing the others do not.
+  const all = await getListingUniverse();
+  const places = placesWithStock(all);
 
   const filtered = all.filter((p) => {
     if (sp.q) {
@@ -158,27 +158,40 @@ export default async function ListingsPage({
         ) : (
           <ListingGrid properties={filtered} priorityCount={3} className="mt-10" />
         )}
+
+        {/* The route in to the place pages, from the one listings page everybody
+            already reaches. Without a link from here they are in the sitemap and
+            nowhere else, which is a set of pages a crawler is told about and
+            never walked to. */}
+        {places.length > 0 && (
+          <section className="mt-16 border-t border-mist-200 pt-10">
+            <h2 className="text-lg font-bold tracking-tight text-plum-950">Browse by area</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Everywhere we have something on the market right now.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {places.slice(0, 12).map((place) => (
+                <Link
+                  key={place.slug}
+                  href={`/listings/in/${place.slug}`}
+                  className="rounded-full border border-mist-200 bg-white px-4 py-2 text-sm text-plum-950 transition-colors hover:border-wine-500 hover:text-wine-700"
+                >
+                  {place.name}
+                  <span className="ml-1.5 text-slate-600">{place.count}</span>
+                </Link>
+              ))}
+            </div>
+            {places.length > 12 && (
+              <Link
+                href="/listings/in"
+                className="mt-6 inline-flex text-sm font-semibold text-wine-600 transition-colors hover:text-wine-700"
+              >
+                All {places.length} areas
+              </Link>
+            )}
+          </section>
+        )}
       </div>
     </>
-  );
-}
-
-function ListingGrid({
-  properties,
-  priorityCount,
-  className,
-}: {
-  properties: Property[];
-  priorityCount: number;
-  className: string;
-}) {
-  return (
-    <div className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${className}`}>
-      {properties.map((p, i) => (
-        <Reveal key={p.id} delay={(i % 3) * 80}>
-          <PropertyCard property={p} priority={i < priorityCount} />
-        </Reveal>
-      ))}
-    </div>
   );
 }

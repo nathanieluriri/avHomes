@@ -154,6 +154,22 @@ export async function getEstates(): Promise<Property[]> {
   return page.items.map(complete);
 }
 
+/**
+ * Everything a visitor can reach, in one list.
+ *
+ * The main read is the newest 48 and estates have a read of their own, so an
+ * estate older than the 48th listing is missing from the first and present in
+ * the second. The listings index has merged the two since it was written; this
+ * is that merge moved somewhere the place pages and the sitemap can share it.
+ * A place page built from a narrower list than the grid it was reached from
+ * loses listings for no reason a reader could ever work out.
+ */
+export async function getListingUniverse(): Promise<Property[]> {
+  const [latest, estates] = await Promise.all([getProperties(), getEstates()]);
+  const seen = new Set(latest.map((p) => p.id));
+  return [...latest, ...estates.filter((p) => !seen.has(p.id))];
+}
+
 export interface PropertyDetail {
   property: Property;
   similar: Property[];

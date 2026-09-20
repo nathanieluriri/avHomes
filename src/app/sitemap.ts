@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 
 import { SITE_DOMAIN } from "@/lib/api-config";
-import { getProperties } from "@/lib/data";
+import { getListingUniverse } from "@/lib/data";
+import { placesWithStock } from "@/lib/places";
 import { listPosts } from "@/lib/blog/client";
 
 /**
@@ -50,11 +51,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
    * an empty array. The sitemap could never have contained a single post, and
    * nothing said so: the journal is empty today, so the hole was invisible.
    */
-  const [properties, posts] = await Promise.all([getProperties(), listPosts(100)]);
+  /*
+   * `getListingUniverse`, not `getProperties`. The plain read is the newest 48
+   * and estates have their own, so an estate older than the 48th listing was
+   * absent from this file entirely: it had a detail page, a URL anybody could
+   * share, and no entry in the crawl map.
+   */
+  const [properties, posts] = await Promise.all([getListingUniverse(), listPosts(100)]);
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${SITE_DOMAIN}/`, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_DOMAIN}/listings`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${SITE_DOMAIN}/listings/in`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_DOMAIN}/posts`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${SITE_DOMAIN}/contact`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_DOMAIN}/terms`, changeFrequency: "yearly", priority: 0.1 },
@@ -81,5 +89,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...listings, ...journal];
+  /*
+   * One entry per place that has stock, derived from the SAME rows as the
+   * listings above. A crawl map that names a place page the site would answer
+   * 404 for is worse than one that names none: see `placesWithStock`, which is
+   * also what decides the pages exist at all.
+   */
+  const places: MetadataRoute.Sitemap = placesWithStock(properties).map((place) => ({
+    url: `${SITE_DOMAIN}/listings/in/${place.slug}`,
+    changeFrequency: "weekly" as const,
+    // Broader than a listing and narrower than the index it sits under. A place
+    // page outranking the listing it is trying to send people to helps nobody.
+    priority: 0.7,
+  }));
+
+  return [...staticPages, ...places, ...listings, ...journal];
 }
