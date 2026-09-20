@@ -724,7 +724,7 @@ export async function recordSale(
     await ledger(db).insertMany(lines);
   }
 
-  await accrue({
+  await accrue(db, {
     dealId,
     currency: input.currency,
     shares: split.funds,
@@ -936,19 +936,26 @@ export interface ReviewInput {
 /**
  * Where a deal's fund shares go. Injected, because @avhomes/funds owns them and
  * a feature package may not import another.
+ *
+ * Takes `db` first, matching the `notify` port this package already receives, so
+ * the composition root can pass the funds function itself rather than wrapping it
+ * in a closure over a connection it does not have yet.
  */
 export interface FundAccrual {
-  (input: {
-    dealId: string;
-    currency: string;
-    shares: readonly FundShare[];
-    byName: string;
-  }): Promise<void>;
+  (
+    db: Db,
+    input: {
+      dealId: string;
+      currency: string;
+      shares: readonly FundShare[];
+      byName: string;
+    },
+  ): Promise<void>;
 }
 
 /** The reverse, for a deal that fell through. Returns how many entries it wrote. */
 export interface FundReversal {
-  (input: { dealId: string; byName: string; note: string }): Promise<number>;
+  (db: Db, input: { dealId: string; byName: string; note: string }): Promise<number>;
 }
 
 /**
@@ -1072,7 +1079,7 @@ export async function reviewDeal(
    * would notice. Idempotent because the fix for the first case is to run this
    * again.
    */
-  await accrue({
+  await accrue(db, {
     dealId: id,
     currency: doc.currency,
     shares: split.funds,
@@ -1177,7 +1184,7 @@ export async function cancelDeal(
    * is re-runnable: `reverseForDeal` nets what the deal has already moved, so a
    * deal reversed once nets to zero and a second call writes nothing.
    */
-  await reverse({
+  await reverse(db, {
     dealId: id,
     byName: actor.name,
     note: reason || "Deal cancelled",

@@ -27,6 +27,7 @@ import {
   FURNISHINGS,
   LISTING_TYPES,
   PROPERTY_STATUSES,
+  OWNERSHIPS,
   PROPERTY_TYPES,
   PROTOTYPE_KINDS,
   PROTOTYPES_MAX,
@@ -55,7 +56,7 @@ import {
   type Testimonial,
 } from "@avhomes/contracts";
 import { requireAdmin, requireAuth } from "@avhomes/identity";
-import { assertAuthorized } from "../authorize";
+import { assertAuthorized, isScopedCaller } from "../authorize";
 import { expandMapLink } from "../maps";
 import {
   LISTING_KINDS,
@@ -177,6 +178,15 @@ const PatchBody = z
       })
       .strict(),
     agentUserId: str().max(120).nullable(),
+    /*
+     * Whose property this is. Editable by staff, because an agent listing an
+     * outside owner's house is the case the field exists for, and IGNORED for a
+     * scoped caller: see the handler, which drops it rather than refusing, so a
+     * partner saving the form does not meet an error about a control they were
+     * never shown.
+     */
+    ownership: z.enum(OWNERSHIPS),
+    ownerLabel: str().max(160),
   })
   .partial()
   .strict();
@@ -251,7 +261,13 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       type: q.type,
       listingType: q.listingType,
       q: q.q,
-      agentUserId: q.mine === "1" ? user.id : undefined,
+      /*
+       * A scoped role is pinned to its own rows whatever `mine` says. `mine` is a
+       * convenience for staff; this is a boundary, so it wins, and it is applied
+       * as a FILTER rather than by dropping rows after the fetch: a filtered page
+       * would come back short and read as the end of the list.
+       */
+      agentUserId: isScopedCaller(user) ? user.id : q.mine === "1" ? user.id : undefined,
       includeHidden: true,
       // The console's box is a filter that narrows as an operator types, not
       // the site's whole-word search. See `substring` in the repo for the
@@ -272,6 +288,13 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     const property = await createProperty(db, {
       title,
       type,
+      /*
+       * A partner account can only ever create partner property, decided here and
+       * not offered as a field. Everyone else gets AV Homes' own by default and
+       * changes it on the form, where an agent listing an outside owner's house
+       * says so deliberately.
+       */
+      ownership: isScopedCaller(user) ? "partner" : "av",
       agentUserId: user.id,
       // Seeded from the creating account so a new listing is never agent-less on
       // screen. Every field stays editable afterwards.
@@ -292,6 +315,11 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     const id = pathParam(c, "id");
     const property = await getPropertyById(await currentDb(c), id);
     if (!property) throw new NotFoundError(`property ${id}`);
+    /* A scoped caller asking for somebody else's listing gets the same answer as
+       for an id that does not exist. `authorize` decides it; this is the one read
+       route where that matters, because the id came from the URL rather than from
+       a list this caller was allowed to see. */
+    assertAuthorized(property, currentUser(c), "read");
     return c.json({ property });
   });
 
@@ -306,6 +334,14 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     if (!current) throw new NotFoundError(`property ${id}`);
     auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, user, "write");
+
+    /* A scoped caller's listing is partner property by definition, so the two
+       ownership fields are dropped rather than refused: the form never showed
+       them, and a 400 about a control somebody cannot see is a dead end. */
+    if (isScopedCaller(user)) {
+      delete body.patch.ownership;
+      delete body.patch.ownerLabel;
+    }
 
     // The rules below judge `current`, so the write must land on exactly that
     // revision. Without this, a revision ahead of the read is checked against one
@@ -545,9 +581,50 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, currentUser(c), "write");
 
+    /*
+     * `close` does not happen here. It is reachable only through the recorded-sale
+     * flow, which supplies the amount, the buyer, the proof and who closed it, and
+     * leaving a bare status route open to it would be the exact hole that flow
+     * exists to close: a property off the market with no record of its sale.
+     */
+    if (operation === "close") {
+      throw new PreconditionFailedError("record_the_sale", {
+        propertyId: id,
+        detail: "Record the sale instead. A closed listing needs the amount, the buyer and proof.",
+      });
+    }
+
+    /*
+     * Everything except `submit` is a status decision, and a scoped role does not
+     * make those. A partner may hand a listing over and edit it; AV Homes decides
+     * when it is public.
+     */
+    if (operation !== "submit") {
+      assertAuthorized(current, currentUser(c), "status");
+    }
+
     // Refusals name the operation and the status, so a screen can say what is
     // wrong rather than printing a status code.
     assertTransition(current, operation);
+
+    /*
+     * The publish check runs on SUBMIT too, and that is the point of running it
+     * twice: a partner is told what is missing while they can still fix it, rather
+     * than after somebody at AV Homes opens their listing and sends it back.
+     */
+    if (operation === "submit") {
+      const blockers = listingPublishBlockers(current);
+      if (blockers.length > 0) {
+        throw new PreconditionFailedError("not_ready", {
+          propertyId: id,
+          blockers,
+          detail:
+            blockers.length === 1
+              ? blockers[0].message
+              : `This listing is not ready to send: ${blockers.map((b) => b.field).join(", ")}.`,
+        });
+      }
+    }
     /*
      * `publish` is the ONLY transition that carries a listing from a private
      * status into a public one, because TRANSITIONS enforces where each op may

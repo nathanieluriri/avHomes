@@ -21,7 +21,13 @@ import {
   teamRoutes,
 } from "@avhomes/identity";
 import { auditRoutes, auditTrail } from "@avhomes/audit";
-import { listProperties, listingsAdminRoutes, listingsPublicRoutes } from "@avhomes/listings";
+import {
+  closeWithSale,
+  listProperties,
+  listingFacts,
+  listingsAdminRoutes,
+  listingsPublicRoutes,
+} from "@avhomes/listings";
 import { contentAdminRoutes, contentPublicRoutes } from "@avhomes/content";
 import {
   cloudinaryStorage,
@@ -42,9 +48,10 @@ import {
   marketingAppRoutes,
   marketingPublicRoutes,
   readMarketingSettings,
+  type MarketingDeps,
   type RecentListing,
 } from "@avhomes/marketing";
-import { fundsRoutes } from "@avhomes/funds";
+import { accrueForDeal, fundsRoutes, reverseForDeal } from "@avhomes/funds";
 import { dashboardRoutes } from "./dashboard";
 import { healthRoutes } from "./health";
 import { tutorialsRoutes } from "./tutorials";
@@ -146,6 +153,30 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     const settings = await readMarketingSettings(db);
     return { reward: settings.rewardPoolName, foundation: settings.foundationName };
   };
+
+  /*
+   * THE CROSSINGS THE MONEY PATH NEEDS, all one-directional, all wired here
+   * because this is the only file allowed to know both halves of a seam.
+   *
+   *   marketing -> funds      a settled deal's two fund shares, and their reversal
+   *   marketing -> listings   whose property it is, and closing it once sold
+   *   funds     -> marketing  crediting a prize winner through the pay run
+   *
+   * `listingFacts` is the load-bearing one. It is how `ownership` reaches a
+   * commission calculation without ever passing through a request body, which is
+   * what stops the person being paid from choosing their own rate.
+   */
+  const marketingPorts = {
+    accrue: accrueForDeal,
+    reverseFunds: reverseForDeal,
+    listingFacts,
+    closeListing: async (
+      db: Db,
+      input: { listingId: string; dealId: string; actorId: string; actorName: string },
+    ) => {
+      await closeWithSale(db, { listingId: input.listingId, dealId: input.dealId });
+    },
+  } satisfies Partial<MarketingDeps>;
 
   /*
    * The image store, chosen by configuration rather than by which token happens
@@ -370,8 +401,17 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   /* The marketer app first, then the console's side of the same feature. The
      app's routes are the only admin-tier surface a marketer role can reach,
      which is why they live under /api/marketing and not /api/admin. */
-  app.route(API_PREFIX, marketingAppRoutes({ storage, sniff: sniffImage, notify, recentListings }));
-  app.route(API_PREFIX, marketingAdminRoutes());
+  app.route(
+    API_PREFIX,
+    marketingAppRoutes({
+      storage,
+      sniff: sniffImage,
+      notify,
+      recentListings,
+      ...marketingPorts,
+    }),
+  );
+  app.route(API_PREFIX, marketingAdminRoutes({ notify, ...marketingPorts }));
   /* The funds sit beside marketing because that is what feeds them, and they take
      their display names from marketing's settings as a port rather than an
      import: a renameable label is not a reason for one feature package to know
