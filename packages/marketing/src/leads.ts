@@ -27,9 +27,16 @@ import {
   type LeadUnit,
   type Marketer,
   type MarketingSettings,
+  type Ownership,
 } from "@avhomes/contracts";
 import { toLead, type DealDoc, type LeadDoc } from "./schema";
-import { cancelDeal, createDeal, reviewDeal } from "./repo";
+import {
+  cancelDeal,
+  createDeal,
+  reviewDeal,
+  type FundAccrual,
+  type FundReversal,
+} from "./repo";
 
 function leads(db: Db) {
   return collection<LeadDoc>(db, COLLECTIONS.marketingLeads);
@@ -177,6 +184,7 @@ export async function moveLead(
   to: LeadState,
   detail: { reason: string; note: string },
   actor: LeadActor,
+  reverse: FundReversal,
 ): Promise<Lead> {
   const doc = await leads(db).findOne({ _id: id });
   if (!doc) throw new NotFoundError(`lead ${id}`);
@@ -201,10 +209,13 @@ export async function moveLead(
      been paid and writes a negative line against what has, so this reuses it
      rather than restating the rule a second time and getting it subtly wrong. */
   if (doc.state === "won" && doc.dealId) {
-    await cancelDeal(db, doc.dealId, `${detail.reason}. ${detail.note}`, {
-      id: actor.id,
-      name: actor.name,
-    });
+    await cancelDeal(
+      db,
+      doc.dealId,
+      `${detail.reason}. ${detail.note}`,
+      { id: actor.id, name: actor.name },
+      reverse,
+    );
   }
 
   return append(db, doc, to, detail, actor);
@@ -236,6 +247,8 @@ export interface WinInput {
   closedOn: number;
   reason: string;
   note: string;
+  /** Whose property it is, which decides the rate. Read off the listing by the route. */
+  ownership: Ownership;
 }
 
 /**
@@ -254,6 +267,7 @@ export async function winLead(
   reporter: Marketer,
   actor: LeadActor,
   settings: MarketingSettings,
+  accrue: FundAccrual,
 ): Promise<{ lead: Lead; dealId: string }> {
   const doc = await leads(db).findOne({ _id: id });
   if (!doc) throw new NotFoundError(`lead ${id}`);
@@ -305,6 +319,7 @@ export async function winLead(
       proof: [],
       note: `From a buyer ${reporter.displayName} logged. ${input.note}`.trim(),
       closedOn: input.closedOn,
+      ownership: input.ownership,
       leadId: id,
     },
     settings,
@@ -335,6 +350,7 @@ export async function winLead(
         actorName: actor.name,
       },
       settings,
+      accrue,
     );
   } catch (err) {
     await dropUnapprovedDeal(db, deal.id);
