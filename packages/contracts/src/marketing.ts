@@ -512,8 +512,17 @@ export function splitFor(
   return matrix[ownership][kind];
 }
 
+/**
+ * The three PERSON levels, nearest first.
+ *
+ * Still its own type because it is still its own idea: the chain walk takes three
+ * rates, and so does every screen that says "5 / 2 / 1". What it no longer is, is
+ * the whole split, and `CommissionSplit` is now that.
+ */
+export type CommissionRates = [number, number, number];
+
 /** The three person levels, nearest first, for the chain walk. */
-export function personRates(split: CommissionSplit): [number, number, number] {
+export function personRates(split: CommissionSplit): CommissionRates {
   return [split.level1, split.level2, split.level3];
 }
 
@@ -767,8 +776,21 @@ export function splitDeal(
  * decision and `splitFor` is the only way to make it.
  */
 export function previewEarning(amountMinor: number, split: CommissionSplit): number {
+  return earningAtRate(amountMinor, split.level1);
+}
+
+/**
+ * The same sum for a caller holding a bare rate rather than a cell.
+ *
+ * The marketer app is that caller: the API hands it the three person rates per
+ * ownership class, already resolved, because a phone has no business holding the
+ * whole matrix. Rounding is identical, so the app and the server never quote two
+ * different numbers for one listing.
+ */
+export function earningAtRate(amountMinor: number, rate: number): number {
   if (!Number.isFinite(amountMinor) || amountMinor <= 0) return 0;
-  return Math.floor((amountMinor * split.level1) / 100);
+  if (!Number.isFinite(rate) || rate <= 0) return 0;
+  return Math.floor((amountMinor * rate) / 100);
 }
 
 /** `2026-09` for the month a timestamp falls in, in the server's own zone. */

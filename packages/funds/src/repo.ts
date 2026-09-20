@@ -23,7 +23,6 @@ import {
   disbursementRefusal,
   emptyFundBalance,
   quarterFinished,
-  quarterRange,
   type FundBalance,
   type FundEntry,
   type FundKind,
@@ -215,14 +214,23 @@ export async function listFundEntries(
 
 /* ═════════════════════════════════════════════════════════════════ ACCRUAL ══ */
 
-/** What marketing hands over when a deal settles. Injected at the root. */
+/**
+ * What marketing hands over when a deal settles. Injected at the root.
+ *
+ * Takes `db` first, so `accrueForDeal` itself satisfies it and the composition
+ * root passes the function rather than a wrapper. A port type that does not match
+ * its own implementation is a trap for whoever wires the next one.
+ */
 export interface FundAccrualPort {
-  (input: {
-    dealId: string;
-    currency: string;
-    shares: readonly FundShare[];
-    byName: string;
-  }): Promise<void>;
+  (
+    db: Db,
+    input: {
+      dealId: string;
+      currency: string;
+      shares: readonly FundShare[];
+      byName: string;
+    },
+  ): Promise<void>;
 }
 
 /**
@@ -327,7 +335,7 @@ export async function reverseForDeal(
 
 /** The reverse port, as marketing receives it. */
 export interface FundReversalPort {
-  (input: { dealId: string; byName: string; note: string }): Promise<number>;
+  (db: Db, input: { dealId: string; byName: string; note: string }): Promise<number>;
 }
 
 /* ═════════════════════════════════════════════════════════════════ SPENDING ══ */

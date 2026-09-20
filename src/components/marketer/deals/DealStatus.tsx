@@ -2,7 +2,7 @@
 
 import {
   DEAL_STATUS_LABEL,
-  previewEarning,
+  earningAtRate,
   type CommissionRates,
   type DealKind,
   type DealShare,
@@ -47,7 +47,7 @@ export function couldEarn(
 ): { minor: number; rate: number } | null {
   if (!rates) return null;
   const table = rates[kind];
-  return { minor: previewEarning(amountMinor, table), rate: table[0] };
+  return { minor: earningAtRate(amountMinor, table[0]), rate: table[0] };
 }
 
 /** Where a share came from, in the marketer's own words. */

@@ -77,11 +77,26 @@ type PropertySeed = Omit<
   | "seoDescription"
   | "previousSlugs"
   | "mapUrl"
+  /* The fixtures are AV Homes' own stock and none of them has sold through the
+     recorded-sale flow, so all three are supplied by the mapper below rather than
+     restated on twenty seeds. A seed that wants to demonstrate a Non-AV listing
+     sets `ownership` through the Partial<Pick> beneath. */
+  | "ownership"
+  | "ownerLabel"
+  | "closedDealId"
 > &
   Partial<
     Pick<
       Property,
-      "prototypes" | "paymentPlan" | "buildStage" | "titleDocument" | "furnishing" | "serviced" | "minStay"
+      | "prototypes"
+      | "paymentPlan"
+      | "buildStage"
+      | "titleDocument"
+      | "furnishing"
+      | "serviced"
+      | "minStay"
+      | "ownership"
+      | "ownerLabel"
     >
   > & {
   /** Naira. Ignored on an estate, whose price is derived from its prototypes. */
@@ -793,6 +808,15 @@ function toProperty(seed: PropertySeed): Property {
     // No fixture carries a pin, so the map falls back to the address, which is
     // exactly what a real listing with no link does.
     mapUrl: "",
+    /* AV Homes' own unless a seed says otherwise, which is what the real database
+       says about every listing that predates the field. */
+    ownership: seed.ownership ?? "av",
+    ownerLabel: seed.ownerLabel ?? "",
+    /* No fixture sold through the recorded-sale flow, so a "Sold" seed carries no
+       deal. That is honest rather than convenient: the listing page reads this to
+       decide whether it can show the sale, and a fabricated id would point at a
+       deal nobody can open. */
+    closedDealId: null,
     agentUserId: null,
     createdAt: published,
     updatedAt: published,

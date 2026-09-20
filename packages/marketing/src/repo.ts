@@ -31,7 +31,6 @@ import {
   splitFor,
   type ChainMember,
   type CloserKind,
-  type CommissionSplit,
   type Deal,
   type DealKind,
   type DealShare,

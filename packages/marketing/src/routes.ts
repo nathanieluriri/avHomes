@@ -136,7 +136,6 @@ import {
   previewSplit,
   reconcile,
   recordSale,
-  recordSaleRefusal,
   findClosers,
   settledAwaitingClose,
   type FundAccrual,
@@ -723,7 +722,9 @@ const noReversal: FundReversal = async () => 0;
 
 export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
-  const accrue = deps.accrue ?? noAccrual;
+  /* Only the reversal, because nothing a marketer does from the app settles money:
+     they report a deal and an admin approves it. Leaving a lead is the one write
+     here that can un-mint a settled one. */
   const reverseFunds = deps.reverseFunds ?? noReversal;
 
   /** Everything the app's home screen needs, in one read. */

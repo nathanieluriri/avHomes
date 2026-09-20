@@ -33,6 +33,9 @@ const ENTITY_NOUN: Record<AuditEntity, string> = {
   lead: "potential buyer",
   payrun: "pay run",
   update: "marketer update",
+  fund: "fund",
+  award: "prize",
+  application: "partner application",
   unknown: "record",
 };
 
@@ -56,6 +59,9 @@ export const ENTITY_FILTER_LABEL: Record<AuditEntity, string> = {
   lead: "Potential buyers",
   payrun: "Pay runs",
   update: "Marketer updates",
+  fund: "Funds",
+  award: "Prizes",
+  application: "Partner applications",
   unknown: "Other",
 };
 

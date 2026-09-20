@@ -1,6 +1,6 @@
 "use client";
 
-import { previewEarning, type MarketerBalance } from "@avhomes/contracts";
+import { earningAtRate, type MarketerBalance } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import type { DealsResponse, MeResponse } from "./api";
@@ -32,13 +32,13 @@ export function useIfApproved(
   );
 
   if (balance === null || rates === null) return null;
-  if (!perDeal) return previewEarning(balance.pendingMinor, rates.sale);
+  if (!perDeal) return earningAtRate(balance.pendingMinor, rates.sale[0]);
   if (deals.data) {
     return deals.data.items
       .filter((deal) => deal.status === "pending")
-      .reduce((sum, deal) => sum + previewEarning(deal.amountMinor, rates[deal.listingType]), 0);
+      .reduce((sum, deal) => sum + earningAtRate(deal.amountMinor, rates[deal.listingType][0]), 0);
   }
   // After a failed deals read, the nearest honest figure, as on the Money screen.
-  if (deals.error) return previewEarning(balance.pendingMinor, rates.sale);
+  if (deals.error) return earningAtRate(balance.pendingMinor, rates.sale[0]);
   return null;
 }
