@@ -30,6 +30,8 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
          href="#". The two guides are worth writing, and when they are they are
          posts, which is where this points. */
       { label: "Guides", href: "/posts" },
+      { label: "Buying from abroad", href: "/buying-from-abroad" },
+      { label: "Browse by area", href: "/listings/in" },
     ],
   },
   {

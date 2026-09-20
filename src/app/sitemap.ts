@@ -63,6 +63,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_DOMAIN}/`, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_DOMAIN}/listings`, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_DOMAIN}/listings/in`, changeFrequency: "weekly", priority: 0.7 },
+    // High for a static page, and deliberately. It is the only page on the site
+    // written for the market the site is actually aimed at.
+    { url: `${SITE_DOMAIN}/buying-from-abroad`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_DOMAIN}/posts`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${SITE_DOMAIN}/contact`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_DOMAIN}/terms`, changeFrequency: "yearly", priority: 0.1 },

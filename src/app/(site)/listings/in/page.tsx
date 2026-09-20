@@ -79,6 +79,12 @@ export default async function AreasPage() {
             something on the market today. Every one of them is a place we have actually been to,
             because nothing reaches this list until a listing in it does.
           </p>
+          <Link
+            href="/buying-from-abroad"
+            className="mt-6 inline-flex text-sm font-semibold text-wine-600 transition-colors hover:text-wine-700"
+          >
+            Buying from another country?
+          </Link>
         </div>
       </section>
 
