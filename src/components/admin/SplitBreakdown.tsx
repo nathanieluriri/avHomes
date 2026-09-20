@@ -24,6 +24,7 @@ export function SplitBreakdown({
   open,
   onToggle,
   heading = "Where this money goes",
+  spotlight,
 }: {
   amountMinor: number;
   currency: string;
@@ -35,6 +36,8 @@ export function SplitBreakdown({
   open?: boolean;
   onToggle?: () => void;
   heading?: string;
+  /** A tutorial anchor, rendered as `data-spotlight` on whichever state is drawn. */
+  spotlight?: string;
 }) {
   const paidOut =
     people.reduce((sum, share) => sum + share.amountMinor, 0) +
@@ -51,6 +54,7 @@ export function SplitBreakdown({
     return (
       <button
         type="button"
+        data-spotlight={spotlight}
         onClick={onToggle}
         aria-expanded={false}
         className="c-tap flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] text-slate-600 transition-colors hover:bg-mist-50"
@@ -63,7 +67,7 @@ export function SplitBreakdown({
   }
 
   return (
-    <div className="rounded-xl bg-mist-50 p-3">
+    <div data-spotlight={spotlight} className="rounded-xl bg-mist-50 p-3">
       <button
         type="button"
         onClick={onToggle}

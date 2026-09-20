@@ -4,15 +4,48 @@
     "path": "/admin/properties?spotlight=list-an-estate",
     "viewport": "desktop",
     "steps": [
-      { "wait": 1600, "shot": "01-start" },
-      { "click": "::-p-xpath(//button[normalize-space()='New listing'])", "wait": 900, "shot": "02-name" },
-      { "click": "::-p-xpath(//div[@role='group'][@aria-label='Kind of listing']//button[normalize-space()='Estate'])", "wait": 500 },
-      { "type": "Idu Grove Estate", "wait": 300 },
-      { "click": "::-p-xpath(//form//button[@type='submit'])", "wait": 3000, "shot": "03-type" },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "04-options" },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "05-plan" },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "06-where" },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "07-photos" }
+      {
+        "wait": 1600,
+        "shot": "01-start"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='New listing'])",
+        "wait": 900,
+        "shot": "02-name"
+      },
+      {
+        "click": "::-p-xpath(//div[@role='group'][@aria-label='Kind of listing']//button[normalize-space()='Estate'])",
+        "wait": 500
+      },
+      {
+        "type": "Idu Grove Estate",
+        "wait": 300
+      },
+      {
+        "click": "::-p-xpath(//form//button[@type='submit'])",
+        "wait": 3000,
+        "shot": "03-type"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1200,
+        "shot": "04-options"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1200,
+        "shot": "05-plan"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1200,
+        "shot": "06-where"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1200,
+        "shot": "07-photos"
+      }
     ]
   },
   {
@@ -20,15 +53,255 @@
     "path": "/admin/marketers/buyers?spotlight=follow-a-buyer",
     "viewport": "desktop",
     "steps": [
-      { "wait": 1600, "shot": "01-row" },
-      { "click": "::-p-text(Ifeoma Nwosu)", "wait": 2500, "shot": "02-timeline" },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1000, "shot": "03-move" },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1000, "shot": "04-reason" },
-      { "click": "::-p-xpath(//button[normalize-space()='Reached them'])", "wait": 600 },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1000, "shot": "05-note" },
-      { "click": "::-p-xpath(//label[.//span[normalize-space()='What happened']]//textarea)", "wait": 300 },
-      { "type": "Called her this morning, viewing booked for Saturday.", "wait": 500 },
-      { "click": "::-p-xpath(//button[normalize-space()='Next'])", "wait": 1200, "shot": "06-move-it" }
+      {
+        "wait": 1600,
+        "shot": "01-row"
+      },
+      {
+        "click": "::-p-text(Ifeoma Nwosu)",
+        "wait": 2500,
+        "shot": "02-timeline"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1000,
+        "shot": "03-move"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1000,
+        "shot": "04-reason"
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Reached them'])",
+        "wait": 600
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1000,
+        "shot": "05-note"
+      },
+      {
+        "click": "::-p-xpath(//label[.//span[normalize-space()='What happened']]//textarea)",
+        "wait": 300
+      },
+      {
+        "type": "Called her this morning, viewing booked for Saturday.",
+        "wait": 500
+      },
+      {
+        "click": "::-p-xpath(//button[normalize-space()='Next'])",
+        "wait": 1200,
+        "shot": "06-move-it"
+      }
+    ]
+  },
+  {
+    "name": "wt-record-a-sale",
+    "path": "/admin/properties?status=live&spotlight=record-a-sale",
+    "viewport": "desktop",
+    "steps": [
+      {
+        "wait": 1800,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "01-live-row"
+      },
+      {
+        "click": "::-p-xpath(//table//a[contains(@href,'/admin/properties/')])",
+        "wait": 3000,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "02-picker"
+      },
+      {
+        "click": "::-p-xpath(//button[@data-spotlight='listing-publish'])",
+        "wait": 900,
+        "shot": "03-options"
+      },
+      {
+        "click": "::-p-xpath(//div[@role='option'][contains(.,'Record the sale')])",
+        "wait": 2200,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "04-ownership"
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 1000,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "05-amount"
+      }
+    ]
+  },
+  {
+    "name": "wt-record-a-sale-none",
+    "path": "/admin/properties?status=live&spotlight=record-a-sale",
+    "viewport": "desktop",
+    "mock": {
+      "GET /api/admin/properties": {
+        "items": [],
+        "nextCursor": null
+      }
+    },
+    "steps": [
+      {
+        "wait": 3600,
+        "eval": "(() => { const r = document.querySelector('[data-spotlight-root]'); return r ? r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 160) : 'NO CARD'; })()",
+        "shot": "01-nothing-live"
+      }
+    ]
+  },
+  {
+    "name": "wt-read-the-money",
+    "path": "/admin/analytics?spotlight=read-the-money",
+    "viewport": "desktop",
+    "steps": [
+      {
+        "wait": 1800,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "01-period"
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 900,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "02-tiles"
+      },
+      {
+        "click": "::-p-xpath(//button[@data-spotlight='analytics-transacted'])",
+        "wait": 1600,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "03-chart"
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 900,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "04-ownership"
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 900,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "05-funds"
+      },
+      {
+        "click": "::-p-xpath(//a[@data-spotlight='analytics-transactions-link'])",
+        "wait": 3200,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "06-filters"
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 1000,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "07-split"
+      },
+      {
+        "click": "::-p-xpath(//button[@data-spotlight='tx-split'])",
+        "wait": 1200,
+        "shot": "08-open"
+      }
+    ]
+  },
+  {
+    "name": "wt-read-the-money-none",
+    "path": "/admin/analytics?spotlight=read-the-money",
+    "viewport": "desktop",
+    "mock": {
+      "GET /api/admin/analytics/transactions": {
+        "period": {
+          "key": "30d",
+          "label": "Last 30 days",
+          "from": 0,
+          "to": 0,
+          "days": 30
+        },
+        "rows": [],
+        "nextCursor": null,
+        "totalValueMinor": 0,
+        "totalDeals": 0,
+        "currency": "NGN",
+        "fundNames": {
+          "reward": "Reward pool",
+          "foundation": "AV Foundation"
+        }
+      }
+    },
+    "steps": [
+      {
+        "wait": 1800
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 800
+      },
+      {
+        "click": "::-p-xpath(//button[@data-spotlight='analytics-transacted'])",
+        "wait": 1400
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 800
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 800
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 800
+      },
+      {
+        "click": "::-p-xpath(//a[@data-spotlight='analytics-transactions-link'])",
+        "wait": 3600
+      },
+      {
+        "eval": "(() => { const r = document.querySelector('[data-spotlight-root]'); return r ? r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 160) : 'NO CARD'; })()",
+        "shot": "01-no-deals"
+      }
+    ]
+  },
+  {
+    "name": "wt-spend-the-fund",
+    "path": "/admin/analytics/wallets?spotlight=spend-the-fund",
+    "viewport": "desktop",
+    "steps": [
+      {
+        "wait": 1800,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "01-holds"
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 900,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "02-history"
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 900,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "03-pay-out"
+      },
+      {
+        "click": "::-p-xpath(//button[@data-spotlight='fund-spend'])",
+        "wait": 2000,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "04-amount"
+      },
+      {
+        "click": "::-p-xpath(//label[@data-spotlight='spend-amount']//input)",
+        "wait": 300
+      },
+      {
+        "type": "250000",
+        "wait": 500
+      },
+      {
+        "click": "::-p-xpath(//div[@data-spotlight-root]//button[normalize-space()='Next'])",
+        "wait": 900,
+        "eval": "(() => { const c = document.querySelector('[data-spotlight-root] section[aria-label=\"Tutorial\"]'); return c ? [c.querySelector('p').textContent.trim(), c.querySelector('h2').textContent.trim()] : 'no card'; })()",
+        "shot": "05-what-for"
+      }
     ]
   }
 ]

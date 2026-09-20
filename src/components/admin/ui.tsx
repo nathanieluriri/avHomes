@@ -763,6 +763,7 @@ export function EmptyState({
   action,
   art,
   bare = false,
+  spotlight,
 }: {
   title: string;
   hint?: string;
@@ -773,6 +774,8 @@ export function EmptyState({
    *  empty inside the table's own white surface, so the card grade drew a
    *  second shadowed rectangle 8px inside the first. */
   bare?: boolean;
+  /** A tutorial anchor, rendered as `data-spotlight`. */
+  spotlight?: string;
 }) {
   const shell = bare ? "" : "rounded-2xl bg-white shadow-card";
 
@@ -781,7 +784,10 @@ export function EmptyState({
       /* The art goes UNDER the words on a phone, not beside them. Beside them it
          is an auto-width column against a min-content one, which squeezes the
          sentence into a two-word-per-line ribbon. */
-      <div className={`grid items-center gap-6 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:p-10 ${shell}`}>
+      <div
+        data-spotlight={spotlight}
+        className={`grid items-center gap-6 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:p-10 ${shell}`}
+      >
         <div>
           <p className="text-base font-semibold text-plum-950">{title}</p>
           {hint && <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-slate-600">{hint}</p>}
@@ -795,7 +801,7 @@ export function EmptyState({
   }
 
   return (
-    <div className={`px-4 py-10 text-center sm:px-6 sm:py-12 ${shell}`}>
+    <div data-spotlight={spotlight} className={`px-4 py-10 text-center sm:px-6 sm:py-12 ${shell}`}>
       {Icon && (
         <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-mist-100 text-slate-550">
           <Icon className="h-5 w-5" aria-hidden />

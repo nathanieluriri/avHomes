@@ -22,6 +22,9 @@ export const SPOTLIGHT_TOUR_IDS = [
   "set-commission-rates",
   "sort-a-payment-problem",
   "follow-a-buyer",
+  "record-a-sale",
+  "read-the-money",
+  "spend-the-fund",
 ] as const;
 
 export type SpotlightTourId = (typeof SPOTLIGHT_TOUR_IDS)[number];
@@ -39,7 +42,18 @@ export type SpotlightAdvance =
   | "signal";
 
 /** What a screen reports through `signalSpotlight`, after the thing actually happened. */
-export type SpotlightSignal = "enquiry-replied" | "note-saved" | "problem-replied";
+export type SpotlightSignal =
+  | "enquiry-replied"
+  | "note-saved"
+  | "problem-replied"
+  /**
+   * The record-a-sale sheet opened. Reported rather than watched for, because the
+   * step before it sits on a picker whose options are portaled below the trigger:
+   * a step that held the screen would block the very press it is asking for, and
+   * once the sheet is up it is a dialog the card would otherwise step aside from,
+   * leaving nothing to press. A signal crosses both.
+   */
+  | "sale-sheet-open";
 
 export type SpotlightPlacement = "top" | "bottom" | "left" | "right";
 
@@ -104,8 +118,14 @@ export interface SpotlightStep {
 export interface SpotlightTour {
   id: SpotlightTourId;
   title: string;
-  /** Where "Try it now" lands. */
+  /** The screen "Try it now" lands on. A bare pathname: `matchPath` reads it. */
   start: string;
+  /**
+   * Query the screen needs to open in the state the first step expects, such as a
+   * list filtered to the only status the tour can work on. Kept off `start` so
+   * that stays a pathname, and appended by `tryHrefOf`.
+   */
+  startQuery?: string;
   /**
    * Set for tours on screens the console gates below `lg`. `fine` also rules out
    * touch screens. `gated` says the start screen shows its own wide-screen gate,
@@ -848,6 +868,249 @@ const followABuyer: SpotlightTour = {
   ],
 };
 
+/* ═══════════════════════════════════════════════════════════ THE MONEY ════ */
+
+const ANALYTICS = "/admin/analytics";
+const TRANSACTIONS = "/admin/analytics/transactions";
+const WALLETS = "/admin/analytics/wallets";
+
+/**
+ * The one door from live to closed. This walks the sheet rather than describing
+ * it from the trigger, because it is the only place in the console where money,
+ * proof and a listing's state are written in a single press.
+ *
+ * The split panel is left out on purpose. It sits below the sheet's pinned footer
+ * and the sheet's own scroller does not reach it, so a step pointing at it would
+ * hold on something the reader cannot be shown. `read-the-money` opens the same
+ * breakdown on a screen that can scroll to it.
+ */
+const recordASale: SpotlightTour = {
+  id: "record-a-sale",
+  title: "Record a sale",
+  start: LISTINGS,
+  /* Listings opens on All, where the first row is whatever was touched last and
+     may well be a draft. The detour below still covers somebody who walks in on
+     another tab; this is so "Try it now" does not start on one. */
+  startQuery: "status=live",
+  steps: [
+    {
+      anchor: "listing-live-row",
+      page: LISTINGS,
+      title: "Open the listing that sold",
+      body: "Only a live listing can be sold, so this is the Live tab. Open the one the money came in on.",
+      advance: "route",
+      route: LISTING,
+      detour: {
+        anchor: "listing-find-live",
+        title: "Show the live ones",
+        body: "Choose Live. A draft has never been on the market, and an archived one is already off it.",
+      },
+      none: {
+        anchor: "listing-none-live",
+        title: "Nothing is live right now",
+        body: "There is no listing on the market to sell. Publish one first, then come back.",
+        restart: { href: "/admin/properties?status=draft", label: "See the drafts" },
+      },
+    },
+    {
+      /* No Next on this one: the sheet itself reports that it opened. The options
+         are portaled below the trigger, so a step that held the screen would block
+         the press it is asking for, and a `manual` step would then go aside behind
+         the sheet with no button left to move it on. */
+      anchor: "listing-publish",
+      page: LISTING,
+      title: "Open the status picker",
+      body: "Everything a listing can do next is in here. Choose Record the sale: it is the only way to closed, because closing without the money and the proof would lose both.",
+      advance: "signal",
+      signal: "sale-sheet-open",
+      hint: "Choose Record the sale.",
+      placement: "left",
+    },
+    {
+      anchor: "sale-ownership",
+      page: LISTING,
+      title: "Whose property it is",
+      body: "This decides what the sale pays out. AV Homes' own stock pays its people far more than somebody else's does, and the sheet says which before you type a figure.",
+      advance: "manual",
+      waitMs: 6000,
+    },
+    {
+      anchor: "sale-amount",
+      page: LISTING,
+      title: "What it actually sold for",
+      body: "The asking price is already here. Type what was really paid when the two differ: every share below is a percentage of this one number.",
+      advance: "input",
+    },
+    {
+      anchor: "sale-closer",
+      page: LISTING,
+      title: "Who closed it",
+      body: "A marketer is paid, and so are the two people above them. Staff and walk-ins are paid nothing. Both funds take their share either way.",
+      advance: "manual",
+    },
+    {
+      anchor: "sale-buyer",
+      page: LISTING,
+      title: "Who bought it",
+      body: "The name and the number are what make this record worth anything a year from now.",
+      advance: "input",
+    },
+    {
+      anchor: "sale-proof",
+      page: LISTING,
+      title: "The proof",
+      body: "A receipt, a bank alert, or the signed agreement. At least one, and the form will not go on without it.",
+      advance: "manual",
+    },
+    {
+      anchor: "sale-confirm",
+      page: LISTING,
+      title: "Record it and close the listing",
+      body: "One press, because it does both: the money goes on the record and the house comes off the market. If it falls through, cancel the deal and the commission reverses and both funds give their share back. That's the whole flow.",
+      advance: "manual",
+      final: true,
+      placement: "top",
+    },
+  ],
+};
+
+const NO_TRANSACTIONS = {
+  anchor: "tx-none",
+  title: "No deals in this window",
+  body: "Nothing was recorded over the period you chose. Widen it, or record a sale from a listing and it lands here.",
+};
+
+/** What was transacted, who was paid out of it, and what AV Homes kept. */
+const readTheMoney: SpotlightTour = {
+  id: "read-the-money",
+  title: "Read where the money went",
+  start: ANALYTICS,
+  steps: [
+    {
+      anchor: "analytics-period",
+      page: ANALYTICS,
+      title: "Everything here answers for one window",
+      body: "Pick it first. Every figure on every analytics screen is measured over this, and it stays chosen as you move between them.",
+      advance: "manual",
+    },
+    {
+      anchor: "analytics-transacted",
+      page: ANALYTICS,
+      title: "Four numbers, in the order they get asked about",
+      body: "What was transacted, how many deals made it, what went out as commission, and what AV Homes kept. Press Transacted to see it by day.",
+      advance: "click",
+      pending: { body: "Drawing the chart.", until: "next" },
+    },
+    {
+      anchor: "analytics-value-chart",
+      page: ANALYTICS,
+      title: "The same number, by day",
+      body: "One line, because two would need two scales, and a chart with two scales can be read to mean anything.",
+      advance: "manual",
+    },
+    {
+      anchor: "analytics-ownership",
+      page: ANALYTICS,
+      title: "Whose property it was",
+      body: "The split that explains the gap between what was transacted and what was kept. A month of somebody else's stock earns far less than the same month of your own.",
+      advance: "manual",
+    },
+    {
+      anchor: "analytics-funds",
+      page: ANALYTICS,
+      title: "What the two funds hold",
+      body: "Held now, all time: a balance is every deal ever, not this window. That is why the line under it says so.",
+      advance: "manual",
+    },
+    {
+      anchor: "analytics-transactions-link",
+      page: ANALYTICS,
+      title: "The deals behind the totals",
+      body: "Each of those four figures is a sum. This is what it was summed from.",
+      advance: "route",
+      route: TRANSACTIONS,
+    },
+    {
+      anchor: "tx-filters",
+      page: TRANSACTIONS,
+      title: "Narrow it to the question you have",
+      body: "Whose property, sale or rent, and who closed it. The three figures above follow the filters, so the total always belongs to the list under it.",
+      advance: "manual",
+      none: NO_TRANSACTIONS,
+    },
+    {
+      anchor: "tx-split",
+      page: TRANSACTIONS,
+      title: "Open one deal",
+      body: "Every share by name: who closed it, the two people above them, both funds, and what AV Homes kept. It adds back up to the sale. That's the whole flow.",
+      advance: "manual",
+      final: true,
+      none: NO_TRANSACTIONS,
+    },
+  ],
+};
+
+/** A share of every deal goes in. This is the only way some of it comes out. */
+const spendTheFund: SpotlightTour = {
+  id: "spend-the-fund",
+  title: "Spend the community fund",
+  start: WALLETS,
+  steps: [
+    {
+      anchor: "fund-foundation",
+      page: WALLETS,
+      title: "What the fund holds",
+      body: "A share of every recorded deal, whoever closed it. The line under the balance splits it into what came in and what has gone out.",
+      advance: "manual",
+    },
+    {
+      anchor: "fund-foundation-history",
+      page: WALLETS,
+      title: "Where it came from",
+      body: "Every movement, with its date and the rate it was taken at. Nothing arrives in this fund without a deal behind it.",
+      advance: "manual",
+    },
+    {
+      anchor: "fund-spend",
+      page: WALLETS,
+      title: "Pay some of it out",
+      body: "This is the only way money leaves the fund, and it cannot be taken past what the fund holds.",
+      advance: "click",
+      pending: { body: "Opening the form.", until: "next" },
+    },
+    {
+      anchor: "spend-amount",
+      page: WALLETS,
+      title: "How much",
+      body: "Up to the balance, never past it. It says so before the button will go.",
+      advance: "input",
+    },
+    {
+      anchor: "spend-what",
+      page: WALLETS,
+      title: "What it paid for",
+      body: "Write it for somebody reading this in a year with no memory of the day. A borehole, a scholarship, a clinic: these words are the whole record.",
+      advance: "input",
+    },
+    {
+      anchor: "spend-receipt",
+      page: WALLETS,
+      title: "The receipt",
+      body: "At least one. Money leaving a community fund with no evidence behind it is the thing this screen exists to prevent.",
+      advance: "manual",
+    },
+    {
+      anchor: "spend-confirm",
+      page: WALLETS,
+      title: "Record the payment",
+      body: "The balance drops by exactly this, and the payment joins the history with its receipt on it. Nothing here is ever deleted: a mistake is corrected by a new entry the other way. That's the whole flow.",
+      advance: "manual",
+      final: true,
+      placement: "top",
+    },
+  ],
+};
+
 export const SPOTLIGHT_TOURS: Record<SpotlightTourId, SpotlightTour> = {
   "add-a-listing": addAListing,
   "list-an-estate": listAnEstate,
@@ -859,6 +1122,9 @@ export const SPOTLIGHT_TOURS: Record<SpotlightTourId, SpotlightTour> = {
   "set-commission-rates": setCommissionRates,
   "sort-a-payment-problem": sortAPaymentProblem,
   "follow-a-buyer": followABuyer,
+  "record-a-sale": recordASale,
+  "read-the-money": readTheMoney,
+  "spend-the-fund": spendTheFund,
 };
 
 export function isSpotlightTourId(value: string | null | undefined): value is SpotlightTourId {

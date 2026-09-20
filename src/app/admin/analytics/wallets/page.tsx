@@ -105,7 +105,12 @@ export default function WalletsPage() {
               open={open === "foundation"}
               onToggle={() => setOpen((was) => (was === "foundation" ? null : "foundation"))}
               action={
-                <Button size="sm" variant="ghost" onClick={() => setSpending(true)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSpending(true)}
+                  spotlight="fund-spend"
+                >
                   Record a payment out
                 </Button>
               }
@@ -152,8 +157,10 @@ function FundCard({
     [open, fund.fund],
   );
 
+  /* Named off the fund rather than passed in, so both cards carry an anchor and
+     a walkthrough names the one it means: `fund-foundation`, `fund-reward`. */
   return (
-    <Card>
+    <Card spotlight={`fund-${fund.fund}`}>
       <CardHead title={fund.name} action={action} />
       <p className="c-num text-[22px] font-semibold text-plum-950">
         {formatMoney(fund.balanceMinor, fund.currency)}
@@ -170,6 +177,7 @@ function FundCard({
 
       <button
         type="button"
+        data-spotlight={`fund-${fund.fund}-history`}
         onClick={onToggle}
         aria-expanded={open}
         className="c-tap mt-3 text-[12px] font-medium text-wine-700 hover:underline"
@@ -317,7 +325,11 @@ function SpendSheet({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={() => void save()} disabled={busy || refusal !== null}>
+          <Button
+            onClick={() => void save()}
+            disabled={busy || refusal !== null}
+            spotlight="spend-confirm"
+          >
             {busy ? "Recording..." : "Record the payment"}
           </Button>
         </div>
@@ -326,13 +338,18 @@ function SpendSheet({
       <div className="space-y-4">
         {error && <ErrorNote error={error} />}
 
-        <Field label="How much" hint={`Up to ${formatMoney(fund.balanceMinor, fund.currency)}.`}>
+        <Field
+          label="How much"
+          hint={`Up to ${formatMoney(fund.balanceMinor, fund.currency)}.`}
+          spotlight="spend-amount"
+        >
           <MoneyInput value={amount} onChange={setAmount} />
         </Field>
 
         <Field
           label="What it paid for"
           hint="What a reader needs a year from now to know what this was."
+          spotlight="spend-what"
         >
           <input
             className={inputClass}
@@ -342,7 +359,13 @@ function SpendSheet({
           />
         </Field>
 
-        <Field label="The receipt" hint="At least one. Money leaving needs evidence.">
+        {/* The field, not the picker's `image-library` button: the tour must not
+            land on another ImagePicker that happens to come first in the document. */}
+        <Field
+          label="The receipt"
+          hint="At least one. Money leaving needs evidence."
+          spotlight="spend-receipt"
+        >
           <ImagePicker value={proof} onChange={setProof} max={5} />
         </Field>
 
