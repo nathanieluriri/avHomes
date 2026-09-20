@@ -40,8 +40,9 @@ export default async function ContactPage() {
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">
             Whether you are searching for a new home, listing a property to sell, or exploring
-            a partnership, our Lagos and Abuja teams are ready to help. Send a message and we
-            will respond within one business day.
+            a partnership, our teams across Nigeria are ready to help. We work with buyers
+            in every time zone, so say where you are and we will call at an hour that suits
+            you. Expect a reply within one business day.
           </p>
         </div>
       </section>

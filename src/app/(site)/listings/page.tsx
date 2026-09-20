@@ -8,9 +8,9 @@ import FilterBar from "@/components/FilterBar";
 import Reveal from "@/components/Reveal";
 
 export const metadata = {
-  title: "Listings | AVHomes",
+  title: "Property for Sale and Rent in Nigeria | AVHomes",
   description:
-    "Every AVHomes property for sale and to rent across Lagos and Abuja, checked on site before it goes live.",
+    "Every AVHomes property for sale and to rent across Nigeria, checked on site before it goes live. Buy from anywhere in the world.",
   /*
    * ONE canonical for every filter permutation. `?type=Villa`, `?beds=5` and
    * `?q=Lekki` all serve near-identical markup over a subset of the same rows,
@@ -109,7 +109,7 @@ export default async function ListingsPage({
             eyebrow: "Rent",
             lead: "Homes To",
             accent: "Rent",
-            sub: "Yearly rentals across Lagos and Abuja, with no hidden agency fees.",
+            sub: "Yearly rentals across Nigeria, with no hidden agency fees.",
           }
         : {
             eyebrow: "Listings",

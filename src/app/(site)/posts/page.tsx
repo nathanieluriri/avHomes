@@ -8,7 +8,7 @@ import type { PublicPost } from "@/lib/blog/types";
 export const metadata: Metadata = {
   title: "Insights | AVHomes",
   description:
-    "Guides, market reads and legal explainers on buying, renting and building in Lagos and Abuja.",
+    "Guides, market reads and legal explainers on buying, renting and building in Nigeria, written for buyers at home and in the diaspora.",
 };
 
 export const revalidate = 300;
@@ -66,8 +66,8 @@ export default async function PostsIndexPage({
         <p className="tpl__kicker">Insights</p>
         <h1 className="idx__h1">Guides, Stories and Market Reads</h1>
         <p className="idx__intro">
-          Practical writing on buying, renting and building in Lagos and Abuja,
-          from the team that inspects the sites.
+          Practical writing on buying, renting and building in Nigeria, from the
+          team that inspects the sites.
         </p>
       </header>
 

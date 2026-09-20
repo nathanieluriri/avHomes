@@ -23,8 +23,9 @@ export default function Hero() {
             Real Estate <span className="accent text-wine-300">Done Right</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-white/75">
-            AVHomes lists vetted homes across Lagos and Abuja, backed by the build
-            quality of AV Constructions. Every listing is checked before it reaches you.
+            AVHomes lists vetted homes across Nigeria, backed by the build quality of
+            AV Constructions. Every listing is checked on the ground before it reaches
+            you, whether you are here or buying from abroad.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">

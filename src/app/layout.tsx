@@ -39,9 +39,9 @@ export const metadata: Metadata = {
    * itself and production names the stable alias. See SITE_DOMAIN.
    */
   metadataBase: new URL(SITE_DOMAIN),
-  title: "AVHomes | Buy. Sell. Rent.",
+  title: "AVHomes | Vetted Homes for Sale and Rent in Nigeria",
   description:
-    "AVHomes lists vetted homes across Lagos and Abuja, backed by the build quality of AV Constructions.",
+    "AVHomes lists vetted homes across Nigeria, checked on the ground before they go live. Built for Nigerians at home and in the diaspora, backed by AV Constructions.",
   alternates: { canonical: "/" },
 };
 

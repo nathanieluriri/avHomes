@@ -5,8 +5,8 @@
  * options all fail this particular job: Nominatim's usage policy names
  * autocomplete as a forbidden pattern, Photon is a shared instance with no
  * availability promise, and Google and Mapbox both want a billed key on the
- * client. Against that, the useful universe for a Lagos and Abuja agency is a
- * few hundred neighbourhoods, which fits in a file that answers in the same
+ * client. Against that, the useful universe for a Nigerian agency is a few
+ * hundred neighbourhoods, which fits in a file that answers in the same
  * tick with no network, no key and no rate limit.
  *
  * The list is ordered by how often a buyer types the name, not alphabetically,
