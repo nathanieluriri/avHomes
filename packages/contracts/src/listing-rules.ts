@@ -251,6 +251,148 @@ export function listingSeoDescription(p: Property): string {
   return p.seoDescription.trim() || listingMetaDescription(p);
 }
 
+/**
+ * The line an agent wrote, and the line a stranger typed, are not the same line.
+ *
+ * With nothing written, a listing's search title is its own name, and a name an
+ * agent chose reads like "Tropical Oasis Lekki". Nobody types that. They type
+ * "buy land in Ibeju-Lekki" or "4 bedroom duplex for sale in Lekki", and the
+ * page carrying those words is the page that answers them. Every fact needed to
+ * write that sentence is already on the record, so this is one tap instead of an
+ * operator composing it by hand on every listing.
+ *
+ * NOTHING HERE IS INVENTED. Every clause is gated on a stored value: a listing
+ * with no bedrooms never offers "0 Bedroom", a plot with no title document never
+ * claims one, and a listing with no location offers nothing at all. The single
+ * sentence not drawn from this row is the inspection promise, which is the claim
+ * the front page already makes about every listing on the site.
+ *
+ * DROPPED, NOT TRUNCATED, when a suggestion runs over the advised length. One
+ * suggestion fewer beats one cut mid-word, and the field still accepts a longer
+ * line typed by hand.
+ *
+ * These are drafts. The operator picks one, edits it, or ignores all three.
+ */
+function shortlist(options: (string | null)[], advised: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const option of options) {
+    if (option === null) continue;
+    const text = option.replace(/\s+/gu, " ").trim();
+    if (text === "" || text.length > advised || seen.has(text)) continue;
+    seen.add(text);
+    out.push(text);
+    if (out.length === 3) break;
+  }
+  return out;
+}
+
+export function seoTitleSuggestions(p: Property): string[] {
+  const area = p.location.trim();
+  // Every phrasing below is "<something> in <somewhere>". Without the somewhere
+  // there is no suggestion to make, only a worse version of the title.
+  if (area === "") return [];
+  const where = whereLine(p);
+  const doc = p.titleDocument ? TITLE_DOCUMENT_SHORT[p.titleDocument] : null;
+
+  if (isEstate(p.type)) {
+    const s = estateSummary(p.prototypes);
+    // An estate of houses is not land, and one selling both is both.
+    const noun = s.hasPlots ? (s.hasHouses ? "Land and Homes" : "Land") : "Homes";
+    return shortlist(
+      [
+        `${noun} for Sale in ${where}`,
+        `Buy ${noun} in ${area}${doc ? ` with ${doc}` : ""}`,
+        s.fromMinor > 0 ? `${noun} for Sale in ${area} from ${formatPriceShort(s.fromMinor, p)}` : null,
+      ],
+      SEO_TITLE_ADVISED,
+    );
+  }
+
+  const beds = p.bedrooms > 0 ? `${p.bedrooms} Bedroom ` : "";
+
+  if (p.listingType === "rent") {
+    const serviced = p.serviced ? "Serviced " : "";
+    return shortlist(
+      [
+        `${beds}${serviced}${p.type} for Rent in ${where}`,
+        `${beds}${p.type} to Let in ${area}`,
+        // The same search without the bedroom count, for a reader who has not
+        // decided on one. Pointless when there is no count to drop.
+        beds === "" ? null : `${serviced}${p.type} for Rent in ${where}`,
+      ],
+      SEO_TITLE_ADVISED,
+    );
+  }
+
+  return shortlist(
+    [
+      `${beds}${p.type} for Sale in ${where}`,
+      doc ? `${beds}${p.type} for Sale in ${area} with ${doc}` : null,
+      p.priceMinor > 0 ? `${beds}${p.type} for Sale in ${area} at ${formatPriceShort(p.priceMinor, p)}` : null,
+      beds === "" ? null : `${p.type} for Sale in ${where}`,
+    ],
+    SEO_TITLE_ADVISED,
+  );
+}
+
+export function seoDescriptionSuggestions(p: Property): string[] {
+  const area = p.location.trim();
+  if (area === "") return [];
+  const where = whereLine(p);
+  const doc = p.titleDocument ? TITLE_DOCUMENT_SHORT[p.titleDocument] : null;
+  /* The one claim here that is about the company rather than this listing. It
+     is the promise the front page already makes, said once, in the place a
+     search result shows it. */
+  const checked = "Inspected on the ground before it went live.";
+
+  if (isEstate(p.type)) {
+    const s = estateSummary(p.prototypes);
+    const noun = s.hasPlots ? (s.hasHouses ? "Land and homes" : "Land") : "Homes";
+    const from = s.fromMinor > 0 ? ` from ${formatPriceShort(s.fromMinor, p)}` : "";
+    const options = `${s.count} ${s.count === 1 ? "option" : "options"}${from}`;
+    return shortlist(
+      [
+        `${noun} for sale in ${where}. ${options}.${doc ? ` ${doc}.` : ""} ${checked}`,
+        `Buying in ${area} from abroad? ${options}, ${checked.toLowerCase()}`,
+        // Plot size is its own search. "500sqm land in Ibeju-Lekki" is typed as
+        // often as the place name alone, and only an estate holds the number.
+        s.plotSqmMin > 0 ? `${noun} for sale in ${where}. Plots from ${s.plotSqmMin} sqm, ${options}. ${checked}` : null,
+      ],
+      SEO_DESCRIPTION_ADVISED,
+    );
+  }
+
+  const beds = p.bedrooms > 0 ? `${p.bedrooms} bedroom ` : "";
+  // "4 bedroom duplex" mid-sentence, "4 bedroom duplex" opening one.
+  const kind = `${beds}${p.type.toLowerCase()}`;
+  const Kind = kind.charAt(0).toUpperCase() + kind.slice(1);
+  const price = p.priceMinor > 0 ? ` ${formatPriceShort(p.priceMinor, p)}.` : "";
+
+  if (p.listingType === "rent") {
+    const serviced = p.serviced ? "Serviced. " : "";
+    return shortlist(
+      [
+        `${Kind} to rent in ${where}.${price} ${serviced}${checked}`,
+        p.city ? `Moving to ${p.city}? ${Kind} to rent in ${where}.${price} ${checked}` : null,
+        p.tagline.trim() ? `${Kind} to rent in ${where}.${price} ${p.tagline.trim()}` : null,
+      ],
+      SEO_DESCRIPTION_ADVISED,
+    );
+  }
+
+  return shortlist(
+    [
+      `${Kind} for sale in ${where}.${price}${doc ? ` ${doc}.` : ""} ${checked}`,
+      `Buying from abroad? ${Kind} in ${where}.${price} ${checked}`,
+      // The agent's own line instead of the promise. It is the only sentence
+      // here that says something about THIS house rather than about the agency.
+      p.tagline.trim() ? `${Kind} for sale in ${where}.${price} ${p.tagline.trim()}` : null,
+    ],
+    SEO_DESCRIPTION_ADVISED,
+  );
+}
+
 /* ─────────────────────────────── labels ─────────────────────────────── */
 
 export const PROTOTYPE_KIND_LABELS: Record<PrototypeKind, string> = {
