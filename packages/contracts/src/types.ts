@@ -635,7 +635,8 @@ export interface SitePulse {
 export const AUDIT_ENTITIES = [
   "property", "post", "category", "image", "enquiry", "user", "invite",
   "testimonial", "stat", "note", "settings", "session", "auth",
-  "marketer", "deal", "lead", "payrun", "update", "unknown",
+  "marketer", "deal", "lead", "payrun", "update",
+  "fund", "award", "application", "unknown",
 ] as const;
 export type AuditEntity = (typeof AUDIT_ENTITIES)[number];
 

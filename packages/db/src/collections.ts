@@ -40,6 +40,13 @@ export const COLLECTIONS = {
   marketingIssues: "marketing_issues",
   marketingUpdates: "marketing_updates",
   marketingLeads: "marketing_leads",
+  /* The two pots that belong to nobody. Their own collection rather than rows in
+     marketing_ledger, because reconcile() proves that one balances against what
+     marketers are owed and a row with no person behind it would break it. */
+  fundLedger: "fund_ledger",
+  rewardAwards: "reward_awards",
+  listingViews: "listing_views",
+  partnerApplications: "partner_applications",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
