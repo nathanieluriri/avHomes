@@ -13,7 +13,9 @@ const SPEND = "::-p-xpath(//button[normalize-space()='Record a payment out'])";
 const SHEET = "::-p-xpath(//h2[starts-with(normalize-space(),'Pay out of')])";
 const AMOUNT = "::-p-xpath(//label[.//span[normalize-space()='How much']]//input)";
 const WHAT = "::-p-xpath(//label[.//span[normalize-space()='What it paid for']]//input)";
-const RECEIPT = "::-p-xpath(//button[normalize-space()='Choose from library'])";
+const RECEIPT = "::-p-xpath(//div[@role='dialog']//button[normalize-space()='Choose from library'])";
+const LIBRARY_CLOSE =
+  "::-p-xpath(//h2[normalize-space()='Media library']/ancestor::div[@role='dialog'][1]//button[@aria-label='Close'])";
 const CONFIRM = "::-p-xpath(//button[normalize-space()='Record the payment'])";
 const HISTORY = "::-p-xpath((//button[starts-with(normalize-space(),'The history')])[2])";
 const DRY = process.env.NO_RECORD === "1";
@@ -87,11 +89,9 @@ module.exports = {
     await sleep(500);
     await a.click(RECEIPT, 300);
     await sleep(1800);
-    await a.click("::-p-xpath((//div[@role='dialog']//button[.//img])[1])", 300);
-    await sleep(1400);
-    await a
-      .click("::-p-xpath(//div[@role='dialog']//button[normalize-space()='Done' or normalize-space()='Use these'])", 300)
-      .catch(() => {});
+    await a.click("::-p-xpath(//button[.//img[contains(@src,'exterior-01')]])", 600);
+    await sleep(1200);
+    await a.click(LIBRARY_CLOSE, 600);
     await sleep(1400);
     if (DRY) await a.shot("receipt");
 

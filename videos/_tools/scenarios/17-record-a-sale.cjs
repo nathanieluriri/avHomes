@@ -14,7 +14,12 @@ const SHEET = "::-p-xpath(//h2[normalize-space()='Record the sale'])";
 const AMOUNT = "::-p-xpath(//label[.//span[normalize-space()='What it sold for']]//input)";
 const BUYER = "::-p-xpath(//label[.//span[normalize-space()='Who bought it']]//input)";
 const SEARCH = "::-p-xpath(//input[@placeholder='Their code or their name'])";
-const PROOF = "::-p-xpath(//button[normalize-space()='Choose from library'])";
+const PROOF = "::-p-xpath(//div[@role='dialog']//button[normalize-space()='Choose from library'])";
+/* The library's OWN close, not the sheet's behind it. Two dialogs are open and
+   an unscoped aria-label='Close' matches the outer one first, which silently
+   leaves the library up while the rest of the take clicks through it. */
+const LIBRARY_CLOSE =
+  "::-p-xpath(//h2[normalize-space()='Media library']/ancestor::div[@role='dialog'][1]//button[@aria-label='Close'])";
 const SPLIT = "::-p-xpath(//button[.//span[normalize-space()='What this pays out']])";
 const CONFIRM = "::-p-xpath(//button[starts-with(normalize-space(),'Record it and close')])";
 const DRY = process.env.NO_RECORD === "1";
@@ -117,15 +122,21 @@ module.exports = {
     await a.click(PROOF, 300);
     await sleep(1800);
     if (DRY) await a.shot("proof-picker");
-    /* The first photo in the library, which stands in for a receipt. The point on
-       camera is that the field refuses to be empty. */
-    await a.click("::-p-xpath((//div[@role='dialog']//button[.//img])[1])", 300);
-    await sleep(1400);
-    await a.click("::-p-xpath(//div[@role='dialog']//button[normalize-space()='Done' or normalize-space()='Use these'])", 300).catch(() => {});
+    /* One photo from the library, standing in for the receipt. The point on camera
+       is that the field refuses to be empty, not which image it is. Matched by src
+       the way every other scenario picks from this sheet. */
+    await a.click("::-p-xpath(//button[.//img[contains(@src,'exterior-01')]])", 600);
+    await sleep(1200);
+    await a.click(LIBRARY_CLOSE, 600);
     await sleep(1200);
     if (DRY) await a.shot("proof");
 
+    /* Scrolled into view first. The sheet's footer is pinned, so an element that is
+       technically in view can still sit under it, and the take would hold on a
+       breakdown nobody can read. */
     a.mark("split");
+    await a.scrollBy(240, 600);
+    await sleep(400);
     await a.moveTo(SPLIT, 900);
     await sleep(500);
     await a.click(SPLIT, 200);
