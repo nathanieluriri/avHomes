@@ -53,6 +53,7 @@ import {
 } from "@avhomes/marketing";
 import { accrueForDeal, fundsRoutes, reverseForDeal } from "@avhomes/funds";
 import { dashboardRoutes } from "./dashboard";
+import { analyticsConsoleRoutes } from "./analytics";
 import { healthRoutes } from "./health";
 import { tutorialsRoutes } from "./tutorials";
 import { developerNotifier, notificationsRoutes } from "./notifications";
@@ -429,6 +430,10 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * existing route.
    */
   app.route(API_PREFIX, dashboardRoutes());
+  /* Beside the dashboard, and last for the same reason: both mount under the
+     `/admin` prefix the feature routers already use, registered after them, where
+     a collision is this router losing rather than shadowing an existing route. */
+  app.route(API_PREFIX, analyticsConsoleRoutes());
   app.route(API_PREFIX, healthRoutes());
 
   return app;

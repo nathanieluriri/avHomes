@@ -681,6 +681,15 @@ export async function recordSale(
     updatedAt: now,
   };
 
+  /*
+   * `_id` and `createdAt` are REMOVED from the `$set` rather than set to undefined.
+   *
+   * Mongo refuses an update that touches `_id` at all, even with undefined, and
+   * refuses a field appearing in both `$set` and `$setOnInsert`. So the two the
+   * insert owns are deleted from the payload instead of overwritten.
+   */
+  const { _id: _ignoredId, createdAt: _ignoredCreatedAt, ...fields } = doc;
+
   try {
     /* Upsert on the id, because this door is also how a REPORTED deal gets
        settled: the admin opens the sheet pre-filled from it and confirms, and that
@@ -689,8 +698,8 @@ export async function recordSale(
     await deals(db).updateOne(
       { _id: dealId },
       {
-        $set: { ...doc, _id: undefined, createdAt: undefined },
-        $setOnInsert: { _id: dealId, createdAt: now },
+        $set: fields,
+        $setOnInsert: { createdAt: now },
       },
       { upsert: true },
     );

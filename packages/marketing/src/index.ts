@@ -26,8 +26,10 @@ export {
 export {
   approvedDealIds,
   balanceFor,
+  cancelDeal,
   chainFor,
   createMarketer,
+  reviewDeal,
   findClosers,
   findMarketerByCode,
   findMarketerById,
