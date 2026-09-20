@@ -27,6 +27,7 @@ import {
   marketerCode,
   payMonth,
   payMonthLabel,
+  recordSaleRefusal,
   splitDeal,
   splitFor,
   type ChainMember,
@@ -537,36 +538,6 @@ export interface SaleListing {
   title: string;
   location: string;
   estate: string;
-}
-
-/**
- * Everything recording a sale is refused for, checked the same way on both sides.
- *
- * Exported so the sheet renders the same sentence the server would, rather than
- * its own approximation of it. A refusal a form cannot predict is a refusal
- * somebody meets after filling in eight fields.
- */
-export function recordSaleRefusal(input: {
-  amountMinor: number;
-  buyerName: string;
-  proof: readonly string[];
-  closer: { kind: CloserKind };
-  closedOn: number;
-  now?: number;
-}): string | null {
-  if (!Number.isFinite(input.amountMinor) || input.amountMinor <= 0) {
-    return "Enter what it sold for.";
-  }
-  if (input.buyerName.trim().length < 2) return "Enter the buyer's name.";
-  if (input.proof.length === 0) {
-    return "Attach the proof: a receipt, an alert or the signed agreement.";
-  }
-  const now = input.now ?? Date.now();
-  // A day's grace, so a timezone difference is not a refusal.
-  if (input.closedOn > now + 24 * 60 * 60 * 1000) {
-    return "That date is in the future.";
-  }
-  return null;
 }
 
 /**

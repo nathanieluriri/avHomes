@@ -843,6 +843,39 @@ export function referralCodeFrom(value: string | null | undefined): string | nul
   return /^AV-[0-9]{4,8}$/u.test(code) ? code : null;
 }
 
+/**
+ * Everything recording a sale is refused for, checked the same way on both sides.
+ *
+ * HERE rather than in the server package, because the sheet has to render the same
+ * sentence the API would. A refusal a form cannot predict is a refusal somebody
+ * meets after filling in eight fields and attaching a photo.
+ */
+export function recordSaleRefusal(input: {
+  amountMinor: number;
+  buyerName: string;
+  proof: readonly string[];
+  closer: { kind: CloserKind };
+  closedOn: number;
+  now?: number;
+}): string | null {
+  if (!Number.isFinite(input.amountMinor) || input.amountMinor <= 0) {
+    return "Enter what it sold for.";
+  }
+  if (input.buyerName.trim().length < 2) return "Enter the buyer's name.";
+  if (input.proof.length === 0) {
+    return "Attach the proof: a receipt, a bank alert or the signed agreement.";
+  }
+  const now = input.now ?? Date.now();
+  // A day's grace, so a timezone difference between a phone and the server is not
+  // a refusal somebody cannot explain.
+  if (input.closedOn > now + 24 * 60 * 60 * 1000) {
+    return "That date is in the future.";
+  }
+  return null;
+}
+
+// TODO(test): a future closedOn beyond the day's grace is refused, today is not.
+
 /** A NUBAN is ten digits and nothing else. */
 export function isNuban(value: string): boolean {
   return /^[0-9]{10}$/u.test(value);

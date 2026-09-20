@@ -40,7 +40,6 @@ export {
   previewSplit,
   reconcile,
   recordSale,
-  recordSaleRefusal,
   rootMarketer,
   settledAwaitingClose,
   statementFor,
