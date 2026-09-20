@@ -11,7 +11,7 @@ import {
   type Mailer,
 } from "@avhomes/core";
 import { getDb, type Db } from "@avhomes/db";
-import { isVideoUrl } from "@avhomes/contracts";
+import { isVideoUrl, type FundKind } from "@avhomes/contracts";
 import {
   authRoutes,
   clerkRoutes,
@@ -41,8 +41,10 @@ import {
   marketingAdminRoutes,
   marketingAppRoutes,
   marketingPublicRoutes,
+  readMarketingSettings,
   type RecentListing,
 } from "@avhomes/marketing";
+import { fundsRoutes } from "@avhomes/funds";
 import { dashboardRoutes } from "./dashboard";
 import { healthRoutes } from "./health";
 import { tutorialsRoutes } from "./tutorials";
@@ -130,6 +132,20 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   const mailer = deps.mailer ?? resendMailer();
   const notify = developerNotifier(mailer);
+
+  /*
+   * The funds' display names, which an admin can rename and which live in
+   * marketing's settings document.
+   *
+   * A port rather than an import, for the rule that holds the whole layout up:
+   * @avhomes/funds may not know @avhomes/marketing exists. A renameable label is
+   * a thin reason to cross that line, and crossing it thinly is how a layout
+   * stops being one.
+   */
+  const fundNames = async (db: Db): Promise<Record<FundKind, string>> => {
+    const settings = await readMarketingSettings(db);
+    return { reward: settings.rewardPoolName, foundation: settings.foundationName };
+  };
 
   /*
    * The image store, chosen by configuration rather than by which token happens
@@ -356,6 +372,11 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
      which is why they live under /api/marketing and not /api/admin. */
   app.route(API_PREFIX, marketingAppRoutes({ storage, sniff: sniffImage, notify, recentListings }));
   app.route(API_PREFIX, marketingAdminRoutes());
+  /* The funds sit beside marketing because that is what feeds them, and they take
+     their display names from marketing's settings as a port rather than an
+     import: a renameable label is not a reason for one feature package to know
+     another. */
+  app.route(API_PREFIX, fundsRoutes({ names: fundNames }));
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
   app.route(API_PREFIX, notificationsRoutes());

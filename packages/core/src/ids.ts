@@ -46,6 +46,12 @@ export const ID_PREFIXES = {
   payIssue: "pisu",
   marketingUpdate: "upd",
   lead: "lead",
+  /* A fund accrual's id is DERIVED from its deal and fund rather than minted
+     here, so a retry cannot double count. See accrueForDeal. This prefix is for
+     the entries that have no deal: a payout or a correction. */
+  fundEntry: "fund",
+  rewardAward: "awrd",
+  partnerApplication: "appl",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];
