@@ -21,6 +21,7 @@ import {
   getApplication,
   listApplications,
   openApplicationCount,
+  reopenApplication,
 } from "../repo/applications";
 import { createInvite } from "../repo/invites";
 import { upsertPartnerForApplication } from "../repo/partners";
@@ -170,20 +171,28 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
 
     /* The company before the invite: the invite carries its id, and the upsert
        means a retry after a failure finds the company rather than making one. */
-    const partner = await upsertPartnerForApplication(db, {
-      applicationId: application.id,
-      name: application.company || application.name,
-      contactName: application.name,
-      contactEmail: application.email,
-      contactPhone: application.phone,
-    });
-    const invite = await createInvite(db, {
-      email: application.email,
-      role: "partner",
-      invitedBy: actor.id,
-      partnerId: partner.id,
-      partnerRole: "main",
-    });
+    let partner: Awaited<ReturnType<typeof upsertPartnerForApplication>>;
+    let invite: Awaited<ReturnType<typeof createInvite>>;
+    try {
+      partner = await upsertPartnerForApplication(db, {
+        applicationId: application.id,
+        name: application.company || application.name,
+        contactName: application.name,
+        contactEmail: application.email,
+        contactPhone: application.phone,
+      });
+      invite = await createInvite(db, {
+        email: application.email,
+        role: "partner",
+        invitedBy: actor.id,
+        partnerId: partner.id,
+        partnerRole: "main",
+      });
+    } catch (err) {
+      // decideApplication already committed "approved"; put it back to open rather than stranding it with no invite and nothing able to retry.
+      if (application.decidedAt !== null) await reopenApplication(db, application.id, application.decidedAt);
+      throw err;
+    }
 
     /* The deployment's own host, never the request's: this URL goes in mail, and a
        host chosen by whoever made the request is a phishing page wearing our return

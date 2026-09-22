@@ -176,6 +176,26 @@ export async function decideApplication(
   return toApplication(after);
 }
 
+/**
+ * Puts an approval back to open when the company or invite it needed could not be made.
+ *
+ * A compare-and-set on the decision this call wrote, so it never undoes somebody
+ * else's. A newer open application from the same address wins the unique index,
+ * and this one then stays approved.
+ */
+export async function reopenApplication(db: Db, id: string, decidedAt: number): Promise<boolean> {
+  try {
+    const result = await rows(db).updateOne(
+      { _id: id, status: "approved", decidedAt },
+      { $set: { status: "open", reason: "", decidedByName: "", decidedAt: null, updatedAt: Date.now() } },
+    );
+    return result.modifiedCount === 1;
+  } catch (err) {
+    if ((err as { code?: number }).code === 11000) return false;
+    throw err;
+  }
+}
+
 /** How many are waiting, for the nav badge. A queue nobody sees is a queue nobody works. */
 export async function openApplicationCount(db: Db): Promise<number> {
   return rows(db).countDocuments({ status: "open" });

@@ -51,6 +51,7 @@ export {
   getApplication,
   listApplications,
   openApplicationCount,
+  reopenApplication,
   APPLICATION_STATUSES,
   type ApplicationStatus,
   type PartnerApplication,
