@@ -699,7 +699,12 @@ function mockApi(S) {
       const detail = (p) => ({ partner: strip(p), limits: lim(p), defaults: S.partnerSettings.limits, usage: use(p), accounts: p.accounts, invites: p.invites });
       const find = (id) => S.partners.find((p) => p.id === id);
       const mine = () => find(S.owner.partnerId);
-      const view = () => ({ ...detail(mine()), viewer: { userId: S.owner.id, partnerRole: S.owner.partnerRole } });
+      // No `defaults`: CompanyView does not carry AV Homes' default limits, and a
+      // mock more generous than the API is how a screen passes here and fails live.
+      const view = () => {
+        const { defaults, ...rest } = detail(mine());
+        return { ...rest, viewer: { userId: S.owner.id, partnerRole: S.owner.partnerRole } };
+      };
       const touch = (p) => Object.assign(p, { updatedAt: Date.now(), revision: p.revision + 1 });
       return [
         ["GET", /^\/api\/admin\/partners$/, () => ({
@@ -728,12 +733,16 @@ function mockApi(S) {
           const p = find(m[1]);
           const a = p.accounts.find((x) => x.id === m[2]);
           a.disabledAt = m[3] === "disable" ? Date.now() : null;
-          return detail(touch(p));
+          // No touch(): this writes the user, not the company. The detail page
+          // keys its cards by revision, so bumping it here would throw away a
+          // half-typed limit the real console keeps.
+          return detail(p);
         }],
         ["DELETE", /^\/api\/admin\/partners\/([^/]+)\/invites\/([^/]+)$/, (m) => {
           const p = find(m[1]);
           p.invites = p.invites.filter((i) => i.id !== m[2]);
-          return detail(touch(p));
+          // No touch(): revoking writes the invite, not the company.
+          return detail(p);
         }],
         ["GET", /^\/api\/admin\/partner-settings$/, () => ({ settings: S.partnerSettings })],
         ["PATCH", /^\/api\/admin\/partner-settings$/, (m, u, b) => {
