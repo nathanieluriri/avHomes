@@ -113,8 +113,10 @@ The company
      statusReason: string;
      /** A null field takes the default from Partners settings. */
      limits: { [K in keyof PartnerLimits]: number | null };
-     mainUserId: string;
-     applicationId: string;
+     /** Null until the main person first signs in. */
+     mainUserId: string | null;
+     /** Null for a company the migration made from an account with no application. */
+     applicationId: string | null;
      createdAt: number;
      updatedAt: number;
      revision: number;
@@ -215,9 +217,10 @@ door.
 
 Approving an application now makes the company before the invite. The
 application is claimed by the CAS that already exists, the company is upserted
-on a unique ``applicationId``, and the invite carries its id with
-``partnerRole: "main"``. The upsert is what lets a retry after a failure finish
-the job rather than make a second company.
+on an id derived from the application's (``ptnr_`` and the application id's
+body, the way a fund accrual's id is derived from its deal), and the invite
+carries it with ``partnerRole: "main"``. The derived id is what lets a retry
+after a failure finish the job rather than make a second company.
 
 Removing somebody
 -----------------
@@ -496,7 +499,7 @@ Analytics           The overview, listings and traffic pages, over their
                     listings only
 Photos              Their company's uploads
 Company             Contact details, limits and how much of each is used
-Staff               The main account only
+Staff               Who is on the team. Only the main account changes it
 ==================  ===========================================================
 
 Refused, because they are about other people's property: the dashboard's site
@@ -638,26 +641,34 @@ The lifecycle route takes ``withdraw`` from a partner and requires ``note`` on
 Data
 ====
 
-One migration, numbered next in ``packages/db/src/migrations`` when this is
-built. PR #12 adds none, so that is ``0016`` unless something else lands
-first. Read the folder rather than this document.
+One migration per pass, each numbered next in ``packages/db/src/migrations``
+when it is built. Read the folder rather than this document.
 
-=====================  ======================================================
-Collection             Change
-=====================  ======================================================
-``partners``           New. Unique ``applicationId``, index on ``status``
-``listing_reviews``    New. ``_id`` is the listing id. Indexes on
-                       ``(state, submittedAt)`` and ``partnerId``
-``users``              ``partnerId``, ``partnerRole``. Index on ``partnerId``
-``invites``            ``partnerId``, ``partnerRole``
-``properties``         ``partnerId``, ``partnerHold``. Index on
-                       ``(partnerId, status)``
-``enquiries``          ``partnerId``. Index on ``(partnerId, createdAt)``
-``images``             ``partnerId``. Index on ``(partnerId, createdAt)``
-``marketing_deals``    ``closerKind`` gains ``partner``, plus
-                       ``referralCheckedAt``
-``settings``           A ``partners`` document holding the default limits
-=====================  ======================================================
+Before either, ``0016`` re-applies the invites validator and ships on its own.
+``0001`` wrote that validator inline, which froze its role list before
+``partner`` existed, and no later migration re-applied it. So on a database
+migrated before the partner role, approving an application writes an invite the
+validator refuses.
+
+=====================  ====  ================================================
+Collection             Pass  Change
+=====================  ====  ================================================
+``partners``           one   New. Its id derived from the application's.
+                             Indexes on ``applicationId`` and ``status``
+``users``              one   ``partnerId``, ``partnerRole``. Index on
+                             ``partnerId``
+``invites``            one   ``partnerId``, ``partnerRole``
+``properties``         one   ``partnerId``, ``partnerHold``. Index on
+                             ``(partnerId, status)``
+``images``             one   ``partnerId``. Index on ``(partnerId, createdAt)``
+``settings``           one   A ``partners`` document holding the default
+                             limits, read with defaults when absent
+``listing_reviews``    two   New. ``_id`` is the listing id. Indexes on
+                             ``(state, submittedAt)`` and ``partnerId``
+``enquiries``          two   ``partnerId``. Index on ``(partnerId, createdAt)``
+``marketing_deals``    two   ``closerKind`` gains ``partner``, plus
+                             ``referralCheckedAt``
+=====================  ====  ================================================
 
 The backfill turns every partner that exists into a company of one.
 
@@ -666,8 +677,8 @@ The backfill turns every partner that exists into a company of one.
 2. Each open invite at role ``partner`` gets the company of its application,
    so somebody who has not signed in yet lands in the right one.
 3. Every listing whose ``agentUserId`` is a partner account takes that
-   account's ``partnerId``. Every thread takes its listing's, and every image
-   its uploader's.
+   account's ``partnerId``, and every image its uploader's. In pass two, every
+   thread takes its listing's.
 
 A partner account with no application to match gets a company named after the
 account and is listed in the migration's output, so a person decides what it
