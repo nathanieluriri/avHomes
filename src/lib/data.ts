@@ -108,6 +108,7 @@ function complete(p: Property): Property {
     seoTitle: partial.seoTitle ?? "",
     seoDescription: partial.seoDescription ?? "",
     previousSlugs: partial.previousSlugs ?? [],
+    partnerId: partial.partnerId ?? null,
   };
 }
 
