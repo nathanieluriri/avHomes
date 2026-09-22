@@ -37,6 +37,7 @@ import {
   updatePartner,
 } from "../repo/partners";
 import { readPartnerSettings } from "../repo/partner-settings";
+import { limit } from "../repo/ratelimit";
 import { createInvite, findOpenInvite, revokePartnerInvite } from "../repo/invites";
 import { findUserByEmail, findUserById } from "../repo/users";
 
@@ -60,13 +61,7 @@ function requireCompany(): MiddlewareHandler<AppEnv> {
   };
 }
 
-/**
- * The seat decides who the main account is, never the `partnerRole` label on
- * the caller's own session: that label only mirrors the seat and can go
- * stale, so it is never trusted for authority. Loads the company itself and
- * returns it, so a route that needs the partner afterwards does not read it
- * twice.
- */
+// The seat decides, never the session's partnerRole label, which can go stale.
 async function requireMain(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Partner> {
   const id = currentUser(c).partnerId as string;
   const partner = await findPartner(db, id);
@@ -132,6 +127,20 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
   routes.post("/admin/company/staff/invites", requireAuth(), requireCompany(), async (c) => {
     const db = await currentDb(c);
     const partner = await requireMain(db, c);
+
+    await limit(db, `partner-invite:${partner.id}`, 20, 24 * 60 * 60 * 1000);
+
+    const [staffCount, settings] = await Promise.all([countStaffSeats(db, partner.id), readPartnerSettings(db)]);
+    const staffLimit = effectiveLimits(partner.limits, settings.limits).staff;
+    if (staffCount >= staffLimit) {
+      throw new PreconditionFailedError("limit_reached", {
+        limit: "staff",
+        count: staffCount,
+        max: staffLimit,
+        detail: limitRefusal("staff", staffCount, staffLimit, "partner"),
+      });
+    }
+
     const actor = currentUser(c);
     const { email: address } = await readJson(c, InviteBody);
 
@@ -142,15 +151,6 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
         detail: "This address already has an open invite.",
       });
     }
-    const view = await viewFor(db, c, deps);
-    if (view.usage.staff >= view.limits.staff) {
-      throw new PreconditionFailedError("limit_reached", {
-        limit: "staff",
-        count: view.usage.staff,
-        max: view.limits.staff,
-        detail: limitRefusal("staff", view.usage.staff, view.limits.staff, "partner"),
-      });
-    }
 
     const invite = await createInvite(db, {
       email: address,
@@ -159,6 +159,19 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
       partnerId: partner.id,
       partnerRole: "staff",
     });
+
+    // Parallel invites each saw room for one more, so the insert is checked again and undone if it went over.
+    const staffCountAfter = await countStaffSeats(db, partner.id);
+    if (staffCountAfter > staffLimit) {
+      await revokePartnerInvite(db, partner.id, invite._id);
+      throw new PreconditionFailedError("limit_reached", {
+        limit: "staff",
+        count: staffCountAfter,
+        max: staffLimit,
+        detail: limitRefusal("staff", staffCountAfter, staffLimit, "partner"),
+      });
+    }
+
     auditEntityId(c, invite._id);
 
     // The deployment's own host, never the request's, for the reason team invites give.
@@ -167,9 +180,9 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
       deps.mailer,
       {
         to: address,
-        subject: `${actor.displayName} added you to ${view.partner.name} on AV Homes`,
+        subject: `${actor.displayName} added you to ${partner.name} on AV Homes`,
         text: [
-          `${actor.displayName} has added you to ${view.partner.name}'s account on AV Homes.`,
+          `${actor.displayName} has added you to ${partner.name}'s account on AV Homes.`,
           "",
           `Sign in here: ${url}`,
           "",
@@ -194,8 +207,10 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
     const partner = await requireMain(db, c);
     const userId = pathParam(c, "userId");
     const target = await findUserById(db, userId);
-    // Another company's account is simply not found.
-    if (!target || target.user.partnerId !== partner.id) throw new NotFoundError(`account ${userId}`);
+    // Another company's account, or one that is not a partner account, is simply not found.
+    if (!target || target.user.partnerId !== partner.id || target.user.role !== "partner") {
+      throw new NotFoundError(`account ${userId}`);
+    }
     if (partner.mainUserId === userId) {
       throw new PreconditionFailedError("remove_main", {
         detail: "The main account cannot be removed. AV Homes can move the main role to someone else.",
