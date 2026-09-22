@@ -246,7 +246,11 @@ export function partnerAdminRoutes(deps: { mailer: Mailer } & PartnerPorts): Hon
     const userId = pathParam(c, "userId");
     const detail = await detailFor(db, id, deps);
     const target = await findUserById(db, userId);
-    if (!target || target.user.partnerId !== id) throw new NotFoundError(`account ${userId}`);
+    // Both clauses, like disable: an AV Homes account carrying a partnerId is not
+    // this company's to put back either.
+    if (!target || target.user.partnerId !== id || target.user.role !== "partner") {
+      throw new NotFoundError(`account ${userId}`);
+    }
     auditBefore(c, target as unknown as Record<string, unknown>);
     if (target.user.partnerRole === "staff" && target.disabledAt != null) {
       const seats = await countStaffSeats(db, id, userId);
