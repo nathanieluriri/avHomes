@@ -634,6 +634,11 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
       throw new UnauthenticatedError("no account for that address, or the password is wrong");
     }
 
+    // A partner has no app here, and this cookie would open the console past a suspension.
+    if (isScopedRole(found.user.role)) {
+      throw new ForbiddenError("partner accounts sign in at /admin/sign-in");
+    }
+
     const { token, expiresAt } = await createSession(
       db,
       found.user.id,

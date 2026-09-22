@@ -23,6 +23,7 @@ import {
   openApplicationCount,
 } from "../repo/applications";
 import { createInvite } from "../repo/invites";
+import { upsertPartnerForApplication } from "../repo/partners";
 import { limit } from "../repo/ratelimit";
 import { requireAdmin, requireAuth } from "../middleware";
 
@@ -167,10 +168,21 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       return c.json({ application, url: null, already: false });
     }
 
+    /* The company before the invite: the invite carries its id, and the upsert
+       means a retry after a failure finds the company rather than making one. */
+    const partner = await upsertPartnerForApplication(db, {
+      applicationId: application.id,
+      name: application.company || application.name,
+      contactName: application.name,
+      contactEmail: application.email,
+      contactPhone: application.phone,
+    });
     const invite = await createInvite(db, {
       email: application.email,
       role: "partner",
       invitedBy: actor.id,
+      partnerId: partner.id,
+      partnerRole: "main",
     });
 
     /* The deployment's own host, never the request's: this URL goes in mail, and a
@@ -199,7 +211,7 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     /* The URL comes back whether or not the mail went, the rule team invites
        already hold: an approval that depends on a working mail provider is an
        approval nobody can hand over by hand. */
-    return c.json({ application, url, inviteId: invite._id, already: false });
+    return c.json({ application, url, inviteId: invite._id, partnerId: partner.id, already: false });
   });
 
   return routes;
