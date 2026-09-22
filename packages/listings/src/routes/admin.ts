@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   BadRequestError,
+  ForbiddenError,
   NotFoundError,
   PreconditionFailedError,
   StaleWriteError,
@@ -26,6 +27,7 @@ import {
   FEE_KINDS_FOR,
   FURNISHINGS,
   LISTING_TYPES,
+  NO_PARTNER,
   PROPERTY_STATUSES,
   OWNERSHIPS,
   PROPERTY_TYPES,
@@ -288,6 +290,9 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     const db = await currentDb(c);
     const user = currentUser(c);
     const scope = partnerScopeOf(user);
+    // Never written: NO_PARTNER is the sentinel a companyless account scopes to,
+    // and stamping it on a row would let every other companyless account match it.
+    if (scope === NO_PARTNER) throw new ForbiddenError("this partner account has no company");
     const { title, type } = await readJsonOrEmpty(c, CreateBody);
     const property = await createProperty(db, {
       title,

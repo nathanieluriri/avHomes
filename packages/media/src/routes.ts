@@ -25,6 +25,7 @@ import {
   DEFAULT_MEDIA_QUOTA_BYTES,
   formatBytes,
   isScopedRole,
+  NO_PARTNER,
   partnerScopeOf,
   type ImageRecord,
   type MediaUsage,
@@ -365,6 +366,12 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
     // immediately instead of after buffering twelve megabytes.
     deps.storage.assertConfigured();
 
+    const user = currentUser(c);
+    const scope = partnerScopeOf(user);
+    // Never written: NO_PARTNER is the sentinel a companyless account scopes to,
+    // and stamping it on a row would let every other companyless account match it.
+    if (scope === NO_PARTNER) throw new ForbiddenError("this partner account has no company");
+
     const db = await currentDb(c);
     // Checked against the declared length first, so a full store does not buffer a 90MB video to say no.
     const usageBefore = await mediaUsage(db);
@@ -395,7 +402,6 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
     const sniffed = sniffImage(buffer);
     refuseOverQuota(usageBefore, buffer.byteLength);
 
-    const user = currentUser(c);
     const now = Date.now();
     const id = newId("img", now);
 
@@ -417,7 +423,7 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
       createdAt: now,
       updatedAt: now,
       uploadedBy: user.id,
-      partnerId: partnerScopeOf(user),
+      partnerId: scope,
     };
     await images(db).insertOne(doc);
     auditEntityId(c, doc._id);
