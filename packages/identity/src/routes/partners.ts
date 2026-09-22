@@ -225,7 +225,11 @@ export function partnerAdminRoutes(deps: { mailer: Mailer } & PartnerPorts): Hon
     const partner = await findPartner(db, id);
     if (!partner) throw new NotFoundError(`partner ${id}`);
     const target = await findUserById(db, userId);
-    if (!target || target.user.partnerId !== id) throw new NotFoundError(`account ${userId}`);
+    // Both clauses, like the company's own remove: an AV Homes account that somehow
+    // carries a partnerId is not this company's to disable either.
+    if (!target || target.user.partnerId !== id || target.user.role !== "partner") {
+      throw new NotFoundError(`account ${userId}`);
+    }
     auditBefore(c, target as unknown as Record<string, unknown>);
     if (partner.mainUserId === userId) {
       throw new PreconditionFailedError("main_account", {

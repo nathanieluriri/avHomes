@@ -108,10 +108,11 @@ interface Rule {
    * `null` means this path gates ITSELF and the table must not gate it.
    *
    * Reserved for a route that answers every role a DIFFERENT thing rather than
-   * answering some roles nothing. There are two, and the bar for a third is
-   * that its handler already filters its own output per caller: a null
-   * here opts a path out of the catch-all below, so anything that merely wants
-   * to be reachable by several roles wants a domain, not this.
+   * answering some roles nothing. There are five (health, tutorials,
+   * notifications, mail-status, company), and the bar for a sixth is that its
+   * handler already filters its own output per caller: a null here opts a path
+   * out of the catch-all below, so anything that merely wants to be reachable
+   * by several roles wants a domain, not this.
    *
    * Matched EXACTLY, unlike a domain rule, which is a prefix, unless the rule
    * also sets `subtree`. See `domainFor`.
@@ -169,8 +170,9 @@ const RULES: readonly Rule[] = [
    * `requireAuth()`, so this is not open: it is signed-in, then filtered.
    */
   { prefix: "/api/admin/health", domain: null },
-  /* SELF-GATING, and the one SUBTREE bypass: every route under it reads and
-     writes only the caller's own progress, and every role has tutorials.
+  /* SELF-GATING, and one of the three SUBTREE bypasses, with notifications and
+     company: every route under it reads and writes only the caller's own
+     progress, and every role has tutorials.
      `requireAuth()` stays on each route. ANY route added under
      /api/admin/tutorials is open to every signed-in member, so it must only
      ever touch the caller's own rows. */
@@ -228,8 +230,8 @@ export function domainFor(path: string): Domain | null {
      * everything below it on a segment boundary: `/api/admin/tutorials/x` is
      * exempt, `/api/admin/tutorials-x` is not. A new route under a subtree is
      * exempted the day it is written, without anybody deciding to, which is
-     * why there is exactly one and why its routes may only touch the caller's
-     * own rows.
+     * why there are only three (tutorials, notifications, company) and why
+     * their routes may only touch the caller's own rows.
      */
     const matched =
       rule.domain === null

@@ -295,7 +295,7 @@ function AccessCard({ detail, onChanged }: { detail: PartnerDetail; onChanged: C
         hint={
           suspended
             ? "They are told this when their access comes back."
-            : "They are told this. Suspending signs every account out and takes their listings off the site."
+            : "They are told this. Suspending signs every account out at once, and their listings come off the site within about ten minutes."
         }
       >
         <input className={inputClass} value={reason} onChange={(event) => setReason(event.target.value)} />

@@ -39,6 +39,7 @@ export default function StaffPage() {
   async function act(key: string, call: () => Promise<CompanyView & { url?: string }>) {
     setBusy(key);
     setError(null);
+    setLink(null); // The last invite's link is not this action's answer.
     try {
       const next = await call();
       setView(next);

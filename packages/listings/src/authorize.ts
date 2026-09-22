@@ -84,7 +84,7 @@ export function assertAuthorized(
         ? "only an owner or developer can destroy a listing"
         : action === "status"
           ? "only AV Homes can publish or close a listing"
-          : "this listing belongs to another agent",
+          : "this listing belongs to somebody else",
     );
   }
 }

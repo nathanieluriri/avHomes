@@ -4,6 +4,7 @@ import {
   ASSIGNABLE_ROLES,
   canAssign,
   canManage,
+  isConsoleRole,
   type Role,
 } from "@avhomes/contracts";
 import {
@@ -101,7 +102,10 @@ const REFUSAL_DETAIL: Record<Refusal, string> = {
  * row the list no longer shows cannot be reached by id either.
  */
 function refuseIfNotTeam(target: FoundUser, userId: string): void {
-  if (target.user.role === "marketer") refuse("manage_marketer", userId);
+  // The question, not a list of today's answers: a future role that belongs in
+  // neither place is refused by default rather than passing because nobody named it.
+  if (!isConsoleRole(target.user.role)) refuse("manage_marketer", userId);
+  // A partner IS a console role, so it needs its own clause beside the question.
   if (target.user.role === "partner") refuse("manage_partner", userId);
 }
 

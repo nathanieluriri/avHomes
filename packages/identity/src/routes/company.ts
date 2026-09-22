@@ -9,7 +9,6 @@ import {
   type Partner,
 } from "@avhomes/contracts";
 import {
-  DuplicateError,
   ForbiddenError,
   NotFoundError,
   PreconditionFailedError,
@@ -128,6 +127,13 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
     const db = await currentDb(c);
     const partner = await requireMain(db, c);
 
+    const actor = currentUser(c);
+    const { email: address } = await readJson(c, InviteBody);
+
+    /* Parsed before the limiter, like the application intake: a schema check is free
+       and the limiter is a database write, so a mistyped body does not spend a day's
+       budget. It stays ABOVE the address checks below, which is what bounds the
+       probe the neutral refusal down there declines to answer. */
     await limit(db, `partner-invite:${partner.id}`, 20, 24 * 60 * 60 * 1000);
 
     const [staffCount, settings] = await Promise.all([countStaffSeats(db, partner.id), readPartnerSettings(db)]);
@@ -141,14 +147,23 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
       });
     }
 
-    const actor = currentUser(c);
-    const { email: address } = await readJson(c, InviteBody);
-
-    if (await findUserByEmail(db, address)) throw new DuplicateError("email", address);
-    if (await findOpenInvite(db, address)) {
-      throw new PreconditionFailedError("invite_open", {
-        email: address,
-        detail: "This address already has an open invite.",
+    const [existing, open] = await Promise.all([findUserByEmail(db, address), findOpenInvite(db, address)]);
+    if (existing || open) {
+      /* ONE refusal for both, and it asserts nothing: two would let a company's main
+         account learn whether an address is known to AV Homes ANYWHERE, which is more
+         than "is it free in my company". The reason stays in the log, where AV Homes
+         can still tell the two apart. */
+      console.warn(
+        "[api]",
+        JSON.stringify({
+          requestId: c.get("requestId"),
+          route: "POST /admin/company/staff/invites",
+          partnerId: partner.id,
+          reason: existing ? "account_exists" : "invite_open",
+        }),
+      );
+      throw new PreconditionFailedError("invite_unavailable", {
+        detail: "This address cannot be added. Check it, and ask AV Homes if it looks right.",
       });
     }
 
