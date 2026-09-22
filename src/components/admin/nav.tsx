@@ -306,22 +306,36 @@ export const NAV: readonly NavItem[] = [
     ],
   },
   {
+    href: "/admin/partners",
+    label: "Partners",
+    hint: "Companies listing their own property, their teams and limits",
+    icon: Building2,
+    domain: "team",
+    unscoped: true,
+    children: [
+      {
+        href: "/admin/partners/applications",
+        label: "Applications",
+        hint: "People asking to list their own property",
+        icon: UserRoundSearch,
+        domain: "team",
+      },
+      {
+        href: "/admin/partners/settings",
+        label: "Settings",
+        hint: "The limits every partner starts with",
+        icon: SlidersHorizontal,
+        domain: "team",
+      },
+    ],
+  },
+  {
     href: "/admin/team",
     label: "Team",
     hint: "Who can sign in, and what they may touch",
     icon: Users,
     domain: "team",
     children: [
-      {
-        /* Under Team because approving one mints an account, which is exactly what
-           the team domain governs. A partner is not a teammate, but deciding who
-           gets an account is the same job. */
-        href: "/admin/partners",
-        label: "Partner applications",
-        hint: "People asking to list their own property",
-        icon: UserRoundSearch,
-        domain: "team",
-      },
       {
         href: "/admin/audit",
         label: "Audit trail",

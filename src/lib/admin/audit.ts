@@ -192,6 +192,7 @@ const OWN_PAGE: Partial<Record<AuditEntity, string>> = {
   post: "/admin/posts",
   enquiry: "/admin/enquiries",
   lead: "/admin/marketers/buyers",
+  partner: "/admin/partners",
 };
 
 /**
@@ -216,6 +217,7 @@ const ENTITY_SCREEN: Partial<Record<AuditEntity, { href: string; label: string }
   settings: { href: "/admin/settings", label: "the settings screen" },
   update: { href: "/admin/marketers/updates", label: "the updates screen" },
   lead: { href: "/admin/marketers/buyers", label: "the buyers screen" },
+  partner: { href: "/admin/partners", label: "the Partners screen" },
 };
 
 /** Where the console shows this record, and what the link should call it. */
