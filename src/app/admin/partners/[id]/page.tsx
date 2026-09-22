@@ -14,7 +14,7 @@ import {
 } from "@avhomes/contracts";
 import { api, type ApiError } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
-import { relative } from "@/lib/admin/format";
+import { relative, shortDate } from "@/lib/admin/format";
 import { toApiError } from "@/lib/admin/marketing";
 import {
   Badge,
@@ -156,7 +156,9 @@ function TeamCard({ detail, onChanged }: { detail: PartnerDetail; onChanged: Cha
           <li key={invite.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2.5">
             <span className="min-w-0 break-all text-[13px] text-plum-950">{invite.email}</span>
             <Badge tone="amber">Invited</Badge>
-            <span className="text-[11px] text-slate-550">Expires {relative(invite.expiresAt)}</span>
+            {/* A date, not relative(): that helper only counts backwards, so
+                every unexpired invite read "Expires just now". */}
+            <span className="text-[11px] text-slate-550">Expires {shortDate(invite.expiresAt)}</span>
             <span className="ml-auto">
               <ConfirmButton
                 size="sm"
