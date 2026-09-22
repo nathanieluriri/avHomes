@@ -1,5 +1,5 @@
 import type { Db, Document } from "mongodb";
-import { ALL_ROLES } from "@avhomes/contracts";
+import { ALL_ROLES, PARTNER_ROLES } from "@avhomes/contracts";
 import { COLLECTIONS } from "../collections";
 import { ensureCollection, type Migration } from "../migrate";
 
@@ -26,6 +26,8 @@ export function invitesValidator(): Document {
         createdAt: TS,
         expiresAt: TS,
         acceptedAt: NULLABLE_TS,
+        partnerId: { bsonType: ["string", "null"] },
+        partnerRole: { enum: [...PARTNER_ROLES, null] },
       },
     },
   };
