@@ -716,36 +716,6 @@ export async function recordSale(
   return toDeal(after as DealDoc);
 }
 
-/**
- * Approved deals whose listing is not closed yet.
- *
- * The source of the admin alert that opens the sale sheet. Returns deal ids and
- * listing ids only: which of those listings is actually still open is a listings
- * question, answered by the caller, because this package cannot read that
- * collection.
- */
-export async function settledAwaitingClose(
-  db: Db,
-  limit: number,
-): Promise<{ dealId: string; listingId: string; listingTitle: string; reviewedAt: number }[]> {
-  const rows = await deals(db)
-    .find(
-      { status: "approved" },
-      {
-        projection: { _id: 1, listingId: 1, listingTitle: 1, reviewedAt: 1 },
-        sort: { reviewedAt: -1 },
-        limit,
-      },
-    )
-    .toArray();
-  return rows.map((row) => ({
-    dealId: row._id,
-    listingId: row.listingId,
-    listingTitle: row.listingTitle ?? "",
-    reviewedAt: row.reviewedAt ?? row.createdAt,
-  }));
-}
-
 /** Marketers matching a code or a name, for the closer picker. */
 export async function findClosers(db: Db, query: string): Promise<ChainMember[]> {
   const trimmed = query.trim();

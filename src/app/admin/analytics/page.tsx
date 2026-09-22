@@ -56,7 +56,11 @@ export default function AnalyticsOverviewPage() {
       <PageHeader
         icon={ChartNoAxesColumn}
         title="Analytics"
-        subtitle="What the business did, and where the money went."
+        subtitle={
+          data?.scoped
+            ? "How your own listings are doing, and what they have earned you."
+            : "What the business did, and where the money went."
+        }
         actions={<PeriodPicker current={period} spotlight="analytics-period" />}
       />
 
@@ -73,6 +77,44 @@ export default function AnalyticsOverviewPage() {
           <Skeleton className="h-20" />
           <Skeleton className="h-20" />
         </StatRow>
+      ) : data?.yours ? (
+        <>
+          {/*
+            A PARTNER'S OWN FOUR, in the order a property owner asks them: what it
+            sold for, what AV Homes took, what came to them, and how many sales.
+            Every figure is their listings' alone. Each deal's full split (who
+            closed it, each level, both funds, what AV Homes kept) is one tap away
+            on Transactions, rather than a second row of tiles here.
+          */}
+          <StatRow>
+            <StatTile
+              label="Sold"
+              value={formatMoney(data.yours.soldMinor, data.yours.currency)}
+              scope={scope}
+              spotlight="analytics-yours-sold"
+            />
+            <StatTile
+              label="AV Homes' fee"
+              value={formatMoney(data.yours.feeMinor, data.yours.currency)}
+              scope="commission and both funds"
+              tone="quiet"
+            />
+            <StatTile
+              label="Yours"
+              value={formatMoney(data.yours.netMinor, data.yours.currency)}
+              scope="after the fee"
+              tone="quiet"
+            />
+            <StatTile label="Sales" value={String(data.yours.deals)} scope={scope} tone="quiet" />
+          </StatRow>
+
+          <div className="mb-4 flex">
+            <ButtonLink href="/admin/analytics/transactions" variant="ghost">
+              <Receipt className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Every sale, with its split
+            </ButtonLink>
+          </div>
+        </>
       ) : money ? (
         <>
           {/*

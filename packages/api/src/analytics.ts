@@ -3,6 +3,7 @@ import { z } from "zod";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import {
   BadRequestError,
+  ForbiddenError,
   clampLimit,
   currentDb,
   currentUser,
@@ -36,6 +37,7 @@ import {
   type Ownership,
   type PartnerMoney,
   type PartnerSaleRow,
+  type PartnerTotals,
   type PeoplePage,
   type Period,
   type PersonRow,
@@ -385,16 +387,26 @@ export function analyticsConsoleRoutes(): Hono<AppEnv> {
     const period = periodFrom(readQuery(c, PeriodQuery).period);
     const settings = await readMarketingSettings(db);
 
-    const [money, funds, pulse, listingCounts] = await Promise.all([
-      scope.money ? moneyOverview(db, period, scope, settings.currency) : null,
+    /*
+     * A PARTNER'S OVERVIEW HAS ITS OWN SHAPE, not AV Homes' with some tiles hidden.
+     *
+     * `money` is how AV Homes divided each sale (commission out, what it kept), and
+     * `pulse` is every visitor to the whole site. Both are AV Homes' figures, and a
+     * screen hiding them would still have shipped them in the response. So for a
+     * partner they are never computed, and `yours` carries the three numbers that
+     * are genuinely theirs.
+     */
+    const [money, funds, pulse, listingCounts, yours] = await Promise.all([
+      scope.money && !scope.partner ? moneyOverview(db, period, scope, settings.currency) : null,
       scope.money && !scope.partner
         ? fundBalances(db, {
             reward: settings.rewardPoolName,
             foundation: settings.foundationName,
           })
         : null,
-      sitePulse(db),
+      scope.partner ? null : sitePulse(db),
       listingCountsFor(db, scope, period),
+      scope.partner ? partnerMoneyFor(db, period, scope, settings.currency) : null,
     ]);
 
     /* The prize is an AV Homes matter. A partner is not in the league and their
@@ -417,6 +429,7 @@ export function analyticsConsoleRoutes(): Hono<AppEnv> {
       pulse,
       listings: listingCounts,
       scoped: scope.partner,
+      yours: yours ? totalsOf(yours.rows, settings.currency) : null,
     };
     return c.json(body);
   });
@@ -425,6 +438,10 @@ export function analyticsConsoleRoutes(): Hono<AppEnv> {
   routes.get("/admin/analytics/transactions", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const scope = await scopeFor(db, currentUser(c));
+    /* A partner reads every detail of the deals on their OWN listings, the owner's
+       call on 2026-09-22: who closed it, each level's earnings, both fund shares
+       and what AV Homes kept. `dealMatch` narrows the rows to their listing ids, so
+       nothing about anybody else's property can appear here. */
     if (!scope.money) throw new BadRequestError("money", [
       { path: "role", message: "this role does not read money figures" },
     ]);
@@ -677,21 +694,26 @@ export function analyticsConsoleRoutes(): Hono<AppEnv> {
     const scope = await scopeFor(db, currentUser(c));
     const period = periodFrom(readQuery(c, PeriodQuery).period);
 
-    const [pulse, top] = await Promise.all([
-      sitePulse(db),
-      topViewedListings(db, { from: dayOf(period.from), to: dayOf(period.to), limit: 10 }),
+    /* A partner's listings are ranked AMONG THEMSELVES, filtered before the limit.
+       Filtering the whole site's top ten afterwards showed most partners an empty
+       table, since few of anybody's listings make the site's ten. */
+    const [pulse, visible] = await Promise.all([
+      scope.partner ? null : sitePulse(db),
+      scope.listingIds !== null && scope.listingIds.length === 0
+        ? Promise.resolve([])
+        : topViewedListings(db, {
+            from: dayOf(period.from),
+            to: dayOf(period.to),
+            limit: 10,
+            ...(scope.listingIds === null ? {} : { listingIds: scope.listingIds }),
+          }),
     ]);
-
-    /* Titles resolved after the counts, and FILTERED by the scope: a partner sees
-       their own listings in the table and nobody else's, even though the counter
-       itself knows nothing about who owns what. */
-    const allowed = scope.listingIds === null ? null : new Set(scope.listingIds);
-    const visible = top.filter((row) => allowed === null || allowed.has(row.listingId));
     const titles = await titlesFor(db, visible.map((row) => row.listingId));
 
     const body: TrafficReport = {
       period,
       pulse,
+      scoped: scope.partner,
       top: visible.map((row) => ({
         listingId: row.listingId,
         title: titles.get(row.listingId) ?? "A listing that has since gone",
@@ -714,41 +736,17 @@ export function analyticsConsoleRoutes(): Hono<AppEnv> {
   routes.get("/admin/analytics/my-sales", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const scope = await scopeFor(db, currentUser(c));
+    /* A partner's screen. For anybody else the scope is the whole site, and an
+       agent or support account (no marketing) would have read every sale's price
+       and fee here while Transactions refused them the same thing. */
+    if (!scope.partner) {
+      throw new ForbiddenError("this is a partner's own view; AV Homes' sales are under Transactions");
+    }
     const period = periodFrom(readQuery(c, PeriodQuery).period);
     const settings = await readMarketingSettings(db);
 
-    const rows = await deals(db)
-      .find(dealMatch(period, scope), { sort: { closedOn: -1 } })
-      .toArray();
-
-    const sales: PartnerSaleRow[] = rows.map((row) => {
-      /* The fee is what AV Homes took in total: every person's share plus both
-         funds plus what it kept. Summed rather than derived from a rate, so a deal
-         settled under an older rate table still reports the truth. */
-      const feeMinor =
-        (row.shares ?? []).reduce((sum, share) => sum + share.amountMinor, 0) +
-        (row.fundShares ?? []).reduce((sum, share) => sum + share.amountMinor, 0) +
-        (row.keptMinor ?? 0);
-      return {
-        listingId: row.listingId,
-        title: row.listingTitle ?? "",
-        closedOn: row.closedOn,
-        kind: row.listingType,
-        soldMinor: row.amountMinor,
-        feeMinor,
-        netMinor: row.amountMinor - feeMinor,
-        currency: row.currency ?? settings.currency,
-      };
-    });
-
-    const body: PartnerMoney = {
-      period,
-      rows: sales,
-      soldMinor: sales.reduce((sum, row) => sum + row.soldMinor, 0),
-      feeMinor: sales.reduce((sum, row) => sum + row.feeMinor, 0),
-      netMinor: sales.reduce((sum, row) => sum + row.netMinor, 0),
-      currency: settings.currency,
-    };
+    const { rows } = await partnerMoneyFor(db, period, scope, settings.currency);
+    const body: PartnerMoney = { period, rows, ...totalsOf(rows, settings.currency) };
     return c.json(body);
   });
 
@@ -756,6 +754,51 @@ export function analyticsConsoleRoutes(): Hono<AppEnv> {
 }
 
 /* ═════════════════════════════════════════════════════════════════ HELPERS ══ */
+
+/**
+ * A partner's settled sales in the window, each reduced to price, fee and net.
+ *
+ * The fee is what AV Homes took in total: every person's share plus both funds
+ * plus what it kept. Summed rather than derived from a rate, so a deal settled
+ * under an older rate table still reports the truth.
+ */
+async function partnerMoneyFor(
+  db: Db,
+  period: Period,
+  scope: Scope,
+  currency: string,
+): Promise<{ rows: PartnerSaleRow[] }> {
+  const docs = await deals(db)
+    .find(dealMatch(period, scope), { sort: { closedOn: -1 } })
+    .toArray();
+  const rows = docs.map((row) => {
+    const feeMinor =
+      (row.shares ?? []).reduce((sum, share) => sum + share.amountMinor, 0) +
+      (row.fundShares ?? []).reduce((sum, share) => sum + share.amountMinor, 0) +
+      (row.keptMinor ?? 0);
+    return {
+      listingId: row.listingId,
+      title: row.listingTitle ?? "",
+      closedOn: row.closedOn,
+      kind: row.listingType,
+      soldMinor: row.amountMinor,
+      feeMinor,
+      netMinor: row.amountMinor - feeMinor,
+      currency: row.currency ?? currency,
+    };
+  });
+  return { rows };
+}
+
+function totalsOf(rows: readonly PartnerSaleRow[], currency: string): PartnerTotals {
+  return {
+    currency,
+    deals: rows.length,
+    soldMinor: rows.reduce((sum, row) => sum + row.soldMinor, 0),
+    feeMinor: rows.reduce((sum, row) => sum + row.feeMinor, 0),
+    netMinor: rows.reduce((sum, row) => sum + row.netMinor, 0),
+  };
+}
 
 function toTransactionRow(row: DealRow): TransactionRow {
   return {

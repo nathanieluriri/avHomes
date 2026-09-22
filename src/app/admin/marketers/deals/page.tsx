@@ -14,6 +14,7 @@ import { shortDate } from "@/lib/admin/format";
 import { DEAL_TONE, type MarketingCounts } from "@/lib/admin/marketing";
 import { Badge, ButtonLink, EmptyState, ErrorNote, PageHeader } from "@/components/admin/ui";
 import { DataTable, IdCell, TableToolbar, type Column } from "@/components/admin/DataTable";
+import { SoldStillListed } from "@/components/admin/SoldStillListed";
 
 /**
  * Deals to check: the queue somebody works through every morning.
@@ -186,6 +187,10 @@ export default function DealsPage() {
           </ButtonLink>
         }
       />
+
+      {/* Above the queue: an approved deal whose house is still advertised is the
+          one thing here costing a buyer a wasted call today. */}
+      <SoldStillListed />
 
       {error && (
         <div className="mb-4">

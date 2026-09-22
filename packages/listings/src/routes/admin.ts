@@ -335,12 +335,21 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     auditBefore(c, current as unknown as Record<string, unknown>);
     assertAuthorized(current, user, "write");
 
-    /* A scoped caller's listing is partner property by definition, so the two
-       ownership fields are dropped rather than refused: the form never showed
-       them, and a 400 about a control somebody cannot see is a dead end. */
+    /*
+     * Four fields are AV Homes' to set, and a scoped caller's copies are dropped
+     * rather than refused: the form never showed them, and a 400 about a control
+     * somebody cannot see is a dead end.
+     *
+     *   ownership, ownerLabel  a partner's listing is partner property by definition
+     *   featured               the home page slot is a promotion AV Homes chooses
+     *   agentUserId            who owns the record; a partner could hand theirs to
+     *                          another account, or null it and lock themselves out
+     */
     if (isScopedCaller(user)) {
       delete body.patch.ownership;
       delete body.patch.ownerLabel;
+      delete body.patch.featured;
+      delete body.patch.agentUserId;
     }
 
     // The rules below judge `current`, so the write must land on exactly that

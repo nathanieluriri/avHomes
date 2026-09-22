@@ -24,7 +24,9 @@ import {
 } from "@avhomes/identity";
 import { auditRoutes, auditTrail } from "@avhomes/audit";
 import {
+  authorize,
   closeWithSale,
+  getPropertyById,
   listProperties,
   listingFacts,
   listingsAdminRoutes,
@@ -57,6 +59,7 @@ import { accrueForDeal, fundsRoutes, reverseForDeal } from "@avhomes/funds";
 import { dashboardRoutes } from "./dashboard";
 import { analyticsConsoleRoutes } from "./analytics";
 import { healthRoutes } from "./health";
+import { awaitingCloseRoutes } from "./awaiting-close";
 import { tutorialsRoutes } from "./tutorials";
 import { developerNotifier, notificationsRoutes } from "./notifications";
 
@@ -395,7 +398,17 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * anyway: a GET ever added to that same shape would be the one shadowed,
    * not this route.
    */
-  app.route(API_PREFIX, auditRoutes());
+  /* A listing's history names who changed it, so a partner reads it only for a
+     listing they could open, by the same rule the editor itself uses. */
+  app.route(
+    API_PREFIX,
+    auditRoutes({
+      canReadListing: async (db, user, listingId) => {
+        const listing = await getPropertyById(db, listingId);
+        return listing !== null && authorize(listing, user, "read");
+      },
+    }),
+  );
   app.route(API_PREFIX, listingsAdminRoutes());
   app.route(API_PREFIX, contentAdminRoutes());
   app.route(API_PREFIX, mediaRoutes({ storage, notify }));
@@ -444,6 +457,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
      a collision is this router losing rather than shadowing an existing route. */
   app.route(API_PREFIX, analyticsConsoleRoutes());
   app.route(API_PREFIX, healthRoutes());
+  // Sold listings still advertised: needs deals and listings both, so it is answered here.
+  app.route(API_PREFIX, awaitingCloseRoutes());
 
   return app;
 }

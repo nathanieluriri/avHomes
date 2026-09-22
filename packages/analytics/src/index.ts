@@ -359,11 +359,23 @@ export async function listingViewCounts(
  */
 export async function topViewedListings(
   db: Db,
-  input: { from: string; to: string; limit: number },
+  input: {
+    from: string;
+    to: string;
+    limit: number;
+    /**
+     * Ranks only these. Filtered BEFORE the limit, so a partner gets their own ten
+     * best rather than whichever of theirs made the whole site's top ten, which
+     * for most partners is none.
+     */
+    listingIds?: readonly string[];
+  },
 ): Promise<{ listingId: string; views: number; sessions: number }[]> {
+  const match: Record<string, unknown> = { day: { $gte: input.from, $lte: input.to } };
+  if (input.listingIds) match.listingId = { $in: [...input.listingIds] };
   const rows = await listingViews(db)
     .aggregate<{ _id: string; views: number; sessions: number }>([
-      { $match: { day: { $gte: input.from, $lte: input.to } } },
+      { $match: match },
       {
         $group: {
           _id: "$listingId",

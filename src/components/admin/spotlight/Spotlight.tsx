@@ -17,6 +17,7 @@ import { useIsPhone, useIsTouch } from "@/lib/admin/hooks";
 import {
   SPOTLIGHT_TOURS,
   isSpotlightTourId,
+  whenCopies,
   type SpotlightSignal,
   type SpotlightStep,
   type SpotlightTour,
@@ -104,8 +105,8 @@ interface View {
   aside: boolean;
   /** Pointing at the step's detour rather than its anchor. */
   detour: boolean;
-  /** The step's `bodyWhen` anchor is on the page. */
-  alt: boolean;
+  /** Which of the step's `bodyWhen` entries has its anchor on the page, the first found; -1 for none. */
+  alt: number;
   /** The tour's record is proven to be a draft. */
   draft: boolean;
   /** The step's own action came back without the screen reporting success. */
@@ -124,7 +125,7 @@ const IDLE: View = {
   pending: false,
   aside: false,
   detour: false,
-  alt: false,
+  alt: -1,
   draft: false,
   failed: false,
   left: false,
@@ -414,7 +415,7 @@ export function Spotlight() {
           pending: false,
           wrongPage: false,
           detour: false,
-          alt: false,
+          alt: -1,
         };
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -821,7 +822,7 @@ export function Spotlight() {
         aside,
         pending: pend !== null,
         detour,
-        alt: Boolean(here.bodyWhen && findAnchor(here.bodyWhen.anchor)),
+        alt: whenCopies(here).findIndex((when) => findAnchor(when.anchor) !== null),
         draft,
         left,
         failed: failedRef.current === key,
@@ -1477,17 +1478,20 @@ export function Spotlight() {
       const input = step.advance === "input";
       // Draft-only words are said only on a record proven to be a draft.
       const notDraft = tour.record !== undefined && step.whenNotDraft !== undefined && !v.draft;
+      const when = v.alt >= 0 ? whenCopies(step)[v.alt] : undefined;
       const title =
         v.detour && step.detour
           ? step.detour.title
-          : notDraft && step.whenNotDraft?.title
-            ? step.whenNotDraft.title
-            : step.title;
+          : when?.title
+            ? when.title
+            : notDraft && step.whenNotDraft?.title
+              ? step.whenNotDraft.title
+              : step.title;
       const body =
         v.detour && step.detour
           ? step.detour.body
-          : v.alt && step.bodyWhen
-            ? step.bodyWhen.body
+          : when
+            ? when.body
             : notDraft && step.whenNotDraft
               ? step.whenNotDraft.body
               : touch && step.bodyTouch

@@ -1,0 +1,122 @@
+[
+  {
+    "name": "owner-deals-close",
+    "path": "/admin/marketers/deals",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 2500, "eval": "document.querySelectorAll('[data-spotlight=sold-still-listed] li').length", "shot": "01-panel" },
+      { "click": "::-p-xpath((//section[@data-spotlight='sold-still-listed']//button)[1])", "wait": 1800 },
+      { "eval": "document.querySelectorAll('[data-spotlight=sold-still-listed] li').length", "shot": "02-after-one" }
+    ]
+  },
+  {
+    "name": "owner-listing-banner",
+    "path": "/admin/properties/demo_ikoyi-glass-house",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 3000, "eval": "!!document.querySelector('[data-spotlight=listing-sold-still-listed]')", "shot": "01-banner" },
+      { "click": "::-p-xpath(//button[@data-spotlight='listing-publish'])", "wait": 700 },
+      { "eval": "[...document.querySelectorAll('[role=option]')].map(o => o.querySelector('span span')?.textContent || o.textContent.slice(0, 30))", "shot": "02-picker" },
+      { "key": "Escape", "wait": 400 },
+      { "click": "::-p-xpath(//div[@data-spotlight='listing-sold-still-listed']//button)", "wait": 2200 },
+      { "eval": "[!!document.querySelector('[data-spotlight=listing-sold-still-listed]'), [...document.querySelectorAll('span')].map(s => s.textContent.trim()).filter(t => t === 'Closed').length > 0]", "shot": "03-closed" }
+    ]
+  },
+  {
+    "name": "owner-deal-prompt",
+    "path": "/admin/marketers/deals/deal_banana_mansion",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 3000, "eval": "!!document.querySelector('[data-spotlight=deal-take-down]')", "shot": "01-prompt" },
+      { "click": "::-p-xpath(//div[@data-spotlight='deal-take-down']//button)", "wait": 2200 },
+      { "eval": "!!document.querySelector('[data-spotlight=deal-take-down]')", "shot": "02-gone" }
+    ]
+  },
+  {
+    "name": "owner-review-loop",
+    "path": "/admin/properties/demo_yaba-tech-loft",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 3000 },
+      { "click": "::-p-xpath(//button[@data-spotlight='listing-publish'])", "wait": 600 },
+      { "click": "::-p-xpath(//div[@role='option'][contains(.,'Unpublish')])", "wait": 1500 },
+      { "click": "::-p-xpath(//button[@data-spotlight='listing-publish'])", "wait": 600 },
+      { "click": "::-p-xpath(//div[@role='option'][contains(.,'Send for review')])", "wait": 1500 },
+      { "click": "::-p-xpath(//button[@data-spotlight='listing-publish'])", "wait": 600 },
+      { "eval": "[...document.querySelectorAll('[role=option]')].map(o => o.textContent.slice(0, 40))", "shot": "01-submitted-options" },
+      { "click": "::-p-xpath(//div[@role='option'][contains(.,'Approve and publish')])", "wait": 1600 },
+      { "eval": "document.querySelector('[data-spotlight=listing-publish]')?.textContent.slice(0, 40)", "shot": "02-live-again" }
+    ]
+  },
+  {
+    "name": "partner-home",
+    "path": "/admin",
+    "viewport": "desktop",
+    "role": "partner",
+    "steps": [
+      { "wait": 3500, "eval": "location.pathname" },
+      { "eval": "[...document.querySelectorAll('nav a')].map(a => a.textContent.trim()).filter(Boolean)", "shot": "01-home" }
+    ]
+  },
+  {
+    "name": "partner-live-listing",
+    "path": "/admin/properties/demo_ikoyi-glass-house",
+    "viewport": "desktop",
+    "role": "partner",
+    "steps": [
+      { "wait": 3500 },
+      { "eval": "({ ownership: document.body.innerText.includes('Whose property is this'), feature: document.body.innerText.includes('Feature on the landing page'), picker: !!document.querySelector('[data-spotlight=listing-publish]'), note: document.querySelector('[data-spotlight=listing-partner-status]')?.textContent, banner: !!document.querySelector('[data-spotlight=listing-sold-still-listed]') })", "shot": "01-live" }
+    ]
+  },
+  {
+    "name": "partner-new-draft",
+    "path": "/admin/properties",
+    "viewport": "desktop",
+    "role": "partner",
+    "steps": [
+      { "wait": 2500 },
+      { "click": "::-p-xpath(//button[normalize-space()='New listing'])", "wait": 900 },
+      { "type": "Garden flat in Gwarinpa", "wait": 300 },
+      { "click": "::-p-xpath(//form//button[@type='submit'])", "wait": 3200 },
+      { "click": "::-p-xpath(//button[@data-spotlight='listing-publish'])", "wait": 700 },
+      { "eval": "[...document.querySelectorAll('[role=option]')].map(o => o.textContent.slice(0, 40))", "shot": "01-draft-options" },
+      { "key": "Escape", "wait": 400 },
+      { "eval": "({ reviewOnly: !!document.querySelector('[data-spotlight=listing-review-only]'), reviewBlockers: !!document.querySelector('[data-spotlight=listing-review-blockers]'), staffBlockers: !!document.querySelector('[data-spotlight=listing-blockers]') })" }
+    ]
+  },
+  {
+    "name": "partner-analytics",
+    "path": "/admin/analytics",
+    "viewport": "desktop",
+    "role": "partner",
+    "steps": [
+      { "wait": 3000, "eval": "[...document.querySelectorAll('main span.block')].map(s => s.textContent.trim()).slice(0, 12)", "shot": "01-overview" }
+    ]
+  },
+  {
+    "name": "partner-traffic",
+    "path": "/admin/analytics/traffic",
+    "viewport": "desktop",
+    "role": "partner",
+    "steps": [
+      { "wait": 3000, "eval": "({ sessions: document.body.innerText.includes('Sessions'), heading: document.body.innerText.includes('Your most looked at listings') })", "shot": "01-traffic" }
+    ]
+  },
+  {
+    "name": "partner-marketer-app",
+    "path": "/m",
+    "viewport": "phone",
+    "role": "partner",
+    "steps": [
+      { "wait": 4000, "eval": "location.pathname", "shot": "01-redirected" }
+    ]
+  },
+  {
+    "name": "footer-link",
+    "path": "/",
+    "viewport": "desktop",
+    "steps": [
+      { "wait": 2500, "eval": "[...document.querySelectorAll('footer a')].filter(a => a.getAttribute('href') === '/list-with-us').map(a => a.textContent.trim())" }
+    ]
+  }
+]

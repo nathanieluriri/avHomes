@@ -49,7 +49,9 @@ import {
   UPDATE_LINK_LABEL_MAX,
   UPDATE_LINK_MAX,
   UPDATE_TITLE_MAX,
+  isConsoleRole,
   isNuban,
+  isScopedRole,
   matrixRefusal,
   payMonth,
   personRates,
@@ -137,7 +139,6 @@ import {
   reconcile,
   recordSale,
   findClosers,
-  settledAwaitingClose,
   type FundAccrual,
   type FundReversal,
   replyToIssue,
@@ -656,6 +657,20 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
  */
 async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Marketer> {
   const user = currentUser(c);
+  /*
+   * A PARTNER LISTER IS NOT A MARKETER, and is refused before any profile is read.
+   *
+   * Every `/marketing/*` route is sign-in only, since the domain gate does not
+   * cover that prefix, and the session cookie is the console's. Below, any account
+   * without a profile that is not a marketer is minted an ADMIN profile, which is
+   * right for AV Homes staff and was handed to partners too: a third party could
+   * open the app, report deals on any listing and be paid commission on them.
+   * Checked before the lookup, so a profile minted that way before this line
+   * existed is inert rather than grandfathered.
+   */
+  if (isScopedRole(user.role)) {
+    throw new ForbiddenError("partner accounts do not use the marketer app");
+  }
   const found = await findMarketerByUser(db, user.id);
   if (found) return found;
 
@@ -760,7 +775,8 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       },
       supportPhone: settings.supportPhone,
       bankCheck,
-      isAdmin: currentUser(c).role !== "marketer",
+      // AV Homes staff, not merely "not a marketer": a partner is neither, and is refused above anyway.
+      isAdmin: isConsoleRole(currentUser(c).role) && !isScopedRole(currentUser(c).role),
       // The bell's number: only what they must act on.
       alertCount: alerts.filter((alert) => alert.tone === "act").length,
     });
@@ -1494,8 +1510,10 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
    *
    * Two writes in sequence, in one handler, and the ordering is the point: the
    * deal and its money first, then the listing. A crash between them leaves a
-   * recorded sale on a listing that still says live, which the admin alert names
-   * and this same route finishes on a retry. The other order would take a
+   * recorded sale on a listing that still says live, which the sold-still-listed
+   * alert names and `close-listing` below finishes without writing money again. A
+   * retry of THIS route would be refused, since the listing now has an approved
+   * deal. The other order would take a
    * property off the market with no record of who sold it or for how much, which
    * is the exact hole this whole flow exists to close.
    *
@@ -1551,10 +1569,55 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     return c.json({ deal }, 201);
   });
 
-  /** Approved deals whose listing has not been closed yet. Feeds the alert. */
-  routes.get("/admin/marketing/awaiting-close", requireAuth(), async (c) => {
+  /*
+   * TAKE A SOLD LISTING OFF THE MARKET, for a deal already on the record.
+   *
+   * Approving a marketer's deal writes the commission and both fund shares, and
+   * leaves the listing live, because checking proof and taking a house down are
+   * two decisions. This is the second one. It writes NO money: the money is
+   * already written, and running `recordSale` again for the same deal would pay
+   * every marketer in the chain twice.
+   *
+   * It is also the recovery for a crash between the two writes in the route
+   * above: a sale on the record whose listing still says live.
+   *
+   * Which deals are waiting is `/admin/marketing/awaiting-close`, answered at the
+   * composition root because it needs both collections.
+   */
+  routes.post("/admin/marketing/deals/:id/close-listing", requireAuth(), async (c) => {
     const db = await currentDb(c);
-    return c.json({ deals: await settledAwaitingClose(db, 20) });
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const deal = await getDeal(db, id);
+    if (!deal) throw new NotFoundError(`deal ${id}`);
+    if (deal.status !== "approved") {
+      throw new PreconditionFailedError("not_settled", {
+        detail: "Approve the deal first. A listing comes off the market once its sale is on the record.",
+      });
+    }
+    if (deal.unitKey !== "") {
+      throw new PreconditionFailedError("estate_unit", {
+        detail: "This sale is one unit of an estate, so the estate stays on the market for the rest.",
+      });
+    }
+    const facts = deps.listingFacts ? await deps.listingFacts(db, deal.listingId) : null;
+    if (!facts) throw new NotFoundError(`listing ${deal.listingId}`);
+    // Already down is the answer the caller wanted, so it is not an error.
+    if (facts.status === "closed") return c.json({ closed: true, already: true });
+    if (facts.status !== "live" && facts.status !== "under-offer") {
+      throw new PreconditionFailedError("not_on_market", {
+        detail: "This listing is not on the market, so there is nothing to take down.",
+      });
+    }
+    if (!deps.closeListing) throw new Error("closeListing port is not wired");
+    await deps.closeListing(db, {
+      listingId: deal.listingId,
+      dealId: deal.id,
+      actorId: user.id,
+      actorName: user.displayName,
+    });
+    auditEntityId(c, deal.id);
+    return c.json({ closed: true, already: false });
   });
 
   routes.post("/admin/marketing/deals/:id/review", requireAuth(), async (c) => {

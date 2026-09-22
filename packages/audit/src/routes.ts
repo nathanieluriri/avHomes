@@ -1,14 +1,17 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { AUDIT_ENTITIES } from "@avhomes/contracts";
+import { AUDIT_ENTITIES, isScopedRole } from "@avhomes/contracts";
 import {
+  NotFoundError,
   clampLimit,
   currentDb,
+  currentUser,
   pathParam,
   readQuery,
   str,
   type AppEnv,
 } from "@avhomes/core";
+import type { Db } from "@avhomes/db";
 import { requireAuth } from "@avhomes/identity";
 import { assertAuditCursor, listEntityHistory, listEntries } from "./repo";
 
@@ -43,7 +46,17 @@ const ListQuery = z
 
 const HistoryQuery = z.object({ limit: str().optional() }).strict();
 
-export function auditRoutes(): Hono<AppEnv> {
+/**
+ * May this caller read this listing? A port, because whether a listing is
+ * somebody's is a listings question and this package may not import that one.
+ */
+export type ListingReadCheck = (
+  db: Db,
+  user: ReturnType<typeof currentUser>,
+  listingId: string,
+) => Promise<boolean>;
+
+export function auditRoutes(deps: { canReadListing?: ListingReadCheck } = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   /**
@@ -91,9 +104,19 @@ export function auditRoutes(): Hono<AppEnv> {
   routes.get("/admin/properties/:id/history", requireAuth(), async (c) => {
     const id = pathParam(c, "id");
     const q = readQuery(c, HistoryQuery);
+    const db = await currentDb(c);
+    /* The `listings` domain lets a partner lister in, and without this they could
+       read who changed what on any listing whose id they had. Not found rather
+       than forbidden, so an id somebody does not own says nothing about itself.
+       With no check wired a scoped caller is refused outright: failing closed. */
+    const user = currentUser(c);
+    if (isScopedRole(user.role)) {
+      const allowed = deps.canReadListing ? await deps.canReadListing(db, user, id) : false;
+      if (!allowed) throw new NotFoundError(`property ${id}`);
+    }
     // One bounded page, newest first. A panel beside an editor is not a place
     // anybody scrolls two years back, so there is no cursor to get wrong.
-    const items = await listEntityHistory(await currentDb(c), "property", id, clampLimit(q.limit));
+    const items = await listEntityHistory(db, "property", id, clampLimit(q.limit));
     // An envelope, not a bare array, like every other list response here.
     return c.json({ items });
   });

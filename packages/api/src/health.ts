@@ -6,6 +6,7 @@ import {
   PUBLIC_PROPERTY_STATUSES,
   hasDomain,
   isAdminRole,
+  isScopedRole,
   siteAlerts,
   splitFor,
   visibleAlerts,
@@ -13,6 +14,7 @@ import {
 } from "@avhomes/contracts";
 import { readPublicSettings } from "@avhomes/settings";
 import { marketingCounts, readMarketingSettings } from "@avhomes/marketing";
+import { soldStillListed } from "./awaiting-close";
 
 /**
  * What the site is currently getting wrong.
@@ -48,6 +50,11 @@ export function healthRoutes(): Hono<AppEnv> {
   routes.get("/admin/health", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const user = currentUser(c);
+    /* Nothing for a role scoped to its own records. Every check here is a count
+       over AV Homes' whole site ("your site has no live listings"), which is
+       neither a partner's business nor something they can fix. Their own
+       listing's gaps are listed on the listing, where they can act on them. */
+    if (isScopedRole(user.role)) return c.json({ alerts: [] });
     const snapshot = await gather(db);
     const alerts = visibleAlerts(siteAlerts(snapshot), (domain) =>
       domain === null ? isAdminRole(user.role) : hasDomain(user.role, domain),
@@ -122,8 +129,16 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
     readMarketingSettings(db),
   ]);
 
+  // The three queues a partner or a marketer is waiting on AV Homes to clear.
+  const [submitted, applicationsOpen, soldStill] = await Promise.all([
+    properties.countDocuments({ status: "submitted", deletedAt: null }),
+    db.collection(COLLECTIONS.partnerApplications).countDocuments({ status: "open" }),
+    soldStillListed(db),
+  ]);
+
   return {
-    listings: { publiclyVisible, live, draft, withoutPhotos, incomplete, withoutMap },
+    listings: { publiclyVisible, live, draft, withoutPhotos, incomplete, withoutMap, submitted },
+    partners: { applicationsOpen },
     posts: { published, draft: postDrafts },
     testimonials,
     siteStats,
@@ -136,6 +151,7 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
     marketing: {
       ...marketing,
       ratesUnset: splitFor(marketingSettings.commission, "av", "sale").level1 === 0,
+      soldStillListed: soldStill.length,
     },
   };
 }

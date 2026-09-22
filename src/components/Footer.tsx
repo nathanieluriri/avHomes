@@ -49,6 +49,8 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: "Get in Touch", href: "/contact" },
       { label: "Book a Viewing", href: "/contact" },
+      // The only public way into the partner application; nothing linked to it before.
+      { label: "List your property", href: "/list-with-us" },
       { label: "Support", href: "/contact" },
     ],
   },
