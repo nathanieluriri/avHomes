@@ -23,6 +23,7 @@ export {
   type UserDoc,
   type SessionDoc,
   type InviteDoc,
+  type PartnerDoc,
 } from "./schema";
 
 export {

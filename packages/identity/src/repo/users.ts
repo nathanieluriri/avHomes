@@ -10,6 +10,7 @@ import type { UserDoc } from "../schema";
  * cannot arrive in a response by default, which is the whole rule.
  */
 const PROFILE_FIELDS = { avatarUrl: 1, title: 1, phone: 1 } as const;
+const PARTNER_FIELDS = { partnerId: 1, partnerRole: 1 } as const;
 const AUTH_PROJECTION = {
   _id: 1,
   email: 1,
@@ -17,6 +18,7 @@ const AUTH_PROJECTION = {
   role: 1,
   disabledAt: 1,
   ...PROFILE_FIELDS,
+  ...PARTNER_FIELDS,
 } as const;
 const TEAM_PROJECTION = {
   _id: 1,
@@ -26,6 +28,7 @@ const TEAM_PROJECTION = {
   createdAt: 1,
   disabledAt: 1,
   ...PROFILE_FIELDS,
+  ...PARTNER_FIELDS,
 } as const;
 
 function users(db: Db) {
@@ -43,7 +46,7 @@ function users(db: Db) {
  */
 export function toAuthUser(
   doc: Pick<UserDoc, "_id" | "email" | "displayName" | "role"> &
-    Partial<Pick<UserDoc, "avatarUrl" | "title" | "phone">>,
+    Partial<Pick<UserDoc, "avatarUrl" | "title" | "phone" | "partnerId" | "partnerRole">>,
 ): AuthUser {
   return {
     id: doc._id,
@@ -53,6 +56,8 @@ export function toAuthUser(
     avatarUrl: doc.avatarUrl ?? "",
     title: doc.title ?? "",
     phone: doc.phone ?? "",
+    partnerId: doc.partnerId ?? null,
+    partnerRole: doc.partnerRole ?? null,
   };
 }
 

@@ -47,6 +47,8 @@ interface ImageDoc {
   createdAt: number;
   updatedAt: number;
   uploadedBy: string;
+  /** The company that uploaded it. Null for AV Homes' own. */
+  partnerId?: string | null;
 }
 
 const SORT: SortSpec = { field: "createdAt", direction: -1 };

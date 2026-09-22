@@ -52,6 +52,9 @@ export const ID_PREFIXES = {
   fundEntry: "fund",
   rewardAward: "awrd",
   partnerApplication: "appl",
+  /* A company's id is DERIVED from its application's where it has one, so an
+     approval retried after a failure finds the company it already made. */
+  partner: "ptnr",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

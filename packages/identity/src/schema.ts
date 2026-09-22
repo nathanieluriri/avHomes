@@ -1,4 +1,4 @@
-import type { Role } from "@avhomes/contracts";
+import type { PartnerLimitOverrides, PartnerRole, PartnerStatus, Role } from "@avhomes/contracts";
 
 /** The stored shapes. The wire shapes live in @avhomes/contracts. */
 
@@ -17,6 +17,9 @@ export interface UserDoc {
   avatarUrl?: string | null;
   title?: string | null;
   phone?: string | null;
+  /** Absent on every account made before partner companies; reads as null. */
+  partnerId?: string | null;
+  partnerRole?: PartnerRole | null;
   createdAt: number;
   updatedAt: number;
   /** Non-null means revoked. Sessions were destroyed with it. */
@@ -46,6 +49,25 @@ export interface InviteDoc {
   createdAt: number;
   expiresAt: number;
   acceptedAt: number | null;
+  /** The company a partner invite joins, and which seat. Absent on a team invite. */
+  partnerId?: string | null;
+  partnerRole?: PartnerRole | null;
+}
+
+export interface PartnerDoc {
+  _id: string;
+  name: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  status: PartnerStatus;
+  statusReason: string;
+  limits: PartnerLimitOverrides;
+  mainUserId: string | null;
+  applicationId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  revision: number;
 }
 
 export interface AuthAttemptDoc {

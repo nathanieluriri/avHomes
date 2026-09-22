@@ -87,6 +87,10 @@ export interface PropertyDoc {
   previousSlugs?: string[];
   agent: Agent;
   agentUserId: string | null;
+  /** The partner company. Absent on rows written before companies existed. */
+  partnerId?: string | null;
+  /** True while the company is suspended: off the public site, status untouched. */
+  partnerHold?: boolean;
   createdAt: number;
   updatedAt: number;
   publishedAt: number | null;
@@ -172,6 +176,7 @@ export function toProperty(doc: PropertyDoc): Property {
     minStay: doc.minStay ?? null,
     agent: doc.agent,
     agentUserId: doc.agentUserId,
+    partnerId: doc.partnerId ?? null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     publishedAt: doc.publishedAt,

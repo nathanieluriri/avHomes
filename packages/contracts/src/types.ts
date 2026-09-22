@@ -1,4 +1,4 @@
-import type { Role } from "./roles";
+import type { PartnerRole, Role } from "./roles";
 import type { DocNode } from "./doc";
 
 /* ─────────────────────────────── identity ─────────────────────────────── */
@@ -18,6 +18,10 @@ export interface AuthUser {
   /** The line under the name. "Senior Property Consultant", not the role slug. */
   title: string;
   phone: string;
+  /** The partner company this account works for. Null for AV Homes' own accounts. */
+  partnerId: string | null;
+  /** "main" manages the company's staff and details. Null outside a company. */
+  partnerRole: PartnerRole | null;
 }
 
 export interface TeamUser extends AuthUser {
@@ -279,6 +283,11 @@ export interface Property {
   agent: Agent;
   /** The account that owns this listing, for per-record authorization. */
   agentUserId: string | null;
+  /**
+   * The partner company whose listing this is. Null for AV Homes' own, and for
+   * Non-AV property an AV Homes agent typed in for an owner with no account.
+   */
+  partnerId: string | null;
   createdAt: number;
   updatedAt: number;
   publishedAt: number | null;
