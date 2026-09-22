@@ -13,7 +13,7 @@ import {
   type RefObject,
 } from "react";
 import { Bell, ChevronLeft, Settings } from "lucide-react";
-import type { AuthUser } from "@avhomes/contracts";
+import { isScopedRole, type AuthUser } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useKeyboardInset } from "@/lib/admin/hooks";
 import type { MeResponse } from "@/lib/marketer/api";
@@ -276,15 +276,23 @@ export function AppShell({
   const compact = useScrolledPast(titleRef, variant === "page" && Boolean(title));
 
   const dead = gate.error?.status === 401 || me.error?.status === 401;
+  /* A partner lister shares the console's session cookie, so they can land here
+     signed in. The app refuses them; this sends them to their own listings
+     rather than leaving them on a screen of refusals. The console does the
+     mirror image for a marketer. */
+  const partner = gate.data ? isScopedRole(gate.data.user.role) : false;
 
   useEffect(() => {
     if (dead) router.replace("/m/sign-in");
-  }, [dead, router]);
+    else if (partner) router.replace("/admin/properties");
+  }, [dead, partner, router]);
 
-  if (dead) {
+  if (dead || partner) {
     return (
       <div className="grid flex-1 place-items-center px-6 text-center">
-        <p className="text-[14px] text-m-muted">Taking you to sign in.</p>
+        <p className="text-[14px] text-m-muted">
+          {dead ? "Taking you to sign in." : "This app is for marketers. Taking you to your listings."}
+        </p>
       </div>
     );
   }

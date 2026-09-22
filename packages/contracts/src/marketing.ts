@@ -844,6 +844,29 @@ export function referralCodeFrom(value: string | null | undefined): string | nul
 }
 
 /**
+ * A sale on the record whose listing is still advertised as for sale.
+ *
+ * Approving a marketer's deal settles the money, but the listing stays live until
+ * somebody takes it off the market, because that is a separate decision: the
+ * proof is checked first, then the house comes down. One of these is the gap
+ * between the two, and the console names each until it is closed.
+ *
+ * Only a listing that is ONE thing. A deal on a single unit of an estate leaves
+ * the estate on the market for the rest of its units.
+ */
+export interface AwaitingClose {
+  dealId: string;
+  listingId: string;
+  listingTitle: string;
+  closerName: string;
+  kind: DealKind;
+  amountMinor: number;
+  currency: string;
+  /** When the deal was approved: the moment the money went on the record. */
+  approvedAt: number;
+}
+
+/**
  * Everything recording a sale is refused for, checked the same way on both sides.
  *
  * HERE rather than in the server package, because the sheet has to render the same

@@ -41,7 +41,6 @@ export {
   reconcile,
   recordSale,
   rootMarketer,
-  settledAwaitingClose,
   statementFor,
   teamFor,
   type CloserInput,

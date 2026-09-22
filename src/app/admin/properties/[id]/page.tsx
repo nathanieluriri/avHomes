@@ -18,12 +18,15 @@ import {
   TITLE_DOCUMENT_LABELS,
   canFeature,
   derivedEstateColumns,
+  formatMoney,
   estateSummary,
   fieldsFor,
   formatPrice,
   formatPriceShort,
   formatSqm,
+  hasDomain,
   isEstate,
+  isScopedRole,
   isShortMapLink,
   listingPublishBlockers,
   mapEmbedSrc,
@@ -38,6 +41,7 @@ import {
   sqmToSqft,
   toHandle,
   statusLabel,
+  type AwaitingClose,
   type BuildStage,
   type EstatePrototype,
   type EstateSummary,
@@ -46,6 +50,8 @@ import {
   type ListingType,
   type Ownership,
   type Property,
+  type PropertyStatus,
+  type Role,
   type PropertyType,
   type RentPeriod,
   type TitleDocument,
@@ -54,7 +60,7 @@ import { ApiError, api } from "@/lib/admin/client";
 import { SaveBar } from "@/components/admin/SaveBar";
 import { historySentence } from "@/lib/admin/audit";
 import { fullDate, relative, shortDate } from "@/lib/admin/format";
-import { useAsync } from "@/lib/admin/hooks";
+import { useAsync, useSession } from "@/lib/admin/hooks";
 import ImagePicker, { Thumb } from "@/components/admin/ImagePicker";
 import { AmenityPicker } from "@/components/admin/listing/AmenityPicker";
 import { NumberField } from "@/components/admin/listing/NumberInput";
@@ -363,6 +369,17 @@ function EditorSkeleton() {
 }
 
 const LIFECYCLE: readonly { op: string; label: string; description: string; tone: Tone; when: (p: Property) => boolean }[] = [
+  /* The same op as Publish below, under the name of what it is on a partner's
+     listing. The server has always allowed publishing a submitted listing; the
+     picker never offered it, so a partner's submission could be sent back or
+     archived and never approved. */
+  {
+    op: "publish",
+    label: "Approve and publish",
+    description: "It goes on the public site as it stands",
+    tone: "green",
+    when: (p) => p.deletedAt === null && p.status === "submitted",
+  },
   {
     op: "publish",
     label: "Publish",
@@ -439,6 +456,17 @@ const LIFECYCLE: readonly { op: string; label: string; description: string; tone
      sentence explaining the block and once in a card below it. */
 ];
 
+/** What a partner reads where staff have the status picker: whose move it is now. */
+const PARTNER_STATUS_NOTE: Record<PropertyStatus, string> = {
+  draft: "A draft. Send it for review when it is ready; AV Homes publishes it.",
+  submitted:
+    "With AV Homes for review. It goes live once somebody there approves it, or comes back to you with what to change.",
+  live: "On the site. AV Homes makes every change of status from here, so ask them to mark it sold or take it down.",
+  "under-offer": "Under offer. AV Homes makes every change of status from here.",
+  closed: "Sold, and off the market.",
+  archived: "Archived by AV Homes, so it is off the site.",
+};
+
 export default function PropertyEditorPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -447,6 +475,10 @@ export default function PropertyEditorPage() {
     (signal) => api.get<{ property: Property }>(`/admin/properties/${id}`, signal),
     [id],
   );
+  /* Read HERE, beside the listing and in parallel with it, and waited for behind
+     the same skeleton. Read inside the editor it started only once the listing
+     had loaded, and a partner saw staff controls for the moment in between. */
+  const { session } = useSession();
 
   /*
    * Both branches KEEP THE HEADER. A screen that fails to load and shows only a
@@ -454,7 +486,7 @@ export default function PropertyEditorPage() {
    * rise then animates an empty sheet. The layout of a detail screen is known
    * before its data is, so the wait shows that layout.
    */
-  if (loading) {
+  if (loading || session.status === "unknown") {
     return (
       <>
         <PageHeader icon={Building2} backTo="/admin/properties" backLabel="Listings" title="Listing" />
@@ -481,10 +513,11 @@ export default function PropertyEditorPage() {
    * and avoids an effect that would briefly render one listing'''s data under
    * another'''s heading.
    */
-  return <PropertyEditor key={data.property.id} initial={data.property} />;
+  const role = session.status === "signed-in" ? session.user.role : null;
+  return <PropertyEditor key={data.property.id} initial={data.property} role={role} />;
 }
 
-function PropertyEditor({ initial }: { initial: Property }) {
+function PropertyEditor({ initial, role }: { initial: Property; role: Role | null }) {
   const router = useRouter();
   const [property, setProperty] = useState<Property>(initial);
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
@@ -492,6 +525,53 @@ function PropertyEditor({ initial }: { initial: Property }) {
   const [busy, setBusy] = useState(false);
   /** The record-a-sale sheet, which is the only path from live to closed. */
   const [recordingSale, setRecordingSale] = useState(false);
+
+  /*
+   * WHO IS LOOKING decides which controls are real.
+   *
+   * A partner lister edits their own listing and sends it for review; AV Homes
+   * makes every status decision and every call about the home page. The server
+   * refuses the rest either way, so this is about not drawing a control that
+   * only ever answers no.
+   */
+  const scoped = role !== null && isScopedRole(role);
+  // Recording a sale writes money, which the server lets only a marketing holder do.
+  const canSell = role !== null && hasDomain(role, "marketing");
+
+  /*
+   * SOLD, STILL ADVERTISED. Approving a marketer's deal settles the money and
+   * leaves the listing live; this is the one state where Record the sale would
+   * refuse ("already recorded as sold") and the status route refuses closing,
+   * so the listing needs its own way down, and this is where it is offered.
+   */
+  const soldStill = useAsync<{ items: AwaitingClose[] }>(
+    (signal) =>
+      canSell
+        ? api.get<{ items: AwaitingClose[] }>(
+            `/admin/marketing/awaiting-close?listingId=${encodeURIComponent(property.id)}`,
+            signal,
+          )
+        : Promise.resolve({ items: [] }),
+    [canSell, property.id, property.status],
+  );
+  const pendingClose = soldStill.data?.items[0] ?? null;
+  const [closeError, setCloseError] = useState<ApiError | null>(null);
+
+  async function takeDown(dealId: string) {
+    setBusy(true);
+    setCloseError(null);
+    try {
+      // Writes no money: the deal's commission and fund shares were written when it was approved.
+      await api.post(`/admin/marketing/deals/${encodeURIComponent(dealId)}/close-listing`);
+      const res = await api.get<{ property: Property }>(`/admin/properties/${property.id}`);
+      setProperty(res.property);
+      if (!canFeature(res.property)) set("featured", res.property.featured);
+    } catch (err) {
+      setCloseError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+    } finally {
+      setBusy(false);
+    }
+  }
   const [previewOpen, setPreviewOpen] = useState(false);
 
   // A failed load leaves `history.data` null, and the panel below stays
@@ -772,6 +852,19 @@ function PropertyEditor({ initial }: { initial: Property }) {
   }
 
   /*
+   * ONLY THE MOVES THIS READER CAN MAKE. A partner may send a draft for review
+   * and nothing else. Record the sale needs the money domain, and while a sale is
+   * already on the record the banner above is the way down instead: the sheet
+   * would refuse it as sold.
+   */
+  const moves = LIFECYCLE.filter((l) => {
+    if (!l.when(property)) return false;
+    if (scoped) return l.op === "submit";
+    if (l.op === "close") return canSell && pendingClose === null;
+    return true;
+  });
+
+  /*
    * The refusal is shown AT THE BUTTON, not only at the top of the page.
    *
    * This wrote to `saveError`, which renders in the header block. The trash
@@ -1016,37 +1109,41 @@ function PropertyEditor({ initial }: { initial: Property }) {
               describing the field, since the consequence is the only reason an
               operator needs to get this right.
             */}
-            <Field
-              label="Whose property is this"
-              as="group"
-              hint={
-                draft.ownership === "av"
-                  ? "AV Homes' own stock, so it pays the full commission."
-                  : "Somebody else's, so it pays a smaller commission. Name the owner below."
-              }
-            >
-              <Segmented
-                options={OWNERSHIPS.map((value) => ({
-                  value,
-                  label: OWNERSHIP_LABEL[value],
-                }))}
-                value={draft.ownership}
-                onChange={(value) => set("ownership", value)}
-              />
-            </Field>
+            {!scoped && (
+              <>
+                <Field
+                  label="Whose property is this"
+                  as="group"
+                  hint={
+                    draft.ownership === "av"
+                      ? "AV Homes' own stock, so it pays the full commission."
+                      : "Somebody else's, so it pays a smaller commission. Name the owner below."
+                  }
+                >
+                  <Segmented
+                    options={OWNERSHIPS.map((value) => ({
+                      value,
+                      label: OWNERSHIP_LABEL[value],
+                    }))}
+                    value={draft.ownership}
+                    onChange={(value) => set("ownership", value)}
+                  />
+                </Field>
 
-            {draft.ownership === "partner" && (
-              <Field
-                label="Whose it is"
-                hint="The owner or developer, for grouping where stock comes from. Optional."
-              >
-                <input
-                  className={inputClass}
-                  value={draft.ownerLabel}
-                  onChange={(event) => set("ownerLabel", event.target.value)}
-                  placeholder="Ade Properties Ltd"
-                />
-              </Field>
+                {draft.ownership === "partner" && (
+                  <Field
+                    label="Whose it is"
+                    hint="The owner or developer, for grouping where stock comes from. Optional."
+                  >
+                    <input
+                      className={inputClass}
+                      value={draft.ownerLabel}
+                      onChange={(event) => set("ownerLabel", event.target.value)}
+                      placeholder="Ade Properties Ltd"
+                    />
+                  </Field>
+                )}
+              </>
             )}
 
             {hiddenNotice && <p className="text-xs text-amber-700">{hiddenNotice}</p>}
@@ -1357,31 +1454,68 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 scrolling, Unpublish and Archive are one thumb apart.
 
                 None in the trash, where the banner's Restore is the only move. */}
-            {!trashed && (
-              <StatusSelect
-                label="Listing status"
-                value="current"
-                busy={busy}
-                spotlight="listing-publish"
-                onChange={(op) => transition(op)}
-                options={[
-                  {
-                    value: "current",
-                    label: statusLabel(property.status),
-                    description: "Where it is now. Choose a move below.",
-                    tone: property.status === "live" ? "green" : property.status === "draft" ? "amber" : "neutral",
-                    disabled: true,
-                  },
-                  ...LIFECYCLE.filter((l) => l.when(property)).map((l) => ({
-                    value: l.op,
-                    label: l.label,
-                    description: l.description,
-                    tone: l.tone,
-                    disabled: l.op === "publish" && publishBlockers.length > 0,
-                    disabledReason: "Not ready yet. See what is missing below.",
-                  })),
-                ]}
-              />
+            {!trashed && pendingClose && (
+              <div
+                data-spotlight="listing-sold-still-listed"
+                className="rounded-xl border border-amber-200 bg-amber-50 p-3"
+              >
+                <p className="text-[12px] font-semibold text-amber-900">Sold, but still on the market</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-amber-900/90">
+                  {pendingClose.closerName || "A marketer"} sold it for{" "}
+                  {formatMoney(pendingClose.amountMinor, pendingClose.currency)}, and the deal was approved{" "}
+                  {relative(pendingClose.approvedAt)}. Everybody has been paid; the site still shows it{" "}
+                  {pendingClose.kind === "rent" ? "to let" : "for sale"}.
+                </p>
+                {closeError && (
+                  <div className="mt-2">
+                    <ErrorNote error={closeError} />
+                  </div>
+                )}
+                <div className="mt-2">
+                  <Button size="sm" onClick={() => void takeDown(pendingClose.dealId)} disabled={busy}>
+                    Take it off the market
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Wrapped only to carry `listing-review-only` for a partner, which is how
+                the add-a-listing walkthrough knows to say Send for review, not Publish. */}
+            {!trashed && moves.length > 0 && (
+              <div data-spotlight={scoped ? "listing-review-only" : undefined}>
+                <StatusSelect
+                  label="Listing status"
+                  value="current"
+                  busy={busy}
+                  spotlight="listing-publish"
+                  onChange={(op) => transition(op)}
+                  options={[
+                    {
+                      value: "current",
+                      label: statusLabel(property.status),
+                      description: "Where it is now. Choose a move below.",
+                      tone: property.status === "live" ? "green" : property.status === "draft" ? "amber" : "neutral",
+                      disabled: true,
+                    },
+                    ...moves.map((l) => ({
+                      value: l.op,
+                      label: l.label,
+                      description: l.description,
+                      tone: l.tone,
+                      disabled: (l.op === "publish" || l.op === "submit") && publishBlockers.length > 0,
+                      disabledReason: "Not ready yet. See what is missing below.",
+                    })),
+                  ]}
+                />
+              </div>
+            )}
+
+            {/* A partner has no move on anything past a draft, so they get the
+                sentence that says whose move it is instead of an empty picker. */}
+            {!trashed && moves.length === 0 && scoped && (
+              <p data-spotlight="listing-partner-status" className="text-[12px] leading-relaxed text-slate-600">
+                {PARTNER_STATUS_NOTE[property.status]}
+              </p>
             )}
 
             {/* DISABLED AND EXPLAINED, never hidden. A Publish button that is
@@ -1389,13 +1523,13 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 which of a dozen fields the screen is unhappy about. */}
             {!trashed &&
               publishBlockers.length > 0 &&
-              LIFECYCLE.some((l) => l.op === "publish" && l.when(property)) && (
+              moves.some((l) => l.op === "publish" || l.op === "submit") && (
                 <div
-                  data-spotlight="listing-blockers"
+                  data-spotlight={scoped ? "listing-review-blockers" : "listing-blockers"}
                   className="rounded-xl border border-amber-200 bg-amber-50 p-3"
                 >
                   <p className="text-[12px] font-semibold text-amber-900">
-                    Not ready to publish
+                    {scoped ? "Not ready to send for review" : "Not ready to publish"}
                   </p>
                   <ul className="mt-1.5 space-y-1">
                     {publishBlockers.map((b) => (
@@ -1426,7 +1560,7 @@ function PropertyEditor({ initial }: { initial: Property }) {
                 Everything about it is undone from `sm` up, because with a mouse
                 the dense line is right and a 44px block with its own margins
                 would sit in the aside disagreeing with every row around it. */}
-            {canFeature(property) ? (
+            {scoped ? null : canFeature(property) ? (
               <label className="-mx-2 flex min-h-11 items-center gap-3 rounded-lg px-2 text-sm text-plum-950 active:bg-mist-100 sm:mx-0 sm:min-h-0 sm:gap-2 sm:px-0 sm:pt-2">
                 <input
                   type="checkbox"

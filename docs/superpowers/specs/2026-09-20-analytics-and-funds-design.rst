@@ -423,10 +423,28 @@ and it changes there, in the one function, rather than in each route.
    destroy  admin only
    status   never a scoped role
 
-What a partner sees about money: the sale price of their own property, AV Homes'
-total fee on it, and their net. Not which marketer earned what, not the upline
-shares, not the fund cuts. An outside party does not get to read the team's
-individual earnings.
+What a partner sees: **everything about their own listings, and nothing about
+anybody else's.** That covers who closed each sale, every level's name and
+earnings, both fund shares, what AV Homes kept, the buyer, the proof and the
+views. The overview leads with the three numbers a property owner asks first
+(what it sold for, AV Homes' fee, what came to them) and Transactions carries each
+deal's full split.
+
+What stays hidden is anything site-wide: the dashboard's counts and enquiries, the
+league on People, the fund balances, the site's visitor numbers and the Alerts
+feed. Each of those describes AV Homes as a whole, so a partner's session is
+refused them rather than shown a narrowed copy.
+
+*Changed 2026-09-22.* This section first said a partner sees only the sale price,
+the fee and their net. The owner reversed that: a partner sees the full picture on
+their own property.
+
+Beyond analytics, the scoped rule holds everywhere a partner's domains reach. The
+image library returns and deletes only their own uploads, a listing's history is
+readable only on a listing they can open, and a partner's save cannot set
+``featured``, ``ownership``, ``ownerLabel`` or ``agentUserId``. A partner account
+is refused by the marketer app, and its role cannot be changed on the Team screen,
+though it can still be disabled there.
 
 The analytics section
 =====================

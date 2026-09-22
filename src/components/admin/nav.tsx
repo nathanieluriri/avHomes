@@ -30,7 +30,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { hasDomain, type Domain, type Role } from "@avhomes/contracts";
+import { hasDomain, isScopedRole, type Domain, type Role } from "@avhomes/contracts";
 
 /**
  * The rail's contents, in one place because three surfaces read them: the rail
@@ -66,6 +66,19 @@ export interface NavItem {
   domain: Domain | null;
   /** Narrows the row to these roles on top of the domain check. */
   roles?: readonly Role[];
+  /**
+   * The screen reads every record, so a role scoped to its own records never
+   * sees the row. A domain cannot say this: a partner genuinely holds
+   * `analytics` for their own listings, and the dashboard is the whole site's.
+   */
+  unscoped?: true;
+  /**
+   * The screen reads money, which the server hands to a role holding `marketing`
+   * and to a scoped role for its own records, and to nobody else. Mirrors the
+   * `money` flag `scopeFor` computes, so an agent or support account never gets a
+   * row whose API refuses them.
+   */
+  money?: true;
   /** Sub-pages, drawn only while the reader is somewhere inside this row. */
   children?: readonly NavPage[];
 }
@@ -76,6 +89,8 @@ export type NavPage = NavItem & { href: string };
 /** The one filter every surface that renders a nav row must use. */
 export function canSeeNavItem(role: Role, item: NavItem): boolean {
   if (item.roles && !item.roles.includes(role)) return false;
+  if (item.unscoped && isScopedRole(role)) return false;
+  if (item.money && !hasDomain(role, "marketing") && !isScopedRole(role)) return false;
   return item.domain === null || hasDomain(role, item.domain);
 }
 
@@ -86,6 +101,7 @@ export const NAV: readonly NavItem[] = [
     hint: "Traffic, storefront and what is waiting",
     icon: Gauge,
     domain: "analytics",
+    unscoped: true,
   },
   {
     href: "/admin/alerts",
@@ -97,6 +113,8 @@ export const NAV: readonly NavItem[] = [
        nothing about listings. Gating the ROW by a domain would hide that from
        the one person who can fix it. */
     domain: null,
+    // Every check is about AV Homes' whole site, and the server returns none to a partner.
+    unscoped: true,
   },
   {
     href: "/admin/notifications",
@@ -130,6 +148,7 @@ export const NAV: readonly NavItem[] = [
         hint: "Every deal, with its split and its proof",
         icon: Receipt,
         domain: "analytics",
+        money: true,
       },
       {
         href: "/admin/analytics/listings",
@@ -143,14 +162,14 @@ export const NAV: readonly NavItem[] = [
         label: "People",
         hint: "Who is closing, marketers and staff",
         icon: Trophy,
-        domain: "analytics",
+        domain: "marketing",
       },
       {
         href: "/admin/analytics/wallets",
         label: "The two funds",
         hint: "The prize pool and the community fund",
         icon: Wallet,
-        domain: "analytics",
+        domain: "marketing",
       },
       {
         href: "/admin/analytics/traffic",
@@ -428,5 +447,7 @@ export function locate(rows: readonly NavItem[], pathname: string): RailPosition
  * the matrix does. Better a wrong screen than a link with no href.
  */
 export function homeFor(role: Role): string {
+  // A partner's front door is their own listings, not Alerts, which is the first row left once the dashboard is gone.
+  if (isScopedRole(role)) return "/admin/properties";
   return NAV_ITEMS.find((item) => canSeeNavItem(role, item))?.href ?? "/admin";
 }

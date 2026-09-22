@@ -24,6 +24,7 @@ import {
 import {
   DEFAULT_MEDIA_QUOTA_BYTES,
   formatBytes,
+  isScopedRole,
   type ImageRecord,
   type MediaUsage,
   type NotificationInput,
@@ -53,6 +54,19 @@ const SORT_NAME = "newest";
 
 function images(db: Db) {
   return collection<ImageDoc>(db, COLLECTIONS.images);
+}
+
+/**
+ * The rows this caller may see and touch: all of them, or only their own uploads.
+ *
+ * A partner lister holds the `media` domain because they genuinely upload their
+ * property's photographs, but the library is AV Homes' whole catalogue. Without
+ * this a third-party account could browse every photograph and delete any of
+ * them, and a deleted row breaks every page that used it. Merged into the query
+ * rather than checked after a read, so a foreign id is simply not found.
+ */
+function ownedBy(user: { id: string; role: Parameters<typeof isScopedRole>[0] }): Partial<ImageDoc> {
+  return isScopedRole(user.role) ? { uploadedBy: user.id } : {};
 }
 
 function toImageRecord(doc: ImageDoc): ImageRecord {
@@ -283,6 +297,8 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
   });
 
   routes.get("/admin/images/quota/requests", requireAuth(), async (c) => {
+    // The owner's notes to the developer about AV Homes' storage bill: nothing a partner reads.
+    if (isScopedRole(currentUser(c).role)) return c.json({ items: [] });
     const docs = await quotaRequests(await currentDb(c))
       .find({}, { sort: { createdAt: -1 }, limit: 20 })
       .toArray();
@@ -333,7 +349,7 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
     const q = readQuery(c, ListQuery);
     const limit = clampLimit(q.limit);
     const docs = await images(await currentDb(c))
-      .find(keysetFilter<ImageDoc>(SORT, q.cursor, SORT_NAME), {
+      .find({ ...keysetFilter<ImageDoc>(SORT, q.cursor, SORT_NAME), ...ownedBy(currentUser(c)) }, {
         sort: keysetSort(SORT),
         limit: limit + 1,
       })
@@ -409,7 +425,7 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
     const id = pathParam(c, "id");
     const { alt } = await readJson(c, AltBody);
     const after = await images(await currentDb(c)).findOneAndUpdate(
-      { _id: id },
+      { _id: id, ...ownedBy(currentUser(c)) },
       { $set: { alt, updatedAt: Date.now() } },
       { returnDocument: "after" },
     );
@@ -428,7 +444,8 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
   routes.delete("/admin/images/:id", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const id = pathParam(c, "id");
-    const doc = await images(db).findOne({ _id: id });
+    // Not found rather than forbidden for someone else's upload: a partner learns nothing about ids they do not own.
+    const doc = await images(db).findOne({ _id: id, ...ownedBy(currentUser(c)) });
     if (!doc) throw new NotFoundError(`image ${id}`);
 
     await images(db).deleteOne({ _id: id });

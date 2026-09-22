@@ -60,7 +60,11 @@ export default function TrafficPage() {
         backTo="/admin/analytics"
         backLabel="Analytics"
         title="Traffic"
-        subtitle="Who is on the site, and which listings they are looking at."
+        subtitle={
+          data?.scoped
+            ? "Which of your listings people are looking at."
+            : "Who is on the site, and which listings they are looking at."
+        }
         actions={<PeriodPicker current={period} />}
       />
 
@@ -130,7 +134,7 @@ export default function TrafficPage() {
       ) : null}
 
       <Card>
-        <CardHead title="Most looked at listings" />
+        <CardHead title={data?.scoped ? "Your most looked at listings" : "Most looked at listings"} />
         <p className="-mt-2 mb-3 text-[12px] text-slate-550">{scope}</p>
         {data && data.top.length > 0 ? (
           <ol className="space-y-1.5">

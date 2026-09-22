@@ -15,6 +15,7 @@ import {
   personRates,
   plainMajor,
   splitFor,
+  type AwaitingClose,
   type Deal,
   type DealShare,
   type MarketingSettings,
@@ -217,6 +218,38 @@ function DealScreen({ initial }: { initial: DealDetail }) {
     }
   }
 
+  /*
+   * APPROVED, AND THE HOUSE IS STILL ADVERTISED. Approving settles the money and
+   * leaves the listing live, because checking proof and taking a house down are
+   * two decisions. Read after every decision, so approving shows the next step
+   * at once, and closing it clears the prompt.
+   */
+  const awaiting = useAsync<{ items: AwaitingClose[] }>(
+    (signal) =>
+      settled
+        ? api.get<{ items: AwaitingClose[] }>(
+            `/admin/marketing/awaiting-close?dealId=${encodeURIComponent(deal.id)}`,
+            signal,
+          )
+        : Promise.resolve({ items: [] }),
+    [settled, deal.id, deal.updatedAt],
+  );
+  const stillListed = awaiting.data?.items[0] ?? null;
+
+  async function takeDown() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      // Writes no money: that was written when this deal was approved.
+      await api.post(`/admin/marketing/deals/${deal.id}/close-listing`);
+      awaiting.reload();
+    } catch (err) {
+      setActionError(toApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /* A cancelled deal stays cancelled. Everything else is still a decision. */
   const canReview =
     deal.status === "pending" || deal.status === "info" || deal.status === "rejected";
@@ -390,6 +423,23 @@ function DealScreen({ initial }: { initial: DealDetail }) {
       {actionError && (
         <div className="mb-4">
           <ErrorNote error={actionError} />
+        </div>
+      )}
+
+      {/* The step after approval, offered the moment it applies: the proof was
+          just checked, so this is where somebody already knows the house sold. */}
+      {stillListed && (
+        <div
+          data-spotlight="deal-take-down"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"
+        >
+          <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-amber-900">
+            <span className="font-semibold">The money is on the record.</span> {stillListed.listingTitle || "The listing"} is
+            still on the site {stillListed.kind === "rent" ? "to let" : "for sale"}, so buyers can still enquire about it.
+          </p>
+          <Button onClick={() => void takeDown()} disabled={busy}>
+            Take it off the market
+          </Button>
         </div>
       )}
 

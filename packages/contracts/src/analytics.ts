@@ -137,18 +137,37 @@ export interface MoneyOverview {
   series: ValuePoint[];
 }
 
+/**
+ * A partner's money over a window, and nothing else.
+ *
+ * The fee is ONE number on purpose. How AV Homes divides it between marketers,
+ * the two funds and itself is AV Homes' business, and which marketer earned what
+ * is somebody else's pay: a shape with nowhere to put either is the only
+ * guarantee an outside party never reads them.
+ */
+export interface PartnerTotals {
+  currency: string;
+  deals: number;
+  soldMinor: number;
+  feeMinor: number;
+  netMinor: number;
+}
+
 /** The overview page in one response, so the first screen is one request. */
 export interface AnalyticsOverview {
   period: Period;
-  /** Null for a role that holds analytics but not marketing. */
+  /** AV Homes' own money. Null for a role without marketing, and always null for a partner. */
   money: MoneyOverview | null;
   /** Null for the same reason. */
   funds: FundBalance[] | null;
   reward: RewardOutlook | null;
-  pulse: SitePulse;
+  /** The whole site's traffic. Null for a partner, whose numbers are their listings'. */
+  pulse: SitePulse | null;
   listings: { live: number; submitted: number; closedInPeriod: number };
   /** True when this is a partner's own narrowed view. */
   scoped: boolean;
+  /** A partner's own sales over the window. Null for everybody else. */
+  yours: PartnerTotals | null;
 }
 
 export interface TransactionRow {
@@ -270,20 +289,19 @@ export interface PartnerSaleRow {
   currency: string;
 }
 
-export interface PartnerMoney {
+export interface PartnerMoney extends PartnerTotals {
   period: Period;
   rows: PartnerSaleRow[];
-  soldMinor: number;
-  feeMinor: number;
-  netMinor: number;
-  currency: string;
 }
 
 /** The traffic page. The same numbers as the dashboard strip, plus per listing. */
 export interface TrafficReport {
   period: Period;
-  pulse: SitePulse;
+  /** Null for a partner: the whole site's visitors are AV Homes' figure, not theirs. */
+  pulse: SitePulse | null;
   top: { listingId: string; title: string; views: number; sessions: number }[];
+  /** True when `top` is only this caller's own listings. */
+  scoped: boolean;
 }
 
 /** A trend, or an honest refusal to state one. */

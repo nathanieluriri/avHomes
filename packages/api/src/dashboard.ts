@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
-import { currentDb, currentUser, type AppEnv } from "@avhomes/core";
-import { hasDomain } from "@avhomes/contracts";
+import { ForbiddenError, currentDb, currentUser, type AppEnv } from "@avhomes/core";
+import { hasDomain, isScopedRole } from "@avhomes/contracts";
 import { requireAuth } from "@avhomes/identity";
 import { enquiryCounts } from "@avhomes/enquiries";
 import { sitePulse } from "@avhomes/analytics";
@@ -22,6 +22,18 @@ export function dashboardRoutes(): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.get("/admin/dashboard", requireAuth(), async (c) => {
+    /*
+     * REFUSED, not narrowed, for a role scoped to its own records.
+     *
+     * Every figure here is the whole site's, and one block is AV Homes' buyers by
+     * name. The path is gated to `analytics`, which a partner lister holds for
+     * their own listings, so without this line a third-party account read other
+     * people's enquiries off its first screen. Their numbers live on the scoped
+     * analytics screens, and the console never sends them here.
+     */
+    if (isScopedRole(currentUser(c).role)) {
+      throw new ForbiddenError("the dashboard is AV Homes' own; your numbers are under Analytics");
+    }
     const db = await currentDb(c);
     /*
      * The one block on this route that is NOT the same for every caller.

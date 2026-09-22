@@ -704,6 +704,10 @@ function mockApi(S) {
     ["POST", /^\/api\/admin\/properties\/([^/]+)\/(\w+)$/, (m) => {
       const p = byId(S.props, m[1]);
       if (m[2] === "publish") bump(p, { status: "live", slug: p.slug || slugify(p.title), publishedAt: now() });
+      // The partner review loop, as TRANSITIONS has it: a draft goes in, and comes back a draft.
+      if (m[2] === "unpublish" && (p.status === "live" || p.status === "under-offer")) bump(p, { status: "draft", featured: false });
+      if (m[2] === "submit" && p.status === "draft") bump(p, { status: "submitted" });
+      if (m[2] === "sendBack" && p.status === "submitted") bump(p, { status: "draft" });
       return { property: p };
     }],
     ["GET", /^\/api\/admin\/enquiries\/([^/?]+)$/, (m) => ({ enquiry: byId(S.enqs, m[1]) })],
@@ -950,6 +954,34 @@ function moneyApi(S) {
     ["GET", /^\/api\/admin\/analytics\/overview/, (m, u) => {
       const p = period(new URL(u, "http://x").searchParams.get("period") || "30d");
       const q = `${new Date().getFullYear()}-Q${Math.floor(new Date().getMonth() / 3) + 1}`;
+      const listingCounts = {
+        live: S.props.filter((x) => x.status === "live").length,
+        submitted: S.props.filter((x) => x.status === "submitted").length,
+        closedInPeriod: inWindow(p).length,
+      };
+      /* The real route computes nothing site-wide for a partner: no money block,
+         no funds, no pulse, and `yours` in their place. AV Homes' fee is the whole
+         rate cell, which is what the server's shares plus funds plus kept add to. */
+      if (S.owner.role === "partner") {
+        const rows = inWindow(p);
+        const feeOf = (d) => {
+          const c = cell(d.ownership || "partner", d.listingType);
+          const rate = c.level1 + c.level2 + c.level3 + c.rewardPool + c.foundation;
+          return Math.floor((d.amountMinor * rate) / 100);
+        };
+        const soldMinor = rows.reduce((t, d) => t + d.amountMinor, 0);
+        const feeMinor = rows.reduce((t, d) => t + feeOf(d), 0);
+        return {
+          period: p,
+          money: null,
+          funds: null,
+          reward: null,
+          pulse: null,
+          listings: listingCounts,
+          scoped: true,
+          yours: { currency: "NGN", deals: rows.length, soldMinor, feeMinor, netMinor: soldMinor - feeMinor },
+        };
+      }
       return {
         period: p,
         money: money(p),
@@ -964,12 +996,9 @@ function moneyApi(S) {
           award: null,
         },
         pulse: S.pulse || { live: 3, sessions: 1240, previousSessions: 1090, series: [], views: 4820 },
-        listings: {
-          live: S.props.filter((x) => x.status === "live").length,
-          submitted: S.props.filter((x) => x.status === "submitted").length,
-          closedInPeriod: inWindow(p).length,
-        },
+        listings: listingCounts,
         scoped: false,
+        yours: null,
       };
     }],
 
@@ -1072,15 +1101,53 @@ function moneyApi(S) {
 
     ["GET", /^\/api\/admin\/analytics\/traffic/, (m, u) => {
       const p = period(new URL(u, "http://x").searchParams.get("period") || "30d");
+      const partner = S.owner.role === "partner";
       return {
         period: p,
-        pulse: S.pulse || { live: 3, sessions: 1240, previousSessions: 1090, series: [], views: 4820 },
+        pulse: partner ? null : S.pulse || { live: 3, sessions: 1240, previousSessions: 1090, series: [], views: 4820 },
+        scoped: partner,
         top: S.props.slice(0, 8).map((x) => {
           const seed = [...x.id].reduce((t, ch) => t + ch.charCodeAt(0), 0);
           const views = 40 + (seed % 380);
           return { listingId: x.id, title: x.title, views, sessions: Math.round(views * 0.72) };
         }).sort((a, b) => b.views - a.views),
       };
+    }],
+
+    /* Approved single-unit deals whose listing still reads live or under offer,
+       worked out from the same fixture as everything else here. */
+    ["GET", /^\/api\/admin\/marketing\/awaiting-close/, (m, u) => {
+      const sp = new URL(u, "http://x").searchParams;
+      const items = settled()
+        .filter((d) => !d.unitKey)
+        .filter((d) => !sp.get("listingId") || d.listingId === sp.get("listingId"))
+        .filter((d) => !sp.get("dealId") || d.id === sp.get("dealId"))
+        .map((d) => ({ d, listing: S.props.find((x) => x.id === d.listingId) }))
+        .filter(({ listing }) => listing && (listing.status === "live" || listing.status === "under-offer"))
+        .map(({ d, listing }) => ({
+          dealId: d.id,
+          listingId: d.listingId,
+          listingTitle: listing.title || d.listingTitle || "",
+          closerName: d.closerName || d.reporterName || "",
+          kind: d.listingType,
+          amountMinor: d.amountMinor,
+          currency: d.currency || "NGN",
+          approvedAt: d.reviewedAt || d.createdAt,
+        }));
+      return { items };
+    }],
+
+    ["POST", /^\/api\/admin\/marketing\/deals\/([^/]+)\/close-listing$/, (m) => {
+      const d = M.deals.find((x) => x.id === m[1]);
+      const listing = d && S.props.find((x) => x.id === d.listingId);
+      if (!listing) return refuse(404, "not_found");
+      if (listing.status === "closed") return { closed: true, already: true };
+      listing.status = "closed";
+      listing.closedDealId = d.id;
+      listing.featured = false;
+      listing.revision = (listing.revision || 1) + 1;
+      listing.updatedAt = Date.now();
+      return { closed: true, already: false };
     }],
 
     ["GET", /^\/api\/admin\/funds$/, () => ({ funds: balances() })],
@@ -1866,7 +1933,8 @@ function marketingApi(S) {
     ["GET", /^\/api\/admin\/marketing\/deals\/([^/?]+)$/, (m) => {
       const row = deal(m[1]);
       return {
-        deal: row,
+        // `toDeal` defaults these on the real route; a fixture row written before them has neither.
+        deal: { ...row, ownership: row.ownership || "av", closerKind: row.closerKind || "marketer" },
         shares: row.status === "approved" ? row.shares : split(row.amountMinor, row.listingType, row.reporterId),
         alsoClaimed: alsoClaimed(row),
         rates: M.settings,

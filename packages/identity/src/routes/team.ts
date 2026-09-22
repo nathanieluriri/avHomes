@@ -5,6 +5,7 @@ import {
   canAssign,
   canManage,
   isConsoleRole,
+  isScopedRole,
   type Role,
 } from "@avhomes/contracts";
 import {
@@ -75,7 +76,8 @@ type Refusal =
   | "manage_peer"
   | "role_self"
   | "role_owner"
-  | "manage_marketer";
+  | "manage_marketer"
+  | "role_partner";
 
 function refuse(operation: Refusal, userId: string): never {
   throw new PreconditionFailedError(operation, { userId, detail: REFUSAL_DETAIL[operation] });
@@ -89,6 +91,8 @@ const REFUSAL_DETAIL: Record<Refusal, string> = {
   role_owner: "The owner's role cannot be changed in either direction.",
   manage_marketer:
     "This is a marketer account, not a console one. Manage it on the Marketers screen.",
+  role_partner:
+    "This is a partner lister's account. It cannot be given a staff role: invite AV Homes staff from this screen instead.",
 };
 
 /**
@@ -239,6 +243,15 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     if (target.user.id === actor.id) refuse("role_self", id);
     if (target.user.role === "owner") refuse("role_owner", id);
     refuseIfMarketer(target, id);
+    /*
+     * A partner lister is an outside party scoped to their own listings. Any
+     * assignable role is UNSCOPED, so one change on this row would hand them every
+     * listing, every enquiry and the analytics, and the select on a partner's row
+     * showed "Developer", its first option, since "partner" is not among them.
+     * Disabling and enabling stay allowed: this is the one screen that can cut a
+     * partner off, and revoking access must never be the thing that is refused.
+     */
+    if (isScopedRole(target.user.role)) refuse("role_partner", id);
     if (!canManage(actor.role, target.user.role) || !canAssign(actor.role, next as Role)) {
       refuse("manage_peer", id);
     }

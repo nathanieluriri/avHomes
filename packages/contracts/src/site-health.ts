@@ -90,6 +90,12 @@ export interface SiteHealthSnapshot {
      * tell those apart is the one who has never driven past.
      */
     withoutMap: number;
+    /** A partner sent it for review and it is waiting for AV Homes to publish it. */
+    submitted: number;
+  };
+  partners: {
+    /** Somebody asked to list their property with AV Homes and nobody has answered. */
+    applicationsOpen: number;
   };
   posts: {
     published: number;
@@ -132,6 +138,8 @@ export interface SiteHealthSnapshot {
     marketersActive: number;
     /** Level 1 pays zero, so a deal closed today is worth nothing. */
     ratesUnset: boolean;
+    /** Sold through an approved deal and still advertised for sale. See `AwaitingClose`. */
+    soldStillListed: number;
   };
 }
 
@@ -169,7 +177,7 @@ function plural(n: number, one: string, many: string): string {
  */
 export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
   const out: SiteAlert[] = [];
-  const { listings, posts, settings, enquiries, marketing } = snap;
+  const { listings, partners, posts, settings, enquiries, marketing } = snap;
 
   /* ─────────────────────────────── blockers ─────────────────────────────── */
 
@@ -329,6 +337,46 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
       message:
         "The band that says who you have worked for is hidden, and it is the one section of the homepage whose entire job is credibility. One client you can actually show beats five you cannot.",
       action: { label: "Add a client", href: "/admin/settings" },
+    });
+  }
+
+  /*
+   * The alert the approval flow was missing. Approving a deal settles the money
+   * and leaves the house advertised, so without this a sold listing stayed on the
+   * site indefinitely and buyers kept enquiring about something nobody could sell
+   * them. Above `deals-waiting`: that one costs a marketer a wait, this one costs
+   * a buyer a wasted call and AV Homes its word.
+   */
+  if (marketing.soldStillListed > 0) {
+    out.push({
+      id: "sold-still-listed",
+      severity: "warning",
+      domain: "marketing",
+      title: `${marketing.soldStillListed} sold ${plural(marketing.soldStillListed, "listing is", "listings are")} still on the market`,
+      message: `The sale is on the record and everybody has been paid, but the site still shows ${plural(marketing.soldStillListed, "it", "them")} for sale, so buyers are still enquiring about a house they cannot have. Taking ${plural(marketing.soldStillListed, "it", "them")} down writes no money; that part is already done.`,
+      action: { label: "Take them off the market", href: "/admin/marketers/deals" },
+    });
+  }
+
+  if (listings.submitted > 0) {
+    out.push({
+      id: "listings-awaiting-review",
+      severity: "warning",
+      domain: "listings",
+      title: `${listings.submitted} ${plural(listings.submitted, "listing is", "listings are")} waiting for your review`,
+      message: `A partner sent ${plural(listings.submitted, "it", "them")} in and cannot publish it themselves: nothing goes on the site until somebody here approves it. Open each one, then publish it or send it back with what to fix.`,
+      action: { label: "Review them", href: "/admin/properties?status=submitted" },
+    });
+  }
+
+  if (partners.applicationsOpen > 0) {
+    out.push({
+      id: "partner-applications-waiting",
+      severity: "advisory",
+      domain: "team",
+      title: `${partners.applicationsOpen} ${plural(partners.applicationsOpen, "person has", "people have")} asked to list with you`,
+      message: `${plural(partners.applicationsOpen, "They were", "They were each")} told somebody reads every application and they will hear back either way. Approving one sends them a link to sign in; turning one down sends your reason.`,
+      action: { label: "Answer them", href: "/admin/partners" },
     });
   }
 

@@ -57,6 +57,20 @@ export type SpotlightSignal =
 
 export type SpotlightPlacement = "top" | "bottom" | "left" | "right";
 
+/** Copy said instead of a step's own while `anchor` is on the page. `title` is optional. */
+export interface WhenCopy {
+  anchor: string;
+  body: string;
+  title?: string;
+}
+
+/** A step's `bodyWhen`, always as a list, in the order it is tried. */
+export function whenCopies(step: { bodyWhen?: WhenCopy | readonly WhenCopy[] }): readonly WhenCopy[] {
+  const when = step.bodyWhen;
+  if (when === undefined) return [];
+  return "anchor" in when ? [when] : when;
+}
+
 export interface SpotlightStep {
   /** The `data-spotlight` value of the element to highlight. */
   anchor: string;
@@ -68,8 +82,13 @@ export interface SpotlightStep {
   body: string;
   /** Replaces `body` on a touch screen, where a keyboard shortcut is not one. */
   bodyTouch?: string;
-  /** Replaces `body` while this anchor is on the page, such as the list of what still blocks Publish. */
-  bodyWhen?: { anchor: string; body: string };
+  /**
+   * Replaces the copy while one of these anchors is on the page, such as the list
+   * of what still blocks Publish. Several are tried in order and the first found
+   * wins, which is how one step speaks to staff and to a partner lister, whose
+   * picker offers Send for review where staff have Publish.
+   */
+  bodyWhen?: WhenCopy | readonly WhenCopy[];
   /**
    * Replaces the copy unless the tour's record is known to be a draft. Copy
    * that calls something private is only ever shown on a proven draft.
@@ -223,14 +242,29 @@ const addAListing: SpotlightTour = {
     },
     {
       anchor: "listing-publish",
-      also: ["listing-blockers"],
+      also: ["listing-blockers", "listing-review-blockers"],
       page: LISTING,
       title: "Publish when ready",
       body: "When it reads right, press Publish. That's the whole flow.",
-      bodyWhen: {
-        anchor: "listing-blockers",
-        body: "Publish unlocks once the list below is clear. Fill those in, save, then press Publish. That's the whole flow.",
-      },
+      /* A partner lister cannot publish: their picker offers Send for review, and
+         the listing page marks that with its own two anchors. Tried first, so a
+         partner is never told to press a button they do not have. */
+      bodyWhen: [
+        {
+          anchor: "listing-review-blockers",
+          title: "Send it for review when it is ready",
+          body: "Send for review unlocks once the list below is clear. Fill those in and save, then send it: AV Homes checks it and puts it live. That's the whole flow.",
+        },
+        {
+          anchor: "listing-review-only",
+          title: "Send it for review",
+          body: "When it reads right, choose Send for review. AV Homes checks it and puts it live, or sends it back with what to change. That's the whole flow.",
+        },
+        {
+          anchor: "listing-blockers",
+          body: "Publish unlocks once the list below is clear. Fill those in, save, then press Publish. That's the whole flow.",
+        },
+      ],
       advance: "manual",
       final: true,
     },
@@ -316,14 +350,27 @@ const listAnEstate: SpotlightTour = {
     },
     {
       anchor: "listing-publish",
-      also: ["listing-blockers"],
+      also: ["listing-blockers", "listing-review-blockers"],
       page: LISTING,
       title: "Publish when ready",
       body: "The estate's price is worked out from its options, so it reads as a from price on the site. When it looks right, press Publish. That's the whole flow.",
-      bodyWhen: {
-        anchor: "listing-blockers",
-        body: "Publish unlocks once the list below is clear. Fill those in, save, then press Publish. That's the whole flow.",
-      },
+      // A partner lister sends it for review instead: see the same step in `add-a-listing`.
+      bodyWhen: [
+        {
+          anchor: "listing-review-blockers",
+          title: "Send it for review when it is ready",
+          body: "Send for review unlocks once the list below is clear. Fill those in and save, then send it: AV Homes checks it and puts it live. That's the whole flow.",
+        },
+        {
+          anchor: "listing-review-only",
+          title: "Send it for review",
+          body: "The estate's price is worked out from its options. When it looks right, choose Send for review: AV Homes checks it and puts it live. That's the whole flow.",
+        },
+        {
+          anchor: "listing-blockers",
+          body: "Publish unlocks once the list below is clear. Fill those in, save, then press Publish. That's the whole flow.",
+        },
+      ],
       advance: "manual",
       final: true,
     },
@@ -925,6 +972,15 @@ const recordASale: SpotlightTour = {
       signal: "sale-sheet-open",
       hint: "Choose Record the sale.",
       placement: "left",
+      /* A live listing whose sale is already on the record offers no Record the
+         sale, only the banner that takes it down, so the run ends there with the
+         reason rather than waiting on a choice that is not in the picker. */
+      none: {
+        anchor: "listing-sold-still-listed",
+        title: "This one is sold already",
+        body: "Its sale is on the record, so there is nothing to record. Take it off the market with the button here, then try this on another live listing.",
+        restart: { href: "/admin/properties?status=live", label: "Pick another listing" },
+      },
     },
     {
       anchor: "sale-ownership",
