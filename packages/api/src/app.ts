@@ -17,6 +17,7 @@ import {
   applicationPublicRoutes,
   authRoutes,
   clerkRoutes,
+  companyRoutes,
   partnerAdminRoutes,
   passwordRoutes,
   rolePermissions,
@@ -401,6 +402,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, teamRoutes({ mailer }));
   app.route(API_PREFIX, applicationAdminRoutes({ mailer }));
   app.route(API_PREFIX, partnerAdminRoutes({ mailer, ...partnerPorts }));
+  app.route(API_PREFIX, companyRoutes({ mailer, ...partnerPorts }));
   /*
    * BEFORE listingsAdminRoutes, deliberately. Its second route, GET
    * /admin/properties/:id/history, sits on a path listingsAdminRoutes also
