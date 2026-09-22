@@ -683,7 +683,7 @@ export const AUDIT_ENTITIES = [
   "property", "post", "category", "image", "enquiry", "user", "invite",
   "testimonial", "stat", "note", "settings", "session", "auth",
   "marketer", "deal", "lead", "payrun", "update",
-  "fund", "award", "application", "unknown",
+  "fund", "award", "application", "partner", "unknown",
 ] as const;
 export type AuditEntity = (typeof AUDIT_ENTITIES)[number];
 

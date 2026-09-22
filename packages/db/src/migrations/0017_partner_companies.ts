@@ -3,6 +3,7 @@ import { PARTNER_STATUSES } from "@avhomes/contracts";
 import { COLLECTIONS } from "../collections";
 import { ensureCollection, ensureIndex, type Migration } from "../migrate";
 import { usersValidator } from "./0005_enquiry_threads";
+import { auditValidator } from "./0008_audit";
 import { propertiesValidator } from "./0015_analytics_and_funds";
 import { invitesValidator } from "./0016_invites_know_every_role";
 
@@ -133,7 +134,8 @@ invite with no application to match gets a company named after it, listed in
 the output, so a person decides what it should be called.
 
 The users, invites and properties validators are re-applied with the new
-fields.`,
+fields. The audit validator is re-applied too, so a log line naming a partner
+is accepted.`,
 
   async up(db: Db) {
     const now = Date.now();
@@ -222,6 +224,7 @@ fields.`,
     await ensureCollection(db, COLLECTIONS.properties, propertiesValidator());
     await ensureIndex(db, COLLECTIONS.properties, { partnerId: 1, status: 1 }, { name: "properties_partner" });
     await ensureIndex(db, COLLECTIONS.images, { partnerId: 1, createdAt: -1, _id: -1 }, { name: "images_partner" });
+    await ensureCollection(db, COLLECTIONS.audit, auditValidator());
   },
 };
 

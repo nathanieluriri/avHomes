@@ -36,6 +36,7 @@ const ENTITY_NOUN: Record<AuditEntity, string> = {
   fund: "fund",
   award: "prize",
   application: "partner application",
+  partner: "partner company",
   unknown: "record",
 };
 
@@ -62,6 +63,7 @@ export const ENTITY_FILTER_LABEL: Record<AuditEntity, string> = {
   fund: "Funds",
   award: "Prizes",
   application: "Partner applications",
+  partner: "Partner companies",
   unknown: "Other",
 };
 
