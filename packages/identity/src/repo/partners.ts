@@ -97,11 +97,23 @@ export async function listPartners(db: Db): Promise<Partner[]> {
   return docs.map(toPartner);
 }
 
-export async function setPartnerMain(db: Db, partnerId: string, userId: string): Promise<void> {
-  await partners(db).updateOne(
-    { _id: partnerId },
+/**
+ * Hands the main seat to an account, only if it is still held by `expectedMain`.
+ *
+ * A compare-and-set, so two moves at once cannot both land and leave two main
+ * accounts. Returns false when somebody else moved it first.
+ */
+export async function setPartnerMain(
+  db: Db,
+  partnerId: string,
+  userId: string,
+  expectedMain: string | null,
+): Promise<boolean> {
+  const result = await partners(db).updateOne(
+    { _id: partnerId, mainUserId: expectedMain },
     { $set: { mainUserId: userId, updatedAt: Date.now() }, $inc: { revision: 1 } },
   );
+  return result.matchedCount === 1;
 }
 
 export interface PartnerPatch {
