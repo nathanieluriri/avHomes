@@ -1,0 +1,21 @@
+[
+  { "name": "owner-partners-list", "path": "/admin/partners", "viewport": "desktop",
+    "steps": [{ "wait": 2500, "eval": "document.querySelectorAll('a[href^=\"/admin/partners/ptnr_\"]').length", "shot": "list" }] },
+  { "name": "owner-partner-page", "path": "/admin/partners/ptnr_demo_lekki", "viewport": "desktop",
+    "steps": [
+      { "wait": 2500, "shot": "page" },
+      { "click": "::-p-xpath(//button[normalize-space()='Make main'])", "wait": 1200, "shot": "main-moved" }
+    ] },
+  { "name": "owner-partner-suspended-phone", "path": "/admin/partners/ptnr_demo_palm", "viewport": "phone",
+    "steps": [{ "wait": 2500, "shot": "suspended" }] },
+  { "name": "owner-partner-settings", "path": "/admin/partners/settings", "viewport": "desktop",
+    "steps": [{ "wait": 2000, "shot": "settings" }] },
+  { "name": "owner-team", "path": "/admin/team", "viewport": "desktop",
+    "steps": [{ "wait": 2500, "eval": "[document.body.innerText.includes('Lekki Homes'), !!document.querySelector('a[href=\"/admin/partners\"]')]", "shot": "team" }] },
+  { "name": "partner-main-company", "path": "/admin/company", "viewport": "desktop", "role": "partner",
+    "steps": [{ "wait": 2500, "eval": "!!document.querySelector('a[href=\"/admin/partners\"]')", "shot": "company" }] },
+  { "name": "partner-main-staff", "path": "/admin/company/staff", "viewport": "phone", "role": "partner",
+    "steps": [{ "wait": 2500, "shot": "staff" }] },
+  { "name": "partner-staff-staff", "path": "/admin/company/staff", "viewport": "phone", "role": "partner", "partnerRole": "staff",
+    "steps": [{ "wait": 2500, "eval": "document.body.innerText.includes('Add someone')", "shot": "read-only" }] }
+]

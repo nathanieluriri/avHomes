@@ -56,8 +56,39 @@ async function fixtures() {
       avatarUrl: "/images/library/person-06.jpg",
       title: "Senior Property Consultant",
       phone: "+234 801 234 5678",
+      partnerId: (process.env.ROLE || "owner") === "partner" ? "ptnr_demo_lekki" : null,
+      partnerRole: (process.env.ROLE || "owner") === "partner" ? process.env.PARTNER_ROLE || "main" : null,
     },
     props: (await find("properties", { deletedAt: null }, { updatedAt: -1 })).map(strip),
+    partnerSettings: { limits: { review: 3, live: 10, staff: 3 }, updatedAt: 0 },
+    partners: [
+      {
+        id: "ptnr_demo_lekki", name: "Lekki Homes Ltd", contactName: "Tunde Bakare",
+        contactEmail: "tunde@lekkihomes.example", contactPhone: "+234 803 555 0101",
+        status: "active", statusReason: "", limits: { review: null, live: 12, staff: null },
+        mainUserId: "usr_demo_tunde", applicationId: "appl_demo_lekki",
+        createdAt: Date.now() - 20 * 864e5, updatedAt: Date.now() - 864e5, revision: 3,
+        accounts: [
+          { id: "usr_demo_tunde", email: "tunde@lekkihomes.example", displayName: "Tunde Bakare", partnerRole: "main", disabledAt: null, lastActiveAt: Date.now() - 3600e3, createdAt: Date.now() - 20 * 864e5 },
+          { id: "usr_demo_ife", email: "ife@lekkihomes.example", displayName: "Ifeoma Obi", partnerRole: "staff", disabledAt: null, lastActiveAt: Date.now() - 2 * 864e5, createdAt: Date.now() - 9 * 864e5 },
+        ],
+        invites: [{ id: "inv_demo_seun", email: "seun@lekkihomes.example", createdAt: Date.now() - 864e5, expiresAt: Date.now() + 6 * 864e5 }],
+        usage: { review: 2, live: 7 },
+      },
+      {
+        id: "ptnr_demo_palm", name: "Palm Realty", contactName: "Grace Eze",
+        contactEmail: "grace@palmrealty.example", contactPhone: "",
+        status: "suspended", statusReason: "Listings showed prices that were not the asking price.",
+        limits: { review: null, live: null, staff: null },
+        mainUserId: "usr_demo_grace", applicationId: "appl_demo_palm",
+        createdAt: Date.now() - 60 * 864e5, updatedAt: Date.now() - 5 * 864e5, revision: 6,
+        accounts: [
+          { id: "usr_demo_grace", email: "grace@palmrealty.example", displayName: "Grace Eze", partnerRole: "main", disabledAt: null, lastActiveAt: Date.now() - 6 * 864e5, createdAt: Date.now() - 60 * 864e5 },
+        ],
+        invites: [],
+        usage: { review: 0, live: 4 },
+      },
+    ],
     posts: (await find("posts", { deletedAt: null }, { publishedAt: -1 })).map((d) => ({ ...strip(d), author: { name: "Adaeze Vincent" } })),
     enqs: (await find("enquiries", {}, { updatedAt: -1 })).map((d) => {
       const { threadKey, sourceIp, ...e } = strip(d);
@@ -655,6 +686,86 @@ function mockApi(S) {
     ["GET", /^\/api\/admin\/settings$/, () => ({ settings: S.settings })],
     ["GET", /^\/api\/admin\/users$/, () => ({ items: [{ ...S.owner, createdAt: now() - 864e7, disabledAt: null, listingCount: S.props.length, postCount: S.posts.length }] })],
     ["GET", /^\/api\/admin\/images$/, () => ({ items: S.library, nextCursor: null })],
+    // Partner companies: the shapes packages/identity/src/routes/partners.ts and company.ts answer with.
+    ...(() => {
+      const strip = ({ accounts, invites, usage, ...partner }) => partner;
+      const lim = (p) => ({
+        review: p.limits.review ?? S.partnerSettings.limits.review,
+        live: p.limits.live ?? S.partnerSettings.limits.live,
+        staff: p.limits.staff ?? S.partnerSettings.limits.staff,
+      });
+      const seats = (p) => p.accounts.filter((a) => a.partnerRole === "staff" && a.disabledAt === null).length + p.invites.length;
+      const use = (p) => ({ review: p.usage.review, live: p.usage.live, staff: seats(p) });
+      const detail = (p) => ({ partner: strip(p), limits: lim(p), defaults: S.partnerSettings.limits, usage: use(p), accounts: p.accounts, invites: p.invites });
+      const find = (id) => S.partners.find((p) => p.id === id);
+      const mine = () => find(S.owner.partnerId);
+      const view = () => ({ ...detail(mine()), viewer: { userId: S.owner.id, partnerRole: S.owner.partnerRole } });
+      const touch = (p) => Object.assign(p, { updatedAt: Date.now(), revision: p.revision + 1 });
+      return [
+        ["GET", /^\/api\/admin\/partners$/, () => ({
+          items: S.partners.map((p) => ({ partner: strip(p), limits: lim(p), usage: use(p), accounts: p.accounts.length })),
+          settings: S.partnerSettings,
+        })],
+        ["GET", /^\/api\/admin\/partners\/([^/]+)$/, (m) => detail(find(m[1]))],
+        ["PATCH", /^\/api\/admin\/partners\/([^/]+)$/, (m, u, b) => {
+          const p = find(m[1]);
+          if (b.name) p.name = b.name;
+          if (b.limits) p.limits = b.limits;
+          return detail(touch(p));
+        }],
+        ["POST", /^\/api\/admin\/partners\/([^/]+)\/(suspend|reinstate)$/, (m, u, b) => {
+          const p = find(m[1]);
+          Object.assign(p, { status: m[2] === "suspend" ? "suspended" : "active", statusReason: b.reason });
+          return detail(touch(p));
+        }],
+        ["POST", /^\/api\/admin\/partners\/([^/]+)\/main$/, (m, u, b) => {
+          const p = find(m[1]);
+          for (const a of p.accounts) a.partnerRole = a.id === b.userId ? "main" : "staff";
+          p.mainUserId = b.userId;
+          return detail(touch(p));
+        }],
+        ["POST", /^\/api\/admin\/partners\/([^/]+)\/accounts\/([^/]+)\/(disable|enable)$/, (m) => {
+          const p = find(m[1]);
+          const a = p.accounts.find((x) => x.id === m[2]);
+          a.disabledAt = m[3] === "disable" ? Date.now() : null;
+          return detail(touch(p));
+        }],
+        ["DELETE", /^\/api\/admin\/partners\/([^/]+)\/invites\/([^/]+)$/, (m) => {
+          const p = find(m[1]);
+          p.invites = p.invites.filter((i) => i.id !== m[2]);
+          return detail(touch(p));
+        }],
+        ["GET", /^\/api\/admin\/partner-settings$/, () => ({ settings: S.partnerSettings })],
+        ["PATCH", /^\/api\/admin\/partner-settings$/, (m, u, b) => {
+          S.partnerSettings = { limits: b.limits, updatedAt: Date.now() };
+          return { settings: S.partnerSettings };
+        }],
+        ["GET", /^\/api\/admin\/company(\/staff)?$/, () => view()],
+        ["PATCH", /^\/api\/admin\/company$/, (m, u, b) => {
+          const p = mine();
+          Object.assign(p, { contactName: b.contactName, contactEmail: b.contactEmail, contactPhone: b.contactPhone });
+          touch(p);
+          return view();
+        }],
+        ["POST", /^\/api\/admin\/company\/staff\/invites$/, (m, u, b) => {
+          mine().invites.unshift({ id: "inv_" + Date.now().toString(36), email: b.email, createdAt: Date.now(), expiresAt: Date.now() + 7 * 864e5 });
+          return { ...view(), url: "http://localhost:3300/admin/sign-in", emailed: false };
+        }],
+        ["DELETE", /^\/api\/admin\/company\/staff\/invites\/([^/]+)$/, (m) => {
+          const p = mine();
+          p.invites = p.invites.filter((i) => i.id !== m[1]);
+          return view();
+        }],
+        ["POST", /^\/api\/admin\/company\/staff\/([^/]+)\/remove$/, (m) => {
+          const a = mine().accounts.find((x) => x.id === m[1]);
+          a.disabledAt = Date.now();
+          return view();
+        }],
+      ];
+    })(),
+    ["GET", /^\/api\/admin\/applications$/, () => ({ applications: [], open: 0 })],
+    // The Team screen's own open-invite list (AV Homes staff, never a partner's).
+    ["GET", /^\/api\/admin\/invites$/, () => ({ items: [] })],
     ["GET", /^\/api\/admin\/(stats|categories|revisions\/.+)$/, () => ({ items: [] })],
     ["GET", /^\/api\/admin\/properties\/([^/]+)\/history$/, () => ({ items: [] })],
     ["GET", /^\/api\/admin\/properties\/([^/?]+)$/, (m) => ({ property: byId(S.props, m[1]) })],

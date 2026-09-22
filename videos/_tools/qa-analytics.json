@@ -61,7 +61,7 @@
   },
   {
     "name": "partner-applications",
-    "path": "/admin/partners",
+    "path": "/admin/partners/applications",
     "steps": [{ "wait": 1800, "shot": "top" }]
   }
 ]
