@@ -25,6 +25,7 @@ export {
   closeWithSale,
   reopenFromSale,
   listingFacts,
+  partnerListingUsage,
   LISTING_KINDS,
   type ListingKind,
   type ListQuery,

@@ -16,9 +16,11 @@ import {
   DEFAULT_CURRENCY,
   ESTATE_TYPE,
   FEATURABLE_STATUSES,
+  LIVE_LIMIT_STATUSES,
   PRICE_HISTORY_MAX,
   PROPERTY_STATUSES,
   PUBLIC_PROPERTY_STATUSES,
+  REVIEW_LIMIT_STATUSES,
   isEstate,
   type ListingType,
   type Ownership,
@@ -245,6 +247,34 @@ export async function getSimilarProperties(
   const sameType = docs.filter((d) => d.type === current.type);
   const sameCity = docs.filter((d) => d.type !== current.type && d.city === current.city);
   return [...sameType, ...sameCity].slice(0, limit).map(toProperty);
+}
+
+/** How much of each listing limit each company is using, trash excluded. Counted, never stored. */
+export async function partnerListingUsage(
+  db: Db,
+  partnerIds: readonly string[],
+): Promise<Map<string, { review: number; live: number }>> {
+  const out = new Map(partnerIds.map((id) => [id, { review: 0, live: 0 }]));
+  if (partnerIds.length === 0) return out;
+  const rows = await properties(db)
+    .aggregate<{ _id: { partnerId: string; status: PropertyStatus }; count: number }>([
+      {
+        $match: {
+          partnerId: { $in: [...partnerIds] },
+          deletedAt: null,
+          status: { $in: [...REVIEW_LIMIT_STATUSES, ...LIVE_LIMIT_STATUSES] },
+        },
+      },
+      { $group: { _id: { partnerId: "$partnerId", status: "$status" }, count: { $sum: 1 } } },
+    ])
+    .toArray();
+  for (const row of rows) {
+    const entry = out.get(row._id.partnerId);
+    if (!entry) continue;
+    if (REVIEW_LIMIT_STATUSES.includes(row._id.status)) entry.review += row.count;
+    else entry.live += row.count;
+  }
+  return out;
 }
 
 /* ────────────────────────────── mutations ─────────────────────────────── */

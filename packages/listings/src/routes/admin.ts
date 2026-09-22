@@ -27,6 +27,7 @@ import {
   FEE_KINDS_FOR,
   FURNISHINGS,
   LISTING_TYPES,
+  limitRefusal,
   NO_PARTNER,
   PROPERTY_STATUSES,
   OWNERSHIPS,
@@ -58,7 +59,8 @@ import {
   type SiteStat,
   type Testimonial,
 } from "@avhomes/contracts";
-import { requireAdmin, requireAuth } from "@avhomes/identity";
+import { type Db } from "@avhomes/db";
+import { limitsForPartner, requireAdmin, requireAuth } from "@avhomes/identity";
 import { assertAuthorized, isScopedCaller } from "../authorize";
 import { expandMapLink } from "../maps";
 import {
@@ -74,6 +76,7 @@ import {
   listSiteStats,
   listTestimonials,
   assertTransition,
+  partnerListingUsage,
   saveProperty,
   transitionProperty,
   trashProperty,
@@ -245,6 +248,34 @@ const StatBody = z
   })
   .strict();
 
+/**
+ * Refuses when a company has no room left under one listing limit.
+ *
+ * Counted at the moment of the action. Two actions in the same instant can
+ * each see room for one more; the overshoot is at most the company's headcount,
+ * and these are commercial caps, so a counter that drifts would be worse.
+ */
+async function assertRoom(
+  db: Db,
+  partnerId: string,
+  limit: "review" | "live",
+  audience: "partner" | "av",
+): Promise<void> {
+  const found = await limitsForPartner(db, partnerId);
+  if (!found) throw new NotFoundError(`partner ${partnerId}`);
+  const usage = (await partnerListingUsage(db, [partnerId])).get(partnerId) ?? { review: 0, live: 0 };
+  const count = usage[limit];
+  const max = found.limits[limit];
+  if (count >= max) {
+    throw new PreconditionFailedError("limit_reached", {
+      limit,
+      count,
+      max,
+      detail: limitRefusal(limit, count, max, audience),
+    });
+  }
+}
+
 export function listingsAdminRoutes(): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
@@ -293,6 +324,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     // Never written: NO_PARTNER is the sentinel a companyless account scopes to,
     // and stamping it on a row would let every other companyless account match it.
     if (scope === NO_PARTNER) throw new ForbiddenError("this partner account has no company");
+    if (scope !== null) await assertRoom(db, scope, "review", "partner");
     const { title, type } = await readJsonOrEmpty(c, CreateBody);
     const property = await createProperty(db, {
       title,
@@ -625,6 +657,18 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     // Refusals name the operation and the status, so a screen can say what is
     // wrong rather than printing a status code.
     assertTransition(current, operation);
+
+    /* A partner's listing going on the market needs room under the live limit:
+       on submission, so the partner hears it before anyone at AV Homes does; on
+       publish, which is AV Homes approving it; on relisting a sold one. */
+    if (current.partnerId !== null) {
+      const who = isScopedCaller(currentUser(c)) ? "partner" : "av";
+      if (operation === "submit") await assertRoom(db, current.partnerId, "live", who);
+      if (operation === "publish") await assertRoom(db, current.partnerId, "live", "av");
+      if (operation === "relist" && current.status === "closed") {
+        await assertRoom(db, current.partnerId, "live", "av");
+      }
+    }
 
     /*
      * The publish check runs on SUBMIT too, and that is the point of running it
