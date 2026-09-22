@@ -2,7 +2,7 @@ import type { Db } from "@avhomes/db";
 import type { AuthUser } from "@avhomes/contracts";
 import { claimInvite, releaseInvite } from "./repo/invites";
 import { isSuspendedPartner, setPartnerMain } from "./repo/partners";
-import { createUser, findUserByEmail } from "./repo/users";
+import { createUser, findUserByEmail, setPartnerRole } from "./repo/users";
 
 /**
  * The ONE membership decision, shared by both doors.
@@ -68,7 +68,15 @@ export async function admit(db: Db, identity: Identity): Promise<AdmitResult> {
       partnerId: invite.partnerId ?? null,
       partnerRole: invite.partnerRole ?? null,
     });
-    if (invite.partnerId && invite.partnerRole === "main") await setPartnerMain(db, invite.partnerId, user.id, null);
+    if (invite.partnerId && invite.partnerRole === "main") {
+      const took = await setPartnerMain(db, invite.partnerId, user.id, null);
+      // The label follows the seat, because `countStaffSeats` counts the label: an
+      // account labelled main holding no seat is a staff seat nobody ever spends.
+      if (!took) {
+        await setPartnerRole(db, user.id, "staff");
+        return { ok: true, user: { ...user, partnerRole: "staff" } };
+      }
+    }
     return { ok: true, user };
   } catch (err) {
     // Hand the invite back rather than burning it, and only if nothing else

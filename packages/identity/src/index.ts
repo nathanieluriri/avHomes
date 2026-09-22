@@ -57,6 +57,7 @@ export {
   reopenApplication,
   APPLICATION_STATUSES,
   type ApplicationStatus,
+  type Decision,
   type PartnerApplication,
 } from "./repo/applications";
 

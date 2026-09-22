@@ -140,6 +140,12 @@ export async function getApplication(db: Db, id: string): Promise<PartnerApplica
   return doc ? toApplication(doc) : null;
 }
 
+/** `claimed` is whether THIS call won the CAS, which is the only safe thing to act on. */
+export interface Decision {
+  application: PartnerApplication;
+  claimed: boolean;
+}
+
 /**
  * Decide one.
  *
@@ -147,12 +153,15 @@ export async function getApplication(db: Db, id: string): Promise<PartnerApplica
  * loser is told rather than silently overwriting the winner. The caller creates the
  * invite only after this claims the row, which is the order that cannot mint an
  * account for an application somebody else refused a moment earlier.
+ *
+ * The loser gets the winner's document back with `claimed: false`. A status read
+ * before this call cannot tell the two apart, because it is stale by then.
  */
 export async function decideApplication(
   db: Db,
   id: string,
   input: { approve: boolean; reason: string; byName: string },
-): Promise<PartnerApplication> {
+): Promise<Decision> {
   const now = Date.now();
   const after = await rows(db).findOneAndUpdate(
     { _id: id, status: "open" },
@@ -171,9 +180,9 @@ export async function decideApplication(
     const current = await rows(db).findOne({ _id: id });
     if (!current) throw new NotFoundError(`application ${id}`);
     // Already decided. The caller reports it rather than deciding it twice.
-    return toApplication(current);
+    return { application: toApplication(current), claimed: false };
   }
-  return toApplication(after);
+  return { application: toApplication(after), claimed: true };
 }
 
 /**

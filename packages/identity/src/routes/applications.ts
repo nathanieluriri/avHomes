@@ -134,14 +134,17 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
      * act; creating the invite only after it means an account is never minted for
      * an application somebody else refused a moment earlier.
      */
-    const application = await decideApplication(db, id, {
+    const { application, claimed } = await decideApplication(db, id, {
       approve: body.approve,
       reason: body.reason,
       byName: actor.displayName,
     });
     auditEntityId(c, application.id);
 
-    if (before.status !== "open") {
+    /* The CAS, not the status read above it: `before` was read before the claim and
+       still says "open" to the loser of two simultaneous decisions, which would send
+       it on to mail and mint an account against the winner's verdict. */
+    if (!claimed) {
       return c.json({
         application,
         url: null,
