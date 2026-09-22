@@ -78,7 +78,12 @@ async function gather(db: Db): Promise<SiteHealthSnapshot> {
 
   // The same list the public repo reads, so a check can never disagree with the
   // site about what is on it.
-  const onSite = { status: { $in: [...PUBLIC_PROPERTY_STATUSES] }, deletedAt: null };
+  // A suspended company's held listings are off the site, so the health count must not see them either.
+  const onSite = {
+    status: { $in: [...PUBLIC_PROPERTY_STATUSES] },
+    deletedAt: null,
+    partnerHold: { $ne: true },
+  };
 
   const [
     publiclyVisible,

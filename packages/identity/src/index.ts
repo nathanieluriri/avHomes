@@ -45,6 +45,8 @@ export { authRoutes } from "./routes/auth";
 export { clerkRoutes, passwordRoutes, registerClerkVerifier, type ClerkVerifier } from "./routes/doors";
 export { teamRoutes } from "./routes/team";
 export { applicationAdminRoutes, applicationPublicRoutes } from "./routes/applications";
+export { partnerAdminRoutes } from "./routes/partners";
+export { offboardPartnerAccount, agentCardOf, type PartnerPorts } from "./partner-accounts";
 export {
   createApplication,
   decideApplication,

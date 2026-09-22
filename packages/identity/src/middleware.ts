@@ -185,6 +185,15 @@ const RULES: readonly Rule[] = [
   /* Somebody outside AV Homes asking to list property. `team`, because approving
      one mints an account, which is exactly what the team domain governs. */
   { prefix: "/api/admin/applications", domain: "team" },
+  /* A partner company's page and the default limits. `team`, beside the
+     applications: deciding who a company is and what it may ask for is the
+     same job as deciding who gets an account. */
+  { prefix: "/api/admin/partners", domain: "team" },
+  { prefix: "/api/admin/partner-settings", domain: "team" },
+  /* SELF-GATING, like tutorials: every route under it reads or writes only the
+     caller's own company and refuses an account with none. ANY route added
+     under /api/admin/company must only ever touch the caller's own company. */
+  { prefix: "/api/admin/company", domain: null, subtree: true },
   /* The analytics section. Gated on `analytics`, which agent and support already
      hold, and each route narrows its own money blocks to callers who also hold
      `marketing`: the same split `dashboard.ts` makes for its marketing tile. A

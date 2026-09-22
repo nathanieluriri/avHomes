@@ -17,6 +17,7 @@ import {
   applicationPublicRoutes,
   authRoutes,
   clerkRoutes,
+  partnerAdminRoutes,
   passwordRoutes,
   rolePermissions,
   sessionMiddleware,
@@ -31,6 +32,9 @@ import {
   listingFacts,
   listingsAdminRoutes,
   listingsPublicRoutes,
+  partnerListingUsage,
+  reassignPartnerListings,
+  setPartnerHold,
 } from "@avhomes/listings";
 import { contentAdminRoutes, contentPublicRoutes } from "@avhomes/content";
 import {
@@ -186,6 +190,14 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       await closeWithSale(db, { listingId: input.listingId, dealId: input.dealId });
     },
   } satisfies Partial<MarketingDeps>;
+
+  /* identity -> listings: what a company is using, holding its listings off the
+     site, and handing a departed account's listings to its main account. */
+  const partnerPorts = {
+    listingUsage: partnerListingUsage,
+    holdListings: setPartnerHold,
+    reassignListings: reassignPartnerListings,
+  };
 
   /*
    * The image store, chosen by configuration rather than by which token happens
@@ -388,6 +400,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   app.route(API_PREFIX, teamRoutes({ mailer }));
   app.route(API_PREFIX, applicationAdminRoutes({ mailer }));
+  app.route(API_PREFIX, partnerAdminRoutes({ mailer, ...partnerPorts }));
   /*
    * BEFORE listingsAdminRoutes, deliberately. Its second route, GET
    * /admin/properties/:id/history, sits on a path listingsAdminRoutes also
