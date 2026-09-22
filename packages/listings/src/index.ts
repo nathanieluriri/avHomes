@@ -26,6 +26,8 @@ export {
   reopenFromSale,
   listingFacts,
   partnerListingUsage,
+  setPartnerHold,
+  reassignPartnerListings,
   LISTING_KINDS,
   type ListingKind,
   type ListQuery,

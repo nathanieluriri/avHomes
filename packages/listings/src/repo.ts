@@ -22,6 +22,7 @@ import {
   PUBLIC_PROPERTY_STATUSES,
   REVIEW_LIMIT_STATUSES,
   isEstate,
+  type Agent,
   type ListingType,
   type Ownership,
   type Page,
@@ -92,6 +93,20 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
+/**
+ * What the public site may show: a public status, not in the trash, not held.
+ *
+ * One definition, used by all three public reads. It was three copies, and a
+ * condition added to three copies is how the third copy misses it.
+ */
+function publicVisible(status?: PropertyStatus): Filter<PropertyDoc> {
+  return {
+    status: status ?? { $in: [...PUBLIC_PROPERTY_STATUSES] },
+    deletedAt: null,
+    partnerHold: { $ne: true },
+  } as Filter<PropertyDoc>;
+}
+
 function buildFilter(query: ListQuery): Filter<PropertyDoc> {
   const and: Filter<PropertyDoc>[] = [];
 
@@ -100,8 +115,7 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
   } else {
     // The public list is defined by what it EXCLUDES, so a status added later is
     // hidden until somebody adds it to PUBLIC_PROPERTY_STATUSES on purpose.
-    and.push({ status: query.status ?? { $in: [...PUBLIC_PROPERTY_STATUSES] } });
-    and.push({ deletedAt: null });
+    and.push(publicVisible(query.status));
   }
 
   if (query.type) and.push({ type: query.type });
@@ -201,7 +215,7 @@ export async function countProperties(db: Db, query: ListQuery): Promise<number>
  * current one because the returned slug differs from the one asked for.
  */
 export async function getPropertyBySlug(db: Db, slug: string): Promise<Property | null> {
-  const visible = { deletedAt: null, status: { $in: [...PUBLIC_PROPERTY_STATUSES] } };
+  const visible = publicVisible();
   const doc =
     (await properties(db).findOne({ slug, ...visible })) ??
     (await properties(db).findOne({ previousSlugs: slug, ...visible }, { sort: { updatedAt: -1 } }));
@@ -236,8 +250,7 @@ export async function getSimilarProperties(
     .find(
       {
         _id: { $ne: current.id },
-        deletedAt: null,
-        status: { $in: [...PUBLIC_PROPERTY_STATUSES] },
+        ...publicVisible(),
         $or: [{ type: current.type }, { city: current.city }],
       },
       { sort: { publishedAt: -1, _id: -1 }, limit: limit * 3 },
@@ -730,6 +743,45 @@ export async function trashProperty(db: Db, id: string, baseRevision: number): P
   const current = await properties(db).findOne({ _id: id });
   if (!current) throw new NotFoundError(id);
   throw new StaleWriteError("property", baseRevision, current.revision, toProperty(current));
+}
+
+/**
+ * Takes a suspended company's listings off the public site, or puts them back.
+ *
+ * Status, featuring and revision are left alone, so reinstating shows exactly
+ * what was there, and an open editor does not lose its save to a 409.
+ */
+export async function setPartnerHold(db: Db, partnerId: string, held: boolean): Promise<number> {
+  const result = await properties(db).updateMany(
+    { partnerId },
+    held ? { $set: { partnerHold: true } } : { $unset: { partnerHold: "" } },
+  );
+  return result.modifiedCount;
+}
+
+/**
+ * A partner account that leaves hands its listings to the company's main
+ * account: the record, and the contact card wherever the card was theirs.
+ *
+ * The card changes without review, the one content change that does, because a
+ * departed employee's number on a live listing sends buyers to nobody.
+ */
+export async function reassignPartnerListings(
+  db: Db,
+  input: { partnerId: string; fromUserId: string; to: Agent },
+): Promise<number> {
+  const now = Date.now();
+  const [owned, cards] = await Promise.all([
+    properties(db).updateMany(
+      { partnerId: input.partnerId, agentUserId: input.fromUserId },
+      { $set: { agentUserId: input.to.id, updatedAt: now }, $inc: { revision: 1 } },
+    ),
+    properties(db).updateMany(
+      { partnerId: input.partnerId, "agent.id": input.fromUserId },
+      { $set: { agent: input.to, updatedAt: now }, $inc: { revision: 1 } },
+    ),
+  ]);
+  return Math.max(owned.modifiedCount, cards.modifiedCount);
 }
 
 /* ──────────────────────── testimonials and stats ──────────────────────── */
