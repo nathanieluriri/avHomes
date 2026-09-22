@@ -47,6 +47,8 @@ export const COLLECTIONS = {
   rewardAwards: "reward_awards",
   listingViews: "listing_views",
   partnerApplications: "partner_applications",
+  /* Partner companies. Their accounts are users rows carrying the company's id. */
+  partners: "partners",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

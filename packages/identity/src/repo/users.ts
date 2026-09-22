@@ -1,6 +1,6 @@
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { DuplicateError, newId } from "@avhomes/core";
-import type { AuthUser, Role, TeamUser } from "@avhomes/contracts";
+import type { AuthUser, PartnerRole, Role, TeamUser } from "@avhomes/contracts";
 import type { UserDoc } from "../schema";
 
 /**
@@ -127,6 +127,8 @@ export interface CreateUserArgs {
   displayName: string;
   role: Role;
   passwordHash?: string | null;
+  partnerId?: string | null;
+  partnerRole?: PartnerRole | null;
 }
 
 export async function createUser(db: Db, args: CreateUserArgs): Promise<AuthUser> {
@@ -147,6 +149,8 @@ export async function createUser(db: Db, args: CreateUserArgs): Promise<AuthUser
     avatarUrl: null,
     title: null,
     phone: null,
+    partnerId: args.partnerId ?? null,
+    partnerRole: args.partnerRole ?? null,
     createdAt: now,
     updatedAt: now,
     disabledAt: null,
@@ -246,6 +250,11 @@ export async function enableUser(db: Db, userId: string): Promise<void> {
     { _id: userId },
     { $set: { disabledAt: null, updatedAt: Date.now() } },
   );
+}
+
+/** Moves a partner account between the main seat and a staff seat. */
+export async function setPartnerRole(db: Db, userId: string, partnerRole: PartnerRole): Promise<void> {
+  await users(db).updateOne({ _id: userId }, { $set: { partnerRole, updatedAt: Date.now() } });
 }
 
 /** Keeps the last active owner enableable, phrased as an invariant not an identity check. */

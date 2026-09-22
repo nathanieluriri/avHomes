@@ -66,10 +66,36 @@ export {
   countActiveOwners,
   reassignListingsToOwner,
   setPasswordHash,
+  setPartnerRole,
   toAuthUser,
   updateProfile,
   type ProfilePatch,
 } from "./repo/users";
 export { createSession, resolveSession, endAllSessions } from "./repo/sessions";
-export { createInvite, listInvites } from "./repo/invites";
+export {
+  createInvite,
+  listInvites,
+  revokeTeamInvite,
+  revokePartnerInvite,
+} from "./repo/invites";
+export {
+  partnerIdForApplication,
+  upsertPartnerForApplication,
+  findPartner,
+  listPartners,
+  setPartnerMain,
+  updatePartner,
+  setPartnerStatus,
+  isSuspendedPartner,
+  partnerAccounts,
+  partnerUserIds,
+  openPartnerInvites,
+  countStaffSeats,
+  type PartnerPatch,
+} from "./repo/partners";
+export {
+  readPartnerSettings,
+  writePartnerSettings,
+  limitsForPartner,
+} from "./repo/partner-settings";
 export { hashPassword, verifyPassword, burnPasswordTime, mintSessionToken, tokenId } from "./crypto";

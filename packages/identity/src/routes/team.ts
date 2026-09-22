@@ -30,7 +30,7 @@ import {
 } from "@avhomes/core";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { requireAdmin } from "../middleware";
-import { createInvite, findOpenInvite, listInvites, revokeInvite } from "../repo/invites";
+import { createInvite, findOpenInvite, listInvites, revokeTeamInvite } from "../repo/invites";
 import {
   countActiveOwners,
   disableUser,
@@ -358,7 +358,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
 
   routes.delete("/admin/invites/:id", requireAdmin(), async (c) => {
     const id = pathParam(c, "id");
-    const removed = await revokeInvite(await currentDb(c), id);
+    const removed = await revokeTeamInvite(await currentDb(c), id);
     if (!removed) throw new NotFoundError(id);
     return c.json({ ok: true });
   });
