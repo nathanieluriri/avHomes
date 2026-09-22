@@ -1,5 +1,6 @@
 import type { Db } from "@avhomes/db";
 import type { Agent, AuthUser, Partner } from "@avhomes/contracts";
+import { PreconditionFailedError } from "@avhomes/core";
 import { disableUser, findUserById } from "./repo/users";
 import { endAllSessions } from "./repo/sessions";
 
@@ -35,6 +36,11 @@ export async function offboardPartnerAccount(
   userId: string,
   reassign: PartnerPorts["reassignListings"],
 ): Promise<{ sessionsEnded: number; listingsMoved: number }> {
+  if (partner.mainUserId === userId) {
+    throw new PreconditionFailedError("main_account", {
+      detail: "Move the main role to someone else first, or suspend the company.",
+    });
+  }
   await disableUser(db, userId);
   const sessionsEnded = await endAllSessions(db, userId);
   const main = partner.mainUserId ? await findUserById(db, partner.mainUserId) : null;

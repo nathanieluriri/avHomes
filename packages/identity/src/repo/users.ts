@@ -257,6 +257,15 @@ export async function setPartnerRole(db: Db, userId: string, partnerRole: Partne
   await users(db).updateOne({ _id: userId }, { $set: { partnerRole, updatedAt: Date.now() } });
 }
 
+/** Every account in a company still labelled main, except the seat's holder, back to staff. */
+export async function demoteOtherMains(db: Db, partnerId: string, keepUserId: string): Promise<number> {
+  const result = await users(db).updateMany(
+    { partnerId, partnerRole: "main", _id: { $ne: keepUserId } },
+    { $set: { partnerRole: "staff", updatedAt: Date.now() } },
+  );
+  return result.modifiedCount;
+}
+
 /** Keeps the last active owner enableable, phrased as an invariant not an identity check. */
 export async function countActiveOwners(db: Db): Promise<number> {
   return users(db).countDocuments({ role: "owner", disabledAt: null });

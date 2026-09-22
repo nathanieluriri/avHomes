@@ -37,7 +37,7 @@ import {
 } from "../repo/partners";
 import { readPartnerSettings, writePartnerSettings } from "../repo/partner-settings";
 import { revokePartnerInvite } from "../repo/invites";
-import { enableUser, findUserById, setPartnerRole } from "../repo/users";
+import { demoteOtherMains, enableUser, findUserById, setPartnerRole } from "../repo/users";
 import { endAllSessions } from "../repo/sessions";
 
 const LIMIT = z.number().int().min(0).max(PARTNER_LIMIT_MAX);
@@ -205,14 +205,14 @@ export function partnerAdminRoutes(deps: { mailer: Mailer } & PartnerPorts): Hon
       });
     }
     auditBefore(c, partner as unknown as Record<string, unknown>);
-    // Compare-and-set on the seat: a second move racing this one must not leave two main accounts.
+    // The compare-and-set keeps one seat; demoting by query keeps the labels matching it, so a retry repairs a half-done move.
     const moved = await setPartnerMain(db, id, userId, partner.mainUserId);
     if (!moved) {
       throw new PreconditionFailedError("main_changed", {
         detail: "Someone moved this company's main account a moment ago. Reload and try again.",
       });
     }
-    if (partner.mainUserId && partner.mainUserId !== userId) await setPartnerRole(db, partner.mainUserId, "staff");
+    await demoteOtherMains(db, id, userId);
     await setPartnerRole(db, userId, "main");
     auditEntityId(c, id);
     return c.json(await detailFor(db, id, deps));
@@ -227,7 +227,7 @@ export function partnerAdminRoutes(deps: { mailer: Mailer } & PartnerPorts): Hon
     const target = await findUserById(db, userId);
     if (!target || target.user.partnerId !== id) throw new NotFoundError(`account ${userId}`);
     auditBefore(c, target as unknown as Record<string, unknown>);
-    if (target.user.partnerRole === "main") {
+    if (partner.mainUserId === userId) {
       throw new PreconditionFailedError("main_account", {
         detail: "Move the main role to someone else first, or suspend the company.",
       });
