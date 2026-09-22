@@ -5,7 +5,6 @@ import { Building2 } from "lucide-react";
 import {
   PARTNER_LIMIT_HINT,
   PARTNER_LIMIT_KEYS,
-  PARTNER_LIMIT_LABEL,
   type CompanyView,
 } from "@avhomes/contracts";
 import { api, type ApiError } from "@/lib/admin/client";
@@ -40,9 +39,12 @@ export default function CompanyPage() {
       <div className="space-y-3">
         <Card>
           <CardHead title="Limits" />
+          {/* The hint is the whole label: a DRow label is one line, and joining
+              label and hint read "Live. Live plus under offer". Each hint names
+              its own limit, so nothing is lost. */}
           <DefinitionList>
             {PARTNER_LIMIT_KEYS.map((key) => (
-              <DRow key={key} label={`${PARTNER_LIMIT_LABEL[key]}. ${PARTNER_LIMIT_HINT[key]}`}>
+              <DRow key={key} label={PARTNER_LIMIT_HINT[key]}>
                 {current.usage[key]} of {current.limits[key]}
               </DRow>
             ))}
