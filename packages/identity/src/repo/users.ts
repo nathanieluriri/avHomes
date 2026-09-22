@@ -295,7 +295,7 @@ export async function listUsers(
   db: Db,
   scope: UserScope = "console",
 ): Promise<Omit<TeamUser, "listingCount" | "postCount">[]> {
-  const filter = scope === "console" ? { role: { $ne: "marketer" as const } } : {};
+  const filter = scope === "console" ? { role: { $nin: ["marketer", "partner"] as Role[] } } : {};
   const docs = await users(db)
     .find(filter, { projection: TEAM_PROJECTION, sort: { createdAt: 1 } })
     .toArray();
