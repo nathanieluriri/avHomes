@@ -132,6 +132,24 @@ export const NAV: readonly NavItem[] = [
     domain: "listings",
   },
   {
+    href: "/admin/company",
+    label: "Company",
+    hint: "Your company's details and limits",
+    icon: Building2,
+    domain: null,
+    roles: ["partner"],
+    children: [
+      {
+        href: "/admin/company/staff",
+        label: "Staff",
+        hint: "Who works on your listings",
+        icon: UsersRound,
+        domain: null,
+        roles: ["partner"],
+      },
+    ],
+  },
+  {
     /* A section rather than one screen, because six pages each answer their own
        question and a single page answering all six is the overload this whole
        section is built to avoid. Placed under Listings and above Marketers: it
