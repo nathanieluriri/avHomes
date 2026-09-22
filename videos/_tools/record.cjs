@@ -129,6 +129,17 @@ async function fixtures() {
       })),
   };
   S.marketing = marketingFixtures(ownerId, S.props);
+  /* A partner recording signs in AS one of the company's own accounts, so the seat
+     is real and `view()` below can derive viewer.partnerRole the way viewFor does.
+     PARTNER_ROLE picks which account, not what the view is told. */
+  if (S.owner.role === "partner") {
+    const company = S.partners.find((p) => p.id === S.owner.partnerId);
+    const account =
+      S.owner.partnerRole === "main"
+        ? company.accounts.find((a) => a.id === company.mainUserId)
+        : company.accounts.find((a) => a.id !== company.mainUserId);
+    Object.assign(S.owner, { id: account.id, email: account.email, displayName: account.displayName });
+  }
   if (c) await c.close();
   return S;
 }
@@ -703,7 +714,10 @@ function mockApi(S) {
       // mock more generous than the API is how a screen passes here and fails live.
       const view = () => {
         const { defaults, ...rest } = detail(mine());
-        return { ...rest, viewer: { userId: S.owner.id, partnerRole: S.owner.partnerRole } };
+        // The seat, exactly as viewFor reads it. A mock that read the stored label
+        // would be checking its own rule rather than the server's.
+        const partnerRole = mine().mainUserId === S.owner.id ? "main" : "staff";
+        return { ...rest, viewer: { userId: S.owner.id, partnerRole } };
       };
       const touch = (p) => Object.assign(p, { updatedAt: Date.now(), revision: p.revision + 1 });
       return [

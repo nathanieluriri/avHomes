@@ -143,7 +143,11 @@ company's id, never by who created a row. The main account adds and removes
 staff; AV Homes approves the company, sets its limits (listings not yet
 approved, live listings, staff seats) and can suspend it, which signs every
 account out and holds its listings off the public site. Partner accounts are
-managed on their company's page under Partners, never on the Team screen.
+managed on their company's page under Partners, never on the Team screen. The
+migrations run against production in order, ``0016`` then ``0017``, before the
+code is live: the audit middleware logs a failed insert rather than failing the
+request, so a partner action taken before ``0017`` widens the audit validator
+succeeds and leaves no row behind it.
 
 Environment
 ===========
