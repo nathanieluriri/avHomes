@@ -21,7 +21,7 @@ import {
   PERIOD_KEYS,
   hasDomain,
   isPeriodKey,
-  isScopedRole,
+  partnerScopeOf,
   quarterFinished,
   quarterOf,
   quarterRange,
@@ -107,12 +107,12 @@ interface Scope {
  * rather than "match everything".
  */
 async function scopeFor(db: Db, user: ReturnType<typeof currentUser>): Promise<Scope> {
-  const scoped = isScopedRole(user.role);
-  if (!scoped) {
+  const scope = partnerScopeOf(user);
+  if (scope === null) {
     return { listingIds: null, money: hasDomain(user.role, "marketing"), partner: false };
   }
   const rows = await collection<{ _id: string }>(db, COLLECTIONS.properties)
-    .find({ agentUserId: user.id }, { projection: { _id: 1 } })
+    .find({ partnerId: scope }, { projection: { _id: 1 } })
     .toArray();
   return { listingIds: rows.map((row) => row._id), money: true, partner: true };
 }

@@ -47,6 +47,7 @@ import {
   normalizeAmenities,
   normalizeFees,
   parseMajor,
+  partnerScopeOf,
   PREVIOUS_SLUGS_MAX,
   SEO_DESCRIPTION_MAX,
   SEO_TITLE_MAX,
@@ -252,6 +253,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
 
     const db = await currentDb(c);
     const user = currentUser(c);
+    const scope = partnerScopeOf(user);
     const query = {
       sort: q.sort,
       limit,
@@ -262,12 +264,13 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       listingType: q.listingType,
       q: q.q,
       /*
-       * A scoped role is pinned to its own rows whatever `mine` says. `mine` is a
-       * convenience for staff; this is a boundary, so it wins, and it is applied
-       * as a FILTER rather than by dropping rows after the fetch: a filtered page
-       * would come back short and read as the end of the list.
+       * A scoped role is pinned to its company's rows whatever `mine` says. `mine`
+       * is a convenience for staff; this is a boundary, so it wins, and it is
+       * applied as a FILTER rather than by dropping rows after the fetch: a
+       * filtered page would come back short and read as the end of the list.
        */
-      agentUserId: isScopedCaller(user) ? user.id : q.mine === "1" ? user.id : undefined,
+      partnerId: scope ?? undefined,
+      agentUserId: scope === null && q.mine === "1" ? user.id : undefined,
       includeHidden: true,
       // The console's box is a filter that narrows as an operator types, not
       // the site's whole-word search. See `substring` in the repo for the
@@ -284,6 +287,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
   routes.post("/admin/properties", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const user = currentUser(c);
+    const scope = partnerScopeOf(user);
     const { title, type } = await readJsonOrEmpty(c, CreateBody);
     const property = await createProperty(db, {
       title,
@@ -294,7 +298,8 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
        * changes it on the form, where an agent listing an outside owner's house
        * says so deliberately.
        */
-      ownership: isScopedCaller(user) ? "partner" : "av",
+      ownership: scope !== null ? "partner" : "av",
+      partnerId: scope,
       agentUserId: user.id,
       // Seeded from the creating account so a new listing is never agent-less on
       // screen. Every field stays editable afterwards.

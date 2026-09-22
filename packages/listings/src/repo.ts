@@ -65,6 +65,7 @@ export interface ListQuery {
   featured?: boolean | undefined;
   q?: string | undefined;
   agentUserId?: string | undefined;
+  partnerId?: string | undefined;
   /** Admin lists see drafts and trash; the public list never does. */
   includeHidden?: boolean;
   /**
@@ -118,6 +119,7 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
     } as Filter<PropertyDoc>);
   }
   if (query.agentUserId) and.push({ agentUserId: query.agentUserId });
+  if (query.partnerId) and.push({ partnerId: query.partnerId });
 
   if (query.minPriceMinor !== undefined || query.maxPriceMinor !== undefined) {
     const range: Record<string, number> = {};
@@ -261,6 +263,7 @@ export interface CreatePropertyArgs {
    */
   ownership?: Ownership;
   ownerLabel?: string;
+  partnerId?: string | null;
 }
 
 export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<Property> {
@@ -309,6 +312,7 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     previousSlugs: [],
     agent: args.agent,
     agentUserId: args.agentUserId,
+    partnerId: args.partnerId ?? null,
     createdAt: now,
     updatedAt: now,
     publishedAt: null,

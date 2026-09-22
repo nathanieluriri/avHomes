@@ -1,5 +1,5 @@
 import { ForbiddenError } from "@avhomes/core";
-import { isAdminRole, isScopedRole, type AuthUser } from "@avhomes/contracts";
+import { isAdminRole, partnerScopeOf, type AuthUser } from "@avhomes/contracts";
 
 /**
  * Authorization, in ONE function called by every listing route.
@@ -12,10 +12,11 @@ import { isAdminRole, isScopedRole, type AuthUser } from "@avhomes/contracts";
  * The four rules:
  *
  *  - **read**: every signed-in user reads everything, drafts included, EXCEPT a
- *    scoped role, which reads only what it owns. This is one agency with an
+ *    scoped role, which reads only its company's own. This is one agency with an
  *    invite-only staff list, plus outside partners who are not staff.
- *  - **write**: the listing's own agent, or an admin. An agent owns their
- *    listings; an owner can fix anything, which is what makes the role useful.
+ *  - **write**: the listing's own agent, or an admin, EXCEPT a scoped role, which
+ *    writes only its company's own. An agent owns their listings; an owner can
+ *    fix anything, which is what makes the role useful.
  *  - **status**: never a scoped role. A partner submits; AV Homes publishes.
  *  - **destroy**: admin only. It is the one irreversible action here, and trash
  *    is the reversible door an agent already has.
@@ -33,18 +34,16 @@ export type Action = "read" | "write" | "status" | "destroy";
  * the whole document just to ask whether it may edit it.
  */
 export function authorize(
-  listing: { agentUserId: string | null },
+  listing: { agentUserId: string | null; partnerId: string | null },
   user: AuthUser,
   action: Action,
 ): boolean {
   if (action === "destroy") return isAdminRole(user.role);
-  if (action === "status") return !isScopedRole(user.role);
-  if (action === "read") {
-    /* The one place "everyone reads everything" stops being true. A scoped role
-       reads only rows it owns, and an unclaimed row belongs to nobody, so it is
-       not theirs either. */
-    return isScopedRole(user.role) ? listing.agentUserId === user.id : true;
-  }
+  const scope = partnerScopeOf(user);
+  if (action === "status") return scope === null;
+  // A partner reads and writes its company's listings, and nothing else.
+  if (scope !== null) return listing.partnerId === scope;
+  if (action === "read") return true;
   // An unclaimed listing (imported, or created before agents existed) is
   // admin-only rather than everyone's, which is the safe direction to be wrong.
   if (listing.agentUserId === null) return isAdminRole(user.role);
@@ -59,12 +58,13 @@ export function authorize(
  * Empty for staff, so the common path adds nothing.
  */
 export function scopeFilter(user: AuthUser): Record<string, unknown> {
-  return isScopedRole(user.role) ? { agentUserId: user.id } : {};
+  const scope = partnerScopeOf(user);
+  return scope === null ? {} : { partnerId: scope };
 }
 
-/** Does this caller see only their own rows? For a screen deciding what to draw. */
+/** Does this caller see only its company's rows? For a screen deciding what to draw. */
 export function isScopedCaller(user: AuthUser): boolean {
-  return isScopedRole(user.role);
+  return partnerScopeOf(user) !== null;
 }
 
 /**
@@ -74,7 +74,7 @@ export function isScopedCaller(user: AuthUser): boolean {
  * shape that gets copied without the `!` exactly once.
  */
 export function assertAuthorized(
-  listing: { agentUserId: string | null },
+  listing: { agentUserId: string | null; partnerId: string | null },
   user: AuthUser,
   action: Action,
 ): void {

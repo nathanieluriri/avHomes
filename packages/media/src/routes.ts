@@ -25,11 +25,13 @@ import {
   DEFAULT_MEDIA_QUOTA_BYTES,
   formatBytes,
   isScopedRole,
+  partnerScopeOf,
   type ImageRecord,
   type MediaUsage,
   type NotificationInput,
   type QuotaRequest,
   type QuotaRequestStatus,
+  type Role,
 } from "@avhomes/contracts";
 import { requireAuth } from "@avhomes/identity";
 import { sniffImage } from "./sniff";
@@ -59,16 +61,14 @@ function images(db: Db) {
 }
 
 /**
- * The rows this caller may see and touch: all of them, or only their own uploads.
+ * The rows this caller may see and touch: all of them, or its company's.
  *
- * A partner lister holds the `media` domain because they genuinely upload their
- * property's photographs, but the library is AV Homes' whole catalogue. Without
- * this a third-party account could browse every photograph and delete any of
- * them, and a deleted row breaks every page that used it. Merged into the query
- * rather than checked after a read, so a foreign id is simply not found.
+ * By company rather than by uploader, so a partner's staff share one library.
+ * Merged into the query, so another company's id is simply not found.
  */
-function ownedBy(user: { id: string; role: Parameters<typeof isScopedRole>[0] }): Partial<ImageDoc> {
-  return isScopedRole(user.role) ? { uploadedBy: user.id } : {};
+function ownedBy(user: { role: Role; partnerId: string | null }): Partial<ImageDoc> {
+  const scope = partnerScopeOf(user);
+  return scope === null ? {} : { partnerId: scope };
 }
 
 function toImageRecord(doc: ImageDoc): ImageRecord {
@@ -417,6 +417,7 @@ export function mediaRoutes(deps: { storage: StoragePort; notify?: Notifier }): 
       createdAt: now,
       updatedAt: now,
       uploadedBy: user.id,
+      partnerId: partnerScopeOf(user),
     };
     await images(db).insertOne(doc);
     auditEntityId(c, doc._id);
