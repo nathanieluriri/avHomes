@@ -54,9 +54,10 @@ export default function PartnerPage() {
       />
       <div className="space-y-3">
         <TeamCard detail={current} onChanged={setDetail} />
-        <LimitsCard detail={current} onChanged={setDetail} />
-        <NameCard detail={current} onChanged={setDetail} />
-        <AccessCard detail={current} onChanged={setDetail} />
+        {/* Keyed by revision, so a card's draft restarts from the record whenever the record changes. */}
+        <LimitsCard key={`limits-${current.partner.revision}`} detail={current} onChanged={setDetail} />
+        <NameCard key={`name-${current.partner.revision}`} detail={current} onChanged={setDetail} />
+        <AccessCard key={`access-${current.partner.revision}`} detail={current} onChanged={setDetail} />
       </div>
     </>
   );
