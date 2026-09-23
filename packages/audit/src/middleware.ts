@@ -70,6 +70,7 @@ const ENTITY_BY_SEGMENT: Record<string, AuditEntity> = {
   notes: "note",
   settings: "settings",
   marketing: "marketer",
+  applications: "application",
 };
 
 /**
@@ -149,7 +150,43 @@ function deriveAuth(segments: string[], method: string): Derived {
   return { entity: "auth", entityId: null, action: actionForMethod(method) };
 }
 
+/**
+ * Partner companies, AV Homes' side and the partner's own.
+ *
+ * Their paths nest an account or an invite under the company, so the generic
+ * "last segment is the operation" rule would record a revoked invite as an
+ * operation named after its id.
+ */
+function derivePartner(segments: string[], method: string): Derived | null {
+  const [, noun, a, b, c, d] = segments;
+  if (noun === "partner-settings") {
+    return { entity: "settings", entityId: "partners", action: actionForMethod(method) };
+  }
+  if (noun === "partners") {
+    if (a === undefined) return { entity: "partner", entityId: null, action: actionForMethod(method) };
+    if (b === "accounts" && c !== undefined) {
+      return { entity: "user", entityId: c, action: d ? `op:${d}` : actionForMethod(method) };
+    }
+    if (b === "invites" && c !== undefined) {
+      return { entity: "invite", entityId: c, action: actionForMethod(method) };
+    }
+    return { entity: "partner", entityId: a, action: b ? `op:${b}` : actionForMethod(method) };
+  }
+  if (noun === "company") {
+    if (a === "staff" && b === "invites") {
+      return { entity: "invite", entityId: c ?? null, action: actionForMethod(method) };
+    }
+    if (a === "staff" && b !== undefined) {
+      return { entity: "user", entityId: b, action: c ? `op:${c}` : actionForMethod(method) };
+    }
+    return { entity: "partner", entityId: null, action: actionForMethod(method) };
+  }
+  return null;
+}
+
 function deriveAdmin(segments: string[], method: string): Derived {
+  const partner = derivePartner(segments, method);
+  if (partner) return partner;
   const nested = NESTED_ENTITY_BY_SEGMENT[segments[1] ?? ""]?.[segments[2] ?? ""];
   if (nested) return deriveRecord(nested, segments.slice(3), method);
   return deriveRecord(ENTITY_BY_SEGMENT[segments[1] ?? ""] ?? "unknown", segments.slice(2), method);
@@ -185,6 +222,14 @@ function deriveRecord(entity: AuditEntity, rest: string[], method: string): Deri
  *   `PUT /admin/testimonials/new` is `create` with a NULL entityId;
  *   `POST /admin/revisions/p1/r2/restore` is `post` + `op:restore` + `p1`;
  *   `PATCH /admin/settings` is `settings` + `update` + null.
+ * TODO(test): the partner rows: `POST /admin/partners/:id/suspend` is
+ *   `partner` + `op:suspend`; `POST /admin/partners/:id/accounts/:userId/
+ *   disable` is `user` + `op:disable`; `DELETE /admin/partners/:id/invites/
+ *   :inviteId` is `invite` + `delete`; `PATCH /admin/partner-settings` is
+ *   `settings` + `update` with entityId `"partners"`; `PATCH /admin/company`
+ *   is `partner` with a NULL entityId; `POST /admin/company/staff/invites`
+ *   is `invite` + `create` with a NULL entityId; and
+ *   `POST /admin/applications/:id/decide` is `application` + `op:decide`.
  * TODO(test): the `/api` prefix is stripped. Drive it through the real app,
  *   where `c.req.path` carries it, not by calling `derive` with a tidy path:
  *   an off-by-one here files everything under `unknown` and nothing errors.

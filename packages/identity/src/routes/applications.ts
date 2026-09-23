@@ -21,8 +21,10 @@ import {
   getApplication,
   listApplications,
   openApplicationCount,
+  reopenApplication,
 } from "../repo/applications";
 import { createInvite } from "../repo/invites";
+import { upsertPartnerForApplication } from "../repo/partners";
 import { limit } from "../repo/ratelimit";
 import { requireAdmin, requireAuth } from "../middleware";
 
@@ -132,14 +134,17 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
      * act; creating the invite only after it means an account is never minted for
      * an application somebody else refused a moment earlier.
      */
-    const application = await decideApplication(db, id, {
+    const { application, claimed } = await decideApplication(db, id, {
       approve: body.approve,
       reason: body.reason,
       byName: actor.displayName,
     });
     auditEntityId(c, application.id);
 
-    if (before.status !== "open") {
+    /* The CAS, not the status read above it: `before` was read before the claim and
+       still says "open" to the loser of two simultaneous decisions, which would send
+       it on to mail and mint an account against the winner's verdict. */
+    if (!claimed) {
       return c.json({
         application,
         url: null,
@@ -167,11 +172,30 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       return c.json({ application, url: null, already: false });
     }
 
-    const invite = await createInvite(db, {
-      email: application.email,
-      role: "partner",
-      invitedBy: actor.id,
-    });
+    /* The company before the invite: the invite carries its id, and the upsert
+       means a retry after a failure finds the company rather than making one. */
+    let partner: Awaited<ReturnType<typeof upsertPartnerForApplication>>;
+    let invite: Awaited<ReturnType<typeof createInvite>>;
+    try {
+      partner = await upsertPartnerForApplication(db, {
+        applicationId: application.id,
+        name: application.company || application.name,
+        contactName: application.name,
+        contactEmail: application.email,
+        contactPhone: application.phone,
+      });
+      invite = await createInvite(db, {
+        email: application.email,
+        role: "partner",
+        invitedBy: actor.id,
+        partnerId: partner.id,
+        partnerRole: "main",
+      });
+    } catch (err) {
+      // decideApplication already committed "approved"; put it back to open rather than stranding it with no invite and nothing able to retry.
+      if (application.decidedAt !== null) await reopenApplication(db, application.id, application.decidedAt);
+      throw err;
+    }
 
     /* The deployment's own host, never the request's: this URL goes in mail, and a
        host chosen by whoever made the request is a phishing page wearing our return
@@ -199,7 +223,7 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     /* The URL comes back whether or not the mail went, the rule team invites
        already hold: an approval that depends on a working mail provider is an
        approval nobody can hand over by hand. */
-    return c.json({ application, url, inviteId: invite._id, already: false });
+    return c.json({ application, url, inviteId: invite._id, partnerId: partner.id, already: false });
   });
 
   return routes;

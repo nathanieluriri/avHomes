@@ -1,6 +1,6 @@
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { newId } from "@avhomes/core";
-import type { Role, TeamInvite } from "@avhomes/contracts";
+import type { PartnerRole, Role, TeamInvite } from "@avhomes/contracts";
 import { INVITE_TTL_MS, type InviteDoc, type UserDoc } from "../schema";
 
 function invites(db: Db) {
@@ -9,7 +9,13 @@ function invites(db: Db) {
 
 export async function createInvite(
   db: Db,
-  args: { email: string; role: Role; invitedBy: string },
+  args: {
+    email: string;
+    role: Role;
+    invitedBy: string;
+    partnerId?: string | null;
+    partnerRole?: PartnerRole | null;
+  },
 ): Promise<InviteDoc> {
   const now = Date.now();
   const doc: InviteDoc = {
@@ -20,6 +26,8 @@ export async function createInvite(
     createdAt: now,
     expiresAt: now + INVITE_TTL_MS,
     acceptedAt: null,
+    partnerId: args.partnerId ?? null,
+    partnerRole: args.partnerRole ?? null,
   };
   await invites(db).insertOne(doc);
   return doc;
@@ -55,8 +63,15 @@ export async function releaseInvite(db: Db, inviteId: string, claimedAt: number)
   await invites(db).updateOne({ _id: inviteId, acceptedAt: claimedAt }, { $set: { acceptedAt: null } });
 }
 
-export async function revokeInvite(db: Db, inviteId: string): Promise<boolean> {
-  const result = await invites(db).deleteOne({ _id: inviteId });
+/** The Team screen's revoke. A partner invite is not the team's to withdraw. */
+export async function revokeTeamInvite(db: Db, inviteId: string): Promise<boolean> {
+  const result = await invites(db).deleteOne({ _id: inviteId, role: { $ne: "partner" } });
+  return result.deletedCount === 1;
+}
+
+/** A partner invite, withdrawn by its company or by AV Homes. Only while open. */
+export async function revokePartnerInvite(db: Db, partnerId: string, inviteId: string): Promise<boolean> {
+  const result = await invites(db).deleteOne({ _id: inviteId, partnerId, acceptedAt: null });
   return result.deletedCount === 1;
 }
 
@@ -78,7 +93,8 @@ export async function findOpenInvite(db: Db, email: string): Promise<InviteDoc |
  */
 export async function listInvites(db: Db, includeHistory: boolean): Promise<TeamInvite[]> {
   const now = Date.now();
-  const filter = includeHistory ? {} : { acceptedAt: null, expiresAt: { $gt: now } };
+  const base = { role: { $ne: "partner" as const } };
+  const filter = includeHistory ? base : { ...base, acceptedAt: null, expiresAt: { $gt: now } };
 
   const rows = await invites(db)
     .aggregate<InviteDoc & { inviter: UserDoc | undefined }>([

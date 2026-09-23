@@ -5,7 +5,6 @@ import {
   canAssign,
   canManage,
   isConsoleRole,
-  isScopedRole,
   type Role,
 } from "@avhomes/contracts";
 import {
@@ -30,7 +29,7 @@ import {
 } from "@avhomes/core";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { requireAdmin } from "../middleware";
-import { createInvite, findOpenInvite, listInvites, revokeInvite } from "../repo/invites";
+import { createInvite, findOpenInvite, listInvites, revokeTeamInvite } from "../repo/invites";
 import {
   countActiveOwners,
   disableUser,
@@ -77,7 +76,7 @@ type Refusal =
   | "role_self"
   | "role_owner"
   | "manage_marketer"
-  | "role_partner";
+  | "manage_partner";
 
 function refuse(operation: Refusal, userId: string): never {
   throw new PreconditionFailedError(operation, { userId, detail: REFUSAL_DETAIL[operation] });
@@ -91,30 +90,23 @@ const REFUSAL_DETAIL: Record<Refusal, string> = {
   role_owner: "The owner's role cannot be changed in either direction.",
   manage_marketer:
     "This is a marketer account, not a console one. Manage it on the Marketers screen.",
-  role_partner:
-    "This is a partner lister's account. It cannot be given a staff role: invite AV Homes staff from this screen instead.",
+  manage_partner:
+    "This is a partner company's account. Manage it on that partner's page under Partners.",
 };
 
 /**
- * A marketer is not a team member, and these routes refuse to treat one as a
- * colleague.
+ * Only AV Homes' own people are managed here.
  *
- * The role is minted by signing up in the marketer app, and it is the whole of
- * that person's access: handing them a console role does not ADD the console to
- * a marketer, it REPLACES the app they work in with one they cannot use, while
- * their profile, code, downline and unpaid ledger go on existing under an
- * account that is no longer a marketer. It read as an ordinary role change on
- * the team screen, one select away, with the audit line "changed this team
- * member's role" and no hint that an entire second app had just been taken off
- * somebody's phone.
- *
- * The list no longer offers them, so this is the wall behind that: the routes
- * refuse by ROLE rather than relying on a screen not to show the row.
- * Suspending a marketer is the Marketers screen's own job, where it means
- * pausing their selling rather than revoking a console nobody had.
+ * A marketer's account is the whole of their app, and a partner's belongs to
+ * their company, managed on its page under Partners. Refused by role, so a
+ * row the list no longer shows cannot be reached by id either.
  */
-function refuseIfMarketer(target: FoundUser, userId: string): void {
+function refuseIfNotTeam(target: FoundUser, userId: string): void {
+  // The question, not a list of today's answers: a future role that belongs in
+  // neither place is refused by default rather than passing because nobody named it.
   if (!isConsoleRole(target.user.role)) refuse("manage_marketer", userId);
+  // A partner IS a console role, so it needs its own clause beside the question.
+  if (target.user.role === "partner") refuse("manage_partner", userId);
 }
 
 /** Counts a user's work, so "what does disabling this person leave behind" has an answer. */
@@ -183,7 +175,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     if (!target) throw new NotFoundError(id);
     auditBefore(c, target as unknown as Record<string, unknown>);
 
-    refuseIfMarketer(target, id);
+    refuseIfNotTeam(target, id);
     if (!canManage(actor.role, target.user.role)) refuse("manage_peer", id);
 
     if (target.user.role === "owner" && target.disabledAt == null) {
@@ -225,7 +217,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const target = await findUserById(db, id);
     if (!target) throw new NotFoundError(id);
     auditBefore(c, target as unknown as Record<string, unknown>);
-    refuseIfMarketer(target, id);
+    refuseIfNotTeam(target, id);
     if (!canManage(currentUser(c).role, target.user.role)) refuse("manage_peer", id);
     await enableUser(db, id);
     return c.json({ ok: true });
@@ -242,16 +234,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     auditBefore(c, target as unknown as Record<string, unknown>);
     if (target.user.id === actor.id) refuse("role_self", id);
     if (target.user.role === "owner") refuse("role_owner", id);
-    refuseIfMarketer(target, id);
-    /*
-     * A partner lister is an outside party scoped to their own listings. Any
-     * assignable role is UNSCOPED, so one change on this row would hand them every
-     * listing, every enquiry and the analytics, and the select on a partner's row
-     * showed "Developer", its first option, since "partner" is not among them.
-     * Disabling and enabling stay allowed: this is the one screen that can cut a
-     * partner off, and revoking access must never be the thing that is refused.
-     */
-    if (isScopedRole(target.user.role)) refuse("role_partner", id);
+    refuseIfNotTeam(target, id);
     if (!canManage(actor.role, target.user.role) || !canAssign(actor.role, next as Role)) {
       refuse("manage_peer", id);
     }
@@ -358,7 +341,7 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
 
   routes.delete("/admin/invites/:id", requireAdmin(), async (c) => {
     const id = pathParam(c, "id");
-    const removed = await revokeInvite(await currentDb(c), id);
+    const removed = await revokeTeamInvite(await currentDb(c), id);
     if (!removed) throw new NotFoundError(id);
     return c.json({ ok: true });
   });

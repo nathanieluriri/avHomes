@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   BadRequestError,
+  ForbiddenError,
   NotFoundError,
   PreconditionFailedError,
   StaleWriteError,
@@ -26,6 +27,8 @@ import {
   FEE_KINDS_FOR,
   FURNISHINGS,
   LISTING_TYPES,
+  limitRefusal,
+  NO_PARTNER,
   PROPERTY_STATUSES,
   OWNERSHIPS,
   PROPERTY_TYPES,
@@ -47,6 +50,7 @@ import {
   normalizeAmenities,
   normalizeFees,
   parseMajor,
+  partnerScopeOf,
   PREVIOUS_SLUGS_MAX,
   SEO_DESCRIPTION_MAX,
   SEO_TITLE_MAX,
@@ -55,7 +59,8 @@ import {
   type SiteStat,
   type Testimonial,
 } from "@avhomes/contracts";
-import { requireAdmin, requireAuth } from "@avhomes/identity";
+import { type Db } from "@avhomes/db";
+import { limitsForPartner, requireAdmin, requireAuth } from "@avhomes/identity";
 import { assertAuthorized, isScopedCaller } from "../authorize";
 import { expandMapLink } from "../maps";
 import {
@@ -71,6 +76,7 @@ import {
   listSiteStats,
   listTestimonials,
   assertTransition,
+  partnerListingUsage,
   saveProperty,
   transitionProperty,
   trashProperty,
@@ -242,6 +248,34 @@ const StatBody = z
   })
   .strict();
 
+/**
+ * Refuses when a company has no room left under one listing limit.
+ *
+ * Counted at the moment of the action. Two actions in the same instant can
+ * each see room for one more; the overshoot is at most the company's headcount,
+ * and these are commercial caps, so a counter that drifts would be worse.
+ */
+async function assertRoom(
+  db: Db,
+  partnerId: string,
+  limit: "review" | "live",
+  audience: "partner" | "av",
+): Promise<void> {
+  const found = await limitsForPartner(db, partnerId);
+  if (!found) throw new NotFoundError(`partner ${partnerId}`);
+  const usage = (await partnerListingUsage(db, [partnerId])).get(partnerId) ?? { review: 0, live: 0 };
+  const count = usage[limit];
+  const max = found.limits[limit];
+  if (count >= max) {
+    throw new PreconditionFailedError("limit_reached", {
+      limit,
+      count,
+      max,
+      detail: limitRefusal(limit, count, max, audience),
+    });
+  }
+}
+
 export function listingsAdminRoutes(): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
@@ -252,6 +286,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
 
     const db = await currentDb(c);
     const user = currentUser(c);
+    const scope = partnerScopeOf(user);
     const query = {
       sort: q.sort,
       limit,
@@ -262,12 +297,13 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       listingType: q.listingType,
       q: q.q,
       /*
-       * A scoped role is pinned to its own rows whatever `mine` says. `mine` is a
-       * convenience for staff; this is a boundary, so it wins, and it is applied
-       * as a FILTER rather than by dropping rows after the fetch: a filtered page
-       * would come back short and read as the end of the list.
+       * A scoped role is pinned to its company's rows whatever `mine` says. `mine`
+       * is a convenience for staff; this is a boundary, so it wins, and it is
+       * applied as a FILTER rather than by dropping rows after the fetch: a
+       * filtered page would come back short and read as the end of the list.
        */
-      agentUserId: isScopedCaller(user) ? user.id : q.mine === "1" ? user.id : undefined,
+      partnerId: scope ?? undefined,
+      agentUserId: scope === null && q.mine === "1" ? user.id : undefined,
       includeHidden: true,
       // The console's box is a filter that narrows as an operator types, not
       // the site's whole-word search. See `substring` in the repo for the
@@ -284,6 +320,11 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
   routes.post("/admin/properties", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const user = currentUser(c);
+    const scope = partnerScopeOf(user);
+    // Never written: NO_PARTNER is the sentinel a companyless account scopes to,
+    // and stamping it on a row would let every other companyless account match it.
+    if (scope === NO_PARTNER) throw new ForbiddenError("this partner account has no company");
+    if (scope !== null) await assertRoom(db, scope, "review", "partner");
     const { title, type } = await readJsonOrEmpty(c, CreateBody);
     const property = await createProperty(db, {
       title,
@@ -294,7 +335,8 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
        * changes it on the form, where an agent listing an outside owner's house
        * says so deliberately.
        */
-      ownership: isScopedCaller(user) ? "partner" : "av",
+      ownership: scope !== null ? "partner" : "av",
+      partnerId: scope,
       agentUserId: user.id,
       // Seeded from the creating account so a new listing is never agent-less on
       // screen. Every field stays editable afterwards.
@@ -615,6 +657,18 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
     // Refusals name the operation and the status, so a screen can say what is
     // wrong rather than printing a status code.
     assertTransition(current, operation);
+
+    /* A partner's listing going on the market needs room under the live limit:
+       on submission, so the partner hears it before anyone at AV Homes does; on
+       publish, which is AV Homes approving it; on relisting a sold one. */
+    if (current.partnerId !== null) {
+      const who = isScopedCaller(currentUser(c)) ? "partner" : "av";
+      if (operation === "submit") await assertRoom(db, current.partnerId, "live", who);
+      if (operation === "publish") await assertRoom(db, current.partnerId, "live", "av");
+      if (operation === "relist" && current.status === "closed") {
+        await assertRoom(db, current.partnerId, "live", "av");
+      }
+    }
 
     /*
      * The publish check runs on SUBMIT too, and that is the point of running it

@@ -5,7 +5,8 @@
 //
 // jobs.json: [{ "name": "tutorials-desktop", "path": "/admin/tutorials",
 //               "viewport": "desktop" | "phone" | "phone-small",
-//               "role": "owner", "reducedMotion": false, "mock": { "GET /api/marketing/updates": { "items": [] } },
+//               "role": "owner", "partnerRole": "main" | "staff",
+//               "reducedMotion": false, "mock": { "GET /api/marketing/updates": { "items": [] } },
 //               "steps": [ {"click": "<selector>"}, {"hover": "<selector>"}, {"type": "text"}, {"key": "Enter"},
 //               {"wait": 800}, {"waitFor": "<selector>"}, {"scroll": 600}, {"eval": "js expression"},
 //               {"shot": "label"} ] }]
@@ -35,6 +36,7 @@ async function run() {
   const browser = await puppeteer.launch({ executablePath: process.env.CHROME, headless: true, args: ["--no-first-run", "--hide-scrollbars"] });
   for (const job of jobs) {
     process.env.ROLE = job.role || "owner";
+    process.env.PARTNER_ROLE = job.partnerRole || "main";
     const S = await fixtures();
     const routes = mockApi(S);
     const ctx = await browser.createBrowserContext();

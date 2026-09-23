@@ -63,8 +63,8 @@ Package                       Holds
                               ids, environment, the mail port.
 ``@avhomes/db``               The cached MongoDB client, collection names, the
                               migration runner.
-``@avhomes/identity``         Users, sessions, invites, the two auth doors and
-                              the domain gate.
+``@avhomes/identity``         Users, sessions, invites, partner companies, the
+                              two auth doors and the domain gate.
 ``@avhomes/listings``         Properties, testimonials, site counters.
 ``@avhomes/content``          Posts, revisions, categories.
 ``@avhomes/media``            The image library and its storage port
@@ -133,6 +133,21 @@ one ``admit()`` decides it.
 
 The way back in when the last owner is locked out is
 ``npm run db:bootstrap-owner``. That is why the password door has no reset flow.
+
+Partner companies
+=================
+
+A partner is a company outside AV Homes that lists its own property. Its
+accounts share its listings, photographs and numbers, scoped by the
+company's id, never by who created a row. The main account adds and removes
+staff; AV Homes approves the company, sets its limits (listings not yet
+approved, live listings, staff seats) and can suspend it, which signs every
+account out and holds its listings off the public site. Partner accounts are
+managed on their company's page under Partners, never on the Team screen. The
+migrations run against production in order, ``0016`` then ``0017``, before the
+code is live: the audit middleware logs a failed insert rather than failing the
+request, so a partner action taken before ``0017`` widens the audit validator
+succeeds and leaves no row behind it.
 
 Environment
 ===========

@@ -81,6 +81,8 @@ export function propertiesValidator(): Document {
            listing, so a value here without an approved deal behind it is a bug
            reconcile() will name. */
         closedDealId: NULLABLE_STR,
+        partnerId: NULLABLE_STR,
+        partnerHold: BOOL,
         listingType: { enum: [...LISTING_TYPES] },
         rentPeriod: { enum: [...RENT_PERIODS, null] },
         fees: {

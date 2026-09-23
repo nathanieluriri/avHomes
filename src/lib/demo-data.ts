@@ -64,6 +64,7 @@ type PropertySeed = Omit<
   | "deletedAt"
   | "revision"
   | "agentUserId"
+  | "partnerId"
   | "featured"
   | "prototypes"
   | "paymentPlan"
@@ -818,6 +819,7 @@ function toProperty(seed: PropertySeed): Property {
        deal nobody can open. */
     closedDealId: null,
     agentUserId: null,
+    partnerId: null,
     createdAt: published,
     updatedAt: published,
     publishedAt: published,

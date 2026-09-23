@@ -1,6 +1,6 @@
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { DuplicateError, newId } from "@avhomes/core";
-import type { AuthUser, Role, TeamUser } from "@avhomes/contracts";
+import type { AuthUser, PartnerRole, Role, TeamUser } from "@avhomes/contracts";
 import type { UserDoc } from "../schema";
 
 /**
@@ -10,6 +10,7 @@ import type { UserDoc } from "../schema";
  * cannot arrive in a response by default, which is the whole rule.
  */
 const PROFILE_FIELDS = { avatarUrl: 1, title: 1, phone: 1 } as const;
+const PARTNER_FIELDS = { partnerId: 1, partnerRole: 1 } as const;
 const AUTH_PROJECTION = {
   _id: 1,
   email: 1,
@@ -17,6 +18,7 @@ const AUTH_PROJECTION = {
   role: 1,
   disabledAt: 1,
   ...PROFILE_FIELDS,
+  ...PARTNER_FIELDS,
 } as const;
 const TEAM_PROJECTION = {
   _id: 1,
@@ -26,6 +28,7 @@ const TEAM_PROJECTION = {
   createdAt: 1,
   disabledAt: 1,
   ...PROFILE_FIELDS,
+  ...PARTNER_FIELDS,
 } as const;
 
 function users(db: Db) {
@@ -43,7 +46,7 @@ function users(db: Db) {
  */
 export function toAuthUser(
   doc: Pick<UserDoc, "_id" | "email" | "displayName" | "role"> &
-    Partial<Pick<UserDoc, "avatarUrl" | "title" | "phone">>,
+    Partial<Pick<UserDoc, "avatarUrl" | "title" | "phone" | "partnerId" | "partnerRole">>,
 ): AuthUser {
   return {
     id: doc._id,
@@ -53,6 +56,8 @@ export function toAuthUser(
     avatarUrl: doc.avatarUrl ?? "",
     title: doc.title ?? "",
     phone: doc.phone ?? "",
+    partnerId: doc.partnerId ?? null,
+    partnerRole: doc.partnerRole ?? null,
   };
 }
 
@@ -122,6 +127,8 @@ export interface CreateUserArgs {
   displayName: string;
   role: Role;
   passwordHash?: string | null;
+  partnerId?: string | null;
+  partnerRole?: PartnerRole | null;
 }
 
 export async function createUser(db: Db, args: CreateUserArgs): Promise<AuthUser> {
@@ -142,6 +149,8 @@ export async function createUser(db: Db, args: CreateUserArgs): Promise<AuthUser
     avatarUrl: null,
     title: null,
     phone: null,
+    partnerId: args.partnerId ?? null,
+    partnerRole: args.partnerRole ?? null,
     createdAt: now,
     updatedAt: now,
     disabledAt: null,
@@ -243,6 +252,20 @@ export async function enableUser(db: Db, userId: string): Promise<void> {
   );
 }
 
+/** Moves a partner account between the main seat and a staff seat. */
+export async function setPartnerRole(db: Db, userId: string, partnerRole: PartnerRole): Promise<void> {
+  await users(db).updateOne({ _id: userId }, { $set: { partnerRole, updatedAt: Date.now() } });
+}
+
+/** Every account in a company still labelled main, except the seat's holder, back to staff. */
+export async function demoteOtherMains(db: Db, partnerId: string, keepUserId: string): Promise<number> {
+  const result = await users(db).updateMany(
+    { partnerId, partnerRole: "main", _id: { $ne: keepUserId } },
+    { $set: { partnerRole: "staff", updatedAt: Date.now() } },
+  );
+  return result.modifiedCount;
+}
+
 /** Keeps the last active owner enableable, phrased as an invariant not an identity check. */
 export async function countActiveOwners(db: Db): Promise<number> {
   return users(db).countDocuments({ role: "owner", disabledAt: null });
@@ -272,7 +295,7 @@ export async function listUsers(
   db: Db,
   scope: UserScope = "console",
 ): Promise<Omit<TeamUser, "listingCount" | "postCount">[]> {
-  const filter = scope === "console" ? { role: { $ne: "marketer" as const } } : {};
+  const filter = scope === "console" ? { role: { $nin: ["marketer", "partner"] as Role[] } } : {};
   const docs = await users(db)
     .find(filter, { projection: TEAM_PROJECTION, sort: { createdAt: 1 } })
     .toArray();

@@ -282,6 +282,8 @@ videos/_captures/
 # Critic output from a QA run: one machine's verdict on one build, regenerated
 # by re-running videos/_tools/qa.cjs. The job files beside them ARE committed.
 videos/_tools/qa-critic-*.json
+# Screenshots qa.cjs writes, one run's view of one build.
+.qa/
 videos/*/snapshots/
 videos/*/renders/
 videos/*/assets/.frames/

@@ -1,7 +1,8 @@
 import type { Db } from "@avhomes/db";
 import type { AuthUser } from "@avhomes/contracts";
 import { claimInvite, releaseInvite } from "./repo/invites";
-import { createUser, findUserByEmail } from "./repo/users";
+import { isSuspendedPartner, setPartnerMain } from "./repo/partners";
+import { createUser, findUserByEmail, setPartnerRole } from "./repo/users";
 
 /**
  * The ONE membership decision, shared by both doors.
@@ -17,7 +18,7 @@ import { createUser, findUserByEmail } from "./repo/users";
  * nothing.
  */
 
-export type AdmitRefusal = "not_invited" | "disabled";
+export type AdmitRefusal = "not_invited" | "disabled" | "suspended";
 
 export type AdmitResult = { ok: true; user: AuthUser } | { ok: false; reason: AdmitRefusal };
 
@@ -41,10 +42,18 @@ export async function admit(db: Db, identity: Identity): Promise<AdmitResult> {
    * ordering that lets exactly that happen.
    */
   if (found && found.disabledAt != null) return { ok: false, reason: "disabled" };
-  if (found) return { ok: true, user: found.user };
+  if (found) {
+    if (await isSuspendedPartner(db, found.user.partnerId)) return { ok: false, reason: "suspended" };
+    return { ok: true, user: found.user };
+  }
 
   const invite = await claimInvite(db, address);
   if (!invite) return { ok: false, reason: "not_invited" };
+
+  if (await isSuspendedPartner(db, invite.partnerId ?? null)) {
+    if (invite.acceptedAt != null) await releaseInvite(db, invite._id, invite.acceptedAt);
+    return { ok: false, reason: "suspended" };
+  }
 
   // `createUser` refuses a blank name, and a Google account without one is
   // ordinary, so the local part is the fallback and it is resolved HERE rather
@@ -52,7 +61,22 @@ export async function admit(db: Db, identity: Identity): Promise<AdmitResult> {
   const displayName = (identity.name ?? "").trim() || address.split("@")[0] || address;
 
   try {
-    const user = await createUser(db, { email: address, displayName, role: invite.role });
+    const user = await createUser(db, {
+      email: address,
+      displayName,
+      role: invite.role,
+      partnerId: invite.partnerId ?? null,
+      partnerRole: invite.partnerRole ?? null,
+    });
+    if (invite.partnerId && invite.partnerRole === "main") {
+      const took = await setPartnerMain(db, invite.partnerId, user.id, null);
+      // The label follows the seat, because `countStaffSeats` counts the label: an
+      // account labelled main holding no seat is a staff seat nobody ever spends.
+      if (!took) {
+        await setPartnerRole(db, user.id, "staff");
+        return { ok: true, user: { ...user, partnerRole: "staff" } };
+      }
+    }
     return { ok: true, user };
   } catch (err) {
     // Hand the invite back rather than burning it, and only if nothing else
@@ -70,6 +94,8 @@ export function refusalBody(reason: AdmitRefusal): { error: string; reason: Admi
     detail:
       reason === "disabled"
         ? "This account has been disabled. Ask an owner to re-enable it."
-        : "This address has not been invited. Ask an owner or developer for an invite.",
+        : reason === "suspended"
+          ? "Your company's access to AV Homes is suspended. Contact AV Homes."
+          : "This address has not been invited. Ask an owner or developer for an invite.",
   };
 }

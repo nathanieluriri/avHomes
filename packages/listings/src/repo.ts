@@ -16,10 +16,13 @@ import {
   DEFAULT_CURRENCY,
   ESTATE_TYPE,
   FEATURABLE_STATUSES,
+  LIVE_LIMIT_STATUSES,
   PRICE_HISTORY_MAX,
   PROPERTY_STATUSES,
   PUBLIC_PROPERTY_STATUSES,
+  REVIEW_LIMIT_STATUSES,
   isEstate,
+  type Agent,
   type ListingType,
   type Ownership,
   type Page,
@@ -65,6 +68,7 @@ export interface ListQuery {
   featured?: boolean | undefined;
   q?: string | undefined;
   agentUserId?: string | undefined;
+  partnerId?: string | undefined;
   /** Admin lists see drafts and trash; the public list never does. */
   includeHidden?: boolean;
   /**
@@ -89,6 +93,20 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
+/**
+ * What the public site may show: a public status, not in the trash, not held.
+ *
+ * One definition, used by all three public reads. It was three copies, and a
+ * condition added to three copies is how the third copy misses it.
+ */
+function publicVisible(status?: PropertyStatus): Filter<PropertyDoc> {
+  return {
+    status: status ?? { $in: [...PUBLIC_PROPERTY_STATUSES] },
+    deletedAt: null,
+    partnerHold: { $ne: true },
+  } as Filter<PropertyDoc>;
+}
+
 function buildFilter(query: ListQuery): Filter<PropertyDoc> {
   const and: Filter<PropertyDoc>[] = [];
 
@@ -97,8 +115,7 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
   } else {
     // The public list is defined by what it EXCLUDES, so a status added later is
     // hidden until somebody adds it to PUBLIC_PROPERTY_STATUSES on purpose.
-    and.push({ status: query.status ?? { $in: [...PUBLIC_PROPERTY_STATUSES] } });
-    and.push({ deletedAt: null });
+    and.push(publicVisible(query.status));
   }
 
   if (query.type) and.push({ type: query.type });
@@ -118,6 +135,7 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
     } as Filter<PropertyDoc>);
   }
   if (query.agentUserId) and.push({ agentUserId: query.agentUserId });
+  if (query.partnerId) and.push({ partnerId: query.partnerId });
 
   if (query.minPriceMinor !== undefined || query.maxPriceMinor !== undefined) {
     const range: Record<string, number> = {};
@@ -197,7 +215,7 @@ export async function countProperties(db: Db, query: ListQuery): Promise<number>
  * current one because the returned slug differs from the one asked for.
  */
 export async function getPropertyBySlug(db: Db, slug: string): Promise<Property | null> {
-  const visible = { deletedAt: null, status: { $in: [...PUBLIC_PROPERTY_STATUSES] } };
+  const visible = publicVisible();
   const doc =
     (await properties(db).findOne({ slug, ...visible })) ??
     (await properties(db).findOne({ previousSlugs: slug, ...visible }, { sort: { updatedAt: -1 } }));
@@ -232,8 +250,7 @@ export async function getSimilarProperties(
     .find(
       {
         _id: { $ne: current.id },
-        deletedAt: null,
-        status: { $in: [...PUBLIC_PROPERTY_STATUSES] },
+        ...publicVisible(),
         $or: [{ type: current.type }, { city: current.city }],
       },
       { sort: { publishedAt: -1, _id: -1 }, limit: limit * 3 },
@@ -243,6 +260,34 @@ export async function getSimilarProperties(
   const sameType = docs.filter((d) => d.type === current.type);
   const sameCity = docs.filter((d) => d.type !== current.type && d.city === current.city);
   return [...sameType, ...sameCity].slice(0, limit).map(toProperty);
+}
+
+/** How much of each listing limit each company is using, trash excluded. Counted, never stored. */
+export async function partnerListingUsage(
+  db: Db,
+  partnerIds: readonly string[],
+): Promise<Map<string, { review: number; live: number }>> {
+  const out = new Map(partnerIds.map((id) => [id, { review: 0, live: 0 }]));
+  if (partnerIds.length === 0) return out;
+  const rows = await properties(db)
+    .aggregate<{ _id: { partnerId: string; status: PropertyStatus }; count: number }>([
+      {
+        $match: {
+          partnerId: { $in: [...partnerIds] },
+          deletedAt: null,
+          status: { $in: [...REVIEW_LIMIT_STATUSES, ...LIVE_LIMIT_STATUSES] },
+        },
+      },
+      { $group: { _id: { partnerId: "$partnerId", status: "$status" }, count: { $sum: 1 } } },
+    ])
+    .toArray();
+  for (const row of rows) {
+    const entry = out.get(row._id.partnerId);
+    if (!entry) continue;
+    if (REVIEW_LIMIT_STATUSES.includes(row._id.status)) entry.review += row.count;
+    else entry.live += row.count;
+  }
+  return out;
 }
 
 /* ────────────────────────────── mutations ─────────────────────────────── */
@@ -261,6 +306,7 @@ export interface CreatePropertyArgs {
    */
   ownership?: Ownership;
   ownerLabel?: string;
+  partnerId?: string | null;
 }
 
 export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<Property> {
@@ -309,6 +355,7 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     previousSlugs: [],
     agent: args.agent,
     agentUserId: args.agentUserId,
+    partnerId: args.partnerId ?? null,
     createdAt: now,
     updatedAt: now,
     publishedAt: null,
@@ -696,6 +743,45 @@ export async function trashProperty(db: Db, id: string, baseRevision: number): P
   const current = await properties(db).findOne({ _id: id });
   if (!current) throw new NotFoundError(id);
   throw new StaleWriteError("property", baseRevision, current.revision, toProperty(current));
+}
+
+/**
+ * Takes a suspended company's listings off the public site, or puts them back.
+ *
+ * Status, featuring and revision are left alone, so reinstating shows exactly
+ * what was there, and an open editor does not lose its save to a 409.
+ */
+export async function setPartnerHold(db: Db, partnerId: string, held: boolean): Promise<number> {
+  const result = await properties(db).updateMany(
+    { partnerId },
+    held ? { $set: { partnerHold: true } } : { $unset: { partnerHold: "" } },
+  );
+  return result.modifiedCount;
+}
+
+/**
+ * A partner account that leaves hands its listings to the company's main
+ * account: the record, and the contact card wherever the card was theirs.
+ *
+ * The card changes without review, the one content change that does, because a
+ * departed employee's number on a live listing sends buyers to nobody.
+ */
+export async function reassignPartnerListings(
+  db: Db,
+  input: { partnerId: string; fromUserId: string; to: Agent },
+): Promise<number> {
+  const now = Date.now();
+  const [owned, cards] = await Promise.all([
+    properties(db).updateMany(
+      { partnerId: input.partnerId, agentUserId: input.fromUserId },
+      { $set: { agentUserId: input.to.id, updatedAt: now }, $inc: { revision: 1 } },
+    ),
+    properties(db).updateMany(
+      { partnerId: input.partnerId, "agent.id": input.fromUserId },
+      { $set: { agent: input.to, updatedAt: now }, $inc: { revision: 1 } },
+    ),
+  ]);
+  return Math.max(owned.modifiedCount, cards.modifiedCount);
 }
 
 /* ──────────────────────── testimonials and stats ──────────────────────── */

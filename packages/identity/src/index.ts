@@ -23,6 +23,7 @@ export {
   type UserDoc,
   type SessionDoc,
   type InviteDoc,
+  type PartnerDoc,
 } from "./schema";
 
 export {
@@ -44,14 +45,19 @@ export { authRoutes } from "./routes/auth";
 export { clerkRoutes, passwordRoutes, registerClerkVerifier, type ClerkVerifier } from "./routes/doors";
 export { teamRoutes } from "./routes/team";
 export { applicationAdminRoutes, applicationPublicRoutes } from "./routes/applications";
+export { partnerAdminRoutes } from "./routes/partners";
+export { companyRoutes } from "./routes/company";
+export { offboardPartnerAccount, agentCardOf, type PartnerPorts } from "./partner-accounts";
 export {
   createApplication,
   decideApplication,
   getApplication,
   listApplications,
   openApplicationCount,
+  reopenApplication,
   APPLICATION_STATUSES,
   type ApplicationStatus,
+  type Decision,
   type PartnerApplication,
 } from "./repo/applications";
 
@@ -63,12 +69,39 @@ export {
   findUserById,
   listUsers,
   countActiveOwners,
+  demoteOtherMains,
   reassignListingsToOwner,
   setPasswordHash,
+  setPartnerRole,
   toAuthUser,
   updateProfile,
   type ProfilePatch,
 } from "./repo/users";
 export { createSession, resolveSession, endAllSessions } from "./repo/sessions";
-export { createInvite, listInvites } from "./repo/invites";
+export {
+  createInvite,
+  listInvites,
+  revokeTeamInvite,
+  revokePartnerInvite,
+} from "./repo/invites";
+export {
+  partnerIdForApplication,
+  upsertPartnerForApplication,
+  findPartner,
+  listPartners,
+  setPartnerMain,
+  updatePartner,
+  setPartnerStatus,
+  isSuspendedPartner,
+  partnerAccounts,
+  partnerUserIds,
+  openPartnerInvites,
+  countStaffSeats,
+  type PartnerPatch,
+} from "./repo/partners";
+export {
+  readPartnerSettings,
+  writePartnerSettings,
+  limitsForPartner,
+} from "./repo/partner-settings";
 export { hashPassword, verifyPassword, burnPasswordTime, mintSessionToken, tokenId } from "./crypto";

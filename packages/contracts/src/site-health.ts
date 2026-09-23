@@ -376,7 +376,7 @@ export function siteAlerts(snap: SiteHealthSnapshot): SiteAlert[] {
       domain: "team",
       title: `${partners.applicationsOpen} ${plural(partners.applicationsOpen, "person has", "people have")} asked to list with you`,
       message: `${plural(partners.applicationsOpen, "They were", "They were each")} told somebody reads every application and they will hear back either way. Approving one sends them a link to sign in; turning one down sends your reason.`,
-      action: { label: "Answer them", href: "/admin/partners" },
+      action: { label: "Answer them", href: "/admin/partners/applications" },
     });
   }
 

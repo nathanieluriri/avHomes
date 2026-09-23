@@ -94,7 +94,7 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
     label: "Partner lister",
     tagline: "Their own property, their own numbers",
     description:
-      "Lists property they own, uploads its photography and watches how it performs. Sees only their own listings, and a listing goes live once AV Homes approves it.",
+      "Lists their company's property, uploads its photography and watches how it performs. Sees only their company's listings, and a listing goes live once AV Homes approves it.",
     /* Real console domains, narrowed by `scoped` rather than by a smaller grant.
        A partner genuinely uses the listing editor and the image library; what
        differs is which records those surfaces are allowed to return. */
@@ -113,6 +113,10 @@ export const ASSIGNABLE_ROLES = ["developer", "agent", "editor", "support"] as c
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
 export const ALL_ROLES = ["owner", ...ASSIGNABLE_ROLES, "marketer", "partner"] as const;
+
+/** Inside a partner company: the one account that manages it, and everyone else. */
+export const PARTNER_ROLES = ["main", "staff"] as const;
+export type PartnerRole = (typeof PARTNER_ROLES)[number];
 
 export function isRole(value: string): value is Role {
   return (ALL_ROLES as readonly string[]).includes(value);

@@ -23,7 +23,8 @@ import { LOGIN_IP_LIMIT, LOGIN_WINDOW_MS } from "../schema";
 import { clearLimit, limit } from "../repo/ratelimit";
 import { burnPasswordTime, hashPassword, verifyPassword } from "../crypto";
 import { claimInvite, releaseInvite } from "../repo/invites";
-import { createUser, findCredentialByEmail, findUserByEmail, setPasswordHash } from "../repo/users";
+import { isSuspendedPartner, setPartnerMain } from "../repo/partners";
+import { createUser, findCredentialByEmail, findUserByEmail, setPartnerRole, setPasswordHash } from "../repo/users";
 
 /**
  * A verified identity, or null. The suite injects a fake and drives the real
@@ -174,6 +175,9 @@ export function passwordRoutes(): Hono<AppEnv> {
     if (!(await verifyPassword(body.password, found.passwordHash))) {
       throw new UnauthenticatedError("no account for that address, or the password is wrong");
     }
+    if (await isSuspendedPartner(db, found.user.partnerId)) {
+      return c.json({ ...refusalBody("suspended"), requestId: c.get("requestId") }, 403);
+    }
 
     await clearLimit(db, `login:${ip}`, LOGIN_WINDOW_MS);
     await issueSession(c, db, found.user.id);
@@ -214,15 +218,30 @@ export function passwordRoutes(): Hono<AppEnv> {
     if (!invite) {
       return c.json({ ...refusalBody("not_invited"), requestId: c.get("requestId") }, 403);
     }
+    if (await isSuspendedPartner(db, invite.partnerId ?? null)) {
+      if (invite.acceptedAt != null) await releaseInvite(db, invite._id, invite.acceptedAt);
+      return c.json({ ...refusalBody("suspended"), requestId: c.get("requestId") }, 403);
+    }
 
     const displayName = (body.displayName ?? "").trim() || address.split("@")[0] || address;
     try {
-      const user = await createUser(db, {
+      let user = await createUser(db, {
         email: address,
         displayName,
         role: invite.role,
+        partnerId: invite.partnerId ?? null,
+        partnerRole: invite.partnerRole ?? null,
         passwordHash: await hashPassword(body.password),
       });
+      if (invite.partnerId && invite.partnerRole === "main") {
+        const took = await setPartnerMain(db, invite.partnerId, user.id, null);
+        // The label follows the seat, because `countStaffSeats` counts the label: an
+        // account labelled main holding no seat is a staff seat nobody ever spends.
+        if (!took) {
+          await setPartnerRole(db, user.id, "staff");
+          user = { ...user, partnerRole: "staff" };
+        }
+      }
       await issueSession(c, db, user.id);
       // Claim also establishes a session for someone who was anonymous a
       // moment ago, same as login and the Clerk exchange above.

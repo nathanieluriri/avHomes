@@ -1,5 +1,5 @@
 import type { Document } from "mongodb";
-import { ALL_ROLES, ENQUIRY_CHANNELS, ENQUIRY_STATUSES, REPLY_IDENTITIES } from "@avhomes/contracts";
+import { ALL_ROLES, ENQUIRY_CHANNELS, ENQUIRY_STATUSES, PARTNER_ROLES, REPLY_IDENTITIES } from "@avhomes/contracts";
 import { COLLECTIONS } from "../collections";
 import { ensureCollection, ensureIndex, type Migration } from "../migrate";
 
@@ -190,6 +190,8 @@ export function usersValidator(): Document {
         avatarUrl: NULLABLE_STR,
         title: NULLABLE_STR,
         phone: NULLABLE_STR,
+        partnerId: NULLABLE_STR,
+        partnerRole: { enum: [...PARTNER_ROLES, null] },
         createdAt: TS,
         updatedAt: TS,
         disabledAt: NULLABLE_TS,
