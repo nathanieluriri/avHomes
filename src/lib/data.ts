@@ -316,6 +316,29 @@ export async function getSiteSettings(): Promise<PublicSettings> {
   return { ...payload.settings, seo: { ...NO_SETTINGS.seo, ...payload.settings.seo } };
 }
 
+/*
+ * Is the marketer app taking new people.
+ *
+ * `open` is optional on the wire although the route has always sent it: a build
+ * prerenders against the deployment that is still live, so every read added
+ * here has to survive an answer shaped like the previous release. Absent reads
+ * as closed, because the one failure worth avoiding is the front door
+ * advertising a door that is shut.
+ */
+interface WireJoinGate {
+  open?: boolean;
+}
+
+export async function getMarketerJoinOpen(): Promise<boolean> {
+  const gate = await apiGet<WireJoinGate>(
+    "/marketing/join",
+    { open: true },
+    { open: false },
+    { revalidate: DETAIL_REVALIDATE, tags: ["marketing-join"] },
+  );
+  return gate.open ?? false;
+}
+
 /** `wa.me/<digits>` with the enquiry already typed, or null when unset. */
 export function whatsappHref(number: string, message: string): string | null {
   if (number.trim() === "") return null;

@@ -20,6 +20,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/listings?status=For+Sale", label: "Buy" },
   { href: "/listings?status=For+Rent", label: "Rent" },
+  { href: "/list-with-us", label: "List With Us" },
   { href: "/posts", label: "Insights" },
   { href: "/#about", label: "About Us" },
   { href: "/contact", label: "Contact" },
@@ -35,6 +36,7 @@ function activeLink(pathname: string, status: string | null): NavLabel | null {
     if (status === "For Rent") return "Rent";
     return null;
   }
+  if (pathname.startsWith("/list-with-us")) return "List With Us";
   if (pathname.startsWith("/posts") || pathname.startsWith("/blog")) return "Insights";
   if (pathname.startsWith("/contact")) return "Contact";
   return null;

@@ -5,22 +5,25 @@ import FeaturedListings from "@/components/FeaturedListings";
 import WhyChooseUs from "@/components/WhyChooseUs";
 import LogoMarquee from "@/components/LogoMarquee";
 import Testimonials from "@/components/Testimonials";
+import WorkWithUs from "@/components/WorkWithUs";
 import CTABanner from "@/components/CTABanner";
 import JsonLd from "@/components/JsonLd";
 import { SITE_DOMAIN, SITE_NAME } from "@/lib/api-config";
 import {
   getFeaturedProperties,
+  getMarketerJoinOpen,
   getSiteSettings,
   getStats,
   getTestimonials,
 } from "@/lib/data";
 
 export default async function Home() {
-  const [properties, stats, testimonials, site] = await Promise.all([
+  const [properties, stats, testimonials, site, joinOpen] = await Promise.all([
     getFeaturedProperties(),
     getStats(),
     getTestimonials(),
     getSiteSettings(),
+    getMarketerJoinOpen(),
   ]);
 
   /*
@@ -66,6 +69,9 @@ export default async function Home() {
       <LogoMarquee clients={site.clientLogos.map((c) => ({ name: c.name, logo: c.imageUrl }))} />
       <WhyChooseUs stats={stats} />
       <Testimonials testimonials={testimonials} />
+      {/* After the proof, before the closing ask: the two doors that are not
+          buying. CTABanner keeps the last word, and its id="contact" anchor. */}
+      <WorkWithUs joinOpen={joinOpen} />
       <CTABanner />
     </>
   );
