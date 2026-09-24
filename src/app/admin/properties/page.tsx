@@ -13,9 +13,12 @@ import {
   estateSummary,
   formatPriceShort,
   formatSqm,
+  isAdminRole,
   isEstate,
+  partnerScopeOf,
   prototypeLabel,
   statusLabel,
+  type AuthUser,
   type EstatePrototype,
   type EstateSummary,
   type ListingType,
@@ -24,7 +27,7 @@ import {
   type PropertyStatus,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { useAsync, useDebounced, useCursorStack } from "@/lib/admin/hooks";
+import { useAsync, useDebounced, useCursorStack, useSession } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
 import {
   Badge,
@@ -42,6 +45,7 @@ import {
   TableToolbar,
   type Column,
 } from "@/components/admin/DataTable";
+import { BulkActions } from "@/components/admin/listing/BulkActions";
 
 /**
  * The Listings screen.
@@ -289,6 +293,27 @@ function PropertiesScreen() {
   }
 
   const rows = data?.items ?? [];
+
+  /*
+   * The selection belongs to the view it was made in. Keyed on every filter and
+   * the page, so changing any of them starts it empty rather than carrying ticks
+   * on rows the reader can no longer see into a bulk action.
+   */
+  const { session } = useSession();
+  const me = session.status === "signed-in" ? session.user : null;
+  const viewKey = [tab, kind, listingTypeFilter, sort, query, paging.cursor ?? ""].join("|");
+  const [selection, setSelection] = useState<{ key: string; ids: ReadonlySet<string> }>({
+    key: viewKey,
+    ids: new Set(),
+  });
+  const selectedIds = selection.key === viewKey ? selection.ids : NONE;
+  const selectedRows = rows.filter((p) => selectedIds.has(p.id));
+  const selectable = me ? rows.filter((p) => mayChange(p, me)) : [];
+  const selectedCount = selectable.filter((p) => selectedIds.has(p.id)).length;
+
+  function select(ids: ReadonlySet<string>) {
+    setSelection({ key: viewKey, ids });
+  }
   // Kind is left out: an empty kind with nothing else narrowing it gets its own first-run state below.
   const filtered = tab !== "all" || listingTypeFilter !== "all" || query !== "";
 
@@ -571,6 +596,26 @@ function PropertiesScreen() {
         rows={rows}
         rowKey={(p) => p.id}
         hrefFor={(p) => `/admin/properties/${p.id}`}
+        selection={
+          me
+            ? {
+                isSelected: (p) => selectedIds.has(p.id),
+                canSelect: (p) => mayChange(p, me),
+                blockedReason: "This listing belongs to somebody else",
+                onToggle: (p, on) => {
+                  const next = new Set(selectedIds);
+                  if (on) next.add(p.id);
+                  else next.delete(p.id);
+                  select(next);
+                },
+                all:
+                  selectedCount === 0 ? "none" : selectedCount === selectable.length ? "all" : "some",
+                onToggleAll: (on) => select(on ? new Set(selectable.map((p) => p.id)) : NONE),
+                allLabel: "Select every listing on this page",
+                label: (p) => `Select ${p.title || "Untitled listing"}`,
+              }
+            : undefined
+        }
         rowSpotlight={(p) => (p === liveRow ? "listing-live-row" : undefined)}
         spotlight={settled && tab === "live" && query === "" && rows.length === 0 ? "listing-none-live" : undefined}
         loading={loading}
@@ -749,8 +794,34 @@ function PropertiesScreen() {
           />
         }
       />
+
+      {me && (
+        <BulkActions
+          selected={selectedRows}
+          user={me}
+          onClear={() => select(NONE)}
+          onDone={(changed) => {
+            // What was refused stays ticked, so it can be fixed and tried again.
+            select(new Set([...selectedIds].filter((id) => !changed.has(id))));
+            reload();
+          }}
+        />
+      )}
     </>
   );
+}
+
+const NONE: ReadonlySet<string> = new Set();
+
+/**
+ * The server's `write` rule from `authorize`, so a row this reader could not
+ * change on its own page is not offered for a bulk change either.
+ */
+function mayChange(p: Property, user: AuthUser): boolean {
+  const scope = partnerScopeOf(user);
+  if (scope !== null) return p.partnerId === scope;
+  if (p.agentUserId === null) return isAdminRole(user.role);
+  return p.agentUserId === user.id || isAdminRole(user.role);
 }
 
 /**

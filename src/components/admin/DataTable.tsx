@@ -92,6 +92,25 @@ export interface Column<T> {
   thumb?: boolean;
 }
 
+/**
+ * Row checkboxes for a screen with bulk actions. The screen owns the set; the
+ * table only draws it. A row `canSelect` refuses gets a disabled box titled with
+ * `blockedReason`, so it says why rather than just not answering.
+ */
+export interface TableSelection<T> {
+  isSelected: (row: T) => boolean;
+  canSelect: (row: T) => boolean;
+  blockedReason?: string;
+  onToggle: (row: T, selected: boolean) => void;
+  /** Over the selectable rows on screen. */
+  all: "none" | "some" | "all";
+  onToggleAll: (selected: boolean) => void;
+  /** Names the select-all box: "Select every listing on this page". */
+  allLabel: string;
+  /** Names each row's box for a screen reader: "Select Kuje Estate". */
+  label: (row: T) => string;
+}
+
 /** A `tablet` column is drawn on the 640 to 1023 card only. */
 function cardGrade<T>(column: Column<T>): string {
   return column.mobile === "tablet" ? "max-sm:hidden" : "";
@@ -111,6 +130,7 @@ export function DataTable<T>({
   footer,
   footerWhenEmpty = false,
   caption,
+  selection,
 }: {
   columns: readonly Column<T>[];
   rows: readonly T[];
@@ -144,6 +164,7 @@ export function DataTable<T>({
   /** Names the table for a screen reader, and names the card list too. Not
    *  painted. */
   caption: string;
+  selection?: TableSelection<T>;
 }) {
   const router = useRouter();
   const primary = columns.find((column) => column.primary) ?? columns[0];
@@ -231,7 +252,7 @@ export function DataTable<T>({
           reader who was halfway down. Held rows simply stay up until the new
           ones replace them. */}
       {loading && rows.length === 0 ? (
-        <TableSkeleton columns={columns} caption={caption} />
+        <TableSkeleton columns={columns} caption={caption} selectable={Boolean(selection)} />
       ) : rows.length === 0 ? (
         /* No empty means the caller knows why the list is empty and is saying
            so somewhere else. A failed load must not fall through to an
@@ -261,6 +282,21 @@ export function DataTable<T>({
                 the cell goes.
               */}
               <tr>
+                {selection && (
+                  <th
+                    scope="col"
+                    style={{ top: headTop }}
+                    className="sticky z-20 w-px bg-mist-50 py-2.5 pl-4 pr-1 shadow-[inset_0_-1px_0_0_var(--mist-200)]"
+                  >
+                    <SelectBox
+                      label={selection.allLabel}
+                      checked={selection.all === "all"}
+                      indeterminate={selection.all === "some"}
+                      disabled={!rows.some(selection.canSelect)}
+                      onChange={selection.onToggleAll}
+                    />
+                  </th>
+                )}
                 {columns.map((column) => (
                   <th
                     key={column.key}
@@ -309,8 +345,19 @@ export function DataTable<T>({
                      keyboard reaches the link inside it. */
                   className={`group border-b border-mist-100 last:border-0 hover:bg-wine-50/40 focus-within:bg-wine-50/40 ${
                     hrefFor ? "cursor-pointer" : ""
-                  }`}
+                  } ${selection?.isSelected(row) ? "bg-wine-50/60" : ""}`}
                 >
+                  {selection && (
+                    <td className="w-px py-2.5 pl-4 pr-1 align-middle">
+                      <SelectBox
+                        label={selection.label(row)}
+                        checked={selection.isSelected(row)}
+                        disabled={!selection.canSelect(row)}
+                        title={selection.canSelect(row) ? undefined : selection.blockedReason}
+                        onChange={(next) => selection.onToggle(row, next)}
+                      />
+                    </td>
+                  )}
                   {columns.map((column) => (
                     <td
                       key={column.key}
@@ -338,6 +385,20 @@ export function DataTable<T>({
           {/* The card list. Same data, different object, and `aria-label`
               because the `<caption>` above it lives inside a table that is
               `display: none` at exactly the widths a phone reader is at. */}
+          {/* The phone's select-all, once a card is ticked. Always on, it would
+              spend a row of every visit on a mode most visits never enter. */}
+          {selection && selection.all !== "none" && (
+            <label className="flex min-h-11 items-center gap-3 border-b border-mist-200 bg-mist-50 px-4 text-[13px] font-semibold text-plum-950 md:hidden">
+              <SelectBox
+                label={selection.allLabel}
+                checked={selection.all === "all"}
+                indeterminate={selection.all === "some"}
+                onChange={selection.onToggleAll}
+                bare
+              />
+              Select all on this page
+            </label>
+          )}
           <ul className="md:hidden" aria-label={caption}>
             {rows.map((row) => (
               /*
@@ -361,8 +422,23 @@ export function DataTable<T>({
               <li
                 key={rowKey(row)}
                 data-spotlight={rowSpotlight?.(row)}
-                className="relative flex items-center gap-3 border-b border-mist-100 px-4 py-3 last:border-0 has-[a:active]:bg-wine-50/60"
+                className={`relative flex items-center gap-3 border-b border-mist-100 px-4 py-3 last:border-0 has-[a:active]:bg-wine-50/60 ${
+                  selection?.isSelected(row) ? "bg-wine-50/60" : ""
+                }`}
               >
+                {/* Raised over the card's stretched link, like `rowAction`, so a
+                    tap on the box ticks it rather than opening the listing. */}
+                {selection && (
+                  <div className="relative z-10 -my-3 -ml-4 flex shrink-0 self-stretch pl-1">
+                    <SelectBox
+                      label={selection.label(row)}
+                      checked={selection.isSelected(row)}
+                      disabled={!selection.canSelect(row)}
+                      title={selection.canSelect(row) ? undefined : selection.blockedReason}
+                      onChange={(next) => selection.onToggle(row, next)}
+                    />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="text-[13px] font-semibold text-plum-950">
                     {hrefFor ? (
@@ -461,9 +537,11 @@ export function DataTable<T>({
 function TableSkeleton<T>({
   columns,
   caption,
+  selectable,
 }: {
   columns: readonly Column<T>[];
   caption: string;
+  selectable: boolean;
 }) {
   const primary = columns.find((column) => column.primary) ?? columns[0];
   /* A thumbnail placeholder for a cell that has no thumbnail is the same reflow
@@ -480,6 +558,14 @@ function TableSkeleton<T>({
           {/* Same opaque fill and same drawn rule as the real header, so the
               swap from skeleton to rows changes nothing but the rows. */}
           <tr>
+            {selectable && (
+              <th
+                scope="col"
+                className="w-px bg-mist-50 py-2.5 pl-4 pr-1 shadow-[inset_0_-1px_0_0_var(--mist-200)]"
+              >
+                <span className="block h-4 w-4" />
+              </th>
+            )}
             {columns.map((column) => (
               <th
                 key={column.key}
@@ -496,6 +582,11 @@ function TableSkeleton<T>({
         <tbody>
           {Array.from({ length: 4 }, (_, row) => (
             <tr key={row} className="border-b border-mist-100 last:border-0">
+              {selectable && (
+                <td className="w-px py-2.5 pl-4 pr-1">
+                  <Skeleton className="h-4 w-4 rounded" />
+                </td>
+              )}
               {columns.map((column, index) => (
                 <td key={column.key} className="px-4 py-2.5">
                   {index === 0 ? (
@@ -528,6 +619,58 @@ function TableSkeleton<T>({
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * One row's checkbox, in the console's wine. The label is the hit area: 44px
+ * square on a phone card, the box's own size in the dense table.
+ *
+ * `indeterminate` has no attribute, only a DOM property, so it is set by ref.
+ */
+function SelectBox({
+  label,
+  checked,
+  indeterminate = false,
+  disabled = false,
+  title,
+  onChange,
+  bare = false,
+}: {
+  label: string;
+  checked: boolean;
+  indeterminate?: boolean;
+  disabled?: boolean;
+  title?: string;
+  onChange: (checked: boolean) => void;
+  /** Already inside a label of its own, such as the phone's select-all row. */
+  bare?: boolean;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+
+  const box = (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={label}
+      title={title}
+      checked={checked}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.checked)}
+      className="h-5 w-5 shrink-0 cursor-pointer accent-[var(--wine-600)] disabled:cursor-not-allowed disabled:opacity-40 md:h-4 md:w-4"
+    />
+  );
+  if (bare) return box;
+  return (
+    <label
+      title={title}
+      className="flex min-h-11 min-w-11 items-center justify-center md:min-h-0 md:min-w-0"
+    >
+      {box}
+    </label>
   );
 }
 

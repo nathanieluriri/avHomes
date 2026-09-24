@@ -7,6 +7,7 @@ import {
   requestId,
   type AppEnv,
   type AuditHandle,
+  type AuditItem,
 } from "@avhomes/core";
 import { NO_CAPTURE_PREFIXES, redact, trim } from "./redact";
 import { AUDIT_RETENTION_MS, insertEntry, type AuditEntryDoc } from "./repo";
@@ -336,7 +337,9 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
       before: Record<string, unknown> | null;
       actor: AuthUser | null;
       entityId: string | null;
-    } = { before: null, actor: null, entityId: null };
+      batch: boolean;
+      items: AuditItem[];
+    } = { before: null, actor: null, entityId: null, batch: false, items: [] };
 
     const handle: AuditHandle = {
       setBefore(doc) {
@@ -347,6 +350,13 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
       },
       setEntityId(id) {
         captured.entityId = id;
+      },
+      setBatch() {
+        captured.batch = true;
+      },
+      addItem(item) {
+        captured.batch = true;
+        captured.items.push(item);
       },
     };
     // Installed BEFORE `next()`, so a route can call the helpers while it runs.
@@ -419,6 +429,34 @@ export function auditTrail(): MiddlewareHandler<AppEnv> {
     try {
       const derived = derive(path, method);
       const now = Date.now();
+
+      // A batch files one entry per record under that record's id, and none for itself.
+      if (captured.batch) {
+        const body = await readBody(c);
+        const query = cleanQuery(path, c.req.query());
+        const db = await currentDb(c);
+        for (const item of captured.items) {
+          await insertEntry(db, {
+            _id: newId("aud", now),
+            at: now,
+            actorId: actor.id,
+            actorName: actor.displayName,
+            actorRole: actor.role,
+            entity: derived.entity,
+            entityId: item.entityId,
+            action: item.action,
+            requested: clean(item.requested ?? body),
+            before: clean(item.before),
+            method,
+            path,
+            query,
+            status,
+            requestId: requestId(c),
+            expiresAtDate: new Date(now + AUDIT_RETENTION_MS),
+          });
+        }
+        return;
+      }
 
       const doc: AuditEntryDoc = {
         _id: newId("aud", now),

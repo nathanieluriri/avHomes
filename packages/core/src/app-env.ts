@@ -15,6 +15,21 @@ export interface AuditHandle {
   setActor(user: AuthUser): void;
   /** For creates, which mint an id the path does not carry. */
   setEntityId(id: string): void;
+  /**
+   * For a batch route: one entry per record it changed, in place of the one
+   * entry for the request, so each record's own history still names the change.
+   * `setBatch` drops the request's own entry even when no item succeeded.
+   */
+  setBatch(): void;
+  addItem(item: AuditItem): void;
+}
+
+/** One record a batch changed. `requested` defaults to the request body. */
+export interface AuditItem {
+  entityId: string;
+  action: string;
+  before: Record<string, unknown> | null;
+  requested?: Record<string, unknown>;
 }
 
 /**
@@ -89,4 +104,12 @@ export function auditActor(c: Context<AppEnv>, user: AuthUser): void {
 
 export function auditEntityId(c: Context<AppEnv>, id: string): void {
   c.get("audit")?.setEntityId(id);
+}
+
+export function auditBatch(c: Context<AppEnv>): void {
+  c.get("audit")?.setBatch();
+}
+
+export function auditItem(c: Context<AppEnv>, item: AuditItem): void {
+  c.get("audit")?.addItem(item);
 }

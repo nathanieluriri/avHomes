@@ -70,9 +70,12 @@ export {
   auditBefore,
   auditActor,
   auditEntityId,
+  auditBatch,
+  auditItem,
   type AppEnv,
   type AppVariables,
   type AuditHandle,
+  type AuditItem,
 } from "./app-env";
 
 export { newId, isId, idTime, slugify, disambiguateSlug, ID_PREFIXES, type IdPrefix } from "./ids";
