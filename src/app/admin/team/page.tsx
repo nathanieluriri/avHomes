@@ -6,6 +6,7 @@ import {
   ROLE_INFO,
   canAssign,
   canManage,
+  hasDomain,
   isConsoleRole,
   type AssignableRole,
   type AuthUser,
@@ -15,6 +16,7 @@ import {
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useSession } from "@/lib/admin/hooks";
+import { BottomSheet } from "@/components/admin/BottomSheet";
 import {
   Badge,
   Button,
@@ -51,6 +53,7 @@ import {
 export default function TeamPage() {
   const { session } = useSession();
   const [actionError, setActionError] = useState<ApiError | null>(null);
+  const [heir, setHeir] = useState<TeamUser | null>(null);
 
   /* `keepPrevious`, because every control on this screen reloads both lists.
      Without it a role change or a disable blanks the whole People card to a
@@ -129,6 +132,7 @@ export default function TeamPage() {
                   actor={actor}
                   manageable={actor ? canManage(actor.role, user.role) : false}
                   onRun={run}
+                  onMakeOwner={() => setHeir(user)}
                 />
               ))}
             </ul>
@@ -185,6 +189,8 @@ export default function TeamPage() {
           {actor && <InviteForm actor={actor.role} onDone={() => invites.reload()} />}
         </div>
       </div>
+
+      <TransferSheet heir={heir} onClose={() => setHeir(null)} />
     </>
   );
 }
@@ -207,11 +213,13 @@ function PersonRow({
   actor,
   manageable,
   onRun,
+  onMakeOwner,
 }: {
   user: TeamUser;
   actor: AuthUser | null;
   manageable: boolean;
   onRun: (work: () => Promise<unknown>) => Promise<void>;
+  onMakeOwner: () => void;
 }) {
   const [pending, setPending] = useState<AssignableRole | null>(null);
   const staged = pending && pending !== user.role ? pending : null;
@@ -234,6 +242,9 @@ function PersonRow({
      the wall behind that: a row this screen cannot act on gets its badge and
      no buttons, rather than two that answer 412. */
   const consoleMember = isConsoleRole(user.role);
+  // Mirrors the transfer route's refusals, so the button only shows where it can land.
+  const heirable =
+    actor?.role === "owner" && user.id !== actor.id && !user.disabledAt && rerollable;
 
   return (
     <li className="flex flex-col gap-3 border-b border-mist-100 px-4 py-4 last:border-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
@@ -297,6 +308,12 @@ function PersonRow({
           </ConfirmButton>
         )}
 
+        {heirable && (
+          <Button variant="ghost" onClick={onMakeOwner}>
+            Make owner
+          </Button>
+        )}
+
         {manageable &&
           consoleMember &&
           user.id !== actor?.id &&
@@ -321,6 +338,107 @@ function PersonRow({
           ))}
       </div>
     </li>
+  );
+}
+
+/**
+ * Handing ownership to a colleague.
+ *
+ * A sheet rather than a `ConfirmButton`, because this one needs a choice (the
+ * role the owner keeps) and a typed confirmation: it cannot be undone by the
+ * person doing it, only by the person receiving it.
+ */
+function TransferSheet({ heir, onClose }: { heir: TeamUser | null; onClose: () => void }) {
+  const [stepDownTo, setStepDownTo] = useState<AssignableRole>(ASSIGNABLE_ROLES[0]);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const matches = heir !== null && typed.trim().toLowerCase() === heir.email.toLowerCase();
+
+  function close() {
+    if (busy) return;
+    setStepDownTo(ASSIGNABLE_ROLES[0]);
+    setTyped("");
+    setError(null);
+    onClose();
+  }
+
+  async function submit() {
+    if (!heir || !matches) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/admin/users/${heir.id}/transfer-ownership`, { stepDownTo });
+      /* A full navigation, not a reload of this page's lists. The console shell
+         holds its own copy of the session, and its nav and role label would
+         keep saying owner until the next hard load. A role that loses the team
+         domain would land on a 403 here, so it goes to its own home instead. */
+      if (hasDomain(stepDownTo, "team")) window.location.reload();
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      else window.location.href = "/admin";
+    } catch (err) {
+      setError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet
+      open={heir !== null}
+      onOpenChange={(next) => {
+        if (!next) close();
+      }}
+      title="Make owner"
+      description={heir ? `${heir.displayName} · ${heir.email}` : undefined}
+      footer={
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={close} disabled={busy}>
+            Cancel
+          </Button>
+          <Button className="flex-1" onClick={() => void submit()} disabled={busy || !matches}>
+            {busy ? "Handing over" : "Hand over ownership"}
+          </Button>
+        </div>
+      }
+    >
+      {heir && (
+        <div className="space-y-3">
+          <p className="text-[13px] leading-relaxed text-slate-600">
+            {heir.displayName} becomes the owner of this site, with every power that
+            comes with it, including the destructive ones. You stop being the owner
+            the moment this saves, and only {heir.displayName} can make you owner
+            again.
+          </p>
+          <Field label="Your role afterwards" hint={ROLE_INFO[stepDownTo].description}>
+            <select
+              className={inputClass}
+              value={stepDownTo}
+              disabled={busy}
+              onChange={(e) => setStepDownTo(e.target.value as AssignableRole)}
+            >
+              {ASSIGNABLE_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_INFO[r].label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Type their email to confirm" hint={heir.email}>
+            <input
+              className={inputClass}
+              type="email"
+              autoComplete="off"
+              spellCheck={false}
+              value={typed}
+              disabled={busy}
+              onChange={(e) => setTyped(e.target.value)}
+            />
+          </Field>
+          {error && <ErrorNote error={error} />}
+        </div>
+      )}
+    </BottomSheet>
   );
 }
 

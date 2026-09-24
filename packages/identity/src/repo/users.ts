@@ -1,6 +1,13 @@
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { DuplicateError, newId } from "@avhomes/core";
-import type { AuthUser, PartnerRole, Role, TeamUser } from "@avhomes/contracts";
+import {
+  ASSIGNABLE_ROLES,
+  type AssignableRole,
+  type AuthUser,
+  type PartnerRole,
+  type Role,
+  type TeamUser,
+} from "@avhomes/contracts";
 import type { UserDoc } from "../schema";
 
 /**
@@ -186,8 +193,9 @@ export async function setDisplayName(db: Db, userId: string, displayName: string
  * Refuses in the SQL, not only in the route.
  *
  * `role: { $ne: "owner" }` in the filter and an owner never in `next` means the
- * owner's role is immutable in BOTH directions as a property of the statement,
- * rather than a rule two route handlers each remember.
+ * owner's role is immutable in BOTH directions through this statement, rather
+ * than a rule two route handlers each remember. Ownership moves only through
+ * `promoteToOwner` and `stepDownOwner`, the pair behind the transfer route.
  */
 export async function setUserRole(db: Db, userId: string, role: Role): Promise<TeamUser | null> {
   if (role === "owner") return null;
@@ -197,6 +205,37 @@ export async function setUserRole(db: Db, userId: string, role: Role): Promise<T
     { returnDocument: "after", projection: TEAM_PROJECTION },
   );
   return after ? { ...toAuthUser(after), createdAt: after.createdAt, disabledAt: after.disabledAt ?? null, listingCount: 0, postCount: 0 } : null;
+}
+
+/**
+ * The first half of a transfer. Only an active holder of an assignable console
+ * role qualifies, so a marketer, a partner, a disabled account or an existing
+ * owner matches nothing and returns false.
+ */
+export async function promoteToOwner(db: Db, userId: string): Promise<boolean> {
+  const res = await users(db).updateOne(
+    { _id: userId, role: { $in: [...ASSIGNABLE_ROLES] }, disabledAt: null },
+    { $set: { role: "owner", updatedAt: Date.now() } },
+  );
+  return res.modifiedCount === 1;
+}
+
+/**
+ * The second half. Matches only while another active owner exists, so this
+ * statement cannot be the one that leaves the site with none.
+ */
+export async function stepDownOwner(db: Db, userId: string, role: AssignableRole): Promise<boolean> {
+  const others = await users(db).countDocuments({
+    role: "owner",
+    disabledAt: null,
+    _id: { $ne: userId },
+  });
+  if (others < 1) return false;
+  const res = await users(db).updateOne(
+    { _id: userId, role: "owner" },
+    { $set: { role, updatedAt: Date.now() } },
+  );
+  return res.modifiedCount === 1;
 }
 
 /** Idempotent: disabling an already-disabled user keeps the original timestamp. */

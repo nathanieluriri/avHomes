@@ -88,6 +88,7 @@ const OP_PREDICATES: Record<string, (target: string) => string> = {
   // The one op that is a possessive rather than a verb on the target, and the
   // reason this table takes the target instead of appending it.
   role: (t) => `changed ${t}'s role`,
+  "transfer-ownership": (t) => `made ${t} the owner`,
   reply: (t) => `replied to ${t}`,
 };
 

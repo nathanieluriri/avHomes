@@ -37,8 +37,10 @@ import {
   findUserById,
   findUserByEmail,
   listUsers,
+  promoteToOwner,
   reassignListingsToOwner,
   setUserRole,
+  stepDownOwner,
   type FoundUser,
 } from "../repo/users";
 import { endAllSessions } from "../repo/sessions";
@@ -53,6 +55,9 @@ const InviteBody = z
 
 const RoleBody = z.object({ role: z.enum(ASSIGNABLE_ROLES) }).strict();
 
+// The role the outgoing owner keeps. Developer is the only one with the same access.
+const TransferBody = z.object({ stepDownTo: z.enum(ASSIGNABLE_ROLES).default("developer") }).strict();
+
 const InviteQuery = z.object({ include: str().max(100).optional() }).strict();
 
 /**
@@ -62,7 +67,7 @@ const InviteQuery = z.object({ include: str().max(100).optional() }).strict();
 const UserQuery = z.object({ scope: z.enum(["console", "all"]).default("console") }).strict();
 
 /**
- * The six refusals, each with its own operation code.
+ * The refusals, each with its own operation code.
  *
  * A different code for each is the whole reason they are not one refusal: a
  * screen has to say "you cannot disable yourself" or "developers cannot remove
@@ -76,7 +81,12 @@ type Refusal =
   | "role_self"
   | "role_owner"
   | "manage_marketer"
-  | "manage_partner";
+  | "manage_partner"
+  | "transfer_not_owner"
+  | "transfer_self"
+  | "transfer_disabled"
+  | "transfer_target_owner"
+  | "transfer_raced";
 
 function refuse(operation: Refusal, userId: string): never {
   throw new PreconditionFailedError(operation, { userId, detail: REFUSAL_DETAIL[operation] });
@@ -87,11 +97,16 @@ const REFUSAL_DETAIL: Record<Refusal, string> = {
   disable_last_owner: "This is the last active owner. Promote someone else first.",
   manage_peer: "A developer cannot manage an owner or another developer.",
   role_self: "You cannot change your own role.",
-  role_owner: "The owner's role cannot be changed in either direction.",
+  role_owner: "The owner's role cannot be changed here. The owner hands it over with Make owner.",
   manage_marketer:
     "This is a marketer account, not a console one. Manage it on the Marketers screen.",
   manage_partner:
     "This is a partner company's account. Manage it on that partner's page under Partners.",
+  transfer_not_owner: "Only the owner can hand over ownership.",
+  transfer_self: "You already own this site.",
+  transfer_disabled: "This account is disabled. Enable it before making them owner.",
+  transfer_target_owner: "This person is already an owner.",
+  transfer_raced: "Their account changed while this was being saved. Reload and try again.",
 };
 
 /**
@@ -243,6 +258,47 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     const updated = await setUserRole(db, id, next as Role);
     if (!updated) throw new NotFoundError(id);
     return c.json({ ok: true, user: updated });
+  });
+
+  /**
+   * Hands ownership to another active colleague, and the caller steps down.
+   *
+   * No transactions in this codebase, so the writes are ORDERED: promote first,
+   * then step down. A failure between them leaves two owners, which the new
+   * owner can tidy, never zero, which nobody can. `stepDownOwner` also refuses
+   * in its own statement unless another active owner exists.
+   *
+   * Nothing to invalidate: `resolveSession` reads the role from the users row on
+   * every request, so the old owner loses owner powers on their next request.
+   */
+  routes.post("/admin/users/:id/transfer-ownership", requireAdmin(), async (c) => {
+    const db = await currentDb(c);
+    const id = pathParam(c, "id");
+    const actor = currentUser(c);
+    const { stepDownTo } = await readJson(c, TransferBody);
+
+    const target = await findUserById(db, id);
+    if (!target) throw new NotFoundError(id);
+    auditBefore(c, target as unknown as Record<string, unknown>);
+
+    if (actor.role !== "owner") refuse("transfer_not_owner", id);
+    if (target.user.id === actor.id) refuse("transfer_self", id);
+    refuseIfNotTeam(target, id);
+    if (target.user.role === "owner") refuse("transfer_target_owner", id);
+    if (target.disabledAt != null) refuse("transfer_disabled", id);
+
+    if (!(await promoteToOwner(db, id))) refuse("transfer_raced", id);
+    // A 2xx even when this misses: the promotion landed and has to reach the
+    // audit trail, which records only successes. Two owners is the safe miss.
+    const steppedDown = await stepDownOwner(db, actor.id, stepDownTo);
+
+    return c.json({
+      ok: true,
+      ownerId: id,
+      previousOwnerId: actor.id,
+      previousOwnerRole: steppedDown ? stepDownTo : "owner",
+      steppedDown,
+    });
   });
 
   /* ─────────────────────────────── invites ────────────────────────────── */
