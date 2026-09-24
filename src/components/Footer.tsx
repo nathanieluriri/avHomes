@@ -6,6 +6,7 @@ import type { SocialPlatform } from "@avhomes/contracts";
 const EMPTY_SOCIAL: Record<SocialPlatform, string> = {
   linkedin: "",
   instagram: "",
+  threads: "",
   facebook: "",
   x: "",
 };

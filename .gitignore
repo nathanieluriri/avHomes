@@ -294,3 +294,6 @@ videos/*/assets/iphone-*.png
 
 # Playwright MCP session logs, written by browser tooling.
 .playwright-mcp/
+
+# Raw listing media handed over for import. Lives in Cloudinary, not git.
+WEBSITE/

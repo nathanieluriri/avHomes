@@ -281,7 +281,7 @@ const NO_SETTINGS: PublicSettings = {
   whatsappNumber: "",
   offices: [],
   clientLogos: [],
-  social: { linkedin: "", instagram: "", facebook: "", x: "" },
+  social: { linkedin: "", instagram: "", threads: "", facebook: "", x: "" },
   seo: { googleVerification: "", googleBusinessProfileUrl: "" },
 };
 
@@ -303,7 +303,11 @@ const NO_SETTINGS: PublicSettings = {
  * CI cannot catch it. The workflow builds with no environment at all, so every
  * read falls back to the bundled defaults below, which do carry the field.
  */
-type WireSettings = Omit<PublicSettings, "seo"> & { seo?: Partial<SeoSettings> };
+type WireSettings = Omit<PublicSettings, "seo" | "social"> & {
+  seo?: Partial<SeoSettings>;
+  // Partial for the same reason: `threads` joined the platforms after the API shipped.
+  social?: Partial<Record<SocialPlatform, string>>;
+};
 
 export async function getSiteSettings(): Promise<PublicSettings> {
   const payload = await apiGet<{ settings: WireSettings }>(
@@ -314,7 +318,11 @@ export async function getSiteSettings(): Promise<PublicSettings> {
   );
   // Spread over the defaults rather than substituted for them, so a payload
   // carrying one of the two fields keeps it and an absent one reads as not set.
-  return { ...payload.settings, seo: { ...NO_SETTINGS.seo, ...payload.settings.seo } };
+  return {
+    ...payload.settings,
+    social: { ...NO_SETTINGS.social, ...payload.settings.social },
+    seo: { ...NO_SETTINGS.seo, ...payload.settings.seo },
+  };
 }
 
 /*

@@ -496,7 +496,7 @@ export type ReplyIdentity = (typeof REPLY_IDENTITIES)[number];
  * and an unknown platform would render an empty hole. Adding one means adding
  * an icon, which is the point of making it a closed set.
  */
-export const SOCIAL_PLATFORMS = ["linkedin", "instagram", "facebook", "x"] as const;
+export const SOCIAL_PLATFORMS = ["linkedin", "instagram", "threads", "facebook", "x"] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
 /** A staffed address a visitor can turn up to. */

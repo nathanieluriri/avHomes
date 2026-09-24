@@ -77,6 +77,7 @@ const DEFAULTS: SiteSettings = {
   social: {
     linkedin: "",
     instagram: "https://www.instagram.com/_avconstruction",
+    threads: "",
     facebook: "",
     x: "https://x.com/_avconstruction",
   },
@@ -276,6 +277,7 @@ const UpdateBody = z
       .object({
         linkedin: socialUrl,
         instagram: socialUrl,
+        threads: socialUrl,
         facebook: socialUrl,
         x: socialUrl,
       })

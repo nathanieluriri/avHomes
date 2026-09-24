@@ -70,6 +70,7 @@ interface Draft {
 const SOCIAL_LABEL: Record<SocialPlatform, string> = {
   linkedin: "LinkedIn",
   instagram: "Instagram",
+  threads: "Threads",
   facebook: "Facebook",
   x: "X",
 };
