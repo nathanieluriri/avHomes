@@ -93,7 +93,7 @@ export function developerNotifier(mailer: Mailer) {
       );
 
       try {
-        mailer.assertConfigured();
+        await mailer.assertConfigured();
       } catch {
         return;
       }

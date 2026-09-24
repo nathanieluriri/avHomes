@@ -389,14 +389,19 @@ export function emailTemplateRoutes(deps: {
   });
 
   // Any signed-in member: the inbox needs it to decide whether Email the buyer can send.
-  routes.get("/admin/mail-status", requireAuth(), (c) => {
+  routes.get("/admin/mail-status", requireAuth(), async (c) => {
     let configured = true;
     try {
-      deps.mailer.assertConfigured();
+      await deps.mailer.assertConfigured();
     } catch {
       configured = false;
     }
-    return c.json({ configured, hint: configured ? null : "Set RESEND_API_KEY and MAIL_FROM in the deployment's environment variables." });
+    return c.json({
+      configured,
+      hint: configured
+        ? null
+        : "An owner can paste a Hostinger API key under Settings, Email delivery, or the developer can set RESEND_API_KEY and MAIL_FROM.",
+    });
   });
 
   routes.get("/admin/email-templates/:key", requireAuth(), async (c) => {

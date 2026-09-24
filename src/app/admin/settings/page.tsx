@@ -11,10 +11,12 @@ import {
   type SeoSettings,
   type SiteSettings,
   type SocialPlatform,
+  isAdminRole,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { useAsync } from "@/lib/admin/hooks";
+import { useAsync, useSession } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
+import { MailDeliveryCard } from "@/components/admin/MailDeliveryCard";
 import { SaveBar } from "@/components/admin/SaveBar";
 import {
   Button,
@@ -138,6 +140,8 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const { session } = useSession();
+  const me = session.status === "signed-in" ? session.user : null;
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(saved));
 
@@ -552,6 +556,9 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
               </Field>
             </Card>
           )}
+
+          {/* Owner and developer only, the same line the server draws. */}
+          {me && isAdminRole(me.role) && <MailDeliveryCard defaultTestTo={me.email} />}
         </div>
       </PageColumns>
     </>

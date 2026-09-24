@@ -14,6 +14,7 @@ import {
   Inbox,
   LibraryBig,
   Mail,
+  Mails,
   Megaphone,
   MessageCircleWarning,
   MailOpen,
@@ -204,6 +205,15 @@ export const NAV: readonly NavItem[] = [
     hint: "The contact form's inbox",
     icon: Inbox,
     domain: "enquiries",
+  },
+  {
+    href: "/admin/mail",
+    label: "Mailboxes",
+    hint: "Read, file and send from the Hostinger mailboxes",
+    icon: Mails,
+    /* Owner and developer, the same line the API draws: a mailbox holds every
+       conversation the business has, not only the site's enquiries. */
+    domain: "danger",
   },
   {
     /* A section, not a screen. An agent holds `media` but not `content`, so

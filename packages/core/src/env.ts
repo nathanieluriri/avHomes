@@ -29,6 +29,8 @@ export interface Env {
   CLOUDINARY_URL: string;
   RESEND_API_KEY: string;
   MAIL_FROM: string;
+  /** Fallback Hostinger Mail API token. A key saved in Settings wins over this one. */
+  HOSTINGER_MAIL_API_KEY: string;
   /** Where a new enquiry is announced. Empty means "do not send". */
   ENQUIRY_NOTIFY_TO: string;
   /**
@@ -61,6 +63,7 @@ export function getEnv(): Env {
     CLOUDINARY_URL: read("CLOUDINARY_URL"),
     RESEND_API_KEY: read("RESEND_API_KEY"),
     MAIL_FROM: read("MAIL_FROM"),
+    HOSTINGER_MAIL_API_KEY: read("HOSTINGER_MAIL_API_KEY"),
     ENQUIRY_NOTIFY_TO: read("ENQUIRY_NOTIFY_TO"),
     PAYSTACK_SECRET_KEY: read("PAYSTACK_SECRET_KEY"),
     NODE_ENV: read("NODE_ENV", "development"),

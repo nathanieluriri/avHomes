@@ -5,7 +5,6 @@ import {
   databaseConfig,
   getEnv,
   requestOrigin,
-  resendMailer,
   toResponse,
   type AppEnv,
   type Mailer,
@@ -48,7 +47,14 @@ import {
   type StoragePort,
 } from "@avhomes/media";
 import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
-import { emailTemplateRoutes, settingsPublicRoutes, settingsRoutes } from "@avhomes/settings";
+import {
+  appMailer,
+  emailTemplateRoutes,
+  mailSettingsRoutes,
+  mailboxRoutes,
+  settingsPublicRoutes,
+  settingsRoutes,
+} from "@avhomes/settings";
 import { feedbackRoutes } from "@avhomes/feedback";
 import { analyticsPublicRoutes } from "@avhomes/analytics";
 import { audienceAdminRoutes, audiencePublicRoutes, unsubscribePublicRoutes } from "@avhomes/audience";
@@ -151,7 +157,9 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
         ? async () => deps.db as Db
         : async () => getDb(databaseConfig());
 
-  const mailer = deps.mailer ?? resendMailer();
+  /* The Hostinger mailbox chosen in Settings when a key is set, else the Resend
+     environment. Reads settings at send time, never at construction. */
+  const mailer = deps.mailer ?? appMailer(resolveDb);
   const notify = developerNotifier(mailer);
 
   /*
@@ -434,6 +442,10 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    */
   app.route(API_PREFIX, enquiriesAdminRoutes({ mailer }));
   app.route(API_PREFIX, settingsRoutes());
+  /* Owner and developer only: `/api/admin/settings/mail` and `/api/admin/mail`
+     both fall to the gate's `danger` catch-all, and each route repeats it. */
+  app.route(API_PREFIX, mailSettingsRoutes({ mailer }));
+  app.route(API_PREFIX, mailboxRoutes());
   app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin, notify }));
   app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
   /* The marketer app first, then the console's side of the same feature. The

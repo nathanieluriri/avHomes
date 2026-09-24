@@ -402,11 +402,11 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     if (body.mode === "test") {
       const message = await newsletterEmail(db, origin, doc, { id: "test", email: user.email });
       const sent = await trySend(deps.mailer, { ...message, subject: `[Test] ${message.subject}` }, ctx);
-      if (!sent) throw new BadRequestError("The test could not be sent. Check that mail is configured (RESEND_API_KEY and MAIL_FROM).");
+      if (!sent) throw new BadRequestError("The test could not be sent. Check Email delivery under Settings.");
       return c.json({ sent: 1, to: user.email });
     }
 
-    deps.mailer.assertConfigured();
+    await deps.mailer.assertConfigured();
     const claimed = await newsletters(db).findOneAndUpdate(
       { _id: id, status: "draft", revision: body.baseRevision },
       { $set: { status: "sending", updatedAt: Date.now() }, $inc: { revision: 1 } },

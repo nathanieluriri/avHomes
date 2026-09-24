@@ -6,6 +6,8 @@ export {
   settingsPublicRoutes,
   type PublicSiteSettings,
 } from "./settings";
+export { appMailer, forgetMailSender, mailSettingsRoutes, readMailSettings } from "./mail";
+export { mailboxRoutes } from "./mailbox";
 export {
   conversationHtml,
   conversationText,

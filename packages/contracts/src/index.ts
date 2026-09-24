@@ -21,3 +21,4 @@ export * from "./email";
 export * from "./funds";
 export * from "./marketing";
 export * from "./analytics";
+export * from "./mail";

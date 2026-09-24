@@ -23,7 +23,8 @@ export interface MailMessage {
 }
 
 export interface Mailer {
-  assertConfigured(): void;
+  /** May be async: a provider configured in settings has to read them first. */
+  assertConfigured(): void | Promise<void>;
   send(message: MailMessage): Promise<void>;
   /** Up to 100 messages in one request. Optional; callers fall back to `send`. */
   sendBatch?(messages: MailMessage[]): Promise<void>;
@@ -142,7 +143,7 @@ export async function trySend(
   ctx: { requestId: string; route: string },
 ): Promise<boolean> {
   try {
-    mailer.assertConfigured();
+    await mailer.assertConfigured();
   } catch {
     return false; // Not configured is not an incident.
   }
