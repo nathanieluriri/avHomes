@@ -33,6 +33,9 @@ import { ButtonLink, Spinner } from "./ui";
 import { SpotlightHost } from "./spotlight/Spotlight";
 import "@/app/admin/console.css";
 
+/** Routes whose page takes the whole content area, with no width cap or page scroll. */
+const FULL_BLEED = ["/admin/mail"];
+
 /**
  * The console shell: a wine bar over a light working panel with a rail.
  *
@@ -109,6 +112,9 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
    */
   const isStudio =
     /^\/admin\/posts\/[^/]+\/advanced\/?$/.test(pathname) || pathname === "/admin/customize";
+
+  // Screens that fill the content area and scroll inside themselves, as Gmail does.
+  const isFullBleed = FULL_BLEED.includes(pathname);
 
   /*
    * Two redirects, and the second one has to compute a destination rather than
@@ -482,11 +488,18 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           /* Programmatically focusable for the effect above, but not a tab stop
              of its own, which -1 is exactly for. */
           tabIndex={-1}
-          className="c-main min-w-0 overflow-y-auto outline-none"
+          className={`c-main min-w-0 outline-none ${isFullBleed ? "overflow-hidden" : "overflow-y-auto"}`}
         >
           {/* Keyed on the pathname so React remounts it per navigation and the
               rise replays without any JavaScript timing. */}
-          <div key={pathname} className="c-sheet mx-auto w-full max-w-[66rem] px-4 py-6 sm:px-6 sm:py-8">
+          <div
+            key={pathname}
+            className={`c-sheet w-full ${
+              isFullBleed
+                ? "flex h-full min-h-0 flex-col md:px-4 md:py-4 xl:px-5"
+                : "mx-auto max-w-[66rem] px-4 py-6 sm:px-6 sm:py-8"
+            }`}
+          >
             <AvatarNag user={user} pathname={pathname} />
             {children}
           </div>

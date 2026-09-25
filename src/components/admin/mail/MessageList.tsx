@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   FolderInput,
+  Inbox,
   Mail,
   MailOpen,
   MoreVertical,
@@ -13,23 +14,22 @@ import {
   RotateCw,
   Star,
   Trash2,
-  Inbox,
 } from "lucide-react";
 import type { MailFolder, MailMessagePage, MailMessageSummary } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { ResponsiveMenu } from "@/components/admin/BottomSheet";
 import { EmptyState, ErrorNote, Skeleton } from "@/components/admin/ui";
+import { PhoneRow, SelectionBar } from "./PhoneList";
 import {
-  MenuLabel,
   MenuRow,
   MenuSeparator,
+  MoveMenu,
   STARRED,
+  ToolIcon,
   announceMailChange,
   asApiError,
   enc,
-  folderIcon,
   folderLabel,
-  hasFiles,
   keyOf,
   listDate,
   who,
@@ -76,6 +76,7 @@ export function useMailActions(mailbox: string, onDone: () => void) {
 }
 
 export function MessageList({
+  variant = "desk",
   mailbox,
   folderPath,
   folders,
@@ -87,7 +88,12 @@ export function MessageList({
   onRefresh,
   onChanged,
   onFolderSettings,
+  lead,
+  label,
+  onScrollDown,
 }: {
+  /** "phone" draws Gmail's app list: avatars, long-press selection, a toolbar over the search bar. */
+  variant?: "desk" | "phone";
   mailbox: string;
   folderPath: string;
   folders: MailFolder[];
@@ -99,10 +105,17 @@ export function MessageList({
   onRefresh: () => void;
   onChanged: () => void;
   onFolderSettings: (() => void) | null;
+  /** Phone only: scrolls away above the rows (the filter chips). */
+  lead?: ReactNode;
+  /** Phone only: the folder's name over the rows. */
+  label?: string;
+  /** Phone only: told which way the list last scrolled, for the compose button. */
+  onScrollDown?: (down: boolean) => void;
 }) {
   const data = state.data;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [patches, setPatches] = useState<Map<string, Patch>>(new Map());
+  const lastTop = useRef(0);
 
   /* Local edits give way to whatever the server says next. The parent keys this
      component by folder, filters and page, so the ticks reset with the list. */
@@ -145,14 +158,178 @@ export function MessageList({
     setSelected(new Set(items.filter(test).map(keyOf)));
   }
 
+  function toggle(m: MailMessageSummary, on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(keyOf(m));
+      else next.delete(keyOf(m));
+      return next;
+    });
+  }
+
   const allOn = items.length > 0 && picked.length === items.length;
   const someOn = picked.length > 0 && !allOn;
   const start = data && data.total > 0 ? (data.page - 1) * 25 + 1 : 0;
   const end = data ? start + Math.max(data.items.length - 1, 0) : 0;
+  const range = data && data.total > 0 ? `${start}-${end} of ${data.total.toLocaleString("en-GB")}${data.capped ? "+" : ""}` : "";
+  const size = variant === "phone" ? "touch" : "desk";
+
+  const bulk = (
+    <>
+      <MoveMenu size={size} targets={targets} disabled={actions.busy} onMove={(path) => void moveTo(picked, path)} />
+      {trash && !inTrash && (
+        <ToolIcon size={size} label="Move to trash" icon={Trash2} disabled={actions.busy} onClick={() => void moveTo(picked, trash.path)} />
+      )}
+      {picked.some((m) => m.unseen) ? (
+        <ToolIcon size={size} label="Mark as read" icon={MailOpen} disabled={actions.busy} onClick={() => void setRead(picked, true)} />
+      ) : (
+        <ToolIcon size={size} label="Mark as unread" icon={Mail} disabled={actions.busy} onClick={() => void setRead(picked, false)} />
+      )}
+      <ToolIcon
+        size={size}
+        label={picked.every((m) => m.flagged) ? "Remove star" : "Star"}
+        icon={Star}
+        disabled={actions.busy}
+        onClick={() => void setStar(picked, !picked.every((m) => m.flagged))}
+      />
+    </>
+  );
+
+  const moreMenu = (touch: boolean) => (
+    <ResponsiveMenu
+      title="More"
+      align={touch ? "end" : "start"}
+      trigger={
+        <button
+          type="button"
+          aria-label={touch ? "Folder options" : "More"}
+          title={touch ? "Folder options" : "More"}
+          className={`c-tap grid place-items-center rounded-full text-slate-600 hover:bg-mist-100 ${touch ? "h-11 w-11" : "h-11 w-11 sm:h-7 sm:w-7 sm:rounded-lg"}`}
+        >
+          <MoreVertical className={touch ? "h-5 w-5" : "h-4 w-4"} aria-hidden="true" />
+        </button>
+      }
+      items={(kind) => (
+        <>
+          {touch && (
+            <MenuRow kind={kind} onSelect={onRefresh}>
+              <RotateCw className="h-4 w-4 text-slate-550" aria-hidden="true" />
+              Refresh
+            </MenuRow>
+          )}
+          <MenuRow
+            kind={kind}
+            disabled={!items.some((m) => m.unseen)}
+            onSelect={() => void setRead(items.filter((m) => m.unseen), true)}
+          >
+            <MailOpen className="h-4 w-4 text-slate-550" aria-hidden="true" />
+            Mark this page as read
+          </MenuRow>
+          {onFolderSettings && (
+            <MenuRow kind={kind} onSelect={onFolderSettings}>
+              <FolderInput className="h-4 w-4 text-slate-550" aria-hidden="true" />
+              Rename or delete folder
+            </MenuRow>
+          )}
+        </>
+      )}
+    />
+  );
+
+  const notes = (
+    <>
+      {actions.problem && (
+        <div className="p-3">
+          <ErrorNote error={actions.problem} />
+        </div>
+      )}
+      {state.error && (
+        <div className="p-3">
+          <ErrorNote error={state.error} onRetry={state.reload} />
+        </div>
+      )}
+    </>
+  );
+
+  const loadingRows = (height: string) => (
+    <div aria-busy="true" className="space-y-px p-2">
+      <span className="sr-only">Loading messages</span>
+      {Array.from({ length: 8 }, (_, i) => (
+        <Skeleton key={i} className={`${height} rounded-md`} />
+      ))}
+    </div>
+  );
+
+  const empty = (
+    <EmptyState
+      bare
+      icon={folderPath === STARRED ? Star : Inbox}
+      title={
+        filtered ? "No messages match these filters" : folderPath === STARRED ? "No starred messages" : "Nothing in this folder"
+      }
+      hint={filtered ? "Change or clear a filter above." : undefined}
+    />
+  );
+
+  if (variant === "phone") {
+    const selecting = picked.length > 0;
+    return (
+      <>
+        {selecting && (
+          <SelectionBar count={picked.length} onClear={() => setSelected(new Set())}>
+            {bulk}
+          </SelectionBar>
+        )}
+        <div
+          onScroll={(event) => {
+            const top = event.currentTarget.scrollTop;
+            if (Math.abs(top - lastTop.current) < 6) return;
+            onScrollDown?.(top > lastTop.current && top > 24);
+            lastTop.current = top;
+          }}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(6rem+var(--safe-b))]"
+        >
+          {lead}
+          <div className="flex items-center gap-2 pl-4 pr-1.5">
+            <h2 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-slate-600">{label}</h2>
+            {moreMenu(true)}
+          </div>
+          {notes}
+          {!data && state.loading ? (
+            loadingRows("h-16")
+          ) : data && items.length === 0 ? (
+            empty
+          ) : (
+            <ul className={`transition-opacity ${state.loading ? "opacity-60" : ""}`}>
+              {items.map((m) => (
+                <PhoneRow
+                  key={keyOf(m)}
+                  message={m}
+                  folder={folderPath === STARRED ? (folders.find((f) => f.path === m.folder) ?? null) : null}
+                  selected={selected.has(keyOf(m))}
+                  selecting={selecting}
+                  onToggle={() => toggle(m, !selected.has(keyOf(m)))}
+                  onOpen={() => onOpen(m)}
+                  onStar={() => void setStar([m], !m.flagged)}
+                />
+              ))}
+            </ul>
+          )}
+          {data && data.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1 px-4 pt-3">
+              <ToolIcon size="touch" label="Newer" icon={ChevronLeft} disabled={page <= 1} onClick={() => onPage(page - 1)} />
+              <span className="px-2 text-[12.5px] tabular-nums text-slate-600">{range}</span>
+              <ToolIcon size="touch" label="Older" icon={ChevronRight} disabled={page >= data.totalPages} onClick={() => onPage(page + 1)} />
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
 
   return (
-    <div className="min-w-0">
-      <div className="flex min-h-12 items-center gap-1 border-b border-mist-100 px-1.5 py-1 sm:px-2.5">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-12 shrink-0 items-center gap-1 border-b border-mist-100 px-1.5 py-1 sm:px-2.5">
         <SelectAll
           checked={allOn}
           indeterminate={someOn}
@@ -170,203 +347,53 @@ export function MessageList({
         {picked.length === 0 ? (
           <>
             <ToolIcon label="Refresh" icon={RotateCw} onClick={onRefresh} />
-            <ResponsiveMenu
-              title="More"
-              align="start"
-              trigger={
-                <button
-                  type="button"
-                  aria-label="More"
-                  title="More"
-                  className="c-tap grid h-11 w-11 place-items-center rounded-lg text-slate-600 hover:bg-mist-100 sm:h-7 sm:w-7"
-                >
-                  <MoreVertical className="h-4 w-4" aria-hidden="true" />
-                </button>
-              }
-              items={(kind) => (
-                <>
-                  <MenuRow
-                    kind={kind}
-                    disabled={!items.some((m) => m.unseen)}
-                    onSelect={() => void setRead(items.filter((m) => m.unseen), true)}
-                  >
-                    <MailOpen className="h-4 w-4 text-slate-550" aria-hidden="true" />
-                    Mark this page as read
-                  </MenuRow>
-                  {onFolderSettings && (
-                    <MenuRow kind={kind} onSelect={onFolderSettings}>
-                      <FolderInput className="h-4 w-4 text-slate-550" aria-hidden="true" />
-                      Rename or delete folder
-                    </MenuRow>
-                  )}
-                </>
-              )}
-            />
+            {moreMenu(false)}
           </>
         ) : (
           <div className="flex items-center gap-0.5">
-            <MoveMenu targets={targets} disabled={actions.busy} onMove={(path) => void moveTo(picked, path)} />
-            {trash && !inTrash && (
-              <ToolIcon label="Move to trash" icon={Trash2} disabled={actions.busy} onClick={() => void moveTo(picked, trash.path)} />
-            )}
-            {picked.some((m) => m.unseen) ? (
-              <ToolIcon label="Mark as read" icon={MailOpen} disabled={actions.busy} onClick={() => void setRead(picked, true)} />
-            ) : (
-              <ToolIcon label="Mark as unread" icon={Mail} disabled={actions.busy} onClick={() => void setRead(picked, false)} />
-            )}
-            <ToolIcon
-              label={picked.every((m) => m.flagged) ? "Remove star" : "Star"}
-              icon={Star}
-              disabled={actions.busy}
-              onClick={() => void setStar(picked, !picked.every((m) => m.flagged))}
-            />
+            {bulk}
             <span className="ml-1.5 hidden text-[12px] font-medium text-slate-600 sm:inline">{picked.length} selected</span>
           </div>
         )}
 
-        {data && data.total > 0 && (
-          <div className={`ml-auto items-center gap-0.5 ${picked.length > 0 ? "hidden sm:flex" : "flex"}`}>
-            <span className="px-1.5 text-[12px] tabular-nums text-slate-600">
-              {start}-{end} of {data.total.toLocaleString("en-GB")}
-              {data.capped ? "+" : ""}
-            </span>
+        {range !== "" && data && (
+          <div className="ml-auto flex items-center gap-0.5">
+            <span className="px-1.5 text-[12px] tabular-nums text-slate-600">{range}</span>
             <ToolIcon label="Newer" icon={ChevronLeft} disabled={page <= 1} onClick={() => onPage(page - 1)} />
             <ToolIcon label="Older" icon={ChevronRight} disabled={page >= data.totalPages} onClick={() => onPage(page + 1)} />
           </div>
         )}
       </div>
 
-      {actions.problem && (
-        <div className="p-3">
-          <ErrorNote error={actions.problem} />
-        </div>
-      )}
-      {state.error && (
-        <div className="p-3">
-          <ErrorNote error={state.error} onRetry={state.reload} />
-        </div>
-      )}
-
-      {!data && state.loading ? (
-        <div aria-busy="true" className="space-y-px p-2">
-          <span className="sr-only">Loading messages</span>
-          {Array.from({ length: 8 }, (_, i) => (
-            <Skeleton key={i} className="h-11 rounded-md" />
-          ))}
-        </div>
-      ) : data && items.length === 0 ? (
-        <EmptyState
-          bare
-          icon={folderPath === STARRED ? Star : Inbox}
-          title={
-            filtered
-              ? "No messages match these filters"
-              : folderPath === STARRED
-                ? "No starred messages"
-                : "Nothing in this folder"
-          }
-          hint={filtered ? "Change or clear a filter above." : undefined}
-        />
-      ) : (
-        <ul className={`transition-opacity ${state.loading ? "opacity-60" : ""}`}>
-          {items.map((m) => (
-            <MessageRow
-              key={keyOf(m)}
-              message={m}
-              folders={folders}
-              showFolder={folderPath === STARRED}
-              selected={selected.has(keyOf(m))}
-              inTrash={inTrash || (trash !== null && m.folder === trash.path)}
-              trashPath={trash?.path ?? null}
-              busy={actions.busy}
-              onSelect={(on) =>
-                setSelected((prev) => {
-                  const next = new Set(prev);
-                  if (on) next.add(keyOf(m));
-                  else next.delete(keyOf(m));
-                  return next;
-                })
-              }
-              onOpen={() => onOpen(m)}
-              onStar={() => void setStar([m], !m.flagged)}
-              onRead={(read) => void setRead([m], read)}
-              onMove={(path) => void moveTo([m], path)}
-            />
-          ))}
-        </ul>
-      )}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {notes}
+        {!data && state.loading ? (
+          loadingRows("h-11")
+        ) : data && items.length === 0 ? (
+          empty
+        ) : (
+          <ul className={`transition-opacity ${state.loading ? "opacity-60" : ""}`}>
+            {items.map((m) => (
+              <MessageRow
+                key={keyOf(m)}
+                message={m}
+                folders={folders}
+                showFolder={folderPath === STARRED}
+                selected={selected.has(keyOf(m))}
+                inTrash={inTrash || (trash !== null && m.folder === trash.path)}
+                trashPath={trash?.path ?? null}
+                busy={actions.busy}
+                onSelect={(on) => toggle(m, on)}
+                onOpen={() => onOpen(m)}
+                onStar={() => void setStar([m], !m.flagged)}
+                onRead={(read) => void setRead([m], read)}
+                onMove={(path) => void moveTo([m], path)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
-  );
-}
-
-function ToolIcon({
-  label,
-  icon: Icon,
-  onClick,
-  disabled = false,
-}: {
-  label: string;
-  icon: typeof Star;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="c-tap grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
-    >
-      <Icon className="h-4 w-4" aria-hidden="true" />
-    </button>
-  );
-}
-
-function MoveMenu({
-  targets,
-  disabled,
-  onMove,
-  compact = false,
-}: {
-  targets: MailFolder[];
-  disabled: boolean;
-  onMove: (path: string) => void;
-  compact?: boolean;
-}) {
-  return (
-    <ResponsiveMenu
-      title="Move to"
-      align="start"
-      trigger={
-        <button
-          type="button"
-          aria-label="Move to"
-          title="Move to"
-          disabled={disabled}
-          className={`c-tap grid shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:opacity-40 ${
-            compact ? "h-8 w-8" : "h-11 w-11 sm:h-8 sm:w-8"
-          }`}
-        >
-          <FolderInput className="h-4 w-4" aria-hidden="true" />
-        </button>
-      }
-      items={(kind) => (
-        <>
-          <MenuLabel>Move to</MenuLabel>
-          {targets.map((f) => {
-            const Icon = folderIcon(f, f.path);
-            return (
-              <MenuRow key={f.path} kind={kind} onSelect={() => onMove(f.path)}>
-                <Icon className="h-4 w-4 text-slate-550" aria-hidden="true" />
-                <span className="truncate">{folderLabel(f, f.path)}</span>
-              </MenuRow>
-            );
-          })}
-        </>
-      )}
-    />
   );
 }
 
@@ -458,7 +485,7 @@ function MessageRow({
   onMove: (path: string) => void;
 }) {
   const home = folders.find((f) => f.path === m.folder) ?? null;
-  const files = hasFiles(m);
+  const files = m.attachments.filter((a) => !a.inline);
   const tint = selected ? "bg-wine-50" : m.unseen ? "bg-white" : "bg-mist-50/60";
   const weight = m.unseen ? "font-semibold text-plum-950" : "font-normal text-plum-900";
 
@@ -480,7 +507,7 @@ function MessageRow({
         aria-label={m.flagged ? "Starred. Remove star" : "Not starred. Star"}
         aria-pressed={m.flagged}
         onClick={onStar}
-        className="c-tap order-last grid h-11 w-9 shrink-0 place-items-center rounded-md sm:order-none sm:h-8 sm:w-8"
+        className="c-tap grid h-11 w-9 shrink-0 place-items-center rounded-md sm:h-8 sm:w-8"
       >
         <Star
           className={`h-4 w-4 ${m.flagged ? "fill-amber-400 text-amber-500" : "text-mist-400 group-hover:text-slate-550"}`}
@@ -488,45 +515,44 @@ function MessageRow({
         />
       </button>
 
-      <button
-        type="button"
-        onClick={onOpen}
-        className="min-w-0 flex-1 py-2.5 pl-1 text-left sm:flex sm:items-center sm:gap-3 sm:py-2"
-      >
-        <span className="flex items-center gap-2 sm:w-44 sm:shrink-0">
-          <span className={`min-w-0 flex-1 truncate text-[13px] ${weight}`}>{who(m)}</span>
-          <span className={`shrink-0 text-[12px] sm:hidden ${m.unseen ? "font-semibold text-plum-950" : "text-slate-600"}`}>
-            {listDate(m.date)}
-          </span>
-        </span>
-        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:mt-0 sm:flex-1">
+      <button type="button" onClick={onOpen} className="flex min-h-10 min-w-0 flex-1 items-center gap-3 py-2 pl-1 text-left xl:gap-4">
+        <span className={`w-44 shrink-0 truncate text-[13px] xl:w-56 ${weight}`}>{who(m)}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
           {showFolder && home && (
             <span className="shrink-0 rounded bg-mist-100 px-1.5 py-px text-[11px] font-medium text-slate-600">
               {folderLabel(home, home.path)}
             </span>
           )}
-          <span className={`min-w-0 flex-1 truncate text-[13px] ${weight}`}>{m.subject || "(no subject)"}</span>
-          {files && <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-550" aria-label="Has attachments" />}
+          <span className={`min-w-0 truncate text-[13px] ${weight}`}>{m.subject || "(no subject)"}</span>
+          {/* The filenames get the width a wide screen now has to spare. */}
+          {files.length > 0 && (
+            <span className="ml-auto hidden min-w-0 shrink items-center gap-1.5 pl-3 2xl:flex">
+              {files.slice(0, 2).map((a) => (
+                <span
+                  key={a.id}
+                  className="inline-flex min-w-0 max-w-[12rem] items-center gap-1 rounded-full border border-mist-200 bg-white px-2 py-0.5 text-[11.5px] text-slate-600"
+                >
+                  <Paperclip className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{a.filename}</span>
+                </span>
+              ))}
+            </span>
+          )}
+          {files.length > 0 && <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-550 2xl:hidden" aria-label="Has attachments" />}
         </span>
         <span className="sr-only">{m.unseen ? "Unread" : "Read"}</span>
       </button>
 
       <span
-        className={`hidden w-16 shrink-0 text-right text-[12px] sm:block sm:group-hover:hidden sm:group-focus-within:hidden ${
+        className={`w-20 shrink-0 text-right text-[12px] group-hover:hidden group-focus-within:hidden ${
           m.unseen ? "font-semibold text-plum-950" : "text-slate-600"
         }`}
       >
         {listDate(m.date)}
       </span>
-      {/* Hover actions take the date's place, as Gmail's do. Mouse only: a phone
-          ticks the box and uses the toolbar. */}
-      <span className="hidden shrink-0 items-center gap-0.5 sm:group-hover:flex sm:group-focus-within:flex">
-        <MoveMenu
-          compact
-          targets={folders.filter((f) => f.path !== m.folder)}
-          disabled={busy}
-          onMove={onMove}
-        />
+      {/* Hover actions take the date's place, as Gmail's do. */}
+      <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex group-focus-within:flex">
+        <MoveMenu size="compact" targets={folders.filter((f) => f.path !== m.folder)} disabled={busy} onMove={onMove} />
         {trashPath && !inTrash && (
           <RowIcon label="Move to trash" icon={Trash2} disabled={busy} onClick={() => onMove(trashPath)} />
         )}
@@ -565,3 +591,4 @@ function RowIcon({
     </button>
   );
 }
+

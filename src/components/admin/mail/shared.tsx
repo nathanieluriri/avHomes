@@ -5,6 +5,7 @@ import { Dialog, DropdownMenu } from "radix-ui";
 import {
   File,
   Folder,
+  FolderInput,
   Inbox,
   OctagonAlert,
   Send,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import type { MailFolder, MailListFilters, MailMessageDetail, MailMessageSummary } from "@avhomes/contracts";
 import { ApiError } from "@/lib/admin/client";
+import { ResponsiveMenu } from "@/components/admin/BottomSheet";
 import { dateTime, shortDate } from "@/lib/admin/format";
 
 export const enc = encodeURIComponent;
@@ -249,5 +251,134 @@ export function MenuSeparator({ kind }: { kind: "menu" | "sheet" }) {
     <DropdownMenu.Separator className="my-1.5 h-px bg-mist-200" />
   ) : (
     <div className="my-1.5 h-px bg-mist-200" aria-hidden="true" />
+  );
+}
+
+/* ─────────────────────────────── avatars ─────────────────────────────── */
+
+// Brand tints only, so a list of senders reads as this console rather than Gmail.
+const TONES = [
+  "bg-wine-600",
+  "bg-chrome-700",
+  "bg-plum-800",
+  "bg-wine-500",
+  "bg-slate-600",
+  "bg-wine-700",
+  "bg-chrome-800",
+];
+
+/** The same address always gets the same colour. */
+export function toneOf(key: string): string {
+  let hash = 0;
+  for (const ch of key.toLowerCase()) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return TONES[hash % TONES.length];
+}
+
+export function LetterAvatar({
+  text,
+  toneKey,
+  size = "md",
+  className = "",
+}: {
+  text: string;
+  toneKey: string;
+  size?: "xs" | "sm" | "md" | "lg";
+  className?: string;
+}) {
+  const box = {
+    xs: "h-7 w-7 text-[11px]",
+    sm: "h-8 w-8 text-[12px]",
+    md: "h-10 w-10 text-[15px]",
+    lg: "h-12 w-12 text-[18px]",
+  }[size];
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid shrink-0 place-items-center rounded-full font-semibold text-white ${toneOf(toneKey)} ${box} ${className}`}
+    >
+      {initialOf(text)}
+    </span>
+  );
+}
+
+/* ─────────────────────────────── toolbars ────────────────────────────── */
+
+/** "desk" shrinks to 32px from `sm`; "touch" stays a 44px target at every width. */
+export function ToolIcon({
+  label,
+  icon: Icon,
+  onClick,
+  disabled = false,
+  active = false,
+  size = "desk",
+}: {
+  label: string;
+  icon: LucideIcon;
+  onClick?: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  size?: "desk" | "touch";
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+      className={`c-tap grid shrink-0 place-items-center rounded-full text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:cursor-not-allowed disabled:opacity-40 ${
+        size === "touch" ? "h-11 w-11" : "h-11 w-11 sm:h-8 sm:w-8 sm:rounded-lg"
+      }`}
+    >
+      <Icon
+        className={`${size === "touch" ? "h-5 w-5" : "h-4 w-4"} ${active ? "fill-amber-400 text-amber-500" : ""}`}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
+
+export function MoveMenu({
+  targets,
+  disabled,
+  onMove,
+  size = "desk",
+}: {
+  targets: MailFolder[];
+  disabled: boolean;
+  onMove: (path: string) => void;
+  size?: "desk" | "compact" | "touch";
+}) {
+  const box = size === "compact" ? "h-8 w-8 rounded-lg" : size === "touch" ? "h-11 w-11 rounded-full" : "h-11 w-11 rounded-full sm:h-8 sm:w-8 sm:rounded-lg";
+  return (
+    <ResponsiveMenu
+      title="Move to"
+      align="start"
+      trigger={
+        <button
+          type="button"
+          aria-label="Move to"
+          title="Move to"
+          disabled={disabled}
+          className={`c-tap grid shrink-0 place-items-center text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 disabled:opacity-40 ${box}`}
+        >
+          <FolderInput className={size === "touch" ? "h-5 w-5" : "h-4 w-4"} aria-hidden="true" />
+        </button>
+      }
+      items={(kind) => (
+        <>
+          <MenuLabel>Move to</MenuLabel>
+          {targets.map((f) => {
+            const Icon = folderIcon(f, f.path);
+            return (
+              <MenuRow key={f.path} kind={kind} onSelect={() => onMove(f.path)}>
+                <Icon className="h-4 w-4 text-slate-550" aria-hidden="true" />
+                <span className="truncate">{folderLabel(f, f.path)}</span>
+              </MenuRow>
+            );
+          })}
+        </>
+      )}
+    />
   );
 }

@@ -5,21 +5,13 @@ import { Check, Settings } from "lucide-react";
 import type { MailboxSummary } from "@avhomes/contracts";
 import { ResponsiveMenu } from "@/components/admin/BottomSheet";
 import { Badge } from "@/components/admin/ui";
-import { MenuLabel, MenuRow, MenuSeparator, initialOf, kb } from "./shared";
+import { LetterAvatar, MenuLabel, MenuRow, MenuSeparator, kb } from "./shared";
 
 function Avatar({ address, size = "md" }: { address: string; size?: "md" | "sm" }) {
-  const box = size === "md" ? "h-9 w-9 text-[14px]" : "h-8 w-8 text-[12px]";
-  return (
-    <span
-      aria-hidden="true"
-      className={`grid shrink-0 place-items-center rounded-full bg-wine-600 font-semibold text-white ${box}`}
-    >
-      {initialOf(address)}
-    </span>
-  );
+  return <LetterAvatar text={address} toneKey={address} size={size} />;
 }
 
-function usage(m: MailboxSummary): string {
+export function usage(m: MailboxSummary): string {
   const q = m.quota;
   if (!q || !q.supported) return "Storage use not reported";
   return `${kb(q.storageUsedKb)} of ${kb(q.storageLimitKb)} used`;

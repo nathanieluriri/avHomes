@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Popover } from "radix-ui";
 import { AtSign, Check, ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import type { MailListFilters, MailRecipient } from "@avhomes/contracts";
+import { BottomSheet } from "@/components/admin/BottomSheet";
 import { Button, Field, inputClass } from "@/components/admin/ui";
 import { shortDate } from "@/lib/admin/format";
 import { activeFilters, daysAgo } from "./shared";
@@ -176,24 +177,68 @@ const chipOn = "border-wine-100 bg-wine-50 text-wine-700 hover:bg-wine-100";
 
 function Chip({
   label,
+  title,
   on,
+  sheet,
+  onReset,
   children,
-  menu = true,
 }: {
   label: ReactNode;
+  /** Names the sheet on a phone. */
+  title: string;
   on: boolean;
+  /** A bottom sheet under the thumb instead of a popover. */
+  sheet: boolean;
+  /** Draws an x on an applied chip that clears just this filter. */
+  onReset?: () => void;
   children: (close: () => void) => ReactNode;
-  menu?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const reset = on && onReset;
+  const trigger = (
+    <button
+      type="button"
+      data-on={on || undefined}
+      onClick={sheet ? () => setOpen(true) : undefined}
+      className={`${chipBase} ${on ? chipOn : chipIdle} ${reset ? "rounded-r-none border-r-0 pr-1.5" : ""}`}
+    >
+      <span className="truncate">{label}</span>
+      {!reset && <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+    </button>
+  );
+
+  const pill = reset ? (
+    <span className="inline-flex shrink-0 items-center">
+      {sheet ? trigger : <Popover.Trigger asChild>{trigger}</Popover.Trigger>}
+      <button
+        type="button"
+        aria-label={`Clear ${title}`}
+        title={`Clear ${title}`}
+        onClick={onReset}
+        className={`c-tap grid h-8 w-8 shrink-0 place-items-center rounded-r-full border border-l-0 ${chipOn}`}
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </span>
+  ) : sheet ? (
+    trigger
+  ) : (
+    <Popover.Trigger asChild>{trigger}</Popover.Trigger>
+  );
+
+  if (sheet) {
+    return (
+      <>
+        {pill}
+        <BottomSheet open={open} onOpenChange={setOpen} title={title}>
+          {children(() => setOpen(false))}
+        </BottomSheet>
+      </>
+    );
+  }
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button type="button" className={`${chipBase} ${on ? chipOn : chipIdle}`}>
-          <span className="truncate">{label}</span>
-          {menu && <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
-        </button>
-      </Popover.Trigger>
+      {pill}
       <Popover.Portal>
         <Popover.Content
           sideOffset={6}
@@ -228,11 +273,14 @@ function TextApply({
   initial,
   placeholder,
   onApply,
+  focus = true,
 }: {
   label: string;
   initial: string;
   placeholder: string;
   onApply: (value: string) => void;
+  /** Off on a phone, where focusing raises the keyboard over the choices. */
+  focus?: boolean;
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -248,7 +296,7 @@ function TextApply({
         value={value}
         aria-label={label}
         placeholder={placeholder}
-        autoFocus
+        autoFocus={focus}
         onChange={(event) => setValue(event.target.value)}
       />
       <Button type="submit" size="md">
@@ -292,7 +340,9 @@ export function FilterChips({
   recipientsLoading,
   onChange,
   onClear,
+  phone = false,
 }: {
+  phone?: boolean;
   filters: MailListFilters;
   preset: string | null;
   senders: string[];
@@ -303,14 +353,34 @@ export function FilterChips({
 }) {
   const f = filters;
   const dated = Boolean(f.since || f.before);
+  const row = useRef<HTMLDivElement>(null);
+  const applied = [f.from, f.to, f.since, f.before, f.attachment].join("|");
+
+  // A narrow row scrolls; bring a chip that was just applied into view so its value shows.
+  useEffect(() => {
+    const el = row.current;
+    const chip = el?.querySelector<HTMLElement>("[data-on]");
+    if (!el || !chip) return;
+    const right = chip.offsetLeft + chip.offsetWidth + 44;
+    if (chip.offsetLeft < el.scrollLeft || right > el.scrollLeft + el.clientWidth) {
+      el.scrollTo({ left: Math.max(0, chip.offsetLeft - 12), behavior: "smooth" });
+    }
+  }, [applied]);
 
   return (
-    <div className="no-scrollbar flex items-center gap-2 overflow-x-auto px-3 py-2.5 sm:px-4">
-      <Chip label={f.from ? `From: ${short(f.from)}` : "From"} on={Boolean(f.from)}>
+    <div ref={row} className="no-scrollbar relative flex items-center gap-2 overflow-x-auto px-3 py-2.5 sm:px-4">
+      <Chip
+        label={f.from ? `From: ${short(f.from)}` : "From"}
+        title="From"
+        on={Boolean(f.from)}
+        sheet={phone}
+        onReset={() => onChange({ ...f, from: undefined })}
+      >
         {(close) => (
           <div className="space-y-2">
             <TextApply
               label="Sender"
+              focus={!phone}
               initial={f.from ?? ""}
               placeholder="Name or address"
               onApply={(value) => {
@@ -319,7 +389,7 @@ export function FilterChips({
               }}
             />
             {senders.length > 0 && (
-              <div className="max-h-56 overflow-y-auto">
+              <div className={phone ? "" : "max-h-56 overflow-y-auto"}>
                 {senders.map((s) => (
                   <Option
                     key={s}
@@ -349,7 +419,13 @@ export function FilterChips({
         )}
       </Chip>
 
-      <Chip label={rangeLabel(f, preset)} on={dated}>
+      <Chip
+        label={rangeLabel(f, preset)}
+        title="Date"
+        on={dated}
+        sheet={phone}
+        onReset={() => onChange({ ...f, since: undefined, before: undefined }, null)}
+      >
         {(close) => (
           <div className="space-y-2">
             <div>
@@ -397,13 +473,19 @@ export function FilterChips({
         Has attachment
       </button>
 
-      <Chip label={f.to ? `Sent to: ${short(f.to)}` : "Sent to"} on={Boolean(f.to)}>
+      <Chip
+        label={f.to ? `Sent to: ${phone ? f.to.split("@")[0] : short(f.to)}` : "Sent to"}
+        title="Sent to"
+        on={Boolean(f.to)}
+        sheet={phone}
+        onReset={() => onChange({ ...f, to: undefined })}
+      >
         {(close) => (
           <div className="space-y-2">
             <p className="text-[12px] text-slate-600">
               Mail addressed to one address, including Bcc and alias deliveries.
             </p>
-            <div className="max-h-56 overflow-y-auto">
+            <div className={phone ? "" : "max-h-56 overflow-y-auto"}>
               {recipientsLoading && recipients.length === 0 ? (
                 <p className="px-2.5 py-2 text-[12.5px] text-slate-550">Reading recent mail</p>
               ) : (
@@ -427,6 +509,7 @@ export function FilterChips({
             </div>
             <TextApply
               label="Any address"
+              focus={!phone}
               initial={f.to && !recipients.some((r) => r.address === f.to) ? f.to : ""}
               placeholder="Another address"
               onApply={(value) => {

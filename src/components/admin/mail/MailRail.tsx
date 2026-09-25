@@ -21,7 +21,9 @@ export function MailRail({
   onPick,
   onCompose,
   onChanged,
+  showCompose = true,
 }: {
+  showCompose?: boolean;
   mailbox: string;
   folders: MailFolder[];
   loading: boolean;
@@ -94,26 +96,28 @@ export function MailRail({
 
   return (
     <nav aria-label="Mail folders">
-      <Button size="lg" className="w-full" onClick={onCompose}>
-        <Pencil className="h-4 w-4" aria-hidden="true" />
-        Compose
-      </Button>
+      {showCompose && (
+        <Button size="lg" className="mb-3 w-full" onClick={onCompose}>
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+          Compose
+        </Button>
+      )}
 
       {error && (
-        <div className="mt-3">
+        <div className="mb-3">
           <ErrorNote error={error} />
         </div>
       )}
 
       {loading ? (
-        <div className="mt-3 space-y-1.5">
+        <div className="space-y-1.5">
           {Array.from({ length: 6 }, (_, i) => (
             <Skeleton key={i} className="h-8 rounded-lg" />
           ))}
         </div>
       ) : (
         <>
-          <ul className="mt-3 flex flex-col gap-1 lg:gap-0.5">{rows.map(row)}</ul>
+          <ul className="flex flex-col gap-1 lg:gap-0.5">{rows.map(row)}</ul>
 
           <div className="mt-5 flex items-center gap-2 pl-2">
             <span className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Folders</span>
