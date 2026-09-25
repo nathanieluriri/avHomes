@@ -25,6 +25,7 @@ import {
   type AppEnv,
 } from "@avhomes/core";
 import {
+  ASSIGNABLE_ROLES,
   AMENITY_LENGTH_MAX,
   AMENITY_MAX,
   BUILD_STAGES,
@@ -46,6 +47,7 @@ import {
   derivedEstateColumns,
   fieldsFor,
   PUBLIC_PROPERTY_STATUSES,
+  isAdminRole,
   isEstate,
   listingPublishBlockers,
   MAP_LINK_MAX,
@@ -67,7 +69,7 @@ import {
   type Testimonial,
 } from "@avhomes/contracts";
 import { type Db } from "@avhomes/db";
-import { limitsForPartner, requireAdmin, requireAuth } from "@avhomes/identity";
+import { findUserById, limitsForPartner, requireAdmin, requireAuth } from "@avhomes/identity";
 import { assertAuthorized, isScopedCaller } from "../authorize";
 import { expandMapLink } from "../maps";
 import {
@@ -231,7 +233,8 @@ const BULK_OPS = [
   "sendBack",
   "patch",
   "trash",
-] as const satisfies readonly (LifecycleOp | "patch" | "trash")[];
+  "reassign",
+] as const satisfies readonly (LifecycleOp | "patch" | "trash" | "reassign")[];
 
 /** The fields that mean the same thing on every listing they are set on. */
 const BulkPatch = z
@@ -248,6 +251,8 @@ const BulkBody = z
     ids: z.array(str().min(1).max(120)).min(1).max(BULK_MAX),
     op: z.enum(BULK_OPS),
     patch: BulkPatch.optional(),
+    /** Reassign only: the team member the listings go to. */
+    to: str().min(1).max(120).optional(),
     /** The revision each row was listed at. Patch and trash need one per id, as their single routes do. */
     revisions: z.record(str().max(120), z.number().int().min(0)).optional(),
   })
@@ -674,6 +679,47 @@ async function moveListing(
   return transitionProperty(db, current, operation);
 }
 
+type AgentCard = Property["agent"];
+
+/**
+ * Hands a listing to another team member: who may edit it and the agent card
+ * buyers see both move, because a listing whose card names someone other than
+ * its holder sends buyers to the wrong person.
+ */
+async function reassignListing(
+  db: Db,
+  user: AuthUser,
+  id: string,
+  baseRevision: number,
+  to: AgentCard,
+  onBefore: OnBefore,
+): Promise<Property> {
+  const current = await getPropertyById(db, id);
+  if (!current) throw new NotFoundError(`property ${id}`);
+  onBefore(current);
+  assertAuthorized(current, user, "write");
+  if (baseRevision !== current.revision) {
+    throw new StaleWriteError("property", baseRevision, current.revision, current);
+  }
+  if (current.deletedAt !== null) {
+    throw new PreconditionFailedError("in_trash", {
+      propertyId: id,
+      detail: "This listing is in the trash. Restore it first.",
+    });
+  }
+  // A partner's listing is held by the partner company's own accounts.
+  if (current.partnerId !== null) {
+    throw new PreconditionFailedError("partner_listing", {
+      propertyId: id,
+      detail: "This listing belongs to a partner company, so it stays with their account.",
+    });
+  }
+  return saveProperty(db, id, { agentUserId: to.id, agent: to }, baseRevision, {
+    userId: user.id,
+    name: user.displayName,
+  });
+}
+
 /** SOFT delete, as the DELETE route does it. */
 async function trashListing(
   db: Db,
@@ -844,6 +890,30 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
         { path: "patch", message: "send a patch with op patch, and only then" },
       ]);
     }
+    if ((body.op === "reassign") !== (body.to !== undefined)) {
+      throw new BadRequestError("to", [{ path: "to", message: "send to with op reassign, and only then" }]);
+    }
+
+    // Resolved once, before any row is touched, so a bad target refuses the batch.
+    let heir: AgentCard | null = null;
+    if (body.op === "reassign") {
+      if (!isAdminRole(user.role)) throw new ForbiddenError("only an owner or developer can reassign listings");
+      const found = await findUserById(db, body.to!);
+      const staff = ["owner", ...ASSIGNABLE_ROLES] as string[];
+      if (!found || found.disabledAt !== null || !staff.includes(found.user.role) || found.user.partnerId) {
+        throw new PreconditionFailedError("reassign_target", {
+          detail: "Listings can only go to an active member of the AV Homes team.",
+        });
+      }
+      heir = {
+        id: found.user.id,
+        name: found.user.displayName,
+        role: found.user.title || "Sales agent",
+        phone: found.user.phone,
+        email: found.user.email,
+        avatarUrl: found.user.avatarUrl,
+      };
+    }
     auditBatch(c);
 
     const results: BulkResult[] = [];
@@ -854,7 +924,7 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       };
       try {
         let property: Property;
-        if (body.op === "patch" || body.op === "trash") {
+        if (body.op === "patch" || body.op === "trash" || body.op === "reassign") {
           // Both are compare-and-set writes on their single routes, and stay so here.
           const revision = body.revisions?.[id];
           if (revision === undefined) {
@@ -866,16 +936,23 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
             body.op === "patch"
               ? // A copy per row: the rules drop staff-only fields from the patch they are given.
                 await patchListing(db, user, id, { patch: { ...body.patch }, baseRevision: revision }, onBefore)
-              : await trashListing(db, user, id, revision, onBefore);
+              : body.op === "reassign"
+                ? await reassignListing(db, user, id, revision, heir!, onBefore)
+                : await trashListing(db, user, id, revision, onBefore);
         } else {
           property = await moveListing(db, user, id, body.op, onBefore);
         }
         results.push({ id, ok: true, property });
         auditItem(c, {
           entityId: id,
-          action: body.op === "patch" ? "update" : body.op === "trash" ? "delete" : `op:${body.op}`,
+          action: body.op === "patch" || body.op === "reassign" ? "update" : body.op === "trash" ? "delete" : `op:${body.op}`,
           before: before as Record<string, unknown> | null,
-          requested: { bulk: true, op: body.op, ...(body.patch ? { patch: body.patch } : {}) },
+          requested: {
+            bulk: true,
+            op: body.op,
+            ...(body.patch ? { patch: body.patch } : {}),
+            ...(heir ? { to: heir.id } : {}),
+          },
         });
       } catch (error) {
         results.push({ id, ok: false, ...refusalOf(error, requestId(c)) });

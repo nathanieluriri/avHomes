@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, RotateCw } from "lucide-react";
 import {
+  ASSIGNABLE_ROLES,
+  ROLE_INFO,
   canFeature,
+  isAdminRole,
   isScopedRole,
   type AuthUser,
   type Property,
+  type TeamUser,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { BottomSheet } from "@/components/admin/BottomSheet";
@@ -22,7 +26,16 @@ import { Button, ErrorNote, Field, inputClass } from "@/components/admin/ui";
  * page, and a partial run is reported row by row rather than as one failure.
  */
 
-type BulkOp = "publish" | "unpublish" | "archive" | "unarchive" | "restore" | "submit" | "patch" | "trash";
+type BulkOp =
+  | "publish"
+  | "unpublish"
+  | "archive"
+  | "unarchive"
+  | "restore"
+  | "submit"
+  | "patch"
+  | "trash"
+  | "reassign";
 
 interface BulkPatch {
   featured?: boolean;
@@ -147,6 +160,22 @@ const TRASH: BulkAction = {
   applies: (p) => p.deletedAt === null,
 };
 
+const REASSIGN: BulkAction = {
+  key: "reassign",
+  label: "Reassign to",
+  description: "Hand them to another team member, agent card and all",
+  done: "reassigned",
+  op: "reassign",
+  staffOnly: true,
+  // A partner company's listings stay with its own accounts.
+  applies: (p) => p.deletedAt === null && p.partnerId === null,
+};
+
+/** Who a listing can go to: active AV Homes staff, never a marketer or a partner account. */
+function canHold(u: TeamUser): boolean {
+  return u.disabledAt === null && !u.partnerId && (u.role === "owner" || (ASSIGNABLE_ROLES as readonly string[]).includes(u.role));
+}
+
 interface Outcome {
   action: BulkAction;
   ok: number;
@@ -155,7 +184,7 @@ interface Outcome {
   skipped: number;
 }
 
-type Mode = "menu" | "edit" | "trash" | "running" | "result";
+type Mode = "menu" | "edit" | "trash" | "reassign" | "running" | "result";
 
 function plural(n: number, noun = "listing"): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
@@ -179,12 +208,33 @@ export function BulkActions({
   const [error, setError] = useState<ApiError | null>(null);
   const [city, setCity] = useState("");
   const [area, setArea] = useState("");
+  const [team, setTeam] = useState<TeamUser[] | null>(null);
+  const [heir, setHeir] = useState("");
 
   const scoped = isScopedRole(user.role);
   const offered = ACTIONS.filter((a) => !(scoped && a.staffOnly))
     .map((action) => ({ action, count: selected.filter(action.applies).length }))
     .filter(({ count }) => count > 0);
   const trashable = selected.filter(TRASH.applies).length;
+  const canReassign = isAdminRole(user.role);
+  const reassignable = canReassign ? selected.filter(REASSIGN.applies).length : 0;
+
+  // The team list is only needed once somebody opens the reassign form.
+  useEffect(() => {
+    if (mode !== "reassign" || team !== null) return;
+    let live = true;
+    api
+      .get<{ items: TeamUser[] }>("/admin/users")
+      .then((res) => {
+        if (live) setTeam(res.items.filter(canHold));
+      })
+      .catch((err: unknown) => {
+        if (live) setError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+      });
+    return () => {
+      live = false;
+    };
+  }, [mode, team]);
 
   function show(next: boolean) {
     if (mode === "running") return;
@@ -197,7 +247,7 @@ export function BulkActions({
     }
   }
 
-  async function run(action: BulkAction, patch?: BulkPatch) {
+  async function run(action: BulkAction, patch?: BulkPatch, to?: string) {
     const targets = selected.filter(action.applies);
     setMode("running");
     setError(null);
@@ -206,6 +256,7 @@ export function BulkActions({
         ids: targets.map((p) => p.id),
         op: action.op,
         ...(patch ? { patch } : {}),
+        ...(to ? { to } : {}),
         revisions: Object.fromEntries(targets.map((p) => [p.id, p.revision])),
       });
       const title = new Map(targets.map((p) => [p.id, p.title || "Untitled listing"]));
@@ -222,7 +273,7 @@ export function BulkActions({
       if (changed.size > 0) onDone(changed);
     } catch (err) {
       setError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
-      setMode(action.key === "edit" ? "edit" : action.key === "trash" ? "trash" : "menu");
+      setMode(action.key === "edit" || action.key === "trash" || action.key === "reassign" ? action.key : "menu");
     }
   }
 
@@ -236,7 +287,9 @@ export function BulkActions({
       ? summaryOf(outcome)
       : mode === "edit"
         ? "Set city or area"
-        : mode === "trash"
+        : mode === "reassign"
+          ? `Reassign ${plural(reassignable)}`
+          : mode === "trash"
           ? `Move ${plural(trashable)} to the trash?`
           : `${plural(selected.length)} selected`;
 
@@ -248,6 +301,15 @@ export function BulkActions({
         </Button>
         <Button onClick={() => void run(EDIT, editPatch)} disabled={Object.keys(editPatch).length === 0}>
           Apply to {plural(selected.length)}
+        </Button>
+      </div>
+    ) : mode === "reassign" ? (
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" className="ml-auto" onClick={() => setMode("menu")}>
+          Back
+        </Button>
+        <Button onClick={() => void run(REASSIGN, undefined, heir)} disabled={heir === ""}>
+          Reassign {plural(reassignable)}
         </Button>
       </div>
     ) : mode === "trash" ? (
@@ -314,7 +376,7 @@ export function BulkActions({
 
         {mode === "menu" && (
           <div role="group" aria-label="Actions for the selected listings" className="space-y-1">
-            {offered.length === 0 && trashable === 0 && (
+            {offered.length === 0 && trashable === 0 && reassignable === 0 && (
               <p className="py-2 text-[13px] text-slate-600">
                 Nothing can be done to all of these at once. Open a listing to change it on its own.
               </p>
@@ -339,6 +401,18 @@ export function BulkActions({
                 setMode("edit");
               }}
             />
+            {reassignable > 0 && (
+              <ActionRow
+                label={REASSIGN.label}
+                description={REASSIGN.description}
+                count={reassignable}
+                total={selected.length}
+                onClick={() => {
+                  setError(null);
+                  setMode("reassign");
+                }}
+              />
+            )}
             {trashable > 0 && (
               <ActionRow
                 label={TRASH.label}
@@ -378,6 +452,34 @@ export function BulkActions({
                 placeholder="Guzape"
                 onChange={(event) => setArea(event.target.value)}
               />
+            </Field>
+          </div>
+        )}
+
+        {mode === "reassign" && (
+          <div className="space-y-4">
+            <p className="text-[13px] leading-relaxed text-slate-600">
+              They become theirs to edit, and the agent card buyers see on each listing changes to their name,
+              photo, phone and email.
+              {selected.length > reassignable &&
+                ` ${plural(selected.length - reassignable)} in the trash or held by a partner company will be left as they are.`}
+            </p>
+            <Field label="Team member">
+              <select
+                className={inputClass}
+                value={heir}
+                disabled={team === null}
+                onChange={(event) => setHeir(event.target.value)}
+              >
+                <option value="" disabled>
+                  {team === null ? "Loading the team" : "Choose who they go to"}
+                </option>
+                {(team ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.displayName} ({ROLE_INFO[u.role].label}){u.id === user.id ? ", you" : ""}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
         )}
