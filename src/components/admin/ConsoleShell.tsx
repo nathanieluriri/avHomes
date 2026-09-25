@@ -71,6 +71,11 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     session.status === "signed-in" && hasDomain(session.user.role, "marketing"),
     pathname,
   );
+  /* Owner and developer, the roles the Mailboxes row is drawn for. */
+  const mailUnread = useMailUnread(
+    session.status === "signed-in" && hasDomain(session.user.role, "danger"),
+    pathname,
+  );
   const mainRef = useRef<HTMLElement>(null);
   const railRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -298,6 +303,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const badges: Record<string, number> = {
     "/admin/notifications": unread,
     "/admin/marketers/deals": dealsWaiting,
+    "/admin/mail": mailUnread,
   };
 
   const frame = (
@@ -803,6 +809,34 @@ function useDealsWaiting(enabled: boolean, pathname: string): number {
       controller.abort();
       window.clearInterval(timer);
       window.removeEventListener("avhomes:deals-reviewed", load);
+    };
+  }, [enabled, pathname]);
+  return enabled ? count : 0;
+}
+
+/**
+ * Unread mail in the inboxes of every mailbox the key reaches, on the same
+ * schedule as the two counts above. The server caches it for a minute and
+ * answers 0 when mail is not set up, so this never has an error to show.
+ */
+function useMailUnread(enabled: boolean, pathname: string): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    const load = () =>
+      api
+        .get<{ count: number }>("/admin/mail/unread", controller.signal)
+        .then((res) => setCount(res.count))
+        .catch(() => {});
+    void load();
+    const timer = window.setInterval(() => void load(), 60_000);
+    // The mail screen reads, files and marks messages; it announces that so the badge follows.
+    window.addEventListener("avhomes:mail-read", load);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("avhomes:mail-read", load);
     };
   }, [enabled, pathname]);
   return enabled ? count : 0;

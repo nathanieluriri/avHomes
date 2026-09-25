@@ -93,4 +93,33 @@ export interface MailMessagePage {
   page: number;
   totalPages: number;
   total: number;
+  /** A merged or post-filtered list stopped at its scan window, so `total` is a floor. */
+  capped?: boolean;
+}
+
+/**
+ * The list's filters, as query parameters. Hostinger's search ANDs them.
+ *
+ * `to` also matches mail delivered to that address without naming it in To
+ * (Bcc, forwarded aliases), through the `Received: ... for <address>` trace.
+ * `attachment` has no search criterion upstream, so the server filters it over
+ * the newest matches itself.
+ */
+export interface MailListFilters {
+  q?: string;
+  from?: string;
+  to?: string;
+  subject?: string;
+  /** YYYY-MM-DD, inclusive. */
+  since?: string;
+  /** YYYY-MM-DD, exclusive. */
+  before?: string;
+  attachment?: "1";
+}
+
+/** An address on the mailbox's own domain that recent mail was sent to. */
+export interface MailRecipient {
+  address: string;
+  /** How many of the recent inbox messages named it in To or Cc. */
+  count: number;
 }

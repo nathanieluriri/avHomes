@@ -21,8 +21,10 @@ import type {
   MailAttachmentInfo,
   MailFolder,
   MailMessageDetail,
+  MailMessagePage,
   MailMessageSummary,
   MailQuota,
+  MailRecipient,
   MailboxSummary,
 } from "@avhomes/contracts";
 import { requireAdmin } from "@avhomes/identity";
@@ -183,22 +185,189 @@ function safeFilename(name: string): string {
   return cleaned === "" ? "attachment" : cleaned;
 }
 
+/* ─────────────────────────────── listing ─────────────────────────────── */
+
+const PER_PAGE = 25;
+/* How deep a merged or post-filtered list reads before it stops counting. */
+const SCAN_PAGES = 3;
+const SCAN_PER_PAGE = 100;
+
+type Criteria = Record<string, string | string[]>;
+
+function criteriaOf(f: ListFilters, flagged: boolean): Criteria {
+  const out: Criteria = {};
+  if (f.q) out.text = f.q;
+  if (f.from) out.from = f.from;
+  if (f.subject) out.subject = f.subject;
+  if (f.since) out.since = f.since;
+  if (f.before) out.before = f.before;
+  if (flagged) out.flags = ["\\Flagged"];
+  return out;
+}
+
+/*
+ * Hostinger rewrites Delivered-To to the mailbox itself, so an alias, a Bcc or a
+ * forward survives only in To and in the `Received: ... for <alias>` trace. Two
+ * searches, merged by uid, because IMAP search has no OR here.
+ */
+function variantsOf(f: ListFilters, flagged: boolean): Criteria[] {
+  const base = criteriaOf(f, flagged);
+  if (!f.to) return [base];
+  return [
+    { ...base, to: f.to },
+    { ...base, header: `Received:${f.to}` },
+  ];
+}
+
+function hasFiles(m: MailMessageSummary): boolean {
+  return m.attachments.some((a) => !a.inline);
+}
+
+async function scan(
+  key: string,
+  folderBase: string,
+  criteria: Criteria,
+): Promise<{ items: RawMessage[]; more: boolean }> {
+  const items: RawMessage[] = [];
+  const empty = Object.keys(criteria).length === 0;
+  for (let page = 1; page <= SCAN_PAGES; page += 1) {
+    const query = { page, perPage: SCAN_PER_PAGE, sort: "-date" };
+    const result = empty
+      ? await hostingerPage<RawMessage>(key, `${folderBase}/messages`, query)
+      : await hostingerPage<RawMessage>(key, `${folderBase}/messages/search`, query, {
+          method: "POST",
+          body: criteria,
+        });
+    items.push(...result.data);
+    if (result.page >= result.totalPages) return { items, more: false };
+  }
+  return { items, more: true };
+}
+
+/**
+ * One page of messages across one or more folders.
+ *
+ * The plain case (one folder, one search, no attachment filter) is Hostinger's
+ * own paging. Anything that merges or filters on our side reads the newest
+ * SCAN_PAGES * SCAN_PER_PAGE matches per search and pages over those.
+ */
+async function listMessages(
+  key: string,
+  mailbox: string,
+  folders: string[],
+  f: ListFilters,
+  flagged = false,
+): Promise<MailMessagePage> {
+  const page = f.page ?? 1;
+  const variants = variantsOf(f, flagged);
+  const folderBase = (path: string) => `/mailboxes/${enc(mailbox)}/folders/${enc(path)}`;
+
+  if (folders.length === 1 && variants.length === 1 && !f.attachment) {
+    const criteria = variants[0];
+    const query = { page, perPage: PER_PAGE, sort: "-date" };
+    const result =
+      Object.keys(criteria).length === 0
+        ? await hostingerPage<RawMessage>(key, `${folderBase(folders[0])}/messages`, query)
+        : await hostingerPage<RawMessage>(key, `${folderBase(folders[0])}/messages/search`, query, {
+            method: "POST",
+            body: criteria,
+          });
+    return { items: result.data.map(summary), page: result.page, totalPages: result.totalPages, total: result.total };
+  }
+
+  const runs = await Promise.all(
+    folders.flatMap((path) => variants.map((criteria) => scan(key, folderBase(path), criteria))),
+  );
+  const seen = new Map<string, MailMessageSummary>();
+  for (const run of runs) {
+    for (const raw of run.items) {
+      const m = summary(raw);
+      seen.set(`${m.folder}\u0001${m.uid}`, m);
+    }
+  }
+  let all = [...seen.values()];
+  if (f.attachment) all = all.filter(hasFiles);
+  all.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  const totalPages = Math.max(1, Math.ceil(all.length / PER_PAGE));
+  return {
+    items: all.slice((page - 1) * PER_PAGE, page * PER_PAGE),
+    page,
+    totalPages,
+    total: all.length,
+    capped: runs.some((run) => run.more),
+  };
+}
+
+/* ─────────────────────────────── unread ──────────────────────────────── */
+
+/*
+ * The rail polls this for every owner and developer once a minute, so it is
+ * cached for as long. Anything here that changes a flag or moves mail forgets
+ * it, so the badge follows a read on this instance at once.
+ */
+const UNREAD_TTL_MS = 60_000;
+let unreadCache: { key: string; at: number; value: Promise<number> } | null = null;
+
+function forgetUnread(): void {
+  unreadCache = null;
+}
+
+async function countUnread(key: string): Promise<number> {
+  const account = await hostingerAccount(key);
+  const counts = await Promise.all(
+    account.mailboxes.map(async (m) => {
+      const page = await hostingerPage<RawFolder>(key, `/mailboxes/${enc(m.resourceId)}/folders`, { perPage: 100 });
+      const inbox = page.data.find((f) => f.specialUse === "\\Inbox" || f.path === "INBOX");
+      return inbox?.unreadCount ?? 0;
+    }),
+  );
+  return counts.reduce((sum, n) => sum + n, 0);
+}
+
+function cachedUnread(key: string): Promise<number> {
+  const now = Date.now();
+  if (unreadCache && unreadCache.key === key && now - unreadCache.at < UNREAD_TTL_MS) return unreadCache.value;
+  const value = countUnread(key).catch(() => {
+    // A failed read is not cached, so the next poll tries again.
+    unreadCache = null;
+    return 0;
+  });
+  unreadCache = { key, at: now, value };
+  return value;
+}
+
 /* ─────────────────────────────── bodies ──────────────────────────────── */
 
 const FolderName = z.object({ name: str().trim().min(1).max(100) }).strict();
+
+const day = () => str().regex(/^\d{4}-\d{2}-\d{2}$/u, "date");
 
 const ListQuery = z
   .object({
     page: z.coerce.number().int().min(1).max(10_000).optional(),
     q: str().trim().max(200).optional(),
+    from: str().trim().max(320).optional(),
+    to: str().trim().max(320).optional(),
+    subject: str().trim().max(200).optional(),
+    since: day().optional(),
+    before: day().optional(),
+    attachment: z.literal("1").optional(),
   })
   .strict();
+
+type ListFilters = z.infer<typeof ListQuery>;
 
 const FlagsBody = z
   .object({ read: z.boolean().optional(), flagged: z.boolean().optional() })
   .strict();
 
 const MoveBody = z.object({ targetFolder: str().trim().min(1).max(200) }).strict();
+
+const Uids = z.array(z.number().int().min(1)).min(1).max(100);
+
+const BulkFlagsBody = FlagsBody.extend({ uids: Uids }).strict();
+
+const BulkMoveBody = MoveBody.extend({ uids: Uids }).strict();
 
 const SourceRef = z.object({ uid: z.number().int().min(1), folder: str().min(1).max(200) }).strict();
 
@@ -272,30 +441,97 @@ export function mailboxRoutes(): Hono<AppEnv> {
     return c.json({ ok: true });
   });
 
+  /* Quiet by design: the rail asks on every screen, and a badge is never worth an error. */
+  routes.get("/admin/mail/unread", requireAdmin(), async (c) => {
+    try {
+      const key = await hostingerKey(await currentDb(c));
+      return c.json({ count: key ? await cachedUnread(key) : 0 });
+    } catch {
+      return c.json({ count: 0 });
+    }
+  });
+
+  /*
+   * The addresses on this mailbox's own domain that recent inbox mail was sent
+   * to. Hostinger has no alias listing, so this is how the "Sent to" filter
+   * learns that arc_athanasius@ exists.
+   */
+  routes.get("/admin/mail/mailboxes/:mailbox/recipients", requireAdmin(), async (c) => {
+    const key = await keyFor(c);
+    const id = pathParam(c, "mailbox");
+    const account = await call(() => hostingerAccount(key), "account");
+    const own = account.mailboxes.find((m) => m.resourceId === id);
+    if (!own) throw new NotFoundError("mailbox");
+    const domain = own.address.split("@")[1]?.toLowerCase() ?? "";
+    const recent = await call(
+      () => hostingerPage<RawMessage>(key, `${base(c)}/folders/INBOX/messages`, { perPage: 100, sort: "-date" }),
+      "mailbox",
+    );
+    const counts = new Map<string, number>([[own.address.toLowerCase(), 0]]);
+    for (const m of recent.data) {
+      const named = new Set(addresses([...(m.to ?? []), ...(m.cc ?? [])]).map((a) => a.address.toLowerCase()));
+      for (const a of named) {
+        if (a.endsWith(`@${domain}`)) counts.set(a, (counts.get(a) ?? 0) + 1);
+      }
+    }
+    const recipients: MailRecipient[] = [...counts]
+      .map(([address, count]) => ({ address, count }))
+      .sort((a, b) => b.count - a.count || a.address.localeCompare(b.address));
+    return c.json({ recipients });
+  });
+
+  /* Flagged mail from every folder but Trash and Junk, newest first. */
+  routes.get("/admin/mail/mailboxes/:mailbox/starred", requireAdmin(), async (c) => {
+    const key = await keyFor(c);
+    const filters = readQuery(c, ListQuery);
+    const folders = await call(() => hostingerPage<RawFolder>(key, `${base(c)}/folders`, { perPage: 100 }), "mailbox");
+    const paths = folders.data
+      .filter((f) => f.specialUse !== "\\Trash" && f.specialUse !== "\\Junk")
+      .map((f) => f.path);
+    return c.json(await call(() => listMessages(key, pathParam(c, "mailbox"), paths, filters, true), "mailbox"));
+  });
+
   routes.get("/admin/mail/mailboxes/:mailbox/folders/:folder/messages", requireAdmin(), async (c) => {
     const key = await keyFor(c);
-    const { page = 1, q } = readQuery(c, ListQuery);
-    const query = { page, perPage: 25, sort: "-date" };
+    const filters = readQuery(c, ListQuery);
+    return c.json(
+      await call(() => listMessages(key, pathParam(c, "mailbox"), [pathParam(c, "folder")], filters), "folder"),
+    );
+  });
+
+  routes.post("/admin/mail/mailboxes/:mailbox/folders/:folder/messages/flags", requireAdmin(), async (c) => {
+    const key = await keyFor(c);
+    const { uids, read, flagged } = await readJson(c, BulkFlagsBody);
+    const addFlags: string[] = [];
+    const removeFlags: string[] = [];
+    if (read !== undefined) (read ? addFlags : removeFlags).push("\\Seen");
+    if (flagged !== undefined) (flagged ? addFlags : removeFlags).push("\\Flagged");
+    if (addFlags.length + removeFlags.length === 0) throw new BadRequestError("Nothing to change.");
     const result = await call(
       () =>
-        q
-          ? hostingerPage<RawMessage>(key, `${inFolder(c)}/messages/search`, query, {
-              method: "POST",
-              body: { text: q },
-            })
-          : hostingerPage<RawMessage>(key, `${inFolder(c)}/messages`, query),
+        hostingerRequest<{ successful?: number[]; failed?: { uid: number; reason: string }[] }>(
+          key,
+          "POST",
+          `${inFolder(c)}/messages/flags`,
+          { body: { uids, ...(addFlags.length ? { addFlags } : {}), ...(removeFlags.length ? { removeFlags } : {}) } },
+        ),
       "folder",
     );
-    return c.json({
-      items: result.data.map(summary),
-      page: result.page,
-      totalPages: result.totalPages,
-      total: result.total,
-    });
+    forgetUnread();
+    return c.json({ successful: result?.successful ?? uids, failed: result?.failed ?? [] });
+  });
+
+  routes.post("/admin/mail/mailboxes/:mailbox/folders/:folder/messages/move", requireAdmin(), async (c) => {
+    const key = await keyFor(c);
+    const body = await readJson(c, BulkMoveBody);
+    await call(() => hostingerRequest(key, "POST", `${inFolder(c)}/messages/move`, { body }), "folder");
+    forgetUnread();
+    return c.json({ ok: true });
   });
 
   /* Reading the body marks the message seen, the same as opening it in webmail. */
   routes.get("/admin/mail/mailboxes/:mailbox/folders/:folder/messages/:uid", requireAdmin(), async (c) => {
+    forgetUnread();
     const key = await keyFor(c);
     const path = `${inFolder(c)}/messages/${uidOf(c)}`;
     const [meta, body] = await call(
@@ -331,6 +567,7 @@ export function mailboxRoutes(): Hono<AppEnv> {
         }),
       "message",
     );
+    forgetUnread();
     return c.json({ message: updated ? summary(updated) : null });
   });
 
@@ -341,6 +578,7 @@ export function mailboxRoutes(): Hono<AppEnv> {
       () => hostingerRequest(key, "POST", `${inFolder(c)}/messages/${uidOf(c)}/move`, { body }),
       "message",
     );
+    forgetUnread();
     return c.json({ ok: true });
   });
 
@@ -348,6 +586,7 @@ export function mailboxRoutes(): Hono<AppEnv> {
   routes.delete("/admin/mail/mailboxes/:mailbox/folders/:folder/messages/:uid", requireAdmin(), async (c) => {
     const key = await keyFor(c);
     await call(() => hostingerRequest(key, "DELETE", `${inFolder(c)}/messages/${uidOf(c)}`), "message");
+    forgetUnread();
     return c.json({ ok: true });
   });
 

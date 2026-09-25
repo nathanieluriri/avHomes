@@ -172,6 +172,7 @@ export function ResponsiveMenu({
   title,
   items,
   align = "end",
+  widthClassName = "w-60",
   contentClassName = "",
 }: {
   trigger: ReactNode;
@@ -180,6 +181,8 @@ export function ResponsiveMenu({
   title: string;
   items: (kind: "menu" | "sheet") => ReactNode;
   align?: "start" | "center" | "end";
+  /** REPLACES the dropdown's width, for the reason `BottomSheet` gives. */
+  widthClassName?: string;
   contentClassName?: string;
 }) {
   return (
@@ -191,7 +194,7 @@ export function ResponsiveMenu({
             <DropdownMenu.Content
               sideOffset={8}
               align={align}
-              className={`console-float z-[72] w-60 overflow-hidden rounded-xl border border-mist-200 bg-white p-1.5 shadow-pop ${contentClassName}`}
+              className={`console-float z-[72] ${widthClassName} overflow-hidden rounded-xl border border-mist-200 bg-white p-1.5 shadow-pop ${contentClassName}`}
             >
               {items("menu")}
             </DropdownMenu.Content>
