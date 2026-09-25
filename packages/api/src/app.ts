@@ -52,6 +52,7 @@ import {
   emailTemplateRoutes,
   mailSettingsRoutes,
   mailboxRoutes,
+  mailStateRoutes,
   settingsPublicRoutes,
   settingsRoutes,
 } from "@avhomes/settings";
@@ -446,6 +447,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
      both fall to the gate's `danger` catch-all, and each route repeats it. */
   app.route(API_PREFIX, mailSettingsRoutes({ mailer }));
   app.route(API_PREFIX, mailboxRoutes());
+  app.route(API_PREFIX, mailStateRoutes());
   app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin, notify }));
   app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
   /* The marketer app first, then the console's side of the same feature. The

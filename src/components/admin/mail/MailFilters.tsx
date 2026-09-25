@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Popover } from "radix-ui";
-import { AtSign, Check, ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
+import { AtSign, Check, ChevronDown, History, Search, SlidersHorizontal, X } from "lucide-react";
 import type { MailListFilters, MailRecipient } from "@avhomes/contracts";
 import { BottomSheet } from "@/components/admin/BottomSheet";
 import { Button, Field, inputClass } from "@/components/admin/ui";
@@ -338,11 +338,14 @@ export function FilterChips({
   senders,
   recipients,
   recipientsLoading,
+  recentTo = [],
   onChange,
   onClear,
   phone = false,
 }: {
   phone?: boolean;
+  /** Addresses this member filtered by lately, offered first. */
+  recentTo?: string[];
   filters: MailListFilters;
   preset: string | null;
   senders: string[];
@@ -355,6 +358,12 @@ export function FilterChips({
   const dated = Boolean(f.since || f.before);
   const row = useRef<HTMLDivElement>(null);
   const applied = [f.from, f.to, f.since, f.before, f.attachment].join("|");
+  const counts = new Map(recipients.map((r) => [r.address, r.count]));
+  const recent = new Set(recentTo);
+  const choices = [
+    ...recentTo.map((address) => ({ address, count: counts.get(address) ?? 0 })),
+    ...recipients.filter((r) => !recent.has(r.address)),
+  ];
 
   // A narrow row scrolls; bring a chip that was just applied into view so its value shows.
   useEffect(() => {
@@ -486,10 +495,10 @@ export function FilterChips({
               Mail addressed to one address, including Bcc and alias deliveries.
             </p>
             <div className={phone ? "" : "max-h-56 overflow-y-auto"}>
-              {recipientsLoading && recipients.length === 0 ? (
+              {recipientsLoading && choices.length === 0 ? (
                 <p className="px-2.5 py-2 text-[12.5px] text-slate-550">Reading recent mail</p>
               ) : (
-                recipients.map((r) => (
+                choices.map((r) => (
                   <Option
                     key={r.address}
                     on={f.to === r.address}
@@ -499,7 +508,11 @@ export function FilterChips({
                     }}
                   >
                     <span className="flex items-center gap-2">
-                      <AtSign className="h-3.5 w-3.5 shrink-0 text-slate-550" aria-hidden="true" />
+                      {recent.has(r.address) ? (
+                        <History className="h-3.5 w-3.5 shrink-0 text-slate-550" aria-label="Used lately" />
+                      ) : (
+                        <AtSign className="h-3.5 w-3.5 shrink-0 text-slate-550" aria-hidden="true" />
+                      )}
                       <span className="min-w-0 flex-1 truncate">{r.address}</span>
                       {r.count > 0 && <span className="shrink-0 text-[11.5px] font-normal text-slate-550">{r.count}</span>}
                     </span>
@@ -510,7 +523,7 @@ export function FilterChips({
             <TextApply
               label="Any address"
               focus={!phone}
-              initial={f.to && !recipients.some((r) => r.address === f.to) ? f.to : ""}
+              initial={f.to && !choices.some((r) => r.address === f.to) ? f.to : ""}
               placeholder="Another address"
               onApply={(value) => {
                 onChange({ ...f, to: value || undefined });

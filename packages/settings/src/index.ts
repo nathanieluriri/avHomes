@@ -8,6 +8,7 @@ export {
 } from "./settings";
 export { appMailer, forgetMailSender, mailSettingsRoutes, readMailSettings } from "./mail";
 export { mailboxRoutes } from "./mailbox";
+export { mailStateRoutes } from "./mail-state";
 export {
   conversationHtml,
   conversationText,

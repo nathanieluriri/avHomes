@@ -55,6 +55,8 @@ export const ID_PREFIXES = {
   /* A company's id is DERIVED from its application's where it has one, so an
      approval retried after a failure finds the company it already made. */
   partner: "ptnr",
+  /* Minted in the browser, so a draft has its id before its first save. */
+  mailDraft: "mdrf",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

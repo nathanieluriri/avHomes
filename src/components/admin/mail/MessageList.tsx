@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   FolderInput,
   Inbox,
+  Keyboard,
   Mail,
   MailOpen,
   MoreVertical,
@@ -15,9 +17,9 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import type { MailFolder, MailMessagePage, MailMessageSummary } from "@avhomes/contracts";
+import type { MailDensity, MailFolder, MailMessagePage, MailMessageSummary } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { ResponsiveMenu } from "@/components/admin/BottomSheet";
+import { BottomSheet, ResponsiveMenu } from "@/components/admin/BottomSheet";
 import { EmptyState, ErrorNote, Skeleton } from "@/components/admin/ui";
 import { PhoneRow, SelectionBar } from "./PhoneList";
 import {
@@ -91,6 +93,9 @@ export function MessageList({
   lead,
   label,
   onScrollDown,
+  density = "comfortable",
+  onDensity,
+  keys = false,
 }: {
   /** "phone" draws Gmail's app list: avatars, long-press selection, a toolbar over the search bar. */
   variant?: "desk" | "phone";
@@ -111,11 +116,17 @@ export function MessageList({
   label?: string;
   /** Phone only: told which way the list last scrolled, for the compose button. */
   onScrollDown?: (down: boolean) => void;
+  density?: MailDensity;
+  onDensity?: (next: MailDensity) => void;
+  /** Desk only: j, k, o, x, s, # and friends act on the list. */
+  keys?: boolean;
 }) {
   const data = state.data;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [patches, setPatches] = useState<Map<string, Patch>>(new Map());
   const lastTop = useRef(0);
+  const [cursor, setCursor] = useState(-1);
+  const [help, setHelp] = useState(false);
 
   /* Local edits give way to whatever the server says next. The parent keys this
      component by folder, filters and page, so the ticks reset with the list. */
@@ -123,6 +134,7 @@ export function MessageList({
   if (seenData !== data) {
     setSeenData(data);
     setPatches(new Map());
+    setCursor(-1);
   }
 
   const actions = useMailActions(mailbox, onChanged);
@@ -166,6 +178,71 @@ export function MessageList({
       return next;
     });
   }
+
+  /* Gmail's keys. Read through refs, so the listener is bound once and always sees this render. */
+  const keyState = useRef({ items, cursor, selected, trash, inTrash });
+  const keyActions = useRef({ onOpen, toggle, setStar, setRead, moveTo });
+  useEffect(() => {
+    keyState.current = { items, cursor, selected, trash, inTrash };
+    keyActions.current = { onOpen, toggle, setStar, setRead, moveTo };
+  });
+  useEffect(() => {
+    if (!keys) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=menu]")) return;
+      const { items: list, cursor: at, selected: sel, trash: bin, inTrash: binned } = keyState.current;
+      const act = keyActions.current;
+      const current = list[at] ?? null;
+      const move = (to: number) => {
+        const next = Math.max(0, Math.min(list.length - 1, to));
+        setCursor(next);
+        document.querySelector(`[data-row="${next}"]`)?.scrollIntoView({ block: "nearest" });
+      };
+      switch (event.key) {
+        case "j":
+          move(at + 1);
+          break;
+        case "k":
+          move(at < 0 ? 0 : at - 1);
+          break;
+        case "o":
+        case "Enter":
+          if (!current) return;
+          act.onOpen(current);
+          break;
+        case "x":
+          if (!current) return;
+          act.toggle(current, !sel.has(keyOf(current)));
+          break;
+        case "s":
+          if (!current) return;
+          void act.setStar([current], !current.flagged);
+          break;
+        case "#":
+          if (!current || !bin || binned) return;
+          void act.moveTo([current], bin.path);
+          break;
+        case "I":
+          if (!current) return;
+          void act.setRead([current], true);
+          break;
+        case "U":
+          if (!current) return;
+          void act.setRead([current], false);
+          break;
+        case "?":
+          setHelp(true);
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [keys]);
 
   const allOn = items.length > 0 && picked.length === items.length;
   const someOn = picked.length > 0 && !allOn;
@@ -231,6 +308,19 @@ export function MessageList({
               Rename or delete folder
             </MenuRow>
           )}
+          {!touch && onDensity && (
+            <>
+              <MenuSeparator kind={kind} />
+              <MenuRow kind={kind} onSelect={() => onDensity(density === "compact" ? "comfortable" : "compact")}>
+                <Check className={`h-4 w-4 ${density === "compact" ? "text-wine-600" : "text-transparent"}`} aria-hidden="true" />
+                Compact rows
+              </MenuRow>
+              <MenuRow kind={kind} onSelect={() => setHelp(true)}>
+                <Keyboard className="h-4 w-4 text-slate-550" aria-hidden="true" />
+                Keyboard shortcuts
+              </MenuRow>
+            </>
+          )}
         </>
       )}
     />
@@ -251,24 +341,86 @@ export function MessageList({
     </>
   );
 
-  const loadingRows = (height: string) => (
-    <div aria-busy="true" className="space-y-px p-2">
+  // The row's own shape, so nothing jumps when the mail lands.
+  const loadingRows = (phone: boolean) => (
+    <div aria-busy="true">
       <span className="sr-only">Loading messages</span>
-      {Array.from({ length: 8 }, (_, i) => (
-        <Skeleton key={i} className={`${height} rounded-md`} />
-      ))}
+      {Array.from({ length: 10 }, (_, i) =>
+        phone ? (
+          <div key={i} className="flex items-start gap-3 px-3 py-3">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+              <Skeleton className="h-3.5 w-2/5" />
+              <Skeleton className="h-3 w-4/5" />
+              <Skeleton className="h-3 w-3/5" />
+            </div>
+          </div>
+        ) : (
+          <div key={i} className="flex h-11 items-center gap-3 border-b border-mist-100 px-4">
+            <Skeleton className="h-4 w-4 shrink-0 rounded" />
+            <Skeleton className="h-4 w-4 shrink-0 rounded" />
+            <Skeleton className="h-3.5 w-40 shrink-0 xl:w-52" />
+            <Skeleton className="h-3.5 flex-1" style={{ maxWidth: `${55 + ((i * 17) % 35)}%` }} />
+            <Skeleton className="ml-auto h-3 w-12 shrink-0" />
+          </div>
+        ),
+      )}
     </div>
   );
 
+  const inbox = folderPath === "INBOX" || folders.find((f) => f.path === folderPath)?.specialUse === "\\Inbox";
   const empty = (
     <EmptyState
       bare
       icon={folderPath === STARRED ? Star : Inbox}
       title={
-        filtered ? "No messages match these filters" : folderPath === STARRED ? "No starred messages" : "Nothing in this folder"
+        filtered
+          ? "No messages match these filters"
+          : folderPath === STARRED
+            ? "No starred messages"
+            : inbox
+              ? "Your inbox is empty"
+              : "Nothing in this folder"
       }
-      hint={filtered ? "Change or clear a filter above." : undefined}
+      hint={
+        filtered
+          ? "Change or clear a filter above."
+          : folderPath === STARRED
+            ? "Star a message to keep it here, whichever folder it is in."
+            : inbox
+              ? "New mail shows up here as it arrives."
+              : undefined
+      }
     />
+  );
+
+  const shortcutHelp = (
+    <BottomSheet open={help} onOpenChange={setHelp} title="Keyboard shortcuts">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-2 text-[13px]">
+        {[
+          ["j / k", "Next or previous message"],
+          ["o or Enter", "Open"],
+          ["x", "Select"],
+          ["s", "Star or remove star"],
+          ["#", "Move to trash"],
+          ["Shift + I / Shift + U", "Mark as read or unread"],
+          ["c", "Compose"],
+          ["/", "Search"],
+          ["u or Esc", "Back to the list"],
+          ["Ctrl + Enter", "Send, in a compose window"],
+          ["Esc", "Minimise a compose window"],
+        ].map(([k, what]) => (
+          <div key={k} className="contents">
+            <dt>
+              <kbd className="rounded-md border border-mist-200 bg-mist-50 px-1.5 py-0.5 font-sans text-[12px] font-semibold text-plum-950">
+                {k}
+              </kbd>
+            </dt>
+            <dd className="text-plum-950">{what}</dd>
+          </div>
+        ))}
+      </dl>
+    </BottomSheet>
   );
 
   if (variant === "phone") {
@@ -296,7 +448,7 @@ export function MessageList({
           </div>
           {notes}
           {!data && state.loading ? (
-            loadingRows("h-16")
+            loadingRows(true)
           ) : data && items.length === 0 ? (
             empty
           ) : (
@@ -368,14 +520,17 @@ export function MessageList({
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {notes}
         {!data && state.loading ? (
-          loadingRows("h-11")
+          loadingRows(false)
         ) : data && items.length === 0 ? (
           empty
         ) : (
           <ul className={`transition-opacity ${state.loading ? "opacity-60" : ""}`}>
-            {items.map((m) => (
+            {items.map((m, i) => (
               <MessageRow
                 key={keyOf(m)}
+                index={i}
+                cursor={i === cursor}
+                compact={density === "compact"}
                 message={m}
                 folders={folders}
                 showFolder={folderPath === STARRED}
@@ -384,7 +539,10 @@ export function MessageList({
                 trashPath={trash?.path ?? null}
                 busy={actions.busy}
                 onSelect={(on) => toggle(m, on)}
-                onOpen={() => onOpen(m)}
+                onOpen={() => {
+                  setCursor(i);
+                  onOpen(m);
+                }}
                 onStar={() => void setStar([m], !m.flagged)}
                 onRead={(read) => void setRead([m], read)}
                 onMove={(path) => void moveTo([m], path)}
@@ -393,6 +551,7 @@ export function MessageList({
           </ul>
         )}
       </div>
+      {shortcutHelp}
     </div>
   );
 }
@@ -458,6 +617,9 @@ function SelectAll({
 }
 
 function MessageRow({
+  index,
+  cursor,
+  compact,
   message: m,
   folders,
   showFolder,
@@ -471,6 +633,10 @@ function MessageRow({
   onRead,
   onMove,
 }: {
+  index: number;
+  /** The keyboard's place in the list. */
+  cursor: boolean;
+  compact: boolean;
   message: MailMessageSummary;
   folders: MailFolder[];
   showFolder: boolean;
@@ -491,7 +657,10 @@ function MessageRow({
 
   return (
     <li
-      className={`group relative flex items-center border-b border-mist-100 pl-1.5 pr-2 transition-colors last:border-b-0 hover:z-[1] hover:shadow-card sm:pl-2.5 sm:pr-3 ${tint}`}
+      data-row={index}
+      className={`group relative flex items-center border-b border-mist-100 pl-1.5 pr-2 transition-colors last:border-b-0 hover:z-[1] hover:shadow-card sm:pl-2.5 sm:pr-3 ${tint} ${
+        cursor ? "shadow-[inset_3px_0_0_var(--wine-600)]" : ""
+      }`}
     >
       <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center sm:min-h-8 sm:min-w-8">
         <input
@@ -515,7 +684,11 @@ function MessageRow({
         />
       </button>
 
-      <button type="button" onClick={onOpen} className="flex min-h-10 min-w-0 flex-1 items-center gap-3 py-2 pl-1 text-left xl:gap-4">
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`flex min-w-0 flex-1 items-center gap-3 pl-1 text-left xl:gap-4 ${compact ? "min-h-8 py-1" : "min-h-10 py-2"}`}
+      >
         <span className={`w-44 shrink-0 truncate text-[13px] xl:w-56 ${weight}`}>{who(m)}</span>
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           {showFolder && home && (

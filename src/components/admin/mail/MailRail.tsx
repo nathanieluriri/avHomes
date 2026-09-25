@@ -5,7 +5,7 @@ import { Pencil, Plus } from "lucide-react";
 import type { MailFolder } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { Button, ErrorNote, IconButton, Skeleton, inputClass } from "@/components/admin/ui";
-import { STARRED, asApiError, enc, folderIcon, folderLabel, isSpecial } from "./shared";
+import { DRAFTS, STARRED, asApiError, enc, folderIcon, folderLabel, isSpecial } from "./shared";
 
 /**
  * The mail page's own rail: Compose, the system folders, then the ones
@@ -22,8 +22,11 @@ export function MailRail({
   onCompose,
   onChanged,
   showCompose = true,
+  draftCount,
 }: {
   showCompose?: boolean;
+  /** The "Your drafts" count. */
+  draftCount: number;
   mailbox: string;
   folders: MailFolder[];
   loading: boolean;
@@ -41,9 +44,9 @@ export function MailRail({
   const system = folders.filter(isSpecial);
   const custom = folders.filter((f) => !isSpecial(f));
   const inboxAt = system.findIndex((f) => f.specialUse === "\\Inbox" || f.path === "INBOX");
-  // Starred sits under Inbox, as it does in Gmail.
-  const rows: (MailFolder | null)[] = [...system];
-  rows.splice(inboxAt + 1, 0, null);
+  // Starred sits under Inbox, as it does in Gmail, and this member's own drafts under that.
+  const rows: (MailFolder | string)[] = [...system];
+  rows.splice(inboxAt + 1, 0, STARRED, DRAFTS);
 
   async function create() {
     setBusy(true);
@@ -60,17 +63,21 @@ export function MailRail({
     }
   }
 
-  function row(f: MailFolder | null) {
-    const path = f?.path ?? STARRED;
+  function row(entry: MailFolder | string) {
+    const f = typeof entry === "string" ? null : entry;
+    const path = typeof entry === "string" ? entry : entry.path;
     const Icon = folderIcon(f, path);
     const here = path === current;
     // Drafts counts what is there; everything else counts what is unread. Sent and Trash count nothing.
+    const quiet = path === DRAFTS || f?.specialUse === "\\Drafts";
     const count =
-      f === null || f.specialUse === "\\Sent" || f.specialUse === "\\Trash"
-        ? 0
-        : f.specialUse === "\\Drafts"
-          ? f.messageCount
-          : f.unreadCount;
+      path === DRAFTS
+        ? draftCount
+        : f === null || f.specialUse === "\\Sent" || f.specialUse === "\\Trash"
+          ? 0
+          : f.specialUse === "\\Drafts"
+            ? f.messageCount
+            : f.unreadCount;
     return (
       <li key={path}>
         <button
@@ -83,8 +90,8 @@ export function MailRail({
           <span className="min-w-0 flex-1 truncate">{folderLabel(f, path)}</span>
           {count > 0 && (
             <span
-              className={`shrink-0 text-[12px] tabular-nums ${f?.specialUse === "\\Drafts" ? "font-medium text-slate-600" : "font-bold text-plum-950"}`}
-              aria-label={f?.specialUse === "\\Drafts" ? `${count} drafts` : `${count} unread`}
+              className={`shrink-0 text-[12px] tabular-nums ${quiet ? "font-medium text-slate-600" : "font-bold text-plum-950"}`}
+              aria-label={quiet ? `${count} drafts` : `${count} unread`}
             >
               {count > 999 ? "999+" : count}
             </span>

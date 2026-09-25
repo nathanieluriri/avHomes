@@ -17,6 +17,7 @@ import {
   type AppEnv,
   type Mailer,
 } from "@avhomes/core";
+import { SIGN_IN_CODE_SUBJECT } from "@avhomes/contracts";
 import type { Db } from "@avhomes/db";
 import { admit, completeOwnerInvite, ownerInviteStands, refusalBody, type Identity } from "../admit";
 import { activeDoor } from "../door";
@@ -225,7 +226,8 @@ export function passwordRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
         deps.mailer,
         {
           to: invite.email,
-          subject: "Your AVHomes sign-in code",
+          // The mail console hides this subject from everyone but the owner; keep it on the constant.
+          subject: SIGN_IN_CODE_SUBJECT,
           text: [
             `Your code is ${code}.`,
             "",

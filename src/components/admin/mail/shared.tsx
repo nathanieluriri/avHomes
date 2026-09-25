@@ -8,12 +8,13 @@ import {
   FolderInput,
   Inbox,
   OctagonAlert,
+  PenLine,
   Send,
   Star,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import type { MailFolder, MailListFilters, MailMessageDetail, MailMessageSummary } from "@avhomes/contracts";
+import type { MailDraft, MailFolder, MailListFilters, MailMessageDetail, MailMessageSummary } from "@avhomes/contracts";
 import { ApiError } from "@/lib/admin/client";
 import { ResponsiveMenu } from "@/components/admin/BottomSheet";
 import { dateTime, shortDate } from "@/lib/admin/format";
@@ -92,6 +93,7 @@ export function isSpecial(f: MailFolder): boolean {
 
 export function folderLabel(f: MailFolder | null, path: string): string {
   if (path === STARRED) return "Starred";
+  if (path === DRAFTS) return "Your drafts";
   if (!f) return path;
   if (f.specialUse === "\\Inbox" || f.path === "INBOX") return "Inbox";
   return f.name;
@@ -99,6 +101,7 @@ export function folderLabel(f: MailFolder | null, path: string): string {
 
 export function folderIcon(f: MailFolder | null, path: string): LucideIcon {
   if (path === STARRED) return Star;
+  if (path === DRAFTS) return PenLine;
   switch (f?.specialUse) {
     case "\\Inbox":
       return Inbox;
@@ -143,23 +146,104 @@ export function daysAgo(days: number): string {
 
 /* ─────────────────────────────── drafts ──────────────────────────────── */
 
-export interface Draft {
-  to: string;
-  cc: string;
-  bcc: string;
-  subject: string;
-  text: string;
-  inReplyTo?: { uid: number; folder: string };
-  forwardOf?: { uid: number; folder: string };
+/** A draft as the composer edits it. `revision` 0 means the server has never seen it. */
+export type Draft = Omit<MailDraft, "createdAt">;
+
+/** The virtual folder: this member's own unsent drafts, kept by the console. */
+export const DRAFTS = "*drafts";
+
+const ID_CHARS = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+export function newDraftId(): string {
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  return `mdrf_${[...bytes].map((b) => ID_CHARS[b % 32]).join("")}`;
 }
 
-export const EMPTY_DRAFT: Draft = { to: "", cc: "", bcc: "", subject: "", text: "" };
+export function blankDraft(mailbox: string, extra: Partial<Draft> = {}): Draft {
+  return {
+    id: newDraftId(),
+    mailbox,
+    to: [],
+    cc: [],
+    bcc: [],
+    subject: "",
+    text: "",
+    html: "",
+    mode: "text",
+    inReplyTo: null,
+    forwardOf: null,
+    revision: 0,
+    updatedAt: Date.now(),
+    ...extra,
+  };
+}
 
-export function splitAddresses(value: string): string[] {
+export function draftIsEmpty(d: Draft): boolean {
+  return (
+    d.to.length + d.cc.length + d.bcc.length === 0 &&
+    d.subject.trim() === "" &&
+    d.text.trim() === "" &&
+    d.html.trim() === ""
+  );
+}
+
+export function draftTitle(d: Draft): string {
+  if (d.subject.trim() !== "") return d.subject;
+  return d.inReplyTo ? "Reply" : d.forwardOf ? "Forward" : "New message";
+}
+
+const EMAIL = /^[^\s@<>(),;:"]+@[^\s@.<>(),;:"]+(?:\.[^\s@.<>(),;:"]+)+$/u;
+
+export function isEmail(value: string): boolean {
+  return value.length <= 320 && EMAIL.test(value);
+}
+
+/** "Ada <ada@x.com>", "ada@x.com; bo@y.com" or one per line, as bare addresses. */
+export function parseAddresses(value: string): string[] {
   return value
-    .split(/[,;\s]+/u)
-    .map((part) => part.trim())
+    .split(/[,;\n\r]+/u)
+    .map((part) => {
+      const angled = /<([^>]+)>/u.exec(part);
+      return (angled ? angled[1] : part).trim().replace(/^mailto:/iu, "");
+    })
     .filter((part) => part !== "");
+}
+
+/** The console's plain-text fallback for an HTML body: tags out, links kept as "text (url)". */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<(style|head|title|script)\b[\s\S]*?<\/\1\s*>/giu, "")
+    .replace(/<a\b[^>]*href=("|')(.*?)\1[^>]*>([\s\S]*?)<\/a>/giu, (_, __, href: string, label: string) => {
+      const text = label.replace(/<[^>]+>/gu, "").trim();
+      return text === "" || text === href ? href : `${text} (${href})`;
+    })
+    .replace(/<(br|\/p|\/div|\/tr|\/h[1-6]|\/li|\/blockquote)\b[^>]*>/giu, "\n")
+    .replace(/<li\b[^>]*>/giu, "- ")
+    .replace(/<[^>]+>/gu, "")
+    .replace(/&nbsp;/gu, " ")
+    .replace(/&lt;/gu, "<")
+    .replace(/&gt;/gu, ">")
+    .replace(/&quot;/gu, '"')
+    .replace(/&#39;/gu, "'")
+    .replace(/&amp;/gu, "&")
+    .replace(/[ \t]+/gu, " ")
+    .replace(/ *\n */gu, "\n")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
+}
+
+/** Plain text as paragraphs, the starting point when a message switches to HTML. */
+export function textToHtml(text: string): string {
+  if (text.trim() === "") return "";
+  return text
+    .split(/\n{2,}/u)
+    .map((para) => `<p>${escapeHtml(para).replace(/\n/gu, "<br>")}</p>`)
+    .join("\n");
 }
 
 function quoted(m: MailMessageDetail): string {
@@ -167,17 +251,16 @@ function quoted(m: MailMessageDetail): string {
   return `\n\nOn ${dateTime(Date.parse(m.date))}, ${who(m)} wrote:\n${body}`;
 }
 
-export function replyDraft(m: MailMessageDetail): Draft {
-  return {
-    ...EMPTY_DRAFT,
-    to: m.from?.address ?? "",
+export function replyDraft(mailbox: string, m: MailMessageDetail): Draft {
+  return blankDraft(mailbox, {
+    to: m.from ? [m.from.address.toLowerCase()] : [],
     subject: /^re:/iu.test(m.subject) ? m.subject : `Re: ${m.subject}`,
     text: quoted(m),
     inReplyTo: { uid: m.uid, folder: m.folder },
-  };
+  });
 }
 
-export function forwardDraft(m: MailMessageDetail): Draft {
+export function forwardDraft(mailbox: string, m: MailMessageDetail): Draft {
   const header = [
     "---------- Forwarded message ----------",
     `From: ${m.from ? `${m.from.name} <${m.from.address}>` : ""}`,
@@ -185,12 +268,11 @@ export function forwardDraft(m: MailMessageDetail): Draft {
     `Subject: ${m.subject}`,
     `To: ${m.to.map((a) => a.address).join(", ")}`,
   ].join("\n");
-  return {
-    ...EMPTY_DRAFT,
+  return blankDraft(mailbox, {
     subject: /^fwd?:/iu.test(m.subject) ? m.subject : `Fwd: ${m.subject}`,
     text: `\n\n${header}\n\n${m.text}`,
     forwardOf: { uid: m.uid, folder: m.folder },
-  };
+  });
 }
 
 /* ──────────────────────────────── menus ──────────────────────────────── */

@@ -50,7 +50,13 @@ import { AUDIT_RETENTION_MS, insertEntry, type AuditEntryDoc } from "./repo";
  * nothing on the site or for anybody else, and filing it would bury real edits
  * under "unknown". Matched on a segment boundary, like the gate's subtree rule.
  */
-const UNAUDITED = ["/api/admin/tutorials", "/api/admin/notifications"];
+const UNAUDITED = [
+  "/api/admin/tutorials",
+  "/api/admin/notifications",
+  // A member's own place on the Mailboxes page and draft autosave, several writes a minute.
+  "/api/admin/mail/state",
+  "/api/admin/mail/drafts",
+];
 
 function isUnaudited(path: string): boolean {
   return UNAUDITED.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));

@@ -49,6 +49,11 @@ export const COLLECTIONS = {
   partnerApplications: "partner_applications",
   /* Partner companies. Their accounts are users rows carrying the company's id. */
   partners: "partners",
+  /* The mail console: one row per member (where they left the page), their
+     unsent drafts, and one row per mailbox of harvested correspondents. */
+  mailPrefs: "mail_prefs",
+  mailDrafts: "mail_drafts",
+  mailContacts: "mail_contacts",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
