@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { sessionSecret } from "@avhomes/core";
 
@@ -22,6 +22,25 @@ export function mintSessionToken(): string {
 
 export function tokenId(token: string): string {
   return createHmac("sha256", sessionSecret()).update(token).digest("hex");
+}
+
+/**
+ * The six digit invite code. `randomInt` rejects rather than takes a modulo, so
+ * every code is equally likely.
+ */
+export function mintInviteCode(): string {
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+/** Keyed and bound to the invite, so a leaked hash neither reverses nor transplants. */
+export function inviteCodeHash(inviteId: string, code: string): string {
+  return createHmac("sha256", sessionSecret()).update(`invite-code:${inviteId}:${code}`).digest("hex");
+}
+
+export function sameInviteCode(inviteId: string, code: string, stored: string): boolean {
+  const given = Buffer.from(inviteCodeHash(inviteId, code), "hex");
+  const expected = Buffer.from(stored, "hex");
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 /**

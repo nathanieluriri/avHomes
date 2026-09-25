@@ -405,7 +405,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * keep serving the password door until something rebuilt the app object.
    */
   app.route(API_PREFIX, clerkRoutes());
-  app.route(API_PREFIX, passwordRoutes());
+  app.route(API_PREFIX, passwordRoutes({ mailer }));
 
   app.route(API_PREFIX, teamRoutes({ mailer }));
   app.route(API_PREFIX, applicationAdminRoutes({ mailer }));

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   BadRequestError,
   NotImplementedError,
+  PreconditionFailedError,
   UnauthenticatedError,
   UpstreamError,
   auditActor,
@@ -12,17 +13,24 @@ import {
   getEnv,
   readJson,
   str,
+  trySend,
   type AppEnv,
+  type Mailer,
 } from "@avhomes/core";
 import type { Db } from "@avhomes/db";
-import { admit, refusalBody, type Identity } from "../admit";
+import { admit, completeOwnerInvite, ownerInviteStands, refusalBody, type Identity } from "../admit";
 import { activeDoor } from "../door";
 import { setSessionCookie } from "../middleware";
 import { createSession } from "../repo/sessions";
-import { LOGIN_IP_LIMIT, LOGIN_WINDOW_MS } from "../schema";
+import { INVITE_CODE_RESEND_MS, INVITE_CODE_TTL_MS, LOGIN_IP_LIMIT, LOGIN_WINDOW_MS } from "../schema";
 import { clearLimit, limit } from "../repo/ratelimit";
 import { burnPasswordTime, hashPassword, verifyPassword } from "../crypto";
-import { claimInvite, releaseInvite } from "../repo/invites";
+import {
+  claimInviteWithCode,
+  issueMailedInviteCode,
+  newestOpenInvite,
+  releaseInvite,
+} from "../repo/invites";
 import { isSuspendedPartner, setPartnerMain } from "../repo/partners";
 import { createUser, findCredentialByEmail, findUserByEmail, setPartnerRole, setPasswordHash } from "../repo/users";
 
@@ -80,8 +88,16 @@ const ClaimBody = z
     // one predictable symbol at the end of a short word.
     password: z.string().min(12).max(400),
     displayName: str().min(1).max(120).trim().optional(),
+    code: z.string().trim().regex(/^\d{6}$/, "six digits"),
   })
   .strict();
+const CodeBody = z.object({ email: email() }).strict();
+
+const CODE_SENT = "If that address has an invite, a code is on its way. Check your email.";
+/* One answer for a wrong, expired, used up or never sent code, so the claim
+   cannot be asked who is invited either. */
+const CODE_REFUSED =
+  "That code is not right, or it has expired. Check the latest email, or send a new code.";
 
 /** Shared tail: mint the session and set the cookie. */
 async function issueSession(
@@ -136,11 +152,13 @@ export function clerkRoutes(deps: { verifier?: ClerkVerifier } = {}): Hono<AppEn
  * The password door, deliberately small.
  *
  * Invite-only survives: `claim` spends an invite and sets the first password
- * through the same membership decision the Clerk door uses. There is no reset
+ * through the same membership decision the Clerk door uses. Unlike Clerk it has
+ * no verified address of its own, so the claim needs a code mailed to the
+ * invited one first. There is no reset
  * flow, because a reset needs working mail and mail is optional here. The way
  * back in when the last owner is locked out is the bootstrap-owner script.
  */
-export function passwordRoutes(): Hono<AppEnv> {
+export function passwordRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   function assertActive(req: { url: string }): void {
@@ -188,6 +206,41 @@ export function passwordRoutes(): Hono<AppEnv> {
   });
 
   /**
+   * Mails a code for the claim below.
+   *
+   * The same 200 whether or not the address is invited, has an account, or is
+   * inside the resend cooldown, so this route cannot be used to list the invited.
+   */
+  routes.post("/auth/password/claim/code", async (c) => {
+    assertActive(c.req);
+    const { email: address } = await readJson(c, CodeBody);
+
+    const db = await currentDb(c);
+    await limit(db, `claim-code:${clientIp(c)}`, LOGIN_IP_LIMIT, LOGIN_WINDOW_MS);
+
+    const invite = (await findUserByEmail(db, address)) ? null : await newestOpenInvite(db, address);
+    const code = invite ? await issueMailedInviteCode(db, invite) : null;
+    if (invite && code) {
+      await trySend(
+        deps.mailer,
+        {
+          to: invite.email,
+          subject: "Your AVHomes sign-in code",
+          text: [
+            `Your code is ${code}.`,
+            "",
+            `Enter it on the sign-in screen to accept your invite. It lasts ${INVITE_CODE_TTL_MS / 60_000} minutes.`,
+            "",
+            "If you did not ask for it, ignore this email. Nobody can accept the invite without it.",
+          ].join("\n"),
+        },
+        { requestId: c.get("requestId"), route: "POST /auth/password/claim/code" },
+      );
+    }
+    return c.json({ ok: true, detail: CODE_SENT, resendAfter: INVITE_CODE_RESEND_MS / 1000 });
+  });
+
+  /**
    * Spends an invite and sets the first password.
    *
    * The invite is claimed BEFORE the user is created and handed back if creation
@@ -214,13 +267,15 @@ export function passwordRoutes(): Hono<AppEnv> {
       ]);
     }
 
-    const invite = await claimInvite(db, address);
-    if (!invite) {
-      return c.json({ ...refusalBody("not_invited"), requestId: c.get("requestId") }, 403);
-    }
+    const invite = await claimInviteWithCode(db, address, body.code);
+    if (!invite) throw new PreconditionFailedError("invite_code", { detail: CODE_REFUSED });
     if (await isSuspendedPartner(db, invite.partnerId ?? null)) {
       if (invite.acceptedAt != null) await releaseInvite(db, invite._id, invite.acceptedAt);
       return c.json({ ...refusalBody("suspended"), requestId: c.get("requestId") }, 403);
+    }
+    if (!(await ownerInviteStands(db, invite))) {
+      if (invite.acceptedAt != null) await releaseInvite(db, invite._id, invite.acceptedAt);
+      return c.json({ ...refusalBody("not_invited"), requestId: c.get("requestId") }, 403);
     }
 
     const displayName = (body.displayName ?? "").trim() || address.split("@")[0] || address;
@@ -233,6 +288,7 @@ export function passwordRoutes(): Hono<AppEnv> {
         partnerRole: invite.partnerRole ?? null,
         passwordHash: await hashPassword(body.password),
       });
+      await completeOwnerInvite(db, invite);
       if (invite.partnerId && invite.partnerRole === "main") {
         const took = await setPartnerMain(db, invite.partnerId, user.id, null);
         // The label follows the seat, because `countStaffSeats` counts the label: an

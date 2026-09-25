@@ -1,4 +1,4 @@
-import type { PartnerLimitOverrides, PartnerRole, PartnerStatus, Role } from "@avhomes/contracts";
+import type { AssignableRole, PartnerLimitOverrides, PartnerRole, PartnerStatus, Role } from "@avhomes/contracts";
 
 /** The stored shapes. The wire shapes live in @avhomes/contracts. */
 
@@ -52,6 +52,20 @@ export interface InviteDoc {
   /** The company a partner invite joins, and which seat. Absent on a team invite. */
   partnerId?: string | null;
   partnerRole?: PartnerRole | null;
+  /** An owner invite only: the role the inviting owner takes once it is accepted. */
+  stepDownTo?: AssignableRole | null;
+  /**
+   * The password door's proof that the claimant reads this inbox. Only a keyed
+   * HMAC of the six digits is kept. Absent until a code is first asked for.
+   */
+  codeHash?: string | null;
+  codeExpiresAt?: number | null;
+  /** Guesses spent on the current code, the right one included. */
+  codeAttempts?: number;
+  /** When a code was last MAILED, for the resend cooldown. Handed-out codes do not count. */
+  codeSentAt?: number | null;
+  /** Mailed codes over the invite's life. Never reset, so the cap holds across claims. */
+  codeSends?: number;
 }
 
 export interface PartnerDoc {
@@ -83,6 +97,15 @@ export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** The ceiling. A slide never pushes past this, so a session cannot live forever. */
 export const SESSION_ABSOLUTE_MAX_MS = 90 * 24 * 60 * 60 * 1000;
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The invite code. Five guesses at a million, times ten mailed codes, is a
+ * 1 in 20,000 chance for someone who never sees the inbox.
+ */
+export const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
+export const INVITE_CODE_MAX_ATTEMPTS = 5;
+export const INVITE_CODE_RESEND_MS = 60 * 1000;
+export const INVITE_CODE_MAX_SENDS = 10;
 
 /**
  * Only re-write `expiresAt` when it has moved enough to matter. A write on every

@@ -152,34 +152,12 @@ export default function TeamPage() {
             )}
             <ul>
               {invites.data?.items.map((invite) => (
-                <li
+                <InviteRow
                   key={invite.id}
-                  className="flex flex-col items-start gap-3 border-b border-mist-100 px-4 py-4 last:border-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-plum-950 [overflow-wrap:anywhere]">
-                      {invite.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {ROLE_INFO[invite.role].label} · invited by {invite.invitedByName} ·{" "}
-                      {/* The SERVER's verdict, never re-derived from the clock here:
-                          a client comparing expiresAt against its own clock labels
-                          "open" a row the sign-in flow refuses. */}
-                      {invite.state}
-                    </p>
-                  </div>
-                  {/* Two taps, and the trigger stays neutral so only the armed
-                      state is loud. Revoking destroys the ONLY link by which
-                      this person can reach an invite-only console, and it fired
-                      straight from a 32px onClick sitting under a thumb. */}
-                  <ConfirmButton
-                    variant="ghost"
-                    confirmLabel="Yes, revoke the link"
-                    onConfirm={() => void run(() => api.del(`/admin/invites/${invite.id}`))}
-                  >
-                    Revoke
-                  </ConfirmButton>
-                </li>
+                  invite={invite}
+                  actor={actor}
+                  onRevoke={() => void run(() => api.del(`/admin/invites/${invite.id}`))}
+                />
               ))}
             </ul>
           </Card>
@@ -192,6 +170,89 @@ export default function TeamPage() {
 
       <TransferSheet heir={heir} onClose={() => setHeir(null)} />
     </>
+  );
+}
+
+/**
+ * One open invite. "Get code" is the way in when the emailed code is not
+ * arriving: the admin reads it to the invitee by phone. Offered only to whoever
+ * could have sent the invite, which the server enforces as well.
+ */
+function InviteRow({
+  invite,
+  actor,
+  onRevoke,
+}: {
+  invite: TeamInvite;
+  actor: AuthUser | null;
+  onRevoke: () => void;
+}) {
+  const [issued, setIssued] = useState<{ code: string; expiresAt: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const mayGetCode =
+    actor != null &&
+    invite.state === "open" &&
+    (invite.role === "owner" ? actor.role === "owner" : canAssign(actor.role, invite.role));
+
+  async function getCode() {
+    setBusy(true);
+    setError(null);
+    try {
+      setIssued(await api.post<{ code: string; expiresAt: number }>(`/admin/invites/${invite.id}/code`, {}));
+    } catch (err) {
+      setError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="flex flex-col items-start gap-3 border-b border-mist-100 px-4 py-4 last:border-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
+      <div className="min-w-0">
+        <p className="font-semibold text-plum-950 [overflow-wrap:anywhere]">{invite.email}</p>
+        <p className="text-xs text-muted-foreground">
+          {ROLE_INFO[invite.role].label} · invited by {invite.invitedByName} ·{" "}
+          {/* The SERVER's verdict, never re-derived from the clock here:
+              a client comparing expiresAt against its own clock labels
+              "open" a row the sign-in flow refuses. */}
+          {invite.state}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {mayGetCode && (
+          <Button variant="ghost" disabled={busy} onClick={() => void getCode()}>
+            {busy ? "Getting code" : issued ? "New code" : "Get code"}
+          </Button>
+        )}
+        {/* Two taps, and the trigger stays neutral so only the armed
+            state is loud. Revoking destroys the ONLY link by which
+            this person can reach an invite-only console, and it fired
+            straight from a 32px onClick sitting under a thumb. */}
+        <ConfirmButton variant="ghost" confirmLabel="Yes, revoke the link" onConfirm={onRevoke}>
+          Revoke
+        </ConfirmButton>
+      </div>
+
+      {error && (
+        <div className="w-full">
+          <ErrorNote error={error} />
+        </div>
+      )}
+      {issued && (
+        <div className="w-full rounded-xl border border-wine-100 bg-wine-50 p-3 text-sm text-wine-700">
+          <div className="flex items-center gap-2">
+            <p className="flex-1 font-mono text-lg font-semibold tracking-[0.3em]">{issued.code}</p>
+            <CopyButton value={issued.code} />
+          </div>
+          <p className="mt-1 text-xs">
+            Read it to {invite.email} yourself. It lasts 10 minutes, replaces any code already
+            emailed, and is not shown again.
+          </p>
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -457,7 +518,8 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
    * still makes a silent choice, and the roles are not a line anyway: an editor
    * and a support user hold two domains each and neither contains the other.
    */
-  const [role, setRole] = useState<AssignableRole | "">("");
+  const [role, setRole] = useState<AssignableRole | "owner" | "">("");
+  const [stepDownTo, setStepDownTo] = useState<AssignableRole>(ASSIGNABLE_ROLES[0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [result, setResult] = useState<{ url: string; emailed: boolean } | null>(null);
@@ -479,6 +541,7 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
       const res = await api.post<{ invite: { url: string }; emailed: boolean }>("/admin/invites", {
         email,
         role,
+        ...(role === "owner" ? { stepDownTo } : {}),
       });
       setResult({ url: res.invite.url, emailed: res.emailed });
       setEmail("");
@@ -515,7 +578,7 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
             className={inputClass}
             required
             value={role}
-            onChange={(e) => setRole(e.target.value as AssignableRole)}
+            onChange={(e) => setRole(e.target.value as AssignableRole | "owner")}
           >
             <option value="" disabled>
               Choose a role
@@ -525,13 +588,37 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
                 {ROLE_INFO[r].label}
               </option>
             ))}
+            {actor === "owner" && <option value="owner">Owner (hand the site over)</option>}
           </select>
         </Field>
+
+        {role === "owner" && (
+          <div className="space-y-3 rounded-xl border border-wine-100 bg-wine-50 p-3">
+            <p className="text-[13px] leading-relaxed text-wine-700">
+              When they accept, they become the owner of this site with every power that
+              comes with it, and you stop being the owner. Only they can make you owner again.
+              Until then you can revoke the invite below.
+            </p>
+            <Field label="Your role once they accept" hint={ROLE_INFO[stepDownTo].description}>
+              <select
+                className={inputClass}
+                value={stepDownTo}
+                onChange={(e) => setStepDownTo(e.target.value as AssignableRole)}
+              >
+                {ASSIGNABLE_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_INFO[r].label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        )}
 
         {error && <ErrorNote error={error} />}
 
         <Button type="submit" disabled={busy || role === ""} className="w-full">
-          {busy ? "Sending" : "Send invite"}
+          {busy ? "Sending" : role === "owner" ? "Send owner invite" : "Send invite"}
         </Button>
       </form>
 
@@ -545,7 +632,9 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
           </p>
           <InviteLink url={result.url} />
           <p className="mt-1 text-xs">
-            The link carries no credential. They sign in with the address you invited.
+            The link carries no credential. They sign in with the address you invited, and
+            we email them a 6-digit code to confirm it. If it does not arrive, use Get code
+            under Open invites and read it to them.
           </p>
         </div>
       )}
@@ -567,28 +656,34 @@ function InviteForm({ actor, onDone }: { actor: Role; onDone: () => void }) {
  * the worst possible lie on this screen. The URL stays selectable either way.
  */
 function InviteLink({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
-
   return (
     <div className="mt-1 flex items-start gap-2">
       <p className="min-w-0 flex-1 font-mono text-xs [overflow-wrap:anywhere]">{url}</p>
-      <Button
-        variant="ghost"
-        onClick={() => {
-          // `?.` short-circuits the whole chain, which is what a page served
-          // over plain http needs: there `navigator.clipboard` is undefined,
-          // not merely refusing.
-          void navigator.clipboard?.writeText(url).then(
-            () => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            },
-            () => setCopied(false),
-          );
-        }}
-      >
-        {copied ? "Copied" : "Copy"}
-      </Button>
+      <CopyButton value={url} />
     </div>
+  );
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Button
+      variant="ghost"
+      onClick={() => {
+        // `?.` short-circuits the whole chain, which is what a page served
+        // over plain http needs: there `navigator.clipboard` is undefined,
+        // not merely refusing.
+        void navigator.clipboard?.writeText(value).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          },
+          () => setCopied(false),
+        );
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </Button>
   );
 }

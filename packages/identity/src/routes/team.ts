@@ -29,7 +29,14 @@ import {
 } from "@avhomes/core";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { requireAdmin } from "../middleware";
-import { createInvite, findOpenInvite, listInvites, revokeTeamInvite } from "../repo/invites";
+import {
+  createInvite,
+  findInvite,
+  findOpenInvite,
+  issueHandedInviteCode,
+  listInvites,
+  revokeTeamInvite,
+} from "../repo/invites";
 import {
   countActiveOwners,
   disableUser,
@@ -49,7 +56,9 @@ const InviteBody = z
   .object({
     // RFC 5321's maximum. Format is checked; deliverability is not.
     email: email(),
-    role: z.enum(ASSIGNABLE_ROLES).default("agent"),
+    role: z.enum(["owner", ...ASSIGNABLE_ROLES]).default("agent"),
+    /* Owner invites only. The role the inviting owner takes once it is accepted. */
+    stepDownTo: z.enum(ASSIGNABLE_ROLES).optional(),
   })
   .strict();
 
@@ -329,10 +338,19 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
   routes.post("/admin/invites", requireAdmin(), async (c) => {
     const db = await currentDb(c);
     const actor = currentUser(c);
-    const { email: address, role } = await readJson(c, InviteBody);
+    const { email: address, role, stepDownTo } = await readJson(c, InviteBody);
 
-    if (!canAssign(actor.role, role as Role)) {
+    // Handing over ownership is the owner's alone, so it skips canAssign, which
+    // refuses "owner" for everybody.
+    if (role === "owner") {
+      if (actor.role !== "owner") throw new ForbiddenError("only the owner can invite a new owner");
+    } else if (!canAssign(actor.role, role as Role)) {
       throw new ForbiddenError(`role ${actor.role} cannot assign ${role}`);
+    }
+    if (stepDownTo !== undefined && role !== "owner") {
+      throw new BadRequestError("stepDownTo", [
+        { path: "stepDownTo", message: "only an owner invite names the role to step down to" },
+      ]);
     }
     if (await findUserByEmail(db, address)) throw new DuplicateError("email", address);
     if (await findOpenInvite(db, address)) {
@@ -342,7 +360,12 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       });
     }
 
-    const invite = await createInvite(db, { email: address, role: role as Role, invitedBy: actor.id });
+    const invite = await createInvite(db, {
+      email: address,
+      role: role as Role,
+      invitedBy: actor.id,
+      stepDownTo: role === "owner" ? (stepDownTo ?? "developer") : null,
+    });
     auditEntityId(c, invite._id);
 
     /*
@@ -367,11 +390,13 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
         to: address,
         subject: `${actor.displayName} invited you to AVHomes`,
         text: [
-          `${actor.displayName} has invited you to the AVHomes admin as ${role}.`,
+          role === "owner"
+            ? `${actor.displayName} has invited you to take over the AVHomes admin as its owner.`
+            : `${actor.displayName} has invited you to the AVHomes admin as ${role}.`,
           "",
           `Sign in here: ${url}`,
           "",
-          "Use this same email address. The invite expires in seven days.",
+          "Sign in with this same email address and you'll be sent a 6-digit code to confirm it. The invite expires in seven days.",
         ].join("\n"),
       },
       { requestId: c.get("requestId"), route: "POST /admin/invites" },
@@ -393,6 +418,35 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       },
       201,
     );
+  });
+
+  /**
+   * A code to read out by phone when the mailed one is not arriving. Replaces
+   * any code already sent. Returned once and never stored in the clear; the
+   * audit row keeps only the invite id, because this route takes no body.
+   */
+  routes.post("/admin/invites/:id/code", requireAdmin(), async (c) => {
+    const db = await currentDb(c);
+    const id = pathParam(c, "id");
+    const actor = currentUser(c);
+
+    const invite = await findInvite(db, id);
+    if (!invite || invite.role === "partner") throw new NotFoundError(id);
+    // Whoever could not have sent this invite cannot hand over its code either.
+    if (invite.role === "owner") {
+      if (actor.role !== "owner") throw new ForbiddenError("only the owner can get the code for an owner invite");
+    } else if (!canAssign(actor.role, invite.role)) {
+      throw new ForbiddenError(`role ${actor.role} cannot assign ${invite.role}`);
+    }
+
+    const issued = await issueHandedInviteCode(db, id);
+    if (!issued) {
+      throw new PreconditionFailedError("invite_closed", {
+        detail: "This invite has been accepted or has expired. Send a new one.",
+      });
+    }
+    auditEntityId(c, id);
+    return c.json(issued);
   });
 
   routes.delete("/admin/invites/:id", requireAdmin(), async (c) => {

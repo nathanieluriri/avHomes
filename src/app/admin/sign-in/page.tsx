@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AuthUser } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { homeFor } from "@/components/admin/nav";
@@ -54,14 +54,45 @@ export default function SignInPage() {
 
 function PasswordDoor({ reason }: { reason: string }) {
   const [mode, setMode] = useState<"login" | "claim">("login");
+  /* The claim is two steps: prove the inbox, then set the password. The invite
+     link carries nothing, so without the code whoever typed the invited address
+     first would get the account. */
+  const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resend, setResend] = useState({ at: 0, span: 0 });
+
+  const asking = mode === "claim" && step === "email";
+  const codeStep = mode === "claim" && step === "code";
+  const now = useNow(codeStep);
+  // Clamped, because `now` can be a tick stale when the step first appears.
+  const waitSeconds = Math.min(resend.span, Math.max(0, Math.ceil((resend.at - now) / 1000)));
+
+  function fail(err: unknown) {
+    setError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+  }
+
+  async function sendCode() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ resendAfter: number }>("/auth/password/claim/code", { email });
+      setResend({ at: Date.now() + res.resendAfter * 1000, span: res.resendAfter });
+      setStep("code");
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (asking) return void sendCode();
     setBusy(true);
     setError(null);
     try {
@@ -70,6 +101,7 @@ function PasswordDoor({ reason }: { reason: string }) {
           ? await api.post<{ user: AuthUser }>("/auth/password/login", { email, password })
           : await api.post<{ user: AuthUser }>("/auth/password/claim", {
               email,
+              code,
               password,
               ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
             });
@@ -83,7 +115,7 @@ function PasswordDoor({ reason }: { reason: string }) {
       // identity.
       window.location.href = homeFor(res.user.role);
     } catch (err) {
-      setError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+      fail(err);
       setBusy(false);
     }
   }
@@ -91,48 +123,99 @@ function PasswordDoor({ reason }: { reason: string }) {
   return (
     <Card>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Email">
-          <input
-            className={inputClass}
-            type="email"
-            autoComplete="username"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </Field>
-
-        {mode === "claim" && (
-          <Field label="Your name" hint="Shown on the listings and posts you publish.">
+        {codeStep ? (
+          <div className="rounded-xl border border-wine-100 bg-wine-50 p-3 text-[13px] leading-relaxed text-wine-700">
+            <p>
+              If <span className="font-semibold [overflow-wrap:anywhere]">{email}</span> has an invite, a
+              6-digit code is on its way. It lasts 10 minutes.
+            </p>
+            <button
+              type="button"
+              className="mt-1 text-xs underline underline-offset-2"
+              onClick={() => {
+                setStep("email");
+                setCode("");
+                setError(null);
+              }}
+            >
+              Use a different email
+            </button>
+          </div>
+        ) : (
+          <Field
+            label="Email"
+            hint={asking ? "The address your invite went to. We will email it a 6-digit code." : undefined}
+          >
             <input
               className={inputClass}
-              autoComplete="name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              type="email"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </Field>
         )}
 
-        <Field
-          label="Password"
-          hint={mode === "claim" ? "At least 12 characters. Length is the only rule." : undefined}
-        >
-          <input
-            className={inputClass}
-            type="password"
-            autoComplete={mode === "claim" ? "new-password" : "current-password"}
-            required
-            minLength={mode === "claim" ? 12 : 1}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </Field>
+        {codeStep && (
+          <>
+            <Field label="Code" hint="The 6 digits from the email.">
+              <input
+                className={`${inputClass} text-center font-mono text-lg tracking-[0.5em]`}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+            </Field>
+            <Field label="Your name" hint="Shown on the listings and posts you publish.">
+              <input
+                className={inputClass}
+                autoComplete="name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
+            </Field>
+          </>
+        )}
+
+        {!asking && (
+          <Field
+            label="Password"
+            hint={mode === "claim" ? "At least 12 characters. Length is the only rule." : undefined}
+          >
+            <input
+              className={inputClass}
+              type="password"
+              autoComplete={mode === "claim" ? "new-password" : "current-password"}
+              required
+              minLength={mode === "claim" ? 12 : 1}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </Field>
+        )}
 
         {error && <ErrorNote error={error} />}
 
-        <Button type="submit" disabled={busy} className="w-full">
-          {busy ? "Working" : mode === "login" ? "Sign in" : "Accept invite"}
+        <Button type="submit" disabled={busy || (codeStep && code.length !== 6)} className="w-full">
+          {busy ? "Working" : mode === "login" ? "Sign in" : asking ? "Send code" : "Accept invite"}
         </Button>
+
+        {codeStep && (
+          <Button
+            variant="ghost"
+            className="w-full"
+            disabled={busy || waitSeconds > 0}
+            onClick={() => void sendCode()}
+          >
+            {waitSeconds > 0 ? `Resend code in ${waitSeconds}s` : "Resend code"}
+          </Button>
+        )}
 
         {/* A real box, not an underlined run of text. This is the only route to
             the invite-acceptance flow, which is how every new colleague first
@@ -146,6 +229,8 @@ function PasswordDoor({ reason }: { reason: string }) {
           className="flex min-h-11 w-full items-center justify-center rounded-lg text-center text-[13px] text-muted-foreground underline underline-offset-2 transition-colors hover:bg-mist-50 sm:min-h-0 sm:py-1 sm:text-xs"
           onClick={() => {
             setMode(mode === "login" ? "claim" : "login");
+            setStep("email");
+            setCode("");
             setError(null);
           }}
         >
@@ -160,6 +245,17 @@ function PasswordDoor({ reason }: { reason: string }) {
       )}
     </Card>
   );
+}
+
+/** The clock, ticking once a second while `running`, for the resend countdown. */
+function useNow(running: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+  return now;
 }
 
 /**

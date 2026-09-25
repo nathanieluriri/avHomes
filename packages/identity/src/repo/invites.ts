@@ -1,7 +1,16 @@
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { newId } from "@avhomes/core";
-import type { PartnerRole, Role, TeamInvite } from "@avhomes/contracts";
-import { INVITE_TTL_MS, type InviteDoc, type UserDoc } from "../schema";
+import type { AssignableRole, PartnerRole, Role, TeamInvite } from "@avhomes/contracts";
+import { inviteCodeHash, mintInviteCode, sameInviteCode } from "../crypto";
+import {
+  INVITE_CODE_MAX_ATTEMPTS,
+  INVITE_CODE_MAX_SENDS,
+  INVITE_CODE_RESEND_MS,
+  INVITE_CODE_TTL_MS,
+  INVITE_TTL_MS,
+  type InviteDoc,
+  type UserDoc,
+} from "../schema";
 
 function invites(db: Db) {
   return collection<InviteDoc>(db, COLLECTIONS.invites);
@@ -15,6 +24,7 @@ export async function createInvite(
     invitedBy: string;
     partnerId?: string | null;
     partnerRole?: PartnerRole | null;
+    stepDownTo?: AssignableRole | null;
   },
 ): Promise<InviteDoc> {
   const now = Date.now();
@@ -28,6 +38,7 @@ export async function createInvite(
     acceptedAt: null,
     partnerId: args.partnerId ?? null,
     partnerRole: args.partnerRole ?? null,
+    ...(args.role === "owner" ? { stepDownTo: args.stepDownTo ?? "developer" } : {}),
   };
   await invites(db).insertOne(doc);
   return doc;
@@ -47,6 +58,113 @@ export async function claimInvite(db: Db, email: string): Promise<InviteDoc | nu
     { email: email.trim().toLowerCase(), acceptedAt: null, expiresAt: { $gt: now } },
     { $set: { acceptedAt: now } },
     { sort: { createdAt: -1 }, returnDocument: "after" },
+  );
+}
+
+export async function findInvite(db: Db, inviteId: string): Promise<InviteDoc | null> {
+  return invites(db).findOne({ _id: inviteId });
+}
+
+/** The invite `claimInvite` would take for this address, without taking it. */
+export async function newestOpenInvite(db: Db, email: string, now: number = Date.now()): Promise<InviteDoc | null> {
+  return invites(db).findOne(
+    { email: email.trim().toLowerCase(), acceptedAt: null, expiresAt: { $gt: now } },
+    { sort: { createdAt: -1 } },
+  );
+}
+
+/**
+ * A fresh code to mail, or null when the cooldown or the send cap says no.
+ *
+ * Both limits sit in the update's filter, so two requests racing inside the
+ * cooldown cannot both mint and mail one.
+ */
+export async function issueMailedInviteCode(db: Db, invite: InviteDoc, now: number = Date.now()): Promise<string | null> {
+  const code = mintInviteCode();
+  const result = await invites(db).updateOne(
+    {
+      _id: invite._id,
+      acceptedAt: null,
+      expiresAt: { $gt: now },
+      $and: [
+        { $or: [{ codeSentAt: { $exists: false } }, { codeSentAt: null }, { codeSentAt: { $lte: now - INVITE_CODE_RESEND_MS } }] },
+        { $or: [{ codeSends: { $exists: false } }, { codeSends: { $lt: INVITE_CODE_MAX_SENDS } }] },
+      ],
+    },
+    {
+      $set: {
+        codeHash: inviteCodeHash(invite._id, code),
+        codeExpiresAt: now + INVITE_CODE_TTL_MS,
+        codeAttempts: 0,
+        codeSentAt: now,
+      },
+      $inc: { codeSends: 1 },
+    },
+  );
+  return result.modifiedCount === 1 ? code : null;
+}
+
+/**
+ * A fresh code for an admin to pass on by phone. Replaces any mailed one, and
+ * skips the cooldown: the admin is the rate limit. Never a partner invite.
+ */
+export async function issueHandedInviteCode(
+  db: Db,
+  inviteId: string,
+  now: number = Date.now(),
+): Promise<{ code: string; expiresAt: number } | null> {
+  const code = mintInviteCode();
+  const result = await invites(db).updateOne(
+    { _id: inviteId, role: { $ne: "partner" }, acceptedAt: null, expiresAt: { $gt: now } },
+    {
+      $set: {
+        codeHash: inviteCodeHash(inviteId, code),
+        codeExpiresAt: now + INVITE_CODE_TTL_MS,
+        codeAttempts: 0,
+      },
+    },
+  );
+  return result.modifiedCount === 1 ? { code, expiresAt: now + INVITE_CODE_TTL_MS } : null;
+}
+
+/**
+ * `claimInvite` for the password door: spends the invite only for the right code.
+ *
+ * The guess is COUNTED before it is compared, in one atomic update, so a burst
+ * of parallel guesses cannot all read "no attempts yet" and share one budget.
+ * The claim then names the hash it checked, so a code replaced in between wins
+ * over the one that was just typed. The code fields go with the claim; the send
+ * count stays, so the cap still holds if the claim is released.
+ */
+export async function claimInviteWithCode(
+  db: Db,
+  email: string,
+  code: string,
+  now: number = Date.now(),
+): Promise<InviteDoc | null> {
+  const invite = await newestOpenInvite(db, email, now);
+  if (!invite?.codeHash) return null;
+
+  const counted = await invites(db).findOneAndUpdate(
+    {
+      _id: invite._id,
+      acceptedAt: null,
+      codeHash: invite.codeHash,
+      codeExpiresAt: { $gt: now },
+      $or: [{ codeAttempts: { $exists: false } }, { codeAttempts: { $lt: INVITE_CODE_MAX_ATTEMPTS } }],
+    },
+    { $inc: { codeAttempts: 1 } },
+    { returnDocument: "after" },
+  );
+  if (!counted?.codeHash || !sameInviteCode(counted._id, code, counted.codeHash)) return null;
+
+  return invites(db).findOneAndUpdate(
+    { _id: counted._id, acceptedAt: null, expiresAt: { $gt: now }, codeHash: counted.codeHash },
+    {
+      $set: { acceptedAt: now },
+      $unset: { codeHash: "", codeExpiresAt: "", codeAttempts: "", codeSentAt: "" },
+    },
+    { returnDocument: "after" },
   );
 }
 

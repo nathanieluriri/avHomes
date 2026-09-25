@@ -214,7 +214,7 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
           "AV Homes has approved your account. Sign in here to add your first property:",
           url,
           "",
-          "Use this same email address. Your listings go live once AV Homes has read them.",
+          "Use this same email address and you'll be sent a 6-digit code to confirm it. Your listings go live once AV Homes has read them.",
         ].join("\n"),
       },
       { requestId: c.get("requestId"), route: "POST /admin/applications/:id/decide" },

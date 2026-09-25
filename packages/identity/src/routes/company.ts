@@ -201,7 +201,7 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
           "",
           `Sign in here: ${url}`,
           "",
-          "Use this same email address. The invite expires in seven days.",
+          "Sign in with this same email address and you'll be sent a 6-digit code to confirm it. The invite expires in seven days.",
         ].join("\n"),
       },
       { requestId: c.get("requestId"), route: "POST /admin/company/staff/invites" },

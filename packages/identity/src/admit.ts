@@ -2,7 +2,8 @@ import type { Db } from "@avhomes/db";
 import type { AuthUser } from "@avhomes/contracts";
 import { claimInvite, releaseInvite } from "./repo/invites";
 import { isSuspendedPartner, setPartnerMain } from "./repo/partners";
-import { createUser, findUserByEmail, setPartnerRole } from "./repo/users";
+import { createUser, findUserByEmail, findUserById, setPartnerRole, stepDownOwner } from "./repo/users";
+import type { InviteDoc } from "./schema";
 
 /**
  * The ONE membership decision, shared by both doors.
@@ -17,6 +18,25 @@ import { createUser, findUserByEmail, setPartnerRole } from "./repo/users";
  * one `verify(credential)` interface would be an abstraction that describes
  * nothing.
  */
+
+/**
+ * An owner invite hands the site over, so it only stands while the owner who
+ * sent it still is one. One sent before a transfer must not mint a second owner.
+ */
+export async function ownerInviteStands(db: Db, invite: InviteDoc): Promise<boolean> {
+  if (invite.role !== "owner") return true;
+  const inviter = await findUserById(db, invite.invitedBy);
+  return inviter != null && inviter.disabledAt == null && inviter.user.role === "owner";
+}
+
+/**
+ * The handover's second half, run once the new owner exists. Owner first and
+ * step-down second means a failure between them leaves two owners, never none.
+ */
+export async function completeOwnerInvite(db: Db, invite: InviteDoc): Promise<void> {
+  if (invite.role !== "owner") return;
+  await stepDownOwner(db, invite.invitedBy, invite.stepDownTo ?? "developer");
+}
 
 export type AdmitRefusal = "not_invited" | "disabled" | "suspended";
 
@@ -54,6 +74,10 @@ export async function admit(db: Db, identity: Identity): Promise<AdmitResult> {
     if (invite.acceptedAt != null) await releaseInvite(db, invite._id, invite.acceptedAt);
     return { ok: false, reason: "suspended" };
   }
+  if (!(await ownerInviteStands(db, invite))) {
+    if (invite.acceptedAt != null) await releaseInvite(db, invite._id, invite.acceptedAt);
+    return { ok: false, reason: "not_invited" };
+  }
 
   // `createUser` refuses a blank name, and a Google account without one is
   // ordinary, so the local part is the fallback and it is resolved HERE rather
@@ -68,6 +92,7 @@ export async function admit(db: Db, identity: Identity): Promise<AdmitResult> {
       partnerId: invite.partnerId ?? null,
       partnerRole: invite.partnerRole ?? null,
     });
+    await completeOwnerInvite(db, invite);
     if (invite.partnerId && invite.partnerRole === "main") {
       const took = await setPartnerMain(db, invite.partnerId, user.id, null);
       // The label follows the seat, because `countStaffSeats` counts the label: an
