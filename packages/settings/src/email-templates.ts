@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import {
@@ -18,6 +18,9 @@ import {
 import {
   EMAIL_TEMPLATES,
   EMAIL_TEMPLATE_KEYS,
+  SIGNATURE_SLOT,
+  appendSignature,
+  type RenderedSignature,
   docToText,
   type DocNode,
   TEMPLATE_REQUEST_STATUSES,
@@ -28,6 +31,10 @@ import {
   type TemplateRequestStatus,
 } from "@avhomes/contracts";
 import { requireAuth } from "@avhomes/identity";
+import { htmlToText, sanitizeEmailHtml } from "./html";
+import { companySignature, enquirySignature, signatureOrigin } from "./signature";
+
+export { htmlToText, sanitizeEmailHtml };
 
 /**
  * Editable email templates, and the one HTML layout every email is sent in.
@@ -132,19 +139,26 @@ function fillText(template: string, vars: EmailVars): string {
   return template.replace(PLACEHOLDER, (_, name: string) => vars.text[name] ?? "");
 }
 
-/** Paragraphs from blank lines; a line that is only an HTML placeholder becomes that block. */
+/**
+ * Paragraphs from blank lines; a line that is only an HTML placeholder becomes
+ * that block. A closing unsubscribe line gets the signature slot above it.
+ */
 function fillHtml(template: string, vars: EmailVars): string {
   const blocks = template.split(/\n{2,}/u);
+  const unsubscribeAt = blocks.findLastIndex(
+    (block, i) => i > 0 && i >= blocks.length - 2 && /\{\{\s*unsubscribeLink\s*\}\}/u.test(block),
+  );
   return blocks
-    .map((block) => {
+    .map((block, i) => {
+      const slot = i === unsubscribeAt ? `${SIGNATURE_SLOT}\n` : "";
       const only = block.trim().match(/^\{\{\s*([a-zA-Z]+)\s*\}\}$/u);
-      if (only && vars.html?.[only[1] ?? ""] !== undefined) return vars.html[only[1] ?? ""];
+      if (only && vars.html?.[only[1] ?? ""] !== undefined) return `${slot}${vars.html[only[1] ?? ""]}`;
       const html = linkify(escapeHtml(block)).replace(PLACEHOLDER, (_, name: string) => {
         const rich = vars.html?.[name];
         if (rich !== undefined) return rich;
         return linkify(escapeHtml(vars.text[name] ?? ""));
       });
-      return `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1e1b2e">${html.replace(/\n/gu, "<br>")}</p>`;
+      return `${slot}<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1e1b2e">${html.replace(/\n/gu, "<br>")}</p>`;
     })
     .join("\n");
 }
@@ -159,7 +173,7 @@ export function emailLayout(inner: string, preheader = "", origin = deploymentOr
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden">
 <tr><td style="padding:22px 28px 18px;border-bottom:3px solid #8f2d4a"><a href="${escapeHtml(origin)}" style="text-decoration:none"><img src="${escapeHtml(logo)}" width="180" height="39" alt="AV Homes Ltd" style="display:block;border:0;width:180px;height:auto;max-width:100%;color:#8f2d4a;font-size:18px;font-weight:700"></a></td></tr>
-<tr><td style="padding:28px">${inner}</td></tr>
+<tr><td style="padding:28px">${inner}${inner.includes(SIGNATURE_SLOT) ? "" : SIGNATURE_SLOT}</td></tr>
 </table>
 <p style="font-size:12px;color:#94a3b8;margin:16px 0 0">AV Homes Ltd · Future-Ready Prime Living. Today</p>
 </td></tr></table>
@@ -332,6 +346,13 @@ const TemplateRequestBody = z
 
 const TemplateRequestUpdate = z.object({ status: z.enum(TEMPLATE_REQUEST_STATUSES) }).strict();
 
+/** Enquiry mail is signed like a reply, by the caller or the team; the rest by the company. */
+async function sampleSignature(c: Context<AppEnv>, key: EmailTemplateKey): Promise<RenderedSignature> {
+  const db = await currentDb(c);
+  const origin = signatureOrigin(c.req);
+  return key.startsWith("enquiry-") ? enquirySignature(db, currentUser(c), origin) : companySignature(db, origin);
+}
+
 export function emailTemplateRoutes(deps: {
   mailer: Mailer;
   origin: (req: { url: string }) => string;
@@ -442,7 +463,8 @@ export function emailTemplateRoutes(deps: {
     const key = pathParam(c, "key");
     if (!isTemplateKey(key)) throw new NotFoundError(`template ${key}`);
     const body = await readJson(c, TemplateBody);
-    return c.json({ email: renderWith(body, sampleVars(deps.origin(c.req))) });
+    const email = renderWith(body, sampleVars(deps.origin(c.req)));
+    return c.json({ email: appendSignature(email, await sampleSignature(c, key)) });
   });
 
   routes.post("/admin/email-templates/:key/test", requireAuth(), async (c) => {
@@ -453,7 +475,13 @@ export function emailTemplateRoutes(deps: {
     const email = renderWith(body, sampleVars(deps.origin(c.req)));
     const sent = await trySend(
       deps.mailer,
-      { to: user.email, subject: `[Test] ${email.subject}`, text: email.text, html: email.html },
+      {
+        to: user.email,
+        subject: `[Test] ${email.subject}`,
+        text: email.text,
+        html: email.html,
+        signature: await sampleSignature(c, key),
+      },
       { requestId: c.get("requestId"), route: "POST /admin/email-templates/:key/test" },
     );
     return c.json({ sent, to: user.email });
@@ -465,57 +493,6 @@ export function emailTemplateRoutes(deps: {
 /* ───────────────────────────── pasted HTML ────────────────────────────── */
 
 /**
- * Makes a pasted email design safe to store and send while keeping its look.
- *
- * Tables, inline styles, images and links survive. Anything that runs code or
- * collects input does not: scripts, frames, forms, event handler attributes and
- * `javascript:` URLs. Mail clients strip most of these anyway; removing them here
- * means the preview shows exactly what is sent.
- */
-export function sanitizeEmailHtml(input: string): string {
-  let html = input;
-  html = html.replace(/<!--[\s\S]*?-->/gu, (c) => (/\[if |<!\[endif/iu.test(c) ? c : ""));
-  // Not `style`: email designs keep their CSS in a <style> block.
-  const blocked = "script|iframe|object|embed|form|noscript|template|svg|math";
-  const pair = new RegExp(String.raw`<(${blocked})\b[\s\S]*?<\/\1\s*>`, "giu");
-  const lone = new RegExp(String.raw`<\/?(${blocked})\b[^>]*>`, "giu");
-  // Repeated until nothing changes, so `<scr<script></script>ipt>` cannot reassemble a tag.
-  for (let previous = ""; previous !== html; ) {
-    previous = html;
-    html = html.replace(pair, "").replace(lone, "");
-  }
-  html = html.replace(/<(input|button|select|textarea|link|base|frame|frameset|applet)\b[^>]*>/giu, "");
-  html = html.replace(/<\/(button|select|textarea|frameset|applet)\s*>/giu, "");
-  html = html.replace(/<meta\b[^>]*http-equiv[^>]*>/giu, "");
-  // `/` counts as a separator too: `<img/onerror=...>` is valid HTML.
-  html = html.replace(/[\s/]+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/giu, " ");
-  html = html.replace(
-    /\s(href|src|action|formaction|background|poster)\s*=\s*(?:"\s*(?:javascript|vbscript|data:text\/html)[^"]*"|'\s*(?:javascript|vbscript|data:text\/html)[^']*'|(?:javascript|vbscript|data:text\/html)[^\s>]*)/giu,
-    ' $1="#"',
-  );
-  html = html.replace(/expression\s*\(/giu, "(");
-  return html.trim();
-}
-
-/** A readable plain text copy of an HTML email, for the text/plain part. */
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<(style|head|title)\b[\s\S]*?<\/\1\s*>/giu, "")
-    .replace(/<a\b[^>]*href=("|')(.*?)\1[^>]*>([\s\S]*?)<\/a>/giu, (_, __, href: string, label: string) => `${label.replace(/<[^>]+>/gu, "").trim()} (${href})`)
-    .replace(/<(br|\/p|\/div|\/tr|\/h[1-6]|\/li)\b[^>]*>/giu, "\n")
-    .replace(/<[^>]+>/gu, "")
-    .replace(/&nbsp;/gu, " ")
-    .replace(/&amp;/gu, "&")
-    .replace(/&lt;/gu, "<")
-    .replace(/&gt;/gu, ">")
-    .replace(/&quot;/gu, '"')
-    .replace(/&#39;/gu, "'")
-    .replace(/[ \t]+/gu, " ")
-    .replace(/\n\s*\n\s*\n+/gu, "\n\n")
-    .trim();
-}
-
-/**
  * A pasted design sent as its own document, with the unsubscribe link filled in
  * where it asked for `{{unsubscribeLink}}`, or added as a footer when it did not:
  * every newsletter must carry one.
@@ -525,7 +502,7 @@ export function pastedNewsletterHtml(html: string, vars: { unsubscribeLink: stri
   const link = escapeHtml(vars.unsubscribeLink);
   const hasPlaceholder = /\{\{\s*unsubscribeLink\s*\}\}/u.test(safe);
   let out = safe.replace(/\{\{\s*unsubscribeLink\s*\}\}/gu, link);
-  const footer = `<div style="text-align:center;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;color:#94a3b8;padding:16px">You are receiving this because you subscribed on the AV Homes site. <a href="${link}" style="color:#64748b">Unsubscribe</a></div>`;
+  const footer = `${SIGNATURE_SLOT}<div style="text-align:center;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;color:#94a3b8;padding:16px">You are receiving this because you subscribed on the AV Homes site. <a href="${link}" style="color:#64748b">Unsubscribe</a></div>`;
   const hidden = vars.preheader
     ? `<span style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(vars.preheader)}</span>`
     : "";

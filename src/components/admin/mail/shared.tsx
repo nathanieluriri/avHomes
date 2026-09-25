@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { createContext, type ReactNode } from "react";
 import { Dialog, DropdownMenu } from "radix-ui";
 import {
   File,
@@ -14,7 +14,15 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import type { MailDraft, MailFolder, MailListFilters, MailMessageDetail, MailMessageSummary } from "@avhomes/contracts";
+import {
+  SIGNATURE_DELIMITER,
+  type MailDraft,
+  type MailFolder,
+  type MailListFilters,
+  type MailMessageDetail,
+  type MailMessageSummary,
+  type RenderedSignature,
+} from "@avhomes/contracts";
 import { ApiError } from "@/lib/admin/client";
 import { ResponsiveMenu } from "@/components/admin/BottomSheet";
 import { dateTime, shortDate } from "@/lib/admin/format";
@@ -179,12 +187,21 @@ export function blankDraft(mailbox: string, extra: Partial<Draft> = {}): Draft {
   };
 }
 
+/* What was written above the signature the composer inserted. */
+function aboveSignature(d: Draft): { text: string; html: string } {
+  const text = d.text.split(`\n${SIGNATURE_DELIMITER}\n`)[0] ?? "";
+  const html = (d.html.split("<!-- avh-signature")[0] ?? "").replace(/<[^>]+>|&nbsp;/gu, "");
+  return { text, html };
+}
+
+/** Nothing typed: a new message holding only its signature counts as empty. */
 export function draftIsEmpty(d: Draft): boolean {
+  const above = aboveSignature(d);
   return (
     d.to.length + d.cc.length + d.bcc.length === 0 &&
     d.subject.trim() === "" &&
-    d.text.trim() === "" &&
-    d.html.trim() === ""
+    above.text.trim() === "" &&
+    above.html.trim() === ""
   );
 }
 
@@ -249,6 +266,34 @@ export function textToHtml(text: string): string {
 function quoted(m: MailMessageDetail): string {
   const body = m.text.trim() === "" ? "" : m.text.split("\n").map((line) => `> ${line}`).join("\n");
   return `\n\nOn ${dateTime(Date.parse(m.date))}, ${who(m)} wrote:\n${body}`;
+}
+
+/* ─────────────────────────────── signature ─────────────────────────────── */
+
+/** The member's signature, for the composer's Write to HTML switch. Null until it loads. */
+export const SignatureContext = createContext<RenderedSignature | null>(null);
+
+function signatureBlock(sig: RenderedSignature): string {
+  return `${SIGNATURE_DELIMITER}\n${sig.text}`;
+}
+
+/**
+ * A new message with the signature under the space for writing and above any
+ * quote, as Gmail does. Only new drafts: a saved one keeps what it has.
+ */
+export function signDraft(d: Draft, sig: RenderedSignature | null): Draft {
+  if (!sig || sig.text === "" || d.revision > 0) return d;
+  return { ...d, text: `\n\n${signatureBlock(sig)}${d.text}` };
+}
+
+/** Plain text as HTML, with the signature block drawn as the real signature. */
+export function textToHtmlSigned(text: string, sig: RenderedSignature | null): string {
+  const block = sig && sig.text !== "" ? signatureBlock(sig) : "";
+  const at = block ? text.indexOf(block) : -1;
+  if (!sig || at < 0) return textToHtml(text);
+  const before = textToHtml(text.slice(0, at).replace(/\s+$/u, ""));
+  const after = textToHtml(text.slice(at + block.length).replace(/^\s+/u, ""));
+  return [before || "<p><br></p>", sig.html, after].filter(Boolean).join("\n");
 }
 
 export function replyDraft(mailbox: string, m: MailMessageDetail): Draft {

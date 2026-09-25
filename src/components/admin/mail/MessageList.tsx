@@ -91,6 +91,7 @@ export function MessageList({
   onChanged,
   onFolderSettings,
   lead,
+  banner,
   label,
   onScrollDown,
   density = "comfortable",
@@ -112,6 +113,8 @@ export function MessageList({
   onFolderSettings: (() => void) | null;
   /** Phone only: scrolls away above the rows (the filter chips). */
   lead?: ReactNode;
+  /** Above the rows, inside the scroller: the mail setup card. */
+  banner?: ReactNode;
   /** Phone only: the folder's name over the rows. */
   label?: string;
   /** Phone only: told which way the list last scrolled, for the compose button. */
@@ -518,6 +521,7 @@ export function MessageList({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {banner}
         {notes}
         {!data && state.loading ? (
           loadingRows(false)

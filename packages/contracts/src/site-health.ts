@@ -1,6 +1,13 @@
 import { formatMoney, payMonthLabel } from "./marketing";
 import type { Domain } from "./roles";
 import type { ClientLogo, Office, SeoSettings } from "./types";
+import {
+  COMPANY_FIELD_LABEL,
+  PERSON_FIELD_LABEL,
+  listWords,
+  type CompanySignatureField,
+  type PersonSignatureField,
+} from "./signature";
 
 /**
  * What the site is currently getting wrong, said to the person who can fix it.
@@ -517,4 +524,66 @@ export function visibleAlerts(
   canSee: (domain: Domain | null) => boolean,
 ): SiteAlert[] {
   return alerts.filter((a) => canSee(a.domain));
+}
+
+/* ───────────────────────────── email signatures ───────────────────────────── */
+
+/** What the signature alerts read. `team` and `company` are null for a reader who cannot fix them. */
+export interface SignatureHealth {
+  me: PersonSignatureField[];
+  /** Everyone else on the team with a gap. */
+  team: { name: string; gaps: PersonSignatureField[] }[] | null;
+  company: Exclude<CompanySignatureField, "logo">[] | null;
+}
+
+/**
+ * Every email AV Homes sends ends with a signature, and these say which of its
+ * lines are missing. Personal gaps go to the person, who is the only one who
+ * can edit their profile; the team list and the company details go to owner
+ * and developer.
+ */
+export function signatureAlerts(h: SignatureHealth): SiteAlert[] {
+  const out: SiteAlert[] = [];
+
+  if (h.me.length > 0) {
+    const words = h.me.map((f) => PERSON_FIELD_LABEL[f]);
+    out.push({
+      id: "my-signature-incomplete",
+      severity: "warning",
+      domain: null,
+      title: `Your email signature is missing your ${listWords(words)}`,
+      message: h.me.includes("phone")
+        ? "Every email you send ends with your signature, and it is how the person reading it knows who wrote and how to reach you. Until you add your own number it gives the company's."
+        : `Every email you send ends with your signature, and it is how the person reading it knows who wrote and how to reach you. Add ${plural(h.me.length, "it", "them")} on your profile to complete it.`,
+      action: { label: "Complete your signature", href: "/admin/profile#signature" },
+    });
+  }
+
+  if (h.company && h.company.length > 0) {
+    const words = h.company.map((f) => COMPANY_FIELD_LABEL[f]);
+    out.push({
+      id: "company-signature-incomplete",
+      severity: "warning",
+      domain: null,
+      title: `Email signatures are missing your ${listWords(words)}`,
+      message:
+        "Every email AV Homes sends, from invites and sign-in codes to replies to buyers, ends with a signature built from these details. Without them it leaves out where you are or how to reach you.",
+      action: { label: "Complete the company details", href: "/admin/settings#email-signature" },
+    });
+  }
+
+  if (h.team && h.team.length > 0) {
+    const shown = h.team.slice(0, 3).map((m) => `${m.name || "Someone"} (${listWords(m.gaps.map((f) => PERSON_FIELD_LABEL[f]))})`);
+    const more = h.team.length - shown.length;
+    out.push({
+      id: "team-signatures-incomplete",
+      severity: "advisory",
+      domain: "team",
+      title: `${h.team.length} team ${plural(h.team.length, "member's email signature is", "members' email signatures are")} incomplete`,
+      message: `Missing: ${shown.join("; ")}${more > 0 ? `; and ${more} more` : ""}. Each person fills these in on their own profile, and every email they send carries the gap until they do.`,
+      action: { label: "See the team", href: "/admin/team" },
+    });
+  }
+
+  return out.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }

@@ -56,6 +56,9 @@ const UNAUDITED = [
   // A member's own place on the Mailboxes page and draft autosave, several writes a minute.
   "/api/admin/mail/state",
   "/api/admin/mail/drafts",
+  // A member's own signature and their snooze on the mail setup card.
+  "/api/admin/signature",
+  "/api/admin/mail/setup",
 ];
 
 function isUnaudited(path: string): boolean {

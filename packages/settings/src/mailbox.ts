@@ -6,6 +6,7 @@ import {
   NotFoundError,
   currentDb,
   currentUser,
+  deploymentOrigin,
   email,
   hostingerAccount,
   hostingerFetch,
@@ -19,7 +20,11 @@ import {
 } from "@avhomes/core";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import {
+  SIGNATURE_DELIMITER,
+  SIGNATURE_SLOT,
   SIGN_IN_CODE_MARKER,
+  plainEmailHtml,
+  textToEmailHtml,
   rankContacts,
   type MailAddress,
   type MailAttachmentInfo,
@@ -33,9 +38,25 @@ import {
   type MailboxSummary,
 } from "@avhomes/contracts";
 import { requireAdmin } from "@avhomes/identity";
-import { htmlToText, sanitizeEmailHtml } from "./email-templates";
+import { htmlToText, sanitizeEmailHtml } from "./html";
 import { hostingerKey, hostingerProblem, readMailSettings } from "./mail";
 import { dropDraft } from "./mail-state";
+import { memberSignature } from "./signature";
+
+/**
+ * A plain text message whose signature block is still the one the composer
+ * inserted, as HTML with the real signature in its place. Empty when the
+ * member edited or removed it: then the text goes alone, as written.
+ */
+function signedTextHtml(text: string, sig: { html: string; text: string }): string {
+  if (sig.text === "") return "";
+  const block = `${SIGNATURE_DELIMITER}\n${sig.text}`;
+  const at = text.indexOf(block);
+  if (at < 0) return "";
+  const before = text.slice(0, at);
+  const after = text.slice(at + block.length);
+  return plainEmailHtml(before).replace(SIGNATURE_SLOT, `${sig.html}\n${textToEmailHtml(after.trim())}`);
+}
 
 /**
  * The console's window onto the Hostinger mailboxes: quotas, folders, reading,
@@ -877,8 +898,13 @@ export function mailboxRoutes(): Hono<AppEnv> {
     const body = await readJson(c, SendBody);
     const db = await currentDb(c);
     const settings = await readMailSettings(db);
-    const html = body.html?.trim() ? sanitizeEmailHtml(body.html) : "";
+    let html = body.html?.trim() ? sanitizeEmailHtml(body.html) : "";
     const text = body.text.trim() !== "" || !html ? body.text : htmlToText(html);
+    /* The composer put the signature in the text. Left as the member wrote it, an HTML part draws it properly. */
+    if (!html) {
+      const sig = await memberSignature(db, currentUser(c), deploymentOrigin(c.req));
+      html = signedTextHtml(text, sig);
+    }
     await call(
       () =>
         hostingerRequest(key, "POST", `${base(c)}/send`, {

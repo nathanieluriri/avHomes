@@ -3,8 +3,11 @@ import { z } from "zod";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { currentDb, email, readJson, str, type AppEnv } from "@avhomes/core";
 import {
+  DEFAULT_COMPANY_SIGNATURE,
+  DEFAULT_SIGNATURE_PREFS,
   REPLY_IDENTITIES,
   type ClientLogo,
+  type CompanySignatureSettings,
   type Office,
   type ReplyIdentity,
   type SeoSettings,
@@ -12,6 +15,7 @@ import {
   type SocialPlatform,
 } from "@avhomes/contracts";
 import { requireAdmin, requireAuth } from "@avhomes/identity";
+import { sanitizeEmailHtml } from "./html";
 
 /**
  * The facts about this business that only its owner can supply.
@@ -48,6 +52,7 @@ interface SettingsDoc {
   clientLogos: ClientLogo[];
   social: Record<SocialPlatform, string>;
   seo: SeoSettings;
+  emailSignature?: Partial<CompanySignatureSettings>;
   updatedAt: number;
   revision: number;
 }
@@ -88,6 +93,7 @@ const DEFAULTS: SiteSettings = {
    * site is verified when it is not.
    */
   seo: { googleVerification: "", googleBusinessProfileUrl: "" },
+  emailSignature: DEFAULT_COMPANY_SIGNATURE,
   updatedAt: 0,
   revision: 0,
 };
@@ -104,6 +110,7 @@ const WRITABLE = [
   "clientLogos",
   "social",
   "seo",
+  "emailSignature",
 ] as const;
 
 function settings(db: Db) {
@@ -126,6 +133,11 @@ export async function readSettings(db: Db): Promise<SiteSettings> {
     clientLogos: doc.clientLogos ?? [],
     social: { ...DEFAULTS.social, ...(doc.social ?? {}) },
     seo: { ...DEFAULTS.seo, ...(doc.seo ?? {}) },
+    emailSignature: {
+      ...DEFAULT_COMPANY_SIGNATURE,
+      ...(doc.emailSignature ?? {}),
+      team: { ...DEFAULT_SIGNATURE_PREFS, ...(doc.emailSignature?.team ?? {}) },
+    },
     updatedAt: doc.updatedAt,
     revision: doc.revision,
   };
@@ -260,6 +272,28 @@ const ClientLogoBody = z
   })
   .strict();
 
+/** A signature someone wrote. HTML is cleaned here, once, so every send and preview can trust it. */
+export const SignaturePrefsBody = z
+  .object({
+    mode: z.enum(["default", "custom"]),
+    format: z.enum(["text", "html"]),
+    body: z.string().max(20_000).refine((v) => !v.includes("\u0000"), "control-character"),
+  })
+  .strict()
+  .transform((p) => ({ ...p, body: p.format === "html" ? sanitizeEmailHtml(p.body) : p.body.trim() }));
+
+/* An uploaded image is served from our own /api/public path, so relative is fine; anything else must be https. */
+const imageUrl = z.union([z.literal(""), str().trim().max(600).regex(/^(https:\/\/|\/api\/public\/images\/)[^\s]*$/u, "image-url")]);
+
+const EmailSignatureBody = z
+  .object({
+    companyName: str().max(120).trim(),
+    website: z.union([z.literal(""), str().trim().max(300).regex(/^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}(\/[^\s]*)?$/iu, "website")]),
+    logoUrl: imageUrl,
+    team: SignaturePrefsBody,
+  })
+  .strict();
+
 const UpdateBody = z
   .object({
     replyIdentity: z.enum(REPLY_IDENTITIES).optional(),
@@ -285,6 +319,7 @@ const UpdateBody = z
       .strict()
       .optional(),
     seo: SeoBody.optional(),
+    emailSignature: EmailSignatureBody.optional(),
   })
   .strict();
 

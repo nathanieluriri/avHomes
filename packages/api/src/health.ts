@@ -3,16 +3,22 @@ import { COLLECTIONS, type Db } from "@avhomes/db";
 import { currentDb, currentUser, type AppEnv } from "@avhomes/core";
 import { requireAuth } from "@avhomes/identity";
 import {
+  ALERT_SEVERITIES,
   PUBLIC_PROPERTY_STATUSES,
   hasDomain,
   isAdminRole,
   isScopedRole,
+  companySignatureGaps,
+  personSignatureGaps,
+  signatureAlerts,
   siteAlerts,
   splitFor,
   visibleAlerts,
+  type AuthUser,
+  type SignatureHealth,
   type SiteHealthSnapshot,
 } from "@avhomes/contracts";
-import { readPublicSettings } from "@avhomes/settings";
+import { readPublicSettings, readSettings } from "@avhomes/settings";
 import { marketingCounts, readMarketingSettings } from "@avhomes/marketing";
 import { soldStillListed } from "./awaiting-close";
 
@@ -55,14 +61,51 @@ export function healthRoutes(): Hono<AppEnv> {
        neither a partner's business nor something they can fix. Their own
        listing's gaps are listed on the listing, where they can act on them. */
     if (isScopedRole(user.role)) return c.json({ alerts: [] });
-    const snapshot = await gather(db);
+    const [snapshot, signatures] = await Promise.all([gather(db), signatureHealth(db, user)]);
     const alerts = visibleAlerts(siteAlerts(snapshot), (domain) =>
       domain === null ? isAdminRole(user.role) : hasDomain(user.role, domain),
     );
-    return c.json({ alerts });
+    // Already cut to the reader in signatureHealth: their own gaps, and the rest only for an admin.
+    const all = [...alerts, ...signatureAlerts(signatures)];
+    const rank = (a: (typeof all)[number]) => ALERT_SEVERITIES.indexOf(a.severity);
+    // Stable, so each severity keeps the registry's own order.
+    return c.json({ alerts: all.sort((a, b) => rank(a) - rank(b)) });
   });
 
   return routes;
+}
+
+/* The accounts that send mail from the console. Marketers and partners do not. */
+const SIGNING_ROLES = ["owner", "developer", "agent", "editor", "support"];
+
+async function signatureHealth(db: Db, user: AuthUser): Promise<SignatureHealth> {
+  const me = personSignatureGaps({ name: user.displayName, title: user.title, phone: user.phone, email: user.email });
+  if (!isAdminRole(user.role)) return { me, team: null, company: null };
+  const [site, members] = await Promise.all([
+    readSettings(db),
+    db
+      .collection<{ _id: string; displayName: string; title?: string | null; phone?: string | null; email: string }>(
+        COLLECTIONS.users,
+      )
+      .find(
+        { _id: { $ne: user.id }, disabledAt: null, role: { $in: SIGNING_ROLES } },
+        { projection: { displayName: 1, title: 1, phone: 1, email: 1 }, sort: { displayName: 1 } },
+      )
+      .toArray(),
+  ]);
+  const team = members
+    .map((m) => ({
+      name: m.displayName,
+      gaps: personSignatureGaps({ name: m.displayName ?? "", title: m.title ?? "", phone: m.phone ?? "", email: m.email ?? "" }),
+    }))
+    .filter((m) => m.gaps.length > 0);
+  const company = companySignatureGaps({
+    officeAddress: site.offices[0]?.address ?? "",
+    website: site.emailSignature.website,
+    phone: site.contactPhone,
+    email: site.contactEmail,
+  });
+  return { me, team, company };
 }
 
 /**

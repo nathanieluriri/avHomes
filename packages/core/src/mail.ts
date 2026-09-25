@@ -20,6 +20,11 @@ export interface MailMessage {
   replyTo?: string;
   /** Extra MIME headers, e.g. List-Unsubscribe on a newsletter. */
   headers?: Record<string, string>;
+  /**
+   * Who signs it. Absent means the company signature, added by the app mailer;
+   * `false` means none. Transports never read it.
+   */
+  signature?: { html: string; text: string } | false;
 }
 
 export interface Mailer {

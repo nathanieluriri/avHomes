@@ -28,6 +28,7 @@ import {
 } from "@avhomes/core";
 import {
   ENQUIRY_STATUSES,
+  appendSignature,
   referralCodeFrom,
   type Enquiry,
   type EnquiryChannel,
@@ -50,9 +51,11 @@ import {
 import {
   conversationHtml,
   conversationText,
+  enquirySignature,
   readSettings,
   renderEmail,
   replySignature,
+  signatureOrigin,
   type ConversationLine,
 } from "@avhomes/settings";
 
@@ -862,7 +865,12 @@ export function enquiriesAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     });
     await trySend(
       deps.mailer,
-      { to: after.email, ...replyEmail, replyTo: user.email },
+      {
+        to: after.email,
+        ...replyEmail,
+        replyTo: user.email,
+        signature: await enquirySignature(db, user, signatureOrigin(c.req)),
+      },
       { requestId: c.get("requestId"), route: "POST /admin/enquiries/:id/reply" },
     );
 
@@ -889,11 +897,18 @@ export function enquiriesAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       message: body.message,
       preview: body.preview,
     });
-    if (body.preview) return c.json({ email: rendered, sent: false });
+    const signed = await enquirySignature(db, user, signatureOrigin(c.req));
+    if (body.preview) return c.json({ email: appendSignature(rendered, signed), sent: false });
 
     const sent = await trySend(
       deps.mailer,
-      { to: doc.email, ...rendered, subject: body.subject?.trim() || rendered.subject, replyTo: user.email },
+      {
+        to: doc.email,
+        ...rendered,
+        subject: body.subject?.trim() || rendered.subject,
+        replyTo: user.email,
+        signature: signed,
+      },
       { requestId: c.get("requestId"), route: "POST /admin/enquiries/:id/email" },
     );
     if (!sent) {

@@ -49,6 +49,8 @@ import {
 import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
 import {
   appMailer,
+  senderChosen,
+  signatureRoutes,
   emailTemplateRoutes,
   mailSettingsRoutes,
   mailboxRoutes,
@@ -448,6 +450,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, mailSettingsRoutes({ mailer }));
   app.route(API_PREFIX, mailboxRoutes());
   app.route(API_PREFIX, mailStateRoutes());
+  app.route(API_PREFIX, signatureRoutes({ senderChosen }));
   app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin, notify }));
   app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
   /* The marketer app first, then the console's side of the same feature. The

@@ -15,6 +15,7 @@ import type {
   MailStateResponse,
   MailViewState,
   MailboxSummary,
+  RenderedSignature,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useDebounced, useMediaQuery } from "@/lib/admin/hooks";
@@ -29,6 +30,7 @@ import { MessageList } from "@/components/admin/mail/MessageList";
 import { MessageView } from "@/components/admin/mail/MessageView";
 import { ComposeFab, PhoneAccountSheet, PhoneSearchBar, PhoneSheet } from "@/components/admin/mail/PhoneMail";
 import { MailToast, type MailToastState } from "@/components/admin/mail/Toast";
+import { MailSetupCard } from "@/components/admin/mail/SetupCard";
 import { DEFAULT_PREFS, forgetContacts, usePrefsSaver } from "@/components/admin/mail/state";
 import {
   DRAFTS,
@@ -43,6 +45,8 @@ import {
   isSpecial,
   listQuery,
   replyDraft,
+  SignatureContext,
+  signDraft,
   sortFolders,
   type Draft,
 } from "@/components/admin/mail/shared";
@@ -320,6 +324,9 @@ function MailWorkspace({
     (signal) => api.get(`/admin/mail/mailboxes/${enc(mailbox)}/recipients`, signal),
     [mailbox],
   );
+  // Your signature, put into every new message. Mail still works if it cannot be read.
+  const mySignature = useAsync<{ signature: RenderedSignature }>((signal) => api.get("/admin/signature", signal), []);
+  const signature = mySignature.data?.signature ?? null;
 
   const sorted = sortFolders(folders.data?.folders ?? []);
   const current = sorted.find((f) => f.path === folder) ?? null;
@@ -414,7 +421,7 @@ function MailWorkspace({
     });
   }
 
-  const compose = () => openDraft(blankDraft(mailbox));
+  const compose = () => openDraft(signDraft(blankDraft(mailbox), signature));
 
   function layout(id: string, next: { minimized: boolean; expanded: boolean }) {
     setWindows((prev) =>
@@ -558,7 +565,7 @@ function MailWorkspace({
       if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=menu]")) return;
       if (event.key === "c") {
         event.preventDefault();
-        openDraftRef.current(blankDraft(mailboxRef.current));
+        openDraftRef.current(signDraft(blankDraft(mailboxRef.current), signatureRef.current));
       } else if (event.key === "/") {
         event.preventDefault();
         document.querySelector<HTMLInputElement>('input[aria-label="Search mail"]')?.focus();
@@ -574,7 +581,9 @@ function MailWorkspace({
   const openDraftRef = useRef(openDraft);
   const mailboxRef = useRef(mailbox);
   const readingRef = useRef(reading);
+  const signatureRef = useRef(signature);
   useEffect(() => {
+    signatureRef.current = signature;
     openDraftRef.current = openDraft;
     mailboxRef.current = mailbox;
     readingRef.current = reading;
@@ -626,8 +635,8 @@ function MailWorkspace({
         setOpen(null);
         refresh();
       }}
-      onReply={(m) => openDraft(replyDraft(mailbox, m))}
-      onForward={(m) => openDraft(forwardDraft(mailbox, m))}
+      onReply={(m) => openDraft(signDraft(replyDraft(mailbox, m), signature))}
+      onForward={(m) => openDraft(signDraft(forwardDraft(mailbox, m), signature))}
       onChanged={refresh}
     />
   );
@@ -679,7 +688,7 @@ function MailWorkspace({
   });
 
   const overlays = (
-    <>
+    <SignatureContext.Provider value={signature}>
       {wide
         ? docked.map(({ w, at }) => (
             <ComposeWindow
@@ -721,8 +730,11 @@ function MailWorkspace({
           }}
         />
       )}
-    </>
+    </SignatureContext.Provider>
   );
+
+  // Gmail's setup card, over the inbox only.
+  const setupCard = folder === "INBOX" && !reading ? <MailSetupCard phone={!wide} /> : null;
 
   if (!wide) {
     return (
@@ -747,7 +759,12 @@ function MailWorkspace({
                 key={listKey}
                 {...listProps}
                 variant="phone"
-                lead={chips}
+                lead={
+                  <>
+                    {chips}
+                    {setupCard}
+                  </>
+                }
                 label={folderLabel(current, folder)}
                 onScrollDown={setScrolledDown}
               />
@@ -811,6 +828,7 @@ function MailWorkspace({
                   density={density}
                   onDensity={changeDensity}
                   keys={!reading}
+                  banner={setupCard}
                 />
               </>
             ))}

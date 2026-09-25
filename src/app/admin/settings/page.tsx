@@ -1,23 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Mail, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
+  COMPANY_FIELD_LABEL,
+  DEFAULT_COMPANY_NAME,
   REPLY_IDENTITIES,
   SOCIAL_PLATFORMS,
   type ClientLogo,
+  type CompanySignatureSettings,
   type Office,
   type ReplyIdentity,
   type SeoSettings,
   type SiteSettings,
   type SocialPlatform,
+  companySignatureGaps,
   isAdminRole,
+  listWords,
+  renderSignature,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useSession } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { MailDeliveryCard } from "@/components/admin/MailDeliveryCard";
 import { SaveBar } from "@/components/admin/SaveBar";
+import { SignatureEditor } from "@/components/admin/mail/SignatureEditor";
 import {
   Button,
   Card,
@@ -66,6 +73,7 @@ interface Draft {
   clientLogos: ClientLogo[];
   social: Record<SocialPlatform, string>;
   seo: SeoSettings;
+  emailSignature: CompanySignatureSettings;
 }
 
 /** Field labels only. What is stored is the whole URL. */
@@ -89,6 +97,7 @@ function toDraft(s: SiteSettings): Draft {
     clientLogos: s.clientLogos,
     social: s.social,
     seo: s.seo,
+    emailSignature: s.emailSignature,
   };
 }
 
@@ -168,6 +177,30 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
   }
 
   const isTeam = draft.replyIdentity === "team";
+
+  // The team's standard signature, redrawn from the fields on this page as they change.
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const sig = draft.emailSignature;
+  const office = draft.offices[0]?.address ?? "";
+  const teamStandard = renderSignature(
+    { name: draft.teamName, title: "", phone: draft.contactPhone, email: draft.contactEmail },
+    {
+      name: sig.companyName,
+      phone: draft.contactPhone,
+      email: draft.contactEmail,
+      officeAddress: office,
+      website: sig.website || origin,
+      logoUrl: sig.logoUrl,
+      assetOrigin: origin,
+    },
+  );
+  const sigGaps = companySignatureGaps({
+    officeAddress: office,
+    website: sig.website,
+    phone: draft.contactPhone,
+    email: draft.contactEmail,
+  });
+  const setSig = (next: Partial<CompanySignatureSettings>) => set("emailSignature", { ...sig, ...next });
 
   return (
     <>
@@ -370,80 +403,83 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
             </Field>
           </Card>
 
-          <Card className="space-y-4">
-            <CardHead
-              title="Offices"
-              action={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => set("offices", [...draft.offices, { label: "", address: "" }])}
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
-                  Add
-                </Button>
-              }
-            />
-            {draft.offices.length === 0 ? (
-              <EmptyState
-                bare
-                title="No office published"
-                hint="A visitor has no way to check there is a real place behind the site."
+          <section id="offices" className="scroll-mt-24">
+            <Card className="space-y-4">
+              <CardHead
+                title="Offices"
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => set("offices", [...draft.offices, { label: "", address: "" }])}
+                  >
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+                    Add
+                  </Button>
+                }
               />
-            ) : (
-              draft.offices.map((office, index) => (
-                <div key={index} className="rounded-xl border border-mist-200 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                      Office {index + 1}
-                    </span>
-                    <IconButton
-                      label={`Remove office ${index + 1}`}
-                      icon={Trash2}
-                      size="dense"
-                      variant="danger"
-                      onClick={() =>
-                        set(
-                          "offices",
-                          draft.offices.filter((_, i) => i !== index),
-                        )
-                      }
-                    />
+              {draft.offices.length === 0 ? (
+                <EmptyState
+                  bare
+                  title="No office published"
+                  hint="A visitor has no way to check there is a real place behind the site."
+                />
+              ) : (
+                draft.offices.map((office, index) => (
+                  <div key={index} className="rounded-xl border border-mist-200 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                        Office {index + 1}
+                      </span>
+                      <IconButton
+                        label={`Remove office ${index + 1}`}
+                        icon={Trash2}
+                        size="dense"
+                        variant="danger"
+                        onClick={() =>
+                          set(
+                            "offices",
+                            draft.offices.filter((_, i) => i !== index),
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <input
+                        className={inputClass}
+                        value={office.label}
+                        placeholder="Lagos"
+                        aria-label={`Office ${index + 1} name`}
+                        onChange={(event) =>
+                          set(
+                            "offices",
+                            draft.offices.map((o, i) =>
+                              i === index ? { ...o, label: event.target.value } : o,
+                            ),
+                          )
+                        }
+                      />
+                      <input
+                        className={inputClass}
+                        value={office.address}
+                        placeholder="14 Admiralty Way, Lekki Phase 1"
+                        aria-label={`Office ${index + 1} address`}
+                        onChange={(event) =>
+                          set(
+                            "offices",
+                            draft.offices.map((o, i) =>
+                              i === index ? { ...o, address: event.target.value } : o,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <input
-                      className={inputClass}
-                      value={office.label}
-                      placeholder="Lagos"
-                      aria-label={`Office ${index + 1} name`}
-                      onChange={(event) =>
-                        set(
-                          "offices",
-                          draft.offices.map((o, i) =>
-                            i === index ? { ...o, label: event.target.value } : o,
-                          ),
-                        )
-                      }
-                    />
-                    <input
-                      className={inputClass}
-                      value={office.address}
-                      placeholder="14 Admiralty Way, Lekki Phase 1"
-                      aria-label={`Office ${index + 1} address`}
-                      onChange={(event) =>
-                        set(
-                          "offices",
-                          draft.offices.map((o, i) =>
-                            i === index ? { ...o, address: event.target.value } : o,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </Card>
+                ))
+              )}
+            </Card>
+
+          </section>
 
           <Card className="space-y-4">
             <CardHead
@@ -557,8 +593,66 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
             </Card>
           )}
 
+          <section id="email-signature" className="scroll-mt-24">
+            <Card className="space-y-4">
+              <CardHead title="Email signature" icon={Mail} />
+              <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
+                Every email AV Homes sends ends with a signature. Each person&apos;s is built
+                from their profile and these details; mail nobody signs, like invites,
+                sign-in codes, newsletters and team replies, uses the team signature below.
+                Phone, email and office come from the cards above.
+              </p>
+              {sigGaps.length > 0 && (
+                <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] leading-relaxed text-amber-950">
+                  Signatures are missing your {listWords(sigGaps.map((f) => COMPANY_FIELD_LABEL[f]))}. Emails still
+                  go out, without {sigGaps.length === 1 ? "that line" : "those lines"}.
+                </p>
+              )}
+              <Field label="Company name" hint={`Shown beside every job title. Empty uses ${DEFAULT_COMPANY_NAME}.`}>
+                <input
+                  className={inputClass}
+                  value={sig.companyName}
+                  placeholder={DEFAULT_COMPANY_NAME}
+                  onChange={(event) => setSig({ companyName: event.target.value })}
+                />
+              </Field>
+              <Field label="Website" hint="The link at the foot of every signature. Empty links this site's own address.">
+                <input
+                  className={inputClass}
+                  type="url"
+                  inputMode="url"
+                  value={sig.website}
+                  placeholder="https://www.avhomesltd.com"
+                  onChange={(event) => setSig({ website: event.target.value })}
+                />
+              </Field>
+              <Field label="Signature logo" hint="Optional. A square image works best; it is drawn as a circle. Empty uses the round AV Homes logo." as="group">
+                <ImagePicker
+                  value={sig.logoUrl ? [sig.logoUrl] : []}
+                  onChange={(urls) => setSig({ logoUrl: urls[0] ?? "" })}
+                  max={1}
+                  coverLabel="Signature logo"
+                />
+              </Field>
+              <Field label="Team signature" as="group">
+                <SignatureEditor
+                  name="team-signature"
+                  value={sig.team}
+                  onChange={(team) => setSig({ team })}
+                  standard={teamStandard}
+                  standardLabel="Use the AV Homes signature"
+                  standardBlurb="The team name and the company's details, kept up to date when they change."
+                />
+              </Field>
+            </Card>
+          </section>
+
           {/* Owner and developer only, the same line the server draws. */}
-          {me && isAdminRole(me.role) && <MailDeliveryCard defaultTestTo={me.email} />}
+          {me && isAdminRole(me.role) && (
+            <div id="email-delivery" className="scroll-mt-24">
+              <MailDeliveryCard defaultTestTo={me.email} />
+            </div>
+          )}
         </div>
       </PageColumns>
     </>

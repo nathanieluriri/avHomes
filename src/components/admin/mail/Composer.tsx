@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Dialog } from "radix-ui";
 import { ArrowLeft, ChevronDown, Maximize2, Minimize2, Minus, Send, Trash2, X } from "lucide-react";
@@ -11,6 +11,7 @@ import { Button, ConfirmButton, ErrorNote, Field, inputClass } from "@/component
 import { RecentCircles, RecipientField } from "./Recipients";
 import { type SaveState, useContacts, useDraftAutosave } from "./state";
 import {
+  SignatureContext,
   type Draft,
   asApiError,
   draftIsEmpty,
@@ -19,12 +20,12 @@ import {
   htmlToText,
   isEmail,
   newDraftId,
-  textToHtml,
+  textToHtmlSigned,
 } from "./shared";
 
 /* ─────────────────────────────── the draft ───────────────────────────── */
 
-type Segment = "write" | "html" | "preview";
+export type Segment = "write" | "html" | "preview";
 
 /**
  * One draft being edited: its fields, the recipient lines, the Write, HTML and
@@ -34,6 +35,7 @@ type Segment = "write" | "html" | "preview";
  * chip that the same keystroke just committed.
  */
 function useCompose(initial: Draft, onSaved: (saved: MailDraft) => void) {
+  const signature = useContext(SignatureContext);
   const [draft, setDraft] = useState(initial);
   const ref = useRef(initial);
   const [segment, setSegment] = useState<Segment>(initial.mode === "html" ? "html" : "write");
@@ -64,7 +66,7 @@ function useCompose(initial: Draft, onSaved: (saved: MailDraft) => void) {
       }
       update((d) => ({ ...d, mode: "text" }));
     } else if (draft.mode === "text") {
-      update((d) => ({ ...d, mode: "html", html: d.html.trim() === "" ? textToHtml(d.text) : d.html }));
+      update((d) => ({ ...d, mode: "html", html: d.html.trim() === "" ? textToHtmlSigned(d.text, signature) : d.html }));
     }
     setSegment(next);
   }
@@ -127,9 +129,18 @@ const SEGMENTS: { id: Segment; label: string }[] = [
   { id: "preview", label: "Preview" },
 ];
 
-function ModeSwitch({ value, onPick }: { value: Segment; onPick: (next: Segment) => void }) {
+/** Write, HTML and Preview. Also the signature editor's switch, so both read the same. */
+export function ModeSwitch({
+  value,
+  onPick,
+  label = "Message format",
+}: {
+  value: Segment;
+  onPick: (next: Segment) => void;
+  label?: string;
+}) {
   return (
-    <div role="radiogroup" aria-label="Message format" className="inline-flex shrink-0 rounded-lg bg-mist-100 p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex shrink-0 rounded-lg bg-mist-100 p-0.5">
       {SEGMENTS.map((s) => (
         <button
           key={s.id}
@@ -281,8 +292,8 @@ function Body({ c, phone, autoFocus }: { c: Compose; phone: boolean; autoFocus: 
   const d = c.draft;
   const pad = phone ? "px-4" : "px-3";
   const bodyFocus = (event: FocusEvent<HTMLTextAreaElement>) => {
-    // A reply opens with the quote below an empty first line; start typing above it.
-    if (d.inReplyTo && d.revision === 0 && event.currentTarget.selectionStart === event.currentTarget.value.length) {
+    // A new message opens with the signature (and any quote) below an empty first line; start typing above it.
+    if (d.revision === 0 && d.text.startsWith("\n") && event.currentTarget.selectionStart === event.currentTarget.value.length) {
       event.currentTarget.setSelectionRange(0, 0);
     }
   };

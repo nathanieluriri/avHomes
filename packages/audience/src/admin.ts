@@ -21,6 +21,7 @@ import {
   type Mailer,
 } from "@avhomes/core";
 import {
+  appendSignature,
   emptyDoc,
   validateDoc,
   NEWSLETTER_FORMATS,
@@ -32,6 +33,7 @@ import {
 } from "@avhomes/contracts";
 import { requireAuth, tokenId } from "@avhomes/identity";
 import {
+  companySignature,
   docToEmailHtml,
   docToEmailText,
   htmlToText,
@@ -39,6 +41,7 @@ import {
   readTemplate,
   renderWith,
   sanitizeEmailHtml,
+  signatureOrigin,
 } from "@avhomes/settings";
 
 /**
@@ -375,7 +378,10 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     if (!(await newsletters(db).findOne({ _id: id }, { projection: { _id: 1 } }))) throw new NotFoundError(`newsletter ${id}`);
     const draft = await readJson(c, PreviewBody);
     const content = draft.content === undefined ? emptyDoc() : validateDoc(draft.content);
-    const email = await newsletterEmail(db, requestOrigin(c.req), { ...draft, content }, { id: "preview", email: "" });
+    const email = appendSignature(
+      await newsletterEmail(db, requestOrigin(c.req), { ...draft, content }, { id: "preview", email: "" }),
+      await companySignature(db, signatureOrigin(c.req)),
+    );
     return c.json({ email: { subject: email.subject, html: email.html, text: email.text } });
   });
 

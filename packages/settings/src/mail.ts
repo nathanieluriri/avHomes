@@ -24,6 +24,7 @@ import {
 } from "@avhomes/core";
 import type { MailProvider, MailSettingsView } from "@avhomes/contracts";
 import { requireAdmin } from "@avhomes/identity";
+import { signingMailer } from "./signature";
 
 /**
  * Email delivery: which Hostinger mailbox the site sends as, and the key.
@@ -114,10 +115,20 @@ export function cachedMailSender(resolveDb: () => Promise<Db>): Promise<Hostinge
 
 /**
  * The one transport the whole app sends through: the Hostinger mailbox when a
- * key is set, the Resend environment otherwise.
+ * key is set, the Resend environment otherwise. Every message is signed on the
+ * way through.
  */
 export function appMailer(resolveDb: () => Promise<Db>): Mailer {
-  return mailerWithFallback(hostingerMailer(() => cachedMailSender(resolveDb)), resendMailer());
+  return signingMailer(
+    mailerWithFallback(hostingerMailer(() => cachedMailSender(resolveDb)), resendMailer()),
+    resolveDb,
+  );
+}
+
+/** False while the site sends as whichever mailbox the key lists first. */
+export async function senderChosen(db: Db): Promise<boolean> {
+  const view = await readMailSettings(db);
+  return view.provider !== "hostinger" || view.senderMailboxId !== "";
 }
 
 /* ─────────────────────────────── the view ──────────────────────────────── */

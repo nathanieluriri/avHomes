@@ -108,8 +108,8 @@ interface Rule {
    * `null` means this path gates ITSELF and the table must not gate it.
    *
    * Reserved for a route that answers every role a DIFFERENT thing rather than
-   * answering some roles nothing. There are five (health, tutorials,
-   * notifications, mail-status, company), and the bar for a sixth is that its
+   * answering some roles nothing. There are six (health, tutorials,
+   * notifications, mail-status, signature, company), and the bar for a seventh is that its
    * handler already filters its own output per caller: a null here opts a path
    * out of the catch-all below, so anything that merely wants to be reachable
    * by several roles wants a domain, not this.
@@ -181,6 +181,8 @@ const RULES: readonly Rule[] = [
   { prefix: "/api/admin/notifications", domain: null, subtree: true },
   /* SELF-GATING: a yes or no about mail configuration, for every signed-in member. */
   { prefix: "/api/admin/mail-status", domain: null },
+  /* SELF-GATING: reads and writes only the caller's own email signature. */
+  { prefix: "/api/admin/signature", domain: null },
   { prefix: "/api/admin/marketing", domain: "marketing", subtree: true },
   { prefix: "/api/admin/users", domain: "team" },
   { prefix: "/api/admin/invites", domain: "team" },

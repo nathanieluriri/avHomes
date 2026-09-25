@@ -1,5 +1,6 @@
 import type { PartnerRole, Role } from "./roles";
 import type { DocNode } from "./doc";
+import type { CompanySignatureSettings } from "./signature";
 
 /* ─────────────────────────────── identity ─────────────────────────────── */
 
@@ -582,6 +583,8 @@ export interface SiteSettings {
   social: Record<SocialPlatform, string>;
   /** See SeoSettings. All empty is the shape of a site nobody has listed yet. */
   seo: SeoSettings;
+  /** The company's half of every email signature. Console only, never public. */
+  emailSignature: CompanySignatureSettings;
   updatedAt: number;
   revision: number;
 }

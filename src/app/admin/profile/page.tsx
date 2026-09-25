@@ -1,12 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { UserRound } from "lucide-react";
-import type { AuthUser } from "@avhomes/contracts";
+import { Mail, UserRound } from "lucide-react";
+import {
+  PERSON_FIELD_LABEL,
+  listWords,
+  personSignatureGaps,
+  renderSignature,
+  type AuthUser,
+  type RenderedSignature,
+  type SignatureCompany,
+  type SignaturePrefs,
+} from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { useSession } from "@/lib/admin/hooks";
+import { useAsync, useSession } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { SaveBar } from "@/components/admin/SaveBar";
+import { SignatureEditor } from "@/components/admin/mail/SignatureEditor";
 import {
   Card,
   CardHead,
@@ -43,6 +53,14 @@ interface Draft {
   avatarUrl: string;
 }
 
+/** GET and PUT /admin/signature. */
+interface SignatureState {
+  prefs: SignaturePrefs;
+  signature: RenderedSignature;
+  standard: RenderedSignature;
+  company: SignatureCompany;
+}
+
 function toDraft(user: AuthUser): Draft {
   return {
     displayName: user.displayName,
@@ -54,8 +72,9 @@ function toDraft(user: AuthUser): Draft {
 
 export default function ProfilePage() {
   const { session, refresh } = useSession();
+  const signature = useAsync<SignatureState>((signal) => api.get<SignatureState>("/admin/signature", signal), []);
 
-  if (session.status !== "signed-in") {
+  if (session.status !== "signed-in" || signature.loading) {
     return (
       <>
         <PageHeader icon={UserRound} title="Your profile" />
@@ -68,17 +87,45 @@ export default function ProfilePage() {
   }
 
   // Keyed on the id so a different account never inherits the last one's draft.
-  return <ProfileEditor key={session.user.id} initial={session.user} onSaved={refresh} />;
+  return (
+    <ProfileEditor
+      key={session.user.id}
+      initial={session.user}
+      signature={signature.data}
+      signatureError={signature.error}
+      onSaved={refresh}
+    />
+  );
 }
 
-function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () => void }) {
+function ProfileEditor({
+  initial,
+  signature,
+  signatureError,
+  onSaved,
+}: {
+  initial: AuthUser;
+  /** Null when it could not be read; the profile still saves. */
+  signature: SignatureState | null;
+  signatureError: ApiError | null;
+  onSaved: () => void;
+}) {
   const [user, setUser] = useState<AuthUser>(initial);
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
+  const [sigSaved, setSigSaved] = useState<SignaturePrefs | null>(signature?.prefs ?? null);
+  const [sigDraft, setSigDraft] = useState<SignaturePrefs | null>(signature?.prefs ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
   // Derived, never a flag set by each handler. See the listing editor for why.
-  const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(user));
+  const profileDirty = JSON.stringify(draft) !== JSON.stringify(toDraft(user));
+  const sigDirty = JSON.stringify(sigDraft) !== JSON.stringify(sigSaved);
+  const dirty = profileDirty || sigDirty;
+
+  // The standard signature redrawn from the fields as they are typed.
+  const person = { name: draft.displayName, title: draft.title, phone: draft.phone, email: user.email };
+  const standard = signature ? renderSignature(person, signature.company) : null;
+  const gaps = personSignatureGaps(person);
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -88,6 +135,12 @@ function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () =>
     setBusy(true);
     setError(null);
     try {
+      if (sigDirty && sigDraft) {
+        const res = await api.put<SignatureState>("/admin/signature", sigDraft);
+        setSigSaved(res.prefs);
+        setSigDraft(res.prefs);
+      }
+      if (!profileDirty) return;
       const res = await api.patch<{ user: AuthUser }>("/auth/me", draft);
       setUser(res.user);
       setDraft(toDraft(res.user));
@@ -116,6 +169,7 @@ function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () =>
         saving={busy}
         onDiscard={() => {
           setDraft(toDraft(user));
+          setSigDraft(sigSaved);
           setError(null);
         }}
         onSave={() => void save()}
@@ -242,6 +296,34 @@ function ProfileEditor({ initial, onSaved }: { initial: AuthUser; onSaved: () =>
               />
             </Field>
           </Card>
+
+          <section id="signature" className="scroll-mt-24">
+            <Card>
+              <CardHead title="Email signature" icon={Mail} />
+              <p className="-mt-1 mb-3 text-[12px] leading-relaxed text-slate-600">
+                Every email you send ends with it: replies to enquiries, and mail you write
+                under Mailboxes. It is built from your name, title and phone above and the
+                company details in Settings.
+              </p>
+              {gaps.length > 0 && (
+                <p role="status" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] leading-relaxed text-amber-950">
+                  Your signature is missing your {listWords(gaps.map((f) => PERSON_FIELD_LABEL[f]))}. Add{" "}
+                  {gaps.length === 1 ? "it" : "them"} above to complete it.
+                </p>
+              )}
+              {signatureError && <ErrorNote error={signatureError} />}
+              {standard && sigDraft && (
+                <SignatureEditor
+                  name="my-signature"
+                  value={sigDraft}
+                  onChange={setSigDraft}
+                  standard={standard}
+                  standardLabel="Use the AV Homes signature"
+                  standardBlurb="Your details and the company's, laid out the same for everyone, and kept up to date when either changes."
+                />
+              )}
+            </Card>
+          </section>
         </div>
       </PageColumns>
     </>
