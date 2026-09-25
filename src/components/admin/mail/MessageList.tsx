@@ -17,7 +17,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import type { MailDensity, MailFolder, MailMessagePage, MailMessageSummary } from "@avhomes/contracts";
+import type { MailDensity, MailFolder, MailMessageRef, MailThreadPage, MailThreadSummary } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { BottomSheet, ResponsiveMenu } from "@/components/admin/BottomSheet";
 import { EmptyState, ErrorNote, Skeleton } from "@/components/admin/ui";
@@ -34,25 +34,32 @@ import {
   folderLabel,
   keyOf,
   listDate,
-  who,
+  participantsLabel,
 } from "./shared";
 
 type Patch = { unseen?: boolean; flagged?: boolean };
 
-/** Flag and move calls, grouped per folder, since a Starred page spans several. */
+type Target = MailMessageRef & { members?: MailMessageRef[] };
+
+/**
+ * Flag and move calls, grouped per folder, since a Starred page spans several.
+ * A conversation row stands for all of its messages in the folder listed.
+ */
 export function useMailActions(mailbox: string, onDone: () => void) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<ApiError | null>(null);
 
-  async function run(items: MailMessageSummary[], body: (uids: number[]) => { path: string; payload: unknown }) {
-    const groups = new Map<string, number[]>();
-    for (const m of items) groups.set(m.folder, [...(groups.get(m.folder) ?? []), m.uid]);
+  async function run(items: Target[], body: (uids: number[]) => { path: string; payload: unknown }) {
+    const groups = new Map<string, Set<number>>();
+    for (const m of items.flatMap((t) => t.members ?? [t])) {
+      groups.set(m.folder, (groups.get(m.folder) ?? new Set()).add(m.uid));
+    }
     setBusy(true);
     setProblem(null);
     try {
       await Promise.all(
         [...groups].map(([folder, uids]) => {
-          const { path, payload } = body(uids);
+          const { path, payload } = body([...uids]);
           return api.post(`/admin/mail/mailboxes/${enc(mailbox)}/folders/${enc(folder)}/messages/${path}`, payload);
         }),
       );
@@ -70,9 +77,9 @@ export function useMailActions(mailbox: string, onDone: () => void) {
   return {
     busy,
     problem,
-    flags: (items: MailMessageSummary[], change: { read?: boolean; flagged?: boolean }) =>
+    flags: (items: Target[], change: { read?: boolean; flagged?: boolean }) =>
       run(items, (uids) => ({ path: "flags", payload: { uids, ...change } })),
-    move: (items: MailMessageSummary[], targetFolder: string) =>
+    move: (items: Target[], targetFolder: string) =>
       run(items, (uids) => ({ path: "move", payload: { uids, targetFolder } })),
   };
 }
@@ -80,6 +87,7 @@ export function useMailActions(mailbox: string, onDone: () => void) {
 export function MessageList({
   variant = "desk",
   mailbox,
+  mailboxAddress,
   folderPath,
   folders,
   state,
@@ -101,13 +109,15 @@ export function MessageList({
   /** "phone" draws Gmail's app list: avatars, long-press selection, a toolbar over the search bar. */
   variant?: "desk" | "phone";
   mailbox: string;
+  /** For "me" among a conversation's people. */
+  mailboxAddress: string;
   folderPath: string;
   folders: MailFolder[];
-  state: { data: MailMessagePage | null; error: ApiError | null; loading: boolean; reload: () => void };
+  state: { data: MailThreadPage | null; error: ApiError | null; loading: boolean; reload: () => void };
   page: number;
   filtered: boolean;
   onPage: (page: number) => void;
-  onOpen: (m: MailMessageSummary) => void;
+  onOpen: (m: MailThreadSummary) => void;
   onRefresh: () => void;
   onChanged: () => void;
   onFolderSettings: (() => void) | null;
@@ -147,7 +157,7 @@ export function MessageList({
   const inTrash = trash !== null && trash.path === folderPath;
   const targets = folders.filter((f) => f.path !== folderPath);
 
-  function patch(list: MailMessageSummary[], change: Patch) {
+  function patch(list: MailThreadSummary[], change: Patch) {
     setPatches((prev) => {
       const next = new Map(prev);
       for (const m of list) next.set(keyOf(m), { ...next.get(keyOf(m)), ...change });
@@ -155,25 +165,25 @@ export function MessageList({
     });
   }
 
-  async function setRead(list: MailMessageSummary[], read: boolean) {
+  async function setRead(list: MailThreadSummary[], read: boolean) {
     patch(list, { unseen: !read });
     await actions.flags(list, { read });
   }
 
-  async function setStar(list: MailMessageSummary[], flagged: boolean) {
+  async function setStar(list: MailThreadSummary[], flagged: boolean) {
     patch(list, { flagged });
     await actions.flags(list, { flagged });
   }
 
-  async function moveTo(list: MailMessageSummary[], target: string) {
+  async function moveTo(list: MailThreadSummary[], target: string) {
     if (await actions.move(list, target)) setSelected(new Set());
   }
 
-  function selectWhere(test: (m: MailMessageSummary) => boolean) {
+  function selectWhere(test: (m: MailThreadSummary) => boolean) {
     setSelected(new Set(items.filter(test).map(keyOf)));
   }
 
-  function toggle(m: MailMessageSummary, on: boolean) {
+  function toggle(m: MailThreadSummary, on: boolean) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (on) next.add(keyOf(m));
@@ -460,6 +470,7 @@ export function MessageList({
                 <PhoneRow
                   key={keyOf(m)}
                   message={m}
+                  sender={participantsLabel(m.participants, mailboxAddress)}
                   folder={folderPath === STARRED ? (folders.find((f) => f.path === m.folder) ?? null) : null}
                   selected={selected.has(keyOf(m))}
                   selecting={selecting}
@@ -532,6 +543,7 @@ export function MessageList({
             {items.map((m, i) => (
               <MessageRow
                 key={keyOf(m)}
+                sender={participantsLabel(m.participants, mailboxAddress)}
                 index={i}
                 cursor={i === cursor}
                 compact={density === "compact"}
@@ -621,6 +633,7 @@ function SelectAll({
 }
 
 function MessageRow({
+  sender,
   index,
   cursor,
   compact,
@@ -637,11 +650,13 @@ function MessageRow({
   onRead,
   onMove,
 }: {
+  /** The conversation's people, "Nathaniel, me". */
+  sender: string;
   index: number;
   /** The keyboard's place in the list. */
   cursor: boolean;
   compact: boolean;
-  message: MailMessageSummary;
+  message: MailThreadSummary;
   folders: MailFolder[];
   showFolder: boolean;
   selected: boolean;
@@ -693,7 +708,10 @@ function MessageRow({
         onClick={onOpen}
         className={`flex min-w-0 flex-1 items-center gap-3 pl-1 text-left xl:gap-4 ${compact ? "min-h-8 py-1" : "min-h-10 py-2"}`}
       >
-        <span className={`w-44 shrink-0 truncate text-[13px] xl:w-56 ${weight}`}>{who(m)}</span>
+        <span className={`flex w-44 shrink-0 items-baseline gap-1 text-[13px] xl:w-56 ${weight}`}>
+          <span className="min-w-0 truncate">{sender}</span>
+          {m.count > 1 && <span className="shrink-0 text-[12px] font-normal text-slate-600">{m.count}</span>}
+        </span>
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           {showFolder && home && (
             <span className="shrink-0 rounded bg-mist-100 px-1.5 py-px text-[11px] font-medium text-slate-600">

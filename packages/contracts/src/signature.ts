@@ -224,12 +224,61 @@ export function textToEmailHtml(text: string): string {
   if (text.trim() === "") return "";
   return text
     .split(/\n{2,}/u)
+    .filter((para) => para.trim() !== "")
     .map(
       (para) =>
         `<p style="margin:0 0 14px;font-family:${FONT};font-size:14px;line-height:1.6;color:${INK}">${esc(para)
           .replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)]/gu, (url) => `<a href="${url}" style="color:${WINE}">${url}</a>`)
           .replace(/\n/gu, "<br>")}</p>`,
     )
+    .join("\n");
+}
+
+/** The quoted history under a plain text reply: "On ..., X wrote:" and the `>` lines after it. */
+export interface ReplyQuote {
+  body: string;
+  attribution: string;
+  /** The quoted lines with one level of `>` taken off. */
+  quoted: string;
+}
+
+const ATTRIBUTION = /^On\b.*\bwrote:\s*$/iu;
+
+/** Splits a reply's own words from the history it quotes, or null when there is none. */
+export function splitReplyQuote(text: string): ReplyQuote | null {
+  const lines = text.replace(/\r\n?/gu, "\n").split("\n");
+  for (let i = 0; i < lines.length; i += 1) {
+    let end = -1;
+    if (ATTRIBUTION.test(lines[i])) end = i;
+    // Clients wrap a long attribution onto a second line.
+    else if (/^On\b/iu.test(lines[i]) && i + 1 < lines.length && /\bwrote:\s*$/iu.test(lines[i + 1])) end = i + 1;
+    if (end < 0) continue;
+    let q = end + 1;
+    while (q < lines.length && lines[q].trim() === "") q += 1;
+    if (q >= lines.length || !lines[q].startsWith(">")) continue;
+    const rest = lines.slice(q);
+    // Only a quote that runs to the end: text after it is the member's own.
+    if (rest.some((line) => line.trim() !== "" && !line.startsWith(">"))) continue;
+    return {
+      body: lines.slice(0, i).join("\n").replace(/\s+$/u, ""),
+      attribution: lines.slice(i, end + 1).join(" ").trim(),
+      quoted: rest.map((line) => line.replace(/^> ?/u, "")).join("\n").trim(),
+    };
+  }
+  return null;
+}
+
+/** Gmail's own quote markup, so Gmail folds the history behind its toggle. */
+export function quoteBlockHtml(attributionHtml: string, innerHtml: string): string {
+  return `<div class="gmail_quote"><div dir="ltr" class="gmail_attr">${attributionHtml}<br></div><blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">${innerHtml}</blockquote></div>`;
+}
+
+/** A plain text message as email HTML, its quoted history wrapped the way Gmail wraps it. */
+export function messageTextToEmailHtml(text: string): string {
+  const split = splitReplyQuote(text);
+  if (!split) return textToEmailHtml(text);
+  return [textToEmailHtml(split.body), quoteBlockHtml(esc(split.attribution), textToEmailHtml(split.quoted))]
+    .filter(Boolean)
     .join("\n");
 }
 
@@ -289,8 +338,8 @@ export function plainEmailHtml(text: string): string {
   return `<!doctype html>
 <html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff">
-<div lang="en" dir="ltr" style="padding:16px;max-width:640px">
-${textToEmailHtml(text)}
+<div lang="en" dir="ltr" style="margin:0;padding:0;max-width:640px">
+${messageTextToEmailHtml(text)}
 ${SIGNATURE_SLOT}
 </div>
 </body></html>`;

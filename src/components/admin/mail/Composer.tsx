@@ -9,6 +9,7 @@ import { ApiError, api } from "@/lib/admin/client";
 import { BottomSheet } from "@/components/admin/BottomSheet";
 import { Button, ConfirmButton, ErrorNote, Field, inputClass } from "@/components/admin/ui";
 import { RecentCircles, RecipientField } from "./Recipients";
+import { type Segment, useFormatSwitch } from "./formatSwitch";
 import { type SaveState, useContacts, useDraftAutosave } from "./state";
 import {
   SignatureContext,
@@ -17,7 +18,7 @@ import {
   draftIsEmpty,
   draftTitle,
   enc,
-  htmlToText,
+  htmlToTextSigned,
   isEmail,
   newDraftId,
   textToHtmlSigned,
@@ -25,7 +26,7 @@ import {
 
 /* ─────────────────────────────── the draft ───────────────────────────── */
 
-export type Segment = "write" | "html" | "preview";
+export type { Segment } from "./formatSwitch";
 
 /**
  * One draft being edited: its fields, the recipient lines, the Write, HTML and
@@ -38,8 +39,6 @@ function useCompose(initial: Draft, onSaved: (saved: MailDraft) => void) {
   const signature = useContext(SignatureContext);
   const [draft, setDraft] = useState(initial);
   const ref = useRef(initial);
-  const [segment, setSegment] = useState<Segment>(initial.mode === "html" ? "html" : "write");
-  const [confirmPlain, setConfirmPlain] = useState(false);
   const [showCc, setShowCc] = useState(initial.cc.length > 0);
   const [showBcc, setShowBcc] = useState(initial.bcc.length > 0);
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -57,25 +56,26 @@ function useCompose(initial: Draft, onSaved: (saved: MailDraft) => void) {
     onSaved(saved);
   });
 
-  function pickSegment(next: Segment) {
-    setConfirmPlain(false);
-    if (next === "write") {
-      if (draft.mode === "html" && draft.html.trim() !== "") {
-        setConfirmPlain(true);
-        return;
-      }
-      update((d) => ({ ...d, mode: "text" }));
-    } else if (draft.mode === "text") {
-      update((d) => ({ ...d, mode: "html", html: d.html.trim() === "" ? textToHtmlSigned(d.text, signature) : d.html }));
-    }
-    setSegment(next);
-  }
+  // The text stays on the draft in HTML mode, which is what HTML to Write gives back.
+  const format = useFormatSwitch({
+    format: draft.mode,
+    text: draft.text,
+    html: draft.html,
+    initial: initial.mode === "html" ? "html" : "write",
+    toHtml: (text) => textToHtmlSigned(text, signature),
+    toText: (html) => htmlToTextSigned(html, signature),
+    unedited: (text, html) => html.trim() === "" || html === textToHtmlSigned(text, signature),
+    onChange: (next) =>
+      update((d) => ({
+        ...d,
+        mode: next.format,
+        ...(next.text !== undefined ? { text: next.text } : {}),
+        ...(next.html !== undefined ? { html: next.html } : {}),
+      })),
+  });
 
-  function convertToPlain() {
-    update((d) => ({ ...d, mode: "text", text: htmlToText(d.html), html: "" }));
-    setConfirmPlain(false);
-    setSegment("write");
-  }
+  /** What Preview draws: the HTML in HTML mode, the text as it will be sent otherwise. */
+  const previewHtml = draft.mode === "html" ? draft.html : textToHtmlSigned(draft.text, signature);
 
   /** The draft to send, or null with the reason shown. */
   function ready(): Draft | null {
@@ -103,11 +103,12 @@ function useCompose(initial: Draft, onSaved: (saved: MailDraft) => void) {
     ref,
     set,
     update,
-    segment,
-    pickSegment,
-    confirmPlain,
-    keepHtml: () => setConfirmPlain(false),
-    convertToPlain,
+    segment: format.segment,
+    pickSegment: format.pick,
+    confirmPlain: format.asking,
+    keepHtml: format.cancel,
+    convertToPlain: format.convert,
+    previewHtml,
     showCc,
     setShowCc,
     showBcc,
@@ -225,15 +226,15 @@ function Notices({ c, problem }: { c: Compose; problem: ApiError | null }) {
           actions={
             <>
               <Button size="sm" variant="ghost" onClick={c.keepHtml}>
-                Keep HTML
+                Cancel
               </Button>
               <Button size="sm" onClick={c.convertToPlain}>
-                Switch to plain text
+                Convert to plain text
               </Button>
             </>
           }
         >
-          Plain text drops the formatting. Links stay, as text with the address after them.
+          You edited the HTML. Plain text keeps the words and links, not the formatting.
         </Notice>
       )}
       {s.kind === "conflict" && (
@@ -299,13 +300,18 @@ function Body({ c, phone, autoFocus }: { c: Compose; phone: boolean; autoFocus: 
   };
 
   if (c.segment === "preview") {
-    return d.html.trim() === "" ? (
+    return c.previewHtml.trim() === "" ? (
       <div className="grid min-h-0 flex-1 place-items-center p-6 text-center text-[13px] text-slate-600">
-        Nothing to preview yet. Paste your HTML under HTML.
+        Nothing to preview yet. Write your message under Write or HTML.
       </div>
     ) : (
       // The reading view's sandbox: no scripts, no forms, no reach into this origin.
-      <iframe title="Preview" srcDoc={d.html} sandbox="" className="min-h-0 w-full flex-1 border-0 bg-white" />
+      <iframe
+        title="Preview"
+        srcDoc={`<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:12px;font-family:Arial,Helvetica,sans-serif;font-size:14px">${c.previewHtml}</body></html>`}
+        sandbox=""
+        className="min-h-0 w-full flex-1 border-0 bg-white"
+      />
     );
   }
   if (c.segment === "html") {

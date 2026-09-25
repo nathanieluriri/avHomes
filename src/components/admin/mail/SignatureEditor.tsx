@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import {
   customSignature,
   signatureHtmlToText,
@@ -9,7 +10,8 @@ import {
   type SignaturePrefs,
 } from "@avhomes/contracts";
 import { Button } from "@/components/admin/ui";
-import { ModeSwitch, type Segment } from "./Composer";
+import { ModeSwitch } from "./Composer";
+import { type Segment, useFormatSwitch } from "./formatSwitch";
 
 /**
  * Pick the standard signature or write your own, with the composer's Write,
@@ -54,18 +56,22 @@ export function SignatureEditor({
   /** Radio group name, unique per page. */
   name: string;
 }) {
-  const [segment, setSegment] = useState<Segment>(value.format === "html" ? "html" : "write");
   const custom = value.mode === "custom";
   const shown = custom ? customSignature(value).html || standard.html : standard.html;
-
-  function pick(next: Segment) {
-    if (next === "html" && value.format === "text") {
-      onChange({ ...value, format: "html", body: value.body.trim() === "" ? "" : textToEmailHtml(value.body) });
-    } else if (next === "write" && value.format === "html") {
-      onChange({ ...value, format: "text", body: signatureHtmlToText(value.body) });
-    }
-    setSegment(next);
-  }
+  // One body field: in HTML it holds the HTML, and the text it came from is remembered by the switch.
+  const format = useFormatSwitch({
+    format: value.format,
+    text: value.format === "text" ? value.body : "",
+    html: value.format === "html" ? value.body : "",
+    initial: value.format === "html" ? "html" : "write",
+    toHtml: (text) => (text.trim() === "" ? "" : textToEmailHtml(text)),
+    toText: signatureHtmlToText,
+    unedited: (_, html) => html.trim() === "",
+    onChange: (next) =>
+      onChange({ ...value, format: next.format, body: (next.format === "html" ? next.html : next.text) ?? "" }),
+  });
+  const segment: Segment = format.segment;
+  const pick = format.pick;
 
   const choices = [
     { mode: "default" as const, label: standardLabel, blurb: standardBlurb },
@@ -113,7 +119,7 @@ export function SignatureEditor({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  setSegment("html");
+                  format.reset("html");
                   onChange({ ...value, format: "html", body: standard.html.replace(/<!--[\s\S]*?-->\s*/u, "") });
                 }}
               >
@@ -121,6 +127,25 @@ export function SignatureEditor({
               </Button>
             )}
           </div>
+          {format.asking && (
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-950"
+            >
+              <p className="flex min-w-0 flex-1 items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                You edited the HTML. Plain text keeps the words and links, not the formatting.
+              </p>
+              <div className="flex shrink-0 gap-2">
+                <Button size="sm" variant="ghost" onClick={format.cancel}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={format.convert}>
+                  Convert to plain text
+                </Button>
+              </div>
+            </div>
+          )}
           {segment === "preview" ? (
             <div className="bg-mist-50/60 p-2">
               {value.body.trim() === "" ? (
@@ -157,7 +182,7 @@ export function SignatureEditor({
             size="sm"
             variant="ghost"
             onClick={() => {
-              setSegment("write");
+              format.reset("write");
               onChange({ mode: "default", format: "text", body: "" });
             }}
           >

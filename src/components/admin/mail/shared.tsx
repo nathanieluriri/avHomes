@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import {
   SIGNATURE_DELIMITER,
+  quoteBlockHtml,
+  splitReplyQuote,
+  type MailAddress,
   type MailDraft,
   type MailFolder,
   type MailListFilters,
@@ -55,6 +58,16 @@ export function bytes(value: number): string {
 
 export function who(m: { from: { name: string; address: string } | null }): string {
   return m.from ? m.from.name || m.from.address : "(no sender)";
+}
+
+/** Gmail's sender column for a conversation: "Nathaniel, me", a whole name when there is one person. */
+export function participantsLabel(people: MailAddress[], own: string): string {
+  const me = own.toLowerCase();
+  const names = people.map((p) => (p.address.toLowerCase() === me ? "me" : p.name || p.address.split("@")[0]));
+  if (names.length === 0) return "(no sender)";
+  if (names.length === 1) return names[0];
+  const short = names.map((n) => (n === "me" ? n : n.split(/\s+/u)[0]));
+  return short.length > 3 ? `${short[0]} .. ${short.slice(-2).join(", ")}` : short.join(", ");
 }
 
 export function initialOf(text: string): string {
@@ -227,10 +240,14 @@ export function parseAddresses(value: string): string[] {
     .filter((part) => part !== "");
 }
 
-/** The console's plain-text fallback for an HTML body: tags out, links kept as "text (url)". */
+/** The console's plain-text fallback for an HTML body: tags out, links kept as "text (url)", quotes as "> " lines. */
 export function htmlToText(html: string): string {
   return html
     .replace(/<(style|head|title|script)\b[\s\S]*?<\/\1\s*>/giu, "")
+    .replace(/<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>/giu, (_, inner: string) => {
+      const lines = htmlToText(inner).split("\n");
+      return `\n${lines.map((line) => `> ${line}`.trimEnd()).join("\n")}\n`;
+    })
     .replace(/<a\b[^>]*href=("|')(.*?)\1[^>]*>([\s\S]*?)<\/a>/giu, (_, __, href: string, label: string) => {
       const text = label.replace(/<[^>]+>/gu, "").trim();
       return text === "" || text === href ? href : `${text} (${href})`;
@@ -254,17 +271,28 @@ function escapeHtml(value: string): string {
   return value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
 }
 
-/** Plain text as paragraphs, the starting point when a message switches to HTML. */
-export function textToHtml(text: string): string {
-  if (text.trim() === "") return "";
+function paragraphs(text: string): string {
   return text
     .split(/\n{2,}/u)
+    .filter((para) => para.trim() !== "")
     .map((para) => `<p>${escapeHtml(para).replace(/\n/gu, "<br>")}</p>`)
     .join("\n");
 }
 
+/** Plain text as paragraphs, the starting point when a message switches to HTML. A quoted reply goes in Gmail's quote markup. */
+export function textToHtml(text: string): string {
+  if (text.trim() === "") return "";
+  const split = splitReplyQuote(text);
+  if (!split) return paragraphs(text);
+  return [paragraphs(split.body), quoteBlockHtml(escapeHtml(split.attribution), paragraphs(split.quoted))]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function quoted(m: MailMessageDetail): string {
-  const body = m.text.trim() === "" ? "" : m.text.split("\n").map((line) => `> ${line}`).join("\n");
+  // An HTML-only message still gets quoted, from its HTML.
+  const source = (m.text.trim() === "" ? htmlToText(m.html) : m.text).replace(/\r\n?/gu, "\n").trim();
+  const body = source === "" ? "" : source.split("\n").map((line) => `> ${line}`.trimEnd()).join("\n");
   return `\n\nOn ${dateTime(Date.parse(m.date))}, ${who(m)} wrote:\n${body}`;
 }
 
@@ -296,9 +324,26 @@ export function textToHtmlSigned(text: string, sig: RenderedSignature | null): s
   return [before || "<p><br></p>", sig.html, after].filter(Boolean).join("\n");
 }
 
-export function replyDraft(mailbox: string, m: MailMessageDetail): Draft {
+/**
+ * HTML back to plain text with the signature kept as the composer's own block,
+ * so a later switch to HTML draws the real signature again.
+ */
+export function htmlToTextSigned(html: string, sig: RenderedSignature | null): string {
+  const at = sig && sig.html !== "" && sig.text !== "" ? html.indexOf(sig.html) : -1;
+  if (!sig || at < 0) return htmlToText(html);
+  const before = htmlToText(html.slice(0, at));
+  const after = htmlToText(html.slice(at + sig.html.length));
+  return `${before}\n\n${signatureBlock(sig)}${after ? `\n\n${after}` : ""}`;
+}
+
+/** A reply to our own message goes to whoever it was sent to, as Gmail does. */
+export function replyDraft(mailbox: string, m: MailMessageDetail, own = ""): Draft {
+  const me = own.toLowerCase();
+  const mine = me !== "" && m.from?.address.toLowerCase() === me;
+  const others = (list: MailAddress[]) => list.map((a) => a.address.toLowerCase()).filter((a) => a !== me);
   return blankDraft(mailbox, {
-    to: m.from ? [m.from.address.toLowerCase()] : [],
+    to: mine ? others(m.to) : m.from ? [m.from.address.toLowerCase()] : [],
+    cc: mine ? others(m.cc) : [],
     subject: /^re:/iu.test(m.subject) ? m.subject : `Re: ${m.subject}`,
     text: quoted(m),
     inReplyTo: { uid: m.uid, folder: m.folder },

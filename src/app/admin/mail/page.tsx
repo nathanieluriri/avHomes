@@ -13,6 +13,7 @@ import type {
   MailMessagePage,
   MailRecipient,
   MailStateResponse,
+  MailThreadPage,
   MailViewState,
   MailboxSummary,
   RenderedSignature,
@@ -305,17 +306,18 @@ function MailWorkspace({
 
   const effective: MailListFilters = { ...filters, q: q || undefined };
   const query = listQuery(effective, page);
+  // Conversations, Gmail's way: filters pick messages, and the list shows the threads they are in.
   const listPath =
     folder === STARRED
-      ? `/admin/mail/mailboxes/${enc(mailbox)}/starred?${query}`
-      : `/admin/mail/mailboxes/${enc(mailbox)}/folders/${enc(folder)}/messages?${query}`;
+      ? `/admin/mail/mailboxes/${enc(mailbox)}/starred/threads?${query}`
+      : `/admin/mail/mailboxes/${enc(mailbox)}/folders/${enc(folder)}/threads?${query}`;
 
   const folders = useAsync<{ folders: MailFolder[] }>(
     (signal) => api.get(`/admin/mail/mailboxes/${enc(mailbox)}/folders`, signal),
     [mailbox, nonce],
     { keepPrevious: true },
   );
-  const messages = useAsync<MailMessagePage | null>(
+  const messages = useAsync<MailThreadPage | null>(
     (signal) => (folder === DRAFTS ? Promise.resolve(null) : api.get(listPath, signal)),
     [folder === DRAFTS ? DRAFTS : listPath, nonce],
     { keepPrevious: true },
@@ -635,7 +637,7 @@ function MailWorkspace({
         setOpen(null);
         refresh();
       }}
-      onReply={(m) => openDraft(signDraft(replyDraft(mailbox, m), signature))}
+      onReply={(m) => openDraft(signDraft(replyDraft(mailbox, m, address), signature))}
       onForward={(m) => openDraft(signDraft(forwardDraft(mailbox, m), signature))}
       onChanged={refresh}
     />
@@ -654,6 +656,7 @@ function MailWorkspace({
 
   const listProps = {
     mailbox,
+    mailboxAddress: address,
     folderPath: folder,
     folders: sorted,
     state: messages,

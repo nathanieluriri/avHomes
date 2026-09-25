@@ -88,6 +88,64 @@ export interface MailMessageDetail extends MailMessageSummary {
   html: string;
 }
 
+export interface MailMessageRef {
+  folder: string;
+  uid: number;
+}
+
+/**
+ * One conversation in a list, drawn from its newest message. `folder` and
+ * `uid` name the newest message of the thread inside the listed folder, the
+ * one a click opens; `members` are all of the thread's messages there, which
+ * is what the row's actions change.
+ */
+export interface MailThreadSummary extends MailMessageSummary {
+  threadKey: string;
+  /** Messages in the conversation across Inbox and Sent, one per Message-ID. */
+  count: number;
+  /** Who wrote in it, oldest first, each once. */
+  participants: MailAddress[];
+  members: MailMessageRef[];
+}
+
+/**
+ * A page of conversations. `total` counts conversations in the window that
+ * was read, and `capped` says the folder holds older mail beyond it.
+ */
+export interface MailThreadPage {
+  items: MailThreadSummary[];
+  page: number;
+  totalPages: number;
+  total: number;
+  capped?: boolean;
+}
+
+/**
+ * A conversation opened: every message, oldest first. Opening marks them all
+ * read; each `unseen` says whether it was unread before, for unfolding.
+ */
+export interface MailThread {
+  key: string;
+  subject: string;
+  messages: MailMessageDetail[];
+}
+
+/** A subject without its Re:, Fwd:, Fw: and AW: prefixes, for grouping. */
+export function threadSubject(subject: string): string {
+  let out = subject.trim();
+  for (;;) {
+    const next = out.replace(/^(?:(?:re|fwd?|aw)\s*(?:\[\d+\])?\s*:\s*)+/iu, "").trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out.replace(/\s+/gu, " ").toLowerCase();
+}
+
+/** A reply or forward by its subject alone. */
+export function looksLikeReply(subject: string): boolean {
+  return /^\s*(?:re|fwd?|aw)\s*(?:\[\d+\])?\s*:/iu.test(subject);
+}
+
 export interface MailMessagePage {
   items: MailMessageSummary[];
   page: number;

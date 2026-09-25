@@ -2,8 +2,8 @@
 
 import { useRef, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { ArrowLeft, Check, Paperclip, Star } from "lucide-react";
-import type { MailFolder, MailMessageSummary } from "@avhomes/contracts";
-import { folderLabel, hasFiles, initialOf, listDate, toneOf, who } from "./shared";
+import type { MailFolder, MailThreadSummary } from "@avhomes/contracts";
+import { folderLabel, hasFiles, initialOf, listDate, toneOf } from "./shared";
 
 /** A press held still for 450ms. `consume` says whether the click that follows belongs to it. */
 function useLongPress(onLong: () => void) {
@@ -47,9 +47,10 @@ function useLongPress(onLong: () => void) {
   };
 }
 
-/** Gmail's app row: avatar, sender and date, subject and star. */
+/** Gmail's app row: avatar, the conversation's people and date, subject and star. */
 export function PhoneRow({
   message: m,
+  sender,
   folder,
   selected,
   selecting,
@@ -57,7 +58,9 @@ export function PhoneRow({
   onOpen,
   onStar,
 }: {
-  message: MailMessageSummary;
+  message: MailThreadSummary;
+  /** "Nathaniel, me". */
+  sender: string;
   /** Set on Starred, which mixes folders. */
   folder: MailFolder | null;
   selected: boolean;
@@ -67,7 +70,6 @@ export function PhoneRow({
   onStar: () => void;
 }) {
   const press = useLongPress(onToggle);
-  const sender = who(m);
   const strong = m.unseen ? "font-semibold text-plum-950" : "font-normal text-slate-600";
 
   return (
@@ -82,7 +84,7 @@ export function PhoneRow({
         aria-pressed={selected}
         onClick={onToggle}
         className={`c-tap relative z-[1] mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full text-[15px] font-semibold text-white transition-transform ${
-          selected ? "bg-wine-700" : toneOf(m.from?.address ?? sender)
+          selected ? "bg-wine-700" : toneOf(m.participants[0]?.address ?? sender)
         }`}
       >
         {selected ? <Check className="h-5 w-5" aria-hidden="true" /> : initialOf(sender)}
@@ -100,9 +102,10 @@ export function PhoneRow({
         className="min-w-0 flex-1 text-left before:absolute before:inset-0 before:content-['']"
       >
         <span
-          className={`block truncate text-[15px] ${m.unseen ? "font-semibold text-plum-950" : "font-medium text-plum-900"}`}
+          className={`flex items-baseline gap-1.5 text-[15px] ${m.unseen ? "font-semibold text-plum-950" : "font-medium text-plum-900"}`}
         >
-          {sender}
+          <span className="min-w-0 truncate">{sender}</span>
+          {m.count > 1 && <span className="shrink-0 text-[13px] font-normal text-slate-600">{m.count}</span>}
         </span>
         <span className="mt-0.5 flex items-center gap-1.5">
           {folder && (

@@ -23,9 +23,11 @@ import {
   SIGNATURE_DELIMITER,
   SIGNATURE_SLOT,
   SIGN_IN_CODE_MARKER,
+  messageTextToEmailHtml,
   plainEmailHtml,
-  textToEmailHtml,
   rankContacts,
+  splitReplyQuote,
+  threadSubject,
   type MailAddress,
   type MailAttachmentInfo,
   type MailContact,
@@ -35,6 +37,9 @@ import {
   type MailMessageSummary,
   type MailQuota,
   type MailRecipient,
+  type MailThread,
+  type MailThreadPage,
+  type MailThreadSummary,
   type MailboxSummary,
 } from "@avhomes/contracts";
 import { requireAdmin } from "@avhomes/identity";
@@ -42,20 +47,21 @@ import { htmlToText, sanitizeEmailHtml } from "./html";
 import { hostingerKey, hostingerProblem, readMailSettings } from "./mail";
 import { dropDraft } from "./mail-state";
 import { memberSignature } from "./signature";
+import { groupThreads, type ThreadInput } from "./threads";
 
 /**
  * A plain text message whose signature block is still the one the composer
- * inserted, as HTML with the real signature in its place. Empty when the
- * member edited or removed it: then the text goes alone, as written.
+ * inserted, as HTML with the real signature in its place and any quoted
+ * history in Gmail's quote markup. With the block edited or removed, HTML only
+ * when there is a quote to fold; otherwise the text goes alone, as written.
  */
 function signedTextHtml(text: string, sig: { html: string; text: string }): string {
-  if (sig.text === "") return "";
-  const block = `${SIGNATURE_DELIMITER}\n${sig.text}`;
-  const at = text.indexOf(block);
-  if (at < 0) return "";
+  const block = sig.text === "" ? "" : `${SIGNATURE_DELIMITER}\n${sig.text}`;
+  const at = block ? text.indexOf(block) : -1;
+  if (at < 0) return splitReplyQuote(text) ? plainEmailHtml(text).replace(SIGNATURE_SLOT, "") : "";
   const before = text.slice(0, at);
   const after = text.slice(at + block.length);
-  return plainEmailHtml(before).replace(SIGNATURE_SLOT, `${sig.html}\n${textToEmailHtml(after.trim())}`);
+  return plainEmailHtml(before).replace(SIGNATURE_SLOT, `${sig.html}\n${messageTextToEmailHtml(after.trim())}`);
 }
 
 /**
@@ -95,6 +101,8 @@ interface RawMessage {
   to?: RawAddress[] | null;
   cc?: RawAddress[] | null;
   bcc?: RawAddress[] | null;
+  messageId?: string | null;
+  inReplyTo?: string | null;
   attachments?: RawAttachment[] | null;
 }
 
@@ -416,6 +424,283 @@ async function listMessages(
   };
 }
 
+/* ─────────────────────────────── threads ─────────────────────────────── */
+
+/*
+ * Conversations are built from a window of the newest messages, since IMAP
+ * has no threads to ask for. A folder page reads its folder (with the filters)
+ * plus the newest unfiltered Inbox and Sent, so a row counts the replies we
+ * sent and theirs alike. The window starts at 300 messages per search and
+ * grows with the page asked for, to 1000; past it, `capped` is set and the
+ * count shows as a floor.
+ *
+ * Windows are cached for 20 seconds per instance, so paging, opening a thread
+ * and coming back cost one read. Anything that changes mail here forgets them.
+ */
+
+const THREADS_PER_PAGE = 25;
+const WINDOW_PAGE = 100;
+const WINDOW_MIN_PAGES = 3;
+const WINDOW_MAX_PAGES = 10;
+/* Inbox and Sent read beside a folder, for the other half of each conversation. */
+const CONTEXT_PAGES = 2;
+const WINDOW_TTL_MS = 20_000;
+/* Opening reads every message's body, so a very long thread shows its newest. */
+const THREAD_MAX_MESSAGES = 50;
+
+interface Scan {
+  items: RawMessage[];
+  more: boolean;
+}
+
+const windowCache = new Map<string, { at: number; value: Promise<Scan> }>();
+const folderCache = new Map<string, { at: number; value: Promise<RawFolder[]> }>();
+
+function cached<T>(map: Map<string, { at: number; value: Promise<T> }>, id: string, load: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const hit = map.get(id);
+  if (hit && now - hit.at < WINDOW_TTL_MS) return hit.value;
+  const value = load().catch((err: unknown) => {
+    map.delete(id);
+    throw err;
+  });
+  map.set(id, { at: now, value });
+  return value;
+}
+
+/** The newest `pages` hundred messages of one folder that match, newest first. */
+function readWindow(key: string, mailbox: string, path: string, criteria: Criteria, pages: number): Promise<Scan> {
+  const id = [key.slice(-8), mailbox, path, JSON.stringify(criteria), pages].join("\u0001");
+  return cached(windowCache, id, async () => {
+    const folderBase = `/mailboxes/${enc(mailbox)}/folders/${enc(path)}`;
+    const empty = Object.keys(criteria).length === 0;
+    const read = (page: number) => {
+      const query = { page, perPage: WINDOW_PAGE, sort: "-date" };
+      return empty
+        ? hostingerPage<RawMessage>(key, `${folderBase}/messages`, query)
+        : hostingerPage<RawMessage>(key, `${folderBase}/messages/search`, query, { method: "POST", body: criteria });
+    };
+    const first = await read(1);
+    const last = Math.min(pages, first.totalPages);
+    const rest = await Promise.all(Array.from({ length: Math.max(0, last - 1) }, (_, i) => read(i + 2)));
+    return { items: [first, ...rest].flatMap((p) => p.data), more: first.totalPages > pages };
+  });
+}
+
+function folderList(key: string, mailbox: string): Promise<RawFolder[]> {
+  return cached(folderCache, `${key.slice(-8)}\u0001${mailbox}`, async () => {
+    const page = await hostingerPage<RawFolder>(key, `/mailboxes/${enc(mailbox)}/folders`, { perPage: 100 });
+    return page.data;
+  });
+}
+
+const BINNED = new Set(["\\Trash", "\\Junk"]);
+
+function inboxAndSent(folders: RawFolder[]): string[] {
+  const inbox = folders.find((f) => f.specialUse === "\\Inbox" || f.path === "INBOX")?.path ?? "INBOX";
+  const sent = folders.find((f) => f.specialUse === "\\Sent")?.path;
+  return sent ? [inbox, sent] : [inbox];
+}
+
+function refKey(m: { path: string; uid: number }): string {
+  return `${m.path}\u0001${m.uid}`;
+}
+
+function threadInput(m: RawMessage): ThreadInput {
+  return {
+    key: refKey(m),
+    date: m.date,
+    subject: m.subject ?? "",
+    messageId: m.messageId ?? null,
+    inReplyTo: m.inReplyTo ?? null,
+    people: [m.from, ...(m.to ?? []), ...(m.cc ?? [])]
+      .map((a) => a?.address ?? "")
+      .filter((a) => a !== ""),
+  };
+}
+
+const byDate = (a: RawMessage, b: RawMessage) => Date.parse(a.date) - Date.parse(b.date);
+
+/**
+ * One copy per Message-ID: mail sent to one of our own addresses sits in Sent
+ * and in Inbox. The copy in `prefer` wins, then the one in Inbox.
+ */
+function distinct(messages: RawMessage[], prefer: string[]): RawMessage[] {
+  const rank = (m: RawMessage) => {
+    const i = prefer.indexOf(m.path);
+    return i < 0 ? prefer.length : i;
+  };
+  const out = new Map<string, RawMessage>();
+  for (const m of [...messages].sort((a, b) => rank(a) - rank(b))) {
+    const id = (m.messageId ?? "").trim().toLowerCase() || refKey(m);
+    if (!out.has(id)) out.set(id, m);
+  }
+  return [...out.values()].sort(byDate);
+}
+
+function threadRow(threadKey: string, all: RawMessage[], members: RawMessage[], prefer: string[]): MailThreadSummary {
+  const messages = distinct(all, prefer);
+  const newest = messages[messages.length - 1];
+  const anchor = [...members].sort(byDate)[members.length - 1];
+  const people = new Map<string, MailAddress>();
+  for (const m of messages) {
+    const from = address(m.from);
+    if (from && !people.has(from.address.toLowerCase())) people.set(from.address.toLowerCase(), from);
+  }
+  const memberRows = members.map(summary);
+  return {
+    ...summary(anchor),
+    date: newest.date,
+    subject: messages[0].subject ?? "",
+    from: address(newest.from),
+    unseen: memberRows.some((m) => m.unseen),
+    flagged: memberRows.some((m) => m.flagged),
+    attachments: messages.flatMap((m) => (m.attachments ?? []).map(attachment)),
+    size: messages.reduce((sum, m) => sum + (m.size ?? 0), 0),
+    threadKey,
+    count: messages.length,
+    participants: [...people.values()],
+    members: members.map((m) => ({ folder: m.path, uid: m.uid })),
+  };
+}
+
+/**
+ * One page of conversations: every thread with at least one matching message
+ * in `folders`, newest activity first. Filters pick messages; the row shows
+ * the whole conversation they belong to.
+ */
+async function listThreads(
+  key: string,
+  mailbox: string,
+  folders: string[],
+  context: string[],
+  f: ListFilters,
+  guard: CodeGuard,
+  flagged = false,
+): Promise<MailThreadPage> {
+  const page = f.page ?? 1;
+  const pages = Math.min(
+    WINDOW_MAX_PAGES,
+    Math.max(WINDOW_MIN_PAGES, Math.ceil((page * THREADS_PER_PAGE * 2) / WINDOW_PAGE)),
+  );
+  const variants = variantsOf(f, flagged);
+  const plain = variants.length === 1 && Object.keys(variants[0]).length === 0;
+  const extra = context.filter((path) => !(plain && folders.includes(path)));
+
+  const [runs, contextRuns] = await Promise.all([
+    Promise.all(folders.flatMap((path) => variants.map((criteria) => readWindow(key, mailbox, path, criteria, pages)))),
+    // The other half of a conversation is a nicety; the folder itself must read.
+    Promise.all(extra.map((path) => readWindow(key, mailbox, path, {}, CONTEXT_PAGES).catch(() => ({ items: [], more: false })))),
+  ]);
+
+  const matched = new Map<string, RawMessage>();
+  for (const run of runs) {
+    for (const raw of run.items) {
+      if (!guard.keep(raw)) continue;
+      if (f.attachment && !hasFiles(summary(raw))) continue;
+      matched.set(refKey(raw), raw);
+    }
+  }
+  const all = new Map(matched);
+  for (const run of contextRuns) {
+    for (const raw of run.items) if (guard.keep(raw) && !all.has(refKey(raw))) all.set(refKey(raw), raw);
+  }
+
+  const keys = groupThreads([...all.values()].map(threadInput));
+  const threads = new Map<string, { all: RawMessage[]; members: RawMessage[] }>();
+  for (const [k, raw] of all) {
+    const t = keys.get(k) ?? k;
+    const entry = threads.get(t) ?? { all: [], members: [] };
+    entry.all.push(raw);
+    if (matched.has(k)) entry.members.push(raw);
+    threads.set(t, entry);
+  }
+  const rows = [...threads]
+    .filter(([, t]) => t.members.length > 0)
+    .map(([t, entry]) => threadRow(t, entry.all, entry.members, [...folders, ...context]))
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+
+  return {
+    items: rows.slice((page - 1) * THREADS_PER_PAGE, page * THREADS_PER_PAGE),
+    page,
+    totalPages: Math.max(1, Math.ceil(rows.length / THREADS_PER_PAGE)),
+    total: rows.length,
+    capped: runs.some((run) => run.more),
+  };
+}
+
+/**
+ * Every message of the conversation `anchor` belongs to, oldest first, with
+ * bodies. Read from the anchor's folder, Inbox and Sent (Trash and Junk only
+ * when the anchor is in one), their newest windows plus a subject search, so
+ * an old thread is found whole.
+ */
+async function readThread(
+  key: string,
+  mailbox: string,
+  anchor: RawMessage,
+  guard: CodeGuard,
+): Promise<MailThread> {
+  const folders = await folderList(key, mailbox);
+  const special = (path: string) => folders.find((f) => f.path === path)?.specialUse ?? null;
+  const scope = [...new Set([anchor.path, ...inboxAndSent(folders)])].filter(
+    (path) => path === anchor.path || !BINNED.has(special(path) ?? ""),
+  );
+  const subject = threadSubject(anchor.subject ?? "");
+  const runs = await Promise.all(
+    scope.flatMap((path) => [
+      readWindow(key, mailbox, path, {}, CONTEXT_PAGES).catch(() => ({ items: [], more: false })),
+      ...(subject.length >= 2
+        ? [readWindow(key, mailbox, path, { subject }, 1).catch(() => ({ items: [], more: false }))]
+        : []),
+    ]),
+  );
+  const all = new Map<string, RawMessage>([[refKey(anchor), anchor]]);
+  for (const run of runs) for (const raw of run.items) if (!all.has(refKey(raw))) all.set(refKey(raw), raw);
+
+  const keys = groupThreads([...all.values()].map(threadInput));
+  const threadKey = keys.get(refKey(anchor)) ?? refKey(anchor);
+  const members = [...all.values()].filter((m) => keys.get(refKey(m)) === threadKey && guard.keep(m));
+  const messages = distinct(members, [anchor.path, ...inboxAndSent(folders)]).slice(-THREAD_MAX_MESSAGES);
+
+  const bodies = await Promise.all(
+    messages.map((m) =>
+      hostingerRequest<{ text?: string | null; html?: string | null }>(
+        key,
+        "GET",
+        `/mailboxes/${enc(mailbox)}/folders/${enc(m.path)}/messages/${m.uid}/text`,
+      ).catch(() => null),
+    ),
+  );
+
+  // Reading a body marks it seen upstream; this makes sure of it for the ones that were unread.
+  const unread = new Map<string, number[]>();
+  messages.forEach((m, i) => {
+    if (bodies[i] && (m.unseen ?? !(m.flags ?? []).includes("\\Seen"))) {
+      unread.set(m.path, [...(unread.get(m.path) ?? []), m.uid]);
+    }
+  });
+  await Promise.all(
+    [...unread].map(([path, uids]) =>
+      hostingerRequest(key, "POST", `/mailboxes/${enc(mailbox)}/folders/${enc(path)}/messages/flags`, {
+        body: { uids, addFlags: ["\\Seen"] },
+      }).catch(() => null),
+    ),
+  );
+
+  return {
+    key: threadKey,
+    subject: messages[0]?.subject ?? anchor.subject ?? "",
+    // `unseen` is as it was before opening, so the reader can unfold what was new.
+    messages: messages.map((m, i) => ({
+      ...summary(m),
+      bcc: addresses(m.bcc),
+      text: bodies[i]?.text ?? "",
+      html: bodies[i]?.html ?? "",
+    })),
+  };
+}
+
 /* ─────────────────────────────── unread ──────────────────────────────── */
 
 /*
@@ -430,6 +715,8 @@ const unreadCache = new Map<string, { key: string; at: number; value: Promise<nu
 function forgetUnread(): void {
   unreadCache.clear();
   hiddenCache.clear();
+  windowCache.clear();
+  folderCache.clear();
 }
 
 async function countUnread(key: string, guard: CodeGuard): Promise<number> {
@@ -686,6 +973,7 @@ export function mailboxRoutes(): Hono<AppEnv> {
       () => hostingerRequest<RawFolder>(key, "POST", `${base(c)}/folders`, { body }),
       "mailbox",
     );
+    forgetUnread();
     return c.json({ folder: made ? folder(made) : null }, 201);
   });
 
@@ -693,12 +981,14 @@ export function mailboxRoutes(): Hono<AppEnv> {
     const key = await keyFor(c);
     const body = await readJson(c, FolderName);
     const renamed = await call(() => hostingerRequest<RawFolder>(key, "PUT", inFolder(c), { body }), "folder");
+    forgetUnread();
     return c.json({ folder: renamed ? folder(renamed) : null });
   });
 
   routes.delete("/admin/mail/mailboxes/:mailbox/folders/:folder", requireAdmin(), async (c) => {
     const key = await keyFor(c);
     await call(() => hostingerRequest(key, "DELETE", inFolder(c)), "folder");
+    forgetUnread();
     return c.json({ ok: true });
   });
 
@@ -753,6 +1043,50 @@ export function mailboxRoutes(): Hono<AppEnv> {
     return c.json(
       await call(() => listMessages(key, pathParam(c, "mailbox"), paths, filters, codeGuard(c), true), "mailbox"),
     );
+  });
+
+  /* Starred as conversations: threads holding a flagged message anywhere but Trash and Junk. */
+  routes.get("/admin/mail/mailboxes/:mailbox/starred/threads", requireAdmin(), async (c) => {
+    const key = await keyFor(c);
+    const mailbox = pathParam(c, "mailbox");
+    const filters = readQuery(c, ListQuery);
+    const folders = await call(() => folderList(key, mailbox), "mailbox");
+    const paths = folders.filter((f) => !BINNED.has(f.specialUse ?? "")).map((f) => f.path);
+    return c.json(
+      await call(
+        () => listThreads(key, mailbox, paths, inboxAndSent(folders), filters, codeGuard(c), true),
+        "mailbox",
+      ),
+    );
+  });
+
+  routes.get("/admin/mail/mailboxes/:mailbox/folders/:folder/threads", requireAdmin(), async (c) => {
+    const key = await keyFor(c);
+    const mailbox = pathParam(c, "mailbox");
+    const path = pathParam(c, "folder");
+    const filters = readQuery(c, ListQuery);
+    const folders = await call(() => folderList(key, mailbox), "mailbox");
+    const here = folders.find((f) => f.path === path);
+    // Trash and Junk list only what is in them, as Gmail does.
+    const context = here && BINNED.has(here.specialUse ?? "") ? [] : inboxAndSent(folders);
+    return c.json(await call(() => listThreads(key, mailbox, [path], context, filters, codeGuard(c)), "folder"));
+  });
+
+  /* The whole conversation a message is in. Reading it marks every message in it seen. */
+  routes.get("/admin/mail/mailboxes/:mailbox/folders/:folder/messages/:uid/thread", requireAdmin(), async (c) => {
+    const key = await keyFor(c);
+    const guard = codeGuard(c);
+    const anchor = await call(
+      () => hostingerRequest<RawMessage>(key, "GET", `${inFolder(c)}/messages/${uidOf(c)}`),
+      "message",
+    );
+    if (!anchor || !guard.keep(anchor)) throw new NotFoundError("message");
+    const thread = await call(
+      () => readThread(key, pathParam(c, "mailbox"), { ...anchor, path: anchor.path || pathParam(c, "folder") }, guard),
+      "message",
+    );
+    forgetUnread();
+    return c.json({ thread });
   });
 
   routes.get("/admin/mail/mailboxes/:mailbox/folders/:folder/messages", requireAdmin(), async (c) => {
@@ -924,6 +1258,8 @@ export function mailboxRoutes(): Hono<AppEnv> {
       "mailbox",
     );
     const mailbox = pathParam(c, "mailbox");
+    // Sent has a new message, and a reply may have joined a thread.
+    forgetUnread();
     // Bookkeeping after the fact: the message is already out, so neither may fail the send.
     await Promise.all([
       body.draftId ? dropDraft(db, currentUser(c).id, body.draftId) : null,
