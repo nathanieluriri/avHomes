@@ -1,0 +1,179 @@
+{
+  "project": "AV Homes",
+  "url": "https://www.avhomesltd.com",
+  "cover": "av-homes",
+  "videos": [
+    {
+      "slug": "av-homes",
+      "title": "AV Homes",
+      "wheel": [
+        "AV",
+        "HOMES"
+      ],
+      "description": "Website, console and API for a Nigerian real estate company: vetted listings for buyers, one inbox for the team.",
+      "year": 2026,
+      "role": "Design and full-stack engineering",
+      "stack": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "MongoDB",
+        "Tailwind CSS 4",
+        "Vercel",
+        "Cloudinary"
+      ],
+      "url": "https://www.avhomesltd.com",
+      "color": [
+        0.596,
+        0.235,
+        0.325
+      ],
+      "colorHex": "#983c53",
+      "cover": {
+        "image": "av-homes/av-homes.webp",
+        "video": "av-homes/av-homes.mp4",
+        "webm": "av-homes/av-homes.webm"
+      },
+      "duration": 18.0,
+      "sources": "av-homes/SOURCES.md",
+      "storyboard": "av-homes/STORYBOARD.md"
+    },
+    {
+      "slug": "av-homes-mail",
+      "title": "AV Homes Mailboxes",
+      "wheel": [
+        "AV HOMES",
+        "MAILBOXES"
+      ],
+      "description": "The team's Hostinger mailboxes inside the console: read a buyer's question, reply with the price and plan, and it lands in Sent.",
+      "year": 2026,
+      "role": "Design and full-stack engineering",
+      "stack": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "Hono",
+        "Hostinger Mail API",
+        "MongoDB",
+        "Tailwind CSS 4"
+      ],
+      "url": "https://www.avhomesltd.com",
+      "color": [
+        0.596,
+        0.235,
+        0.325
+      ],
+      "colorHex": "#983c53",
+      "cover": {
+        "image": "av-homes-mail/av-homes-mail.webp",
+        "video": "av-homes-mail/av-homes-mail.mp4",
+        "webm": "av-homes-mail/av-homes-mail.webm"
+      },
+      "duration": 16.0,
+      "sources": "av-homes-mail/SOURCES.md",
+      "storyboard": "av-homes-mail/STORYBOARD.md"
+    },
+    {
+      "slug": "av-homes-marketer-app",
+      "title": "AV Homes Marketers",
+      "wheel": [
+        "AV HOMES",
+        "MARKETERS"
+      ],
+      "description": "The marketers' phone app: report a sale, watch the 5% commission work itself out, send the proof, get paid on pay day.",
+      "year": 2026,
+      "role": "Design and full-stack engineering",
+      "stack": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "Hono",
+        "MongoDB",
+        "Tailwind CSS 4"
+      ],
+      "url": "https://www.avhomesltd.com",
+      "color": [
+        0.596,
+        0.235,
+        0.325
+      ],
+      "colorHex": "#983c53",
+      "cover": {
+        "image": "av-homes-marketer-app/av-homes-marketer-app.webp",
+        "video": "av-homes-marketer-app/av-homes-marketer-app.mp4",
+        "webm": "av-homes-marketer-app/av-homes-marketer-app.webm"
+      },
+      "duration": 16.0,
+      "sources": "av-homes-marketer-app/SOURCES.md",
+      "storyboard": "av-homes-marketer-app/STORYBOARD.md"
+    },
+    {
+      "slug": "av-homes-partner",
+      "title": "AV Homes Partners",
+      "wheel": [
+        "AV HOMES",
+        "PARTNERS"
+      ],
+      "description": "Developers apply on the site, AV Homes approves them in one click, and their first estate goes to review from their own console.",
+      "year": 2026,
+      "role": "Design and full-stack engineering",
+      "stack": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "Hono",
+        "MongoDB",
+        "Tailwind CSS 4"
+      ],
+      "url": "https://www.avhomesltd.com",
+      "color": [
+        0.596,
+        0.235,
+        0.325
+      ],
+      "colorHex": "#983c53",
+      "cover": {
+        "image": "av-homes-partner/av-homes-partner.webp",
+        "video": "av-homes-partner/av-homes-partner.mp4",
+        "webm": "av-homes-partner/av-homes-partner.webm"
+      },
+      "duration": 16.0,
+      "sources": "av-homes-partner/SOURCES.md",
+      "storyboard": "av-homes-partner/STORYBOARD.md"
+    },
+    {
+      "slug": "av-homes-money",
+      "title": "AV Homes Money",
+      "wheel": [
+        "AV HOMES",
+        "MONEY"
+      ],
+      "description": "The console's money desk: check a reported sale, approve the commission split, watch both funds grow, pay everyone on pay day.",
+      "year": 2026,
+      "role": "Design and full-stack engineering",
+      "stack": [
+        "Next.js 16",
+        "React 19",
+        "TypeScript",
+        "Hono",
+        "MongoDB",
+        "Tailwind CSS 4"
+      ],
+      "url": "https://www.avhomesltd.com",
+      "color": [
+        0.596,
+        0.235,
+        0.325
+      ],
+      "colorHex": "#983c53",
+      "cover": {
+        "image": "av-homes-money/av-homes-money.webp",
+        "video": "av-homes-money/av-homes-money.mp4",
+        "webm": "av-homes-money/av-homes-money.webm"
+      },
+      "duration": 16.0,
+      "sources": "av-homes-money/SOURCES.md",
+      "storyboard": "av-homes-money/STORYBOARD.md"
+    }
+  ]
+}

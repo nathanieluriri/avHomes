@@ -1,0 +1,34 @@
+{
+  "slug": "av-homes-mail",
+  "title": "AV Homes Mailboxes",
+  "wheel": [
+    "AV HOMES",
+    "MAILBOXES"
+  ],
+  "description": "The team's Hostinger mailboxes inside the console: read a buyer's question, reply with the price and plan, and it lands in Sent.",
+  "year": 2026,
+  "role": "Design and full-stack engineering",
+  "stack": [
+    "Next.js 16",
+    "React 19",
+    "TypeScript",
+    "Hono",
+    "Hostinger Mail API",
+    "MongoDB",
+    "Tailwind CSS 4"
+  ],
+  "url": "https://www.avhomesltd.com",
+  "color": [
+    0.596,
+    0.235,
+    0.325
+  ],
+  "colorHex": "#983c53",
+  "cover": {
+    "image": "av-homes-mail.webp",
+    "video": "av-homes-mail.mp4",
+    "webm": "av-homes-mail.webm"
+  },
+  "duration": 16.0,
+  "sources": "SOURCES.md"
+}

@@ -1,0 +1,33 @@
+{
+  "slug": "av-homes-marketer-app",
+  "title": "AV Homes Marketers",
+  "wheel": [
+    "AV HOMES",
+    "MARKETERS"
+  ],
+  "description": "The marketers' phone app: report a sale, watch the 5% commission work itself out, send the proof, get paid on pay day.",
+  "year": 2026,
+  "role": "Design and full-stack engineering",
+  "stack": [
+    "Next.js 16",
+    "React 19",
+    "TypeScript",
+    "Hono",
+    "MongoDB",
+    "Tailwind CSS 4"
+  ],
+  "url": "https://www.avhomesltd.com",
+  "color": [
+    0.596,
+    0.235,
+    0.325
+  ],
+  "colorHex": "#983c53",
+  "cover": {
+    "image": "av-homes-marketer-app.webp",
+    "video": "av-homes-marketer-app.mp4",
+    "webm": "av-homes-marketer-app.webm"
+  },
+  "duration": 16.0,
+  "sources": "SOURCES.md"
+}

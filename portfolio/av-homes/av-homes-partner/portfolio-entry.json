@@ -1,0 +1,33 @@
+{
+  "slug": "av-homes-partner",
+  "title": "AV Homes Partners",
+  "wheel": [
+    "AV HOMES",
+    "PARTNERS"
+  ],
+  "description": "Developers apply on the site, AV Homes approves them in one click, and their first estate goes to review from their own console.",
+  "year": 2026,
+  "role": "Design and full-stack engineering",
+  "stack": [
+    "Next.js 16",
+    "React 19",
+    "TypeScript",
+    "Hono",
+    "MongoDB",
+    "Tailwind CSS 4"
+  ],
+  "url": "https://www.avhomesltd.com",
+  "color": [
+    0.596,
+    0.235,
+    0.325
+  ],
+  "colorHex": "#983c53",
+  "cover": {
+    "image": "av-homes-partner.webp",
+    "video": "av-homes-partner.mp4",
+    "webm": "av-homes-partner.webm"
+  },
+  "duration": 16.0,
+  "sources": "SOURCES.md"
+}

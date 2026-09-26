@@ -1,0 +1,33 @@
+{
+  "slug": "av-homes-money",
+  "title": "AV Homes Money",
+  "wheel": [
+    "AV HOMES",
+    "MONEY"
+  ],
+  "description": "The console's money desk: check a reported sale, approve the commission split, watch both funds grow, pay everyone on pay day.",
+  "year": 2026,
+  "role": "Design and full-stack engineering",
+  "stack": [
+    "Next.js 16",
+    "React 19",
+    "TypeScript",
+    "Hono",
+    "MongoDB",
+    "Tailwind CSS 4"
+  ],
+  "url": "https://www.avhomesltd.com",
+  "color": [
+    0.596,
+    0.235,
+    0.325
+  ],
+  "colorHex": "#983c53",
+  "cover": {
+    "image": "av-homes-money.webp",
+    "video": "av-homes-money.mp4",
+    "webm": "av-homes-money.webm"
+  },
+  "duration": 16.0,
+  "sources": "SOURCES.md"
+}

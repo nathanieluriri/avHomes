@@ -277,6 +277,12 @@ new file*
 # about 10 MB for four silent screen recordings, re-encoded by videos/_tools.
 !public/tutorials/*.mp4
 
+# Portfolio showcase loops for the AV Homes entry of the owner's portfolio, about 41 MB.
+!portfolio/av-homes/*/*.mp4
+!portfolio/av-homes/*/*.webm
+# Their notes (sources, storyboards) travel with them for the portfolio site.
+!portfolio/av-homes/**/*.md
+
 # Video review artifacts: snapshots, frame captures and renders are reproducible
 videos/_captures/
 # Critic output from a QA run: one machine's verdict on one build, regenerated
