@@ -56,6 +56,39 @@ async function ask(url: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Prom
   }
 }
 
+interface Resolved {
+  status?: boolean;
+  message?: string;
+  data?: { account_name?: string };
+}
+
+/**
+ * One account check, read the same way for both providers.
+ *
+ * Only a 400 or 422 means the bank said no such account. A refused key, a rate
+ * limit or an outage throws, so the marketer is never told their own correct
+ * details are wrong.
+ */
+async function check(provider: string, url: string, init: RequestInit): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let res: Response;
+  let body: Resolved | null;
+  try {
+    res = await fetch(url, { ...init, signal: controller.signal });
+    body = (await res.json().catch(() => null)) as Resolved | null;
+  } catch {
+    throw new UpstreamError(provider, "no answer from the account check");
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const name = body?.status === true ? (body.data?.account_name ?? "").trim() : "";
+  if (name !== "") return name;
+  if (res.status === 400 || res.status === 422 || (res.ok && body?.status === false)) return null;
+  throw new UpstreamError(provider, `account check answered ${res.status}`);
+}
+
 /* ══════════════════════════════════════════════════════════════════ BANKS ══ */
 
 /**
@@ -203,19 +236,11 @@ async function paystackKey(db: Db): Promise<string> {
 }
 
 async function viaKora(accountNumber: string, bankCode: string): Promise<string | null> {
-  const body = (await ask(`${KORA}/misc/banks/resolve`, {
+  return check("kora", `${KORA}/misc/banks/resolve`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({ bank: bankCode, account: accountNumber }),
-  })) as { status?: boolean; message?: string; data?: { account_name?: string } } | null;
-
-  if (!body) throw new UpstreamError("kora", "no answer from the account check");
-  // A number that does not exist is an ANSWER, not a failure: it means the
-  // details are wrong, and the caller must be able to tell that apart from the
-  // provider being down.
-  if (body.status !== true) return null;
-  const name = (body.data?.account_name ?? "").trim();
-  return name === "" ? null : name;
+  });
 }
 
 async function viaPaystack(
@@ -226,15 +251,11 @@ async function viaPaystack(
   const key = await paystackKey(db);
   if (key === "") throw new UpstreamError("paystack", "no Paystack key is saved");
 
-  const body = (await ask(
+  return check(
+    "paystack",
     `${PAYSTACK}/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
     { headers: { authorization: `Bearer ${key}`, accept: "application/json" } },
-  )) as { status?: boolean; message?: string; data?: { account_name?: string } } | null;
-
-  if (!body) throw new UpstreamError("paystack", "no answer from the account check");
-  if (body.status !== true) return null;
-  const name = (body.data?.account_name ?? "").trim();
-  return name === "" ? null : name;
+  );
 }
 
 /**

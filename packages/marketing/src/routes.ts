@@ -537,7 +537,11 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
     const db = await currentDb(c);
     await limit(db, `bankcheck:${clientIp(c)}`, 20, JOIN_WINDOW_MS);
     const resolved = await resolveAccount(db, body.accountNumber, body.bankCode, body.bankName);
-    return c.json({ accountName: resolved?.accountName ?? "", checked: resolved !== null });
+    return c.json({
+      accountName: resolved?.accountName ?? "",
+      checked: resolved !== null,
+      found: resolved !== null,
+    });
   });
 
   /**

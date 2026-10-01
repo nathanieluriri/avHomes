@@ -143,6 +143,8 @@ export interface BanksResponse {
 export interface ResolvedAccount {
   accountName: string;
   checked: boolean;
+  /** False when the bank answered that no such account exists. */
+  found: boolean;
 }
 
 export interface MarketerResponse {
