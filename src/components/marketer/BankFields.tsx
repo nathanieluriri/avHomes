@@ -71,7 +71,8 @@ export function BankFields({
   const checking = wanted && !answered;
   const name =
     answered && check.data?.checked && check.data.accountName !== "" ? check.data.accountName : "";
-  const unchecked = answered && name === "";
+  const notFound = answered && check.data?.found === false;
+  const unchecked = answered && name === "" && !notFound;
 
   return (
     <div className="space-y-4">
@@ -160,6 +161,13 @@ export function BankFields({
               </span>
             </span>
           </p>
+        )}
+
+        {notFound && (
+          <Note tone="bad">
+            No account at {value.bankName} has that number. Check the ten digits and the bank you
+            picked.
+          </Note>
         )}
 
         {unchecked && (

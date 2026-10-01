@@ -56,6 +56,39 @@ async function ask(url: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Prom
   }
 }
 
+interface Resolved {
+  status?: boolean;
+  message?: string;
+  data?: { account_name?: string };
+}
+
+/**
+ * One account check, read the same way for both providers.
+ *
+ * Only a 400 or 422 means the bank said no such account. A refused key, a rate
+ * limit or an outage throws, so the marketer is never told their own correct
+ * details are wrong.
+ */
+async function check(provider: string, url: string, init: RequestInit): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let res: Response;
+  let body: Resolved | null;
+  try {
+    res = await fetch(url, { ...init, signal: controller.signal });
+    body = (await res.json().catch(() => null)) as Resolved | null;
+  } catch {
+    throw new UpstreamError(provider, "no answer from the account check");
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const name = body?.status === true ? (body.data?.account_name ?? "").trim() : "";
+  if (name !== "") return name;
+  if (res.status === 400 || res.status === 422 || (res.ok && body?.status === false)) return null;
+  throw new UpstreamError(provider, `account check answered ${res.status}`);
+}
+
 /* ══════════════════════════════════════════════════════════════════ BANKS ══ */
 
 /**
@@ -203,19 +236,11 @@ async function paystackKey(db: Db): Promise<string> {
 }
 
 async function viaKora(accountNumber: string, bankCode: string): Promise<string | null> {
-  const body = (await ask(`${KORA}/misc/banks/resolve`, {
+  return check("kora", `${KORA}/misc/banks/resolve`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({ bank: bankCode, account: accountNumber }),
-  })) as { status?: boolean; message?: string; data?: { account_name?: string } } | null;
-
-  if (!body) throw new UpstreamError("kora", "no answer from the account check");
-  // A number that does not exist is an ANSWER, not a failure: it means the
-  // details are wrong, and the caller must be able to tell that apart from the
-  // provider being down.
-  if (body.status !== true) return null;
-  const name = (body.data?.account_name ?? "").trim();
-  return name === "" ? null : name;
+  });
 }
 
 async function viaPaystack(
@@ -226,15 +251,11 @@ async function viaPaystack(
   const key = await paystackKey(db);
   if (key === "") throw new UpstreamError("paystack", "no Paystack key is saved");
 
-  const body = (await ask(
+  return check(
+    "paystack",
     `${PAYSTACK}/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
     { headers: { authorization: `Bearer ${key}`, accept: "application/json" } },
-  )) as { status?: boolean; message?: string; data?: { account_name?: string } } | null;
-
-  if (!body) throw new UpstreamError("paystack", "no answer from the account check");
-  if (body.status !== true) return null;
-  const name = (body.data?.account_name ?? "").trim();
-  return name === "" ? null : name;
+  );
 }
 
 /**
@@ -249,11 +270,57 @@ export async function resolveAccount(
   db: Db,
   accountNumber: string,
   bankCode: string,
-): Promise<{ accountName: string; verifiedAt: number } | null> {
+  bankName = "",
+): Promise<{ accountName: string; verifiedAt: number; bankCode: string } | null> {
   const { accountProvider } = await readMarketingSettings(db);
+  const code = await currentCode(db, bankCode, bankName);
   const name =
     accountProvider === "paystack"
-      ? await viaPaystack(db, accountNumber, bankCode)
-      : await viaKora(accountNumber, forKora(bankCode));
-  return name === null ? null : { accountName: name, verifiedAt: Date.now() };
+      ? await viaPaystack(db, accountNumber, code)
+      : await viaKora(accountNumber, forKora(code));
+  return name === null ? null : { accountName: name, verifiedAt: Date.now(), bankCode: code };
+}
+
+/* Short names people type for banks whose listed name says something else. */
+const BANK_ALIASES: Record<string, string> = {
+  gtb: "guarantytrust",
+  gtbank: "guarantytrust",
+  gtco: "guarantytrust",
+  uba: "unitedforafrica",
+  fcmb: "firstcitymonument",
+  firstbank: "first",
+  stanbic: "stanbicibtc",
+};
+
+const FILLER = new Set(["bank", "plc", "limited", "ltd", "nigeria", "of", "the", "mfb", "microfinance"]);
+
+function bankKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/gu, " and ")
+    .replace(/[^a-z0-9]+/gu, " ")
+    .split(" ")
+    .filter((word) => word !== "" && !FILLER.has(word))
+    .join("");
+}
+
+/**
+ * The code the current provider knows this bank by.
+ *
+ * Accounts saved while the bank list was down carry a typed name and no code,
+ * and accounts saved under the other provider carry that provider's code. Both
+ * resolve to "not found" as they stand, though the account is real.
+ */
+async function currentCode(db: Db, bankCode: string, bankName: string): Promise<string> {
+  const banks = await listBanks(db);
+  if (banks.length === 0 || banks.some((bank) => bank.code === bankCode)) return bankCode;
+  const typed = bankKey(bankName);
+  const want = BANK_ALIASES[typed] ?? typed;
+  if (want === "") return bankCode;
+  const exact = banks.find((bank) => bankKey(bank.name) === want);
+  if (exact) return exact.code;
+  const near = new Set(
+    banks.filter((bank) => bankKey(bank.name).startsWith(want)).map((bank) => bank.code),
+  );
+  return near.size === 1 ? [...near][0]! : bankCode;
 }
