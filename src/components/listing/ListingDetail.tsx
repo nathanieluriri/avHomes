@@ -72,7 +72,7 @@ export default function ListingDetail({ property, similar }: { property: Propert
               <span className="inline-flex items-center rounded-full bg-mist-100 px-3.5 py-1.5 text-xs font-semibold text-plum-950">
                 {property.type}
               </span>
-              {estate && property.buildStage && (
+              {property.buildStage && (
                 <span className="inline-flex items-center rounded-full bg-mist-100 px-3.5 py-1.5 text-xs font-semibold text-plum-950">
                   {BUILD_STAGE_LABELS[property.buildStage]}
                 </span>
@@ -164,12 +164,21 @@ export default function ListingDetail({ property, similar }: { property: Propert
                   )}
                 </>
               ) : (
-                <Reveal delay={80}>
-                  <div className="mt-12 space-y-4">
-                    <RentTerms property={property} />
-                    <SpecGrid property={property} />
-                  </div>
-                </Reveal>
+                <>
+                  <Reveal delay={80}>
+                    <div className="mt-12 space-y-4">
+                      <RentTerms property={property} />
+                      <SpecGrid property={property} />
+                    </div>
+                  </Reveal>
+                  {property.paymentPlan && (
+                    <Reveal delay={80}>
+                      <div className="mt-12">
+                        <PaymentPlanCard property={property} />
+                      </div>
+                    </Reveal>
+                  )}
+                </>
               )}
 
               {property.amenities.length > 0 && (

@@ -665,10 +665,10 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
   const hiddenNotice = [
     !fields.prototypes &&
       draft.prototypes.length > 0 &&
-      "Options and units are only saved for Estate Land and Apartment Building.",
+      "Options, units and shops are only saved for Estate Land, Apartment Building and Plaza.",
     !fields.paymentPlan &&
       (draft.paymentPlan.on || draft.buildStage !== null) &&
-      "The payment plan and the build stage are only saved for Estate Land.",
+      "The payment plan and the build stage are not saved for a rent.",
     !fields.rentTerms &&
       (draft.rentTerms.furnishing !== null ||
         draft.rentTerms.serviced ||
@@ -1309,6 +1309,24 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
                   />
                 </div>
               )}
+            </Card>
+          )}
+
+          {fields.paymentPlan && !fields.prototypes && (
+            <Card>
+              <CardHead title="Payment plan" />
+              <div data-spotlight="listing-payment-plan">
+                <PaymentPlanFields
+                  value={draft.paymentPlan}
+                  onChange={(patch) => setDraft((d) => ({ ...d, paymentPlan: { ...d.paymentPlan, ...patch } }))}
+                  example={
+                    livePrice.ok && livePrice.minor > 0
+                      ? { label: draft.title.trim() || "this listing", priceMinor: livePrice.minor }
+                      : null
+                  }
+                  currency={draft.currency}
+                />
+              </div>
             </Card>
           )}
 
