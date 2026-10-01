@@ -59,7 +59,7 @@ type TeamRead = {
 };
 
 export default function TeamPage() {
-  const team = useAsync((signal) => api.get<TeamResponse>("/marketing/team", signal), []);
+  const team = useAsync((signal) => api.get<TeamResponse>("/marketing/team", signal), [], { cache: "team" });
 
   return (
     <AppShell title="Your Network" back="/m" tab="Your partners" hero={<TeamHero team={team} />}>

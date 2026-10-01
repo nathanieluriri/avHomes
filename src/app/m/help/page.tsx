@@ -86,6 +86,7 @@ function HelpBody() {
   const progress = useAsync(
     (signal) => api.get<TutorialProgressList>(PROGRESS_PATH, signal),
     [],
+    { cache: "tutorials" },
   );
   // Watches this visit stored. Set only once the server has them, so nothing rolls back.
   const [saved, setSaved] = useState<Record<string, true>>({});

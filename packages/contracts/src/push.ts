@@ -26,6 +26,7 @@ export const PUSH_KINDS = [
   "account-active",
   "partner-joined",
   "update",
+  "newsletter",
   // The console.
   "mail-received",
   "mail-failed",

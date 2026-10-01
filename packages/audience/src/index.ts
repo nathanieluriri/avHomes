@@ -16,7 +16,15 @@ import {
 } from "@avhomes/core";
 import { welcomeEmail } from "./admin";
 
-export { audienceAdminRoutes, unsubscribePublicRoutes, unsubscribe, unsubscribeLink } from "./admin";
+export {
+  audienceAdminRoutes,
+  newsletterArticle,
+  recentNewsFor,
+  unsubscribe,
+  unsubscribeLink,
+  unsubscribePublicRoutes,
+  unsubscribedAmong,
+} from "./admin";
 import { SUBSCRIBE_IP_LIMIT, SUBSCRIBE_WINDOW_MS, limit } from "@avhomes/identity";
 
 /**

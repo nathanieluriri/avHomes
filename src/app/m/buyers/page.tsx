@@ -38,7 +38,7 @@ const SCOPES = [
 
 export default function BuyersPage() {
   const [scope, setScope] = useState<Scope>("open");
-  const leads = useAsync((signal) => api.get<LeadsResponse>("/marketing/leads", signal), []);
+  const leads = useAsync((signal) => api.get<LeadsResponse>("/marketing/leads", signal), [], { cache: "leads" });
 
   const all = leads.data?.items ?? [];
   const items = all.filter((lead) => bucket(lead) === scope);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { AuthUser } from "@avhomes/contracts";
-import { ApiError, api } from "./client";
+import { ApiError, api, readCache } from "./client";
 
 /* ═════════════════════════════════════════════════════════════ VIEWPORT ═══ */
 
@@ -138,23 +138,32 @@ export function useAsync<T>(
      * the previous record's fields under the new record's title would be a lie.
      */
     keepPrevious?: boolean;
+    /**
+     * A name for this read in `readCache`, completed by `deps`. The screen opens
+     * on the last answer, not loading, while the fresh one is fetched behind it
+     * and replaces it. For the partner app's screens, which are reopened many
+     * times a day from the Menu and must not draw skeletons every time.
+     */
+    cache?: string;
   } = {},
 ): { data: T | null; error: ApiError | null; loading: boolean; reload: () => void } {
   const [nonce, setNonce] = useState(0);
   const key = `${JSON.stringify(deps)}#${nonce}`;
+  const cacheKey = options.cache === undefined ? null : `${options.cache}:${JSON.stringify(deps)}`;
+  const cached = cacheKey === null ? undefined : (readCache.get(cacheKey) as T | undefined);
 
   const [state, setState] = useState<AsyncState<T>>({
-    data: null,
+    data: cached ?? null,
     error: null,
-    loading: true,
+    loading: cached === undefined,
     key,
   });
 
   if (state.key !== key) {
     setState((prev) => ({
-      data: options.keepPrevious ? prev.data : null,
+      data: cached !== undefined ? cached : options.keepPrevious ? prev.data : null,
       error: null,
-      loading: true,
+      loading: cached === undefined,
       key,
     }));
   }
@@ -171,6 +180,7 @@ export function useAsync<T>(
     runRef
       .current(controller.signal)
       .then((data) => {
+        if (cacheKey !== null) readCache.set(cacheKey, data);
         if (!controller.signal.aborted) setState({ data, error: null, loading: false, key });
       })
       .catch((err: unknown) => {
@@ -179,6 +189,8 @@ export function useAsync<T>(
         setState({ data: null, error: asApiError(err), loading: false, key });
       });
     return () => controller.abort();
+    // `cacheKey` changes only with `key`, so listing it would be a second name for the same thing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);

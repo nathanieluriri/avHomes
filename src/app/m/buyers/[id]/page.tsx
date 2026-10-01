@@ -44,7 +44,7 @@ import { useAsync } from "@/lib/admin/hooks";
 
 export default function BuyerPage() {
   const { id } = useParams<{ id: string }>();
-  const lead = useAsync((signal) => api.get<LeadRow>(`/marketing/leads/${id}`, signal), [id]);
+  const lead = useAsync((signal) => api.get<LeadRow>(`/marketing/leads/${id}`, signal), [id], { cache: "lead" });
   const [closing, setClosing] = useState(false);
   const [noting, setNoting] = useState(false);
 

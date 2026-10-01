@@ -49,7 +49,7 @@ function GroupName({ tone, count }: { tone: MarketerAlertTone; count: number }) 
 }
 
 export default function AlertsPage() {
-  const alerts = useAsync((signal) => api.get<AlertsResponse>("/marketing/alerts", signal), []);
+  const alerts = useAsync((signal) => api.get<AlertsResponse>("/marketing/alerts", signal), [], { cache: "alerts" });
 
   const items = alerts.data ? sortAlerts(alerts.data.items) : [];
   const toDo = alerts.data ? items.filter((alert) => alert.tone === "act").length : undefined;

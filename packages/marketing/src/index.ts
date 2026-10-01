@@ -24,6 +24,7 @@ export {
 } from "./settings";
 
 export {
+  activeMarketerContacts,
   approvedDealIds,
   balanceFor,
   cancelDeal,

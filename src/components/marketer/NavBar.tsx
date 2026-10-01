@@ -20,7 +20,7 @@ import {
   OrbMark,
   type IconProps,
 } from "./icons3d";
-import { Sheet, useDialog, useMounted } from "./Sheet";
+import { Sheet, useDialog, useLeave, useMounted, useSwipeDown } from "./Sheet";
 import { ButtonLink } from "./ui";
 
 /**
@@ -179,13 +179,16 @@ function MenuSheet({
 }) {
   const mounted = useMounted();
   const pathname = usePathname();
+  const root = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   useDialog(open, onClose, panel, returnTo);
+  useLeave(root, panel, open);
+  useSwipeDown(panel, open, onClose);
 
   if (!open || !mounted) return null;
 
   return createPortal(
-    <div className="m-float">
+    <div ref={root} className="m-float">
       <button
         type="button"
         aria-label="Close menu"

@@ -34,7 +34,7 @@ export default function DealsPage() {
     (signal) => api.get<DealsResponse>(`/marketing/deals?scope=${scope}`, signal),
     [scope],
     // Blanking a long list to skeletons on a tab tap would throw the reader back to the top.
-    { keepPrevious: true },
+    { keepPrevious: true, cache: "deals" },
   );
 
   const items = shown(scope, deals.data);

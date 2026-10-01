@@ -71,6 +71,8 @@ import {
   type MarketerBank,
   type MarketingSettings,
   type MarketingUpdate,
+  type NewsArticle,
+  type NewsItem,
   type NotificationInput,
   type Ownership,
   type PayIssue,
@@ -239,6 +241,13 @@ export interface MarketingDeps {
    */
   accrue?: FundAccrual;
   reverseFunds?: FundReversal;
+  /**
+   * Newsletters sent since `sinceMs` that this address did not opt out of, newest
+   * first. Owned by @avhomes/audience, which keeps the list and the letters.
+   */
+  recentNews?: (db: Db, email: string, sinceMs: number, limit: number) => Promise<NewsItem[]>;
+  /** One sent newsletter for this reader, as the email went out. Null when there is no such letter. */
+  newsletterFor?: (db: Db, input: { id: string; email: string; origin: string }) => Promise<NewsArticle | null>;
   /**
    * A recorded sale reaching its listing: the unit sold is marked taken, or a
    * listing that is one thing closes. Owned by @avhomes/listings.
@@ -1019,6 +1028,20 @@ function listingCard(listing: RecentListing): MarketingUpdate {
 const noAccrual: FundAccrual = async () => {};
 const noReversal: FundReversal = async () => 0;
 
+/** How long a newsletter stays in Alerts after it went out. */
+const NEWS_SHOWN_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** A failure to read the news never costs the screen that asked. */
+async function newsFor(deps: MarketingDeps, db: Db, email: string): Promise<NewsItem[]> {
+  if (!deps.recentNews) return [];
+  try {
+    return await deps.recentNews(db, email, Date.now() - NEWS_SHOWN_MS, 3);
+  } catch (err) {
+    console.error("[marketing]", JSON.stringify({ news: email, message: err instanceof Error ? err.message : String(err) }));
+    return [];
+  }
+}
+
 export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
   /* Only the reversal, because nothing a marketer does from the app settles money:
@@ -1032,10 +1055,11 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const marketer = await currentMarketer(db, c);
     const settings = await readMarketingSettings(db);
     const bankCheck = (await providerState(db)).ready;
+    const news = await newsFor(deps, db, marketer.email);
     const [balance, team, alerts] = await Promise.all([
       balanceFor(db, marketer.id, settings.currency),
       teamFor(db, marketer.id),
-      alertsFor(db, marketer, settings, { bankCheck }),
+      alertsFor(db, marketer, settings, { bankCheck, news }),
     ]);
     return c.json({
       marketer,
@@ -1063,9 +1087,22 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const db = await currentDb(c);
     const marketer = await currentMarketer(db, c);
     const settings = await readMarketingSettings(db);
+    const news = await newsFor(deps, db, marketer.email);
     return c.json({
-      items: await alertsFor(db, marketer, settings, { bankCheck: (await providerState(db)).ready }),
+      items: await alertsFor(db, marketer, settings, { bankCheck: (await providerState(db)).ready, news }),
     });
+  });
+
+  /** A newsletter opened from Alerts or a notification, read inside the app. */
+  routes.get("/marketing/news/:id", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const id = pathParam(c, "id");
+    const article = deps.newsletterFor
+      ? await deps.newsletterFor(db, { id, email: marketer.email, origin: requestOrigin(c.req) })
+      : null;
+    if (!article) throw new NotFoundError(`newsletter ${id}`);
+    return c.json(article);
   });
 
   /**

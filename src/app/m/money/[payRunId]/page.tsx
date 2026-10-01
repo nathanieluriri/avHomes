@@ -80,8 +80,8 @@ function ThreadTab({ issue }: { issue: PayIssue }) {
 
 export default function PaymentPage() {
   const { payRunId } = useParams<{ payRunId: string }>();
-  const money = useAsync((signal) => api.get<MoneyResponse>("/marketing/money", signal), []);
-  const issues = useAsync((signal) => api.get<IssuesResponse>("/marketing/issues", signal), []);
+  const money = useAsync((signal) => api.get<MoneyResponse>("/marketing/money", signal), [], { cache: "money" });
+  const issues = useAsync((signal) => api.get<IssuesResponse>("/marketing/issues", signal), [], { cache: "issues" });
   // A report, reply or close answers with the report as it now stands.
   const [latest, setLatest] = useState<PayIssue | null>(null);
   const [justReported, setJustReported] = useState(false);
