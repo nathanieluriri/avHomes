@@ -244,7 +244,7 @@ function fromDriver(err: MongoLikeError): ApiError | null {
   // 121: document failed the collection's $jsonSchema validator. errInfo carries
   // the failing rule, which is the whole diagnostic value of this branch.
   if (code === 121) {
-    return new BadRequestError("document", describeValidationFailure(err.errInfo));
+    return new SchemaRejectedError(describeValidationFailure(err.errInfo));
   }
 
   // 50: operation exceeded its time limit. Genuinely transient, so 502 rather
@@ -257,6 +257,19 @@ function fromDriver(err: MongoLikeError): ApiError | null {
     return new UpstreamError("mongodb", err.message ?? "could not reach the database");
   }
   return null;
+}
+
+/**
+ * The stored validator refused a write. Never the person's fault, so the screen
+ * gets a calm sentence and the failing rules go to the log beside the requestId.
+ */
+export class SchemaRejectedError extends BadRequestError {
+  constructor(readonly rules: readonly { path: string; message: string }[]) {
+    super("That could not be saved. Nothing you entered was lost, so try again in a moment.");
+  }
+  override body() {
+    return { detail: this.detail };
+  }
 }
 
 /** Flattens Mongo's nested schema-validation report into readable paths. */
@@ -346,6 +359,10 @@ export function toResponse(err: unknown, ctx: ErrorContext): Response {
 
   // Only an unmapped error is an incident. A 404 or a 409 is the table working.
   if (!mapped) console.error("[api]", JSON.stringify(logLine(err, ctx)));
+  // A validator refusal is a bug on our side, and its rules are no longer on screen.
+  if (mapped instanceof SchemaRejectedError) {
+    console.error("[api]", JSON.stringify({ ...logLine(err, ctx), rules: mapped.rules }));
+  }
 
   const status = mapped?.status ?? 500;
   const code: ErrorCode = mapped?.code ?? "internal";

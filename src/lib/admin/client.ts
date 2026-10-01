@@ -48,43 +48,58 @@ export interface ApiErrorBody {
  * Twelve written sentences, dead from the day they were added.
  */
 function sentenceFor(status: number, b: ApiErrorBody): string {
-  if (typeof b.detail === "string" && b.detail !== "") return b.detail;
+  if (typeof b.detail === "string" && isHuman(b.detail)) return asSentence(b.detail);
   switch (b.error) {
     case "unauthenticated":
       return "Your session has ended. Sign in again.";
     case "forbidden":
-      return b.reason ?? "You do not have access to this.";
+      return b.reason && isHuman(b.reason) ? asSentence(b.reason) : "You do not have access to this.";
     case "gone":
       return "That no longer exists.";
     case "bad_request":
-      // Capped at three, because this sentence is the headline of `ErrorNote`
-      // and a field path has no spaces in it. Eight of them joined by commas is
-      // one unbreakable token wider than a 288px card, which pushes the whole
-      // console into horizontal scroll on a phone. The full list is still drawn
-      // as a bulleted breakdown underneath.
-      return b.issues?.length
-        ? `Check ${b.issues
-            .slice(0, 3)
-            .map((i) => i.path)
-            .join(", ")}${b.issues.length > 3 ? ` and ${b.issues.length - 3} more` : ""}.`
-        : "That request was not accepted.";
+      return humanIssues(b).length > 0
+        ? "Some details need another look before this can be saved."
+        : "That could not be saved. Check what you entered and try again.";
     case "invalid_document":
-      return `The document is not valid at ${b.path ?? "an unknown position"}.`;
+      return "Part of this content could not be read. Try saving again.";
     case "stale_write":
       return "Someone else saved this while you were editing.";
     case "precondition_failed":
-      return `That is not allowed right now (${b.operation ?? "refused"}).`;
+      return "That is not allowed right now.";
     case "duplicate":
-      return `That ${b.field ?? "value"} is already taken.`;
+      return "That is already taken. Try a different one.";
     case "rate_limited":
-      return `Too many attempts. Try again in ${b.retryAfter ?? 60}s.`;
+      return `Too many attempts. Try again in ${b.retryAfter ?? 60} seconds.`;
     case "not_implemented":
-      return b.hint ? `Not configured: ${b.hint}` : "That feature is not configured.";
+      return "That is not set up yet.";
     case "upstream_failed":
-      return "A service we depend on is not answering.";
+      return "A service we depend on is not answering. Try again in a moment.";
     default:
-      return status >= 500 ? "The server could not answer that." : "Something went wrong.";
+      return status === 0
+        ? "Could not reach the server. Check your connection and try again."
+        : "Something went wrong. Try again in a moment.";
   }
+}
+
+/**
+ * Whether a server string reads as a sentence a person can act on. Field names,
+ * schema rules and stack fragments ("listingType", "failed $jsonSchema") are for
+ * the support details, never the headline.
+ */
+export function isHuman(text: string): boolean {
+  const t = text.trim();
+  return /\s/u.test(t) && !/[$<>{}[\]_]|\benum\b|^failed\b|^[a-z]+:/u.test(t);
+}
+
+function asSentence(text: string): string {
+  const t = text.trim();
+  const capped = t.charAt(0).toUpperCase() + t.slice(1);
+  return /[.!?]$/u.test(capped) ? capped : `${capped}.`;
+}
+
+/** The issues worth showing a person, as sentences. The rest stay in the support details. */
+export function humanIssues(b: ApiErrorBody): string[] {
+  return [...new Set((b.issues ?? []).filter((i) => isHuman(i.message)).map((i) => asSentence(i.message)))];
 }
 
 export class ApiError extends Error {

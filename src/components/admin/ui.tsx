@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronRight } from "lucide-react";
-import { ApiError } from "@/lib/admin/client";
+import { ApiError, humanIssues, isHuman } from "@/lib/admin/client";
 import { PhoneInput } from "@/components/PhoneInput";
 
 /**
@@ -42,79 +42,90 @@ import { PhoneInput } from "@/components/PhoneInput";
 /* ══════════════════════════════════════════════════════════════ FEEDBACK ══ */
 
 /**
- * Renders a failure the way the error table intended.
+ * A failure, said calmly.
  *
- * The sentence, then the named refusal code, then per-field issues, then a
- * copyable diagnostic carrying the requestId. An operator reporting a problem
- * can paste one line that ties their screen to a server log entry.
+ * A plain sentence and what to do next, never a status code or a schema rule
+ * up front. Everything a developer needs (the code, the raw issues, the
+ * requestId to match a log line) sits folded under "Details for support".
  */
 export function ErrorNote({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
   const [copied, setCopied] = useState(false);
   const b = error.body;
+  const issues = humanIssues(b);
+  const technical = (b.issues ?? []).filter((issue) => !isHuman(issue.message));
 
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-      {/* An error sentence can name a field path or a URL, and neither has a
-          space in it. Inside a 288px card an unbreakable token pushes the whole
-          notice into horizontal scroll, which on a fixed frame means the entire
-          console scrolls sideways. */}
-      <p className="font-semibold [overflow-wrap:anywhere]">{error.message}</p>
+    <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+      {/* An error sentence can name a URL, which has no space in it. Inside a
+          288px card an unbreakable token pushes the whole console sideways. */}
+      <p className="font-medium [overflow-wrap:anywhere]">{error.message}</p>
 
-      {b.issues && b.issues.length > 0 && (
-        <ul className="mt-2 list-disc space-y-0.5 pl-5 text-red-800">
-          {b.issues.map((issue) => (
-            <li key={`${issue.path}-${issue.message}`} className="[overflow-wrap:anywhere]">
-              <code className="font-mono text-xs">{issue.path}</code>: {issue.message}
+      {issues.length > 0 && (
+        <ul className="mt-2 list-disc space-y-0.5 pl-5 text-amber-900">
+          {issues.map((issue) => (
+            <li key={issue} className="[overflow-wrap:anywhere]">
+              {issue}
             </li>
           ))}
         </ul>
       )}
 
-      {b.hint && <p className="mt-2 text-red-800 [overflow-wrap:anywhere]">{b.hint}</p>}
+      {b.hint && isHuman(b.hint) && <p className="mt-2 text-amber-900 [overflow-wrap:anywhere]">{b.hint}</p>}
 
-      {/* Real boxes below sm, not underlined words. These two are the whole
-          recovery path from a failed screen, and an underlined 12px run of text
-          is the smallest target in the console at the moment it matters most. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs sm:gap-3">
-        <span className="rounded-full bg-red-100 px-2 py-0.5 font-mono">
-          {error.status} {b.error}
-        </span>
-        {b.requestId && (
-          <button
-            type="button"
-            className="c-tap inline-flex h-9 items-center rounded-lg bg-red-100 px-2.5 font-mono text-red-800 sm:h-auto sm:bg-transparent sm:px-0 sm:text-red-700 sm:underline sm:underline-offset-2"
-            onClick={() => {
-              void navigator.clipboard.writeText(error.diagnostic);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }}
-          >
-            {copied ? "copied" : `requestId ${b.requestId.slice(0, 8)}`}
-          </button>
-        )}
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
         {onRetry && (
           <button
             type="button"
-            className="c-tap inline-flex h-9 items-center rounded-lg bg-red-100 px-2.5 font-semibold text-red-800 sm:h-auto sm:bg-transparent sm:px-0 sm:font-normal sm:text-red-700 sm:underline sm:underline-offset-2"
+            className="c-tap inline-flex h-9 items-center rounded-lg bg-amber-100 px-3 font-semibold text-amber-900 sm:h-8"
             onClick={onRetry}
           >
             Try again
           </button>
         )}
-      </div>
-
-      {b.debug && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-red-700">
-            {b.debug.name} at {b.debug.at}
+        <details className="group min-w-0 basis-full sm:basis-auto">
+          <summary className="cursor-pointer text-amber-800/80 underline-offset-2 hover:underline">
+            Details for support
           </summary>
-          <pre className="mt-2 max-h-48 overflow-auto rounded bg-red-100 p-2 text-[11px] leading-relaxed">
-            {b.debug.message}
-            {"\n"}
-            {b.debug.stack.join("\n")}
-          </pre>
+          <div className="mt-2 space-y-2 rounded-lg bg-amber-100/70 p-2.5 text-amber-900">
+            <p className="font-mono [overflow-wrap:anywhere]">
+              {error.status} {b.error}
+              {b.detail && !isHuman(b.detail) ? ` · ${b.detail}` : ""}
+            </p>
+            {technical.length > 0 && (
+              <ul className="space-y-0.5 font-mono text-[11px]">
+                {technical.map((issue) => (
+                  <li key={`${issue.path}-${issue.message}`} className="[overflow-wrap:anywhere]">
+                    {issue.path}: {issue.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {b.hint && !isHuman(b.hint) && <p className="font-mono [overflow-wrap:anywhere]">{b.hint}</p>}
+            {b.requestId && (
+              <button
+                type="button"
+                className="c-tap inline-flex h-8 items-center rounded-md bg-white/70 px-2 font-mono"
+                onClick={() => {
+                  void navigator.clipboard.writeText(error.diagnostic);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                }}
+              >
+                {copied ? "Copied" : `Copy reference ${b.requestId.slice(0, 8)}`}
+              </button>
+            )}
+            {b.debug && (
+              <pre className="max-h-48 overflow-auto rounded bg-white/70 p-2 text-[11px] leading-relaxed">
+                {b.debug.name} at {b.debug.at}
+                {"\n"}
+                {b.debug.message}
+                {"\n"}
+                {b.debug.stack.join("\n")}
+              </pre>
+            )}
+          </div>
         </details>
-      )}
+      </div>
     </div>
   );
 }
