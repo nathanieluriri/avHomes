@@ -149,7 +149,7 @@ export async function readMarketingSettings(db: Db): Promise<MarketingSettings> 
     blockSelfDeals: doc.blockSelfDeals ?? d.blockSelfDeals,
     minPayoutMinor: doc.minPayoutMinor ?? d.minPayoutMinor,
     currency: doc.currency ?? d.currency,
-    supportPhone: doc.supportPhone ?? d.supportPhone,
+    supportPhone: doc.supportPhone?.trim() || d.supportPhone,
     accountProvider: provider(doc.accountProvider, d.accountProvider),
     updatedAt: doc.updatedAt ?? 0,
   };

@@ -662,7 +662,7 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   blockSelfDeals: true,
   minPayoutMinor: 0,
   currency: DEFAULT_CURRENCY,
-  supportPhone: "",
+  supportPhone: "+2348143345307",
   accountProvider: "kora",
   updatedAt: 0,
 };

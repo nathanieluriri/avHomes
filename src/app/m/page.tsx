@@ -473,7 +473,7 @@ function HomeBody({ alerts }: { alerts: AlertsRead }) {
         <div className="grid grid-cols-3 gap-3">
           <IconTile href="/m/deals" icon={<IconDeals size={46} />} label="My deals" />
           <IconTile href="/m/listings" icon={<IconListings size={46} />} label="Listings" />
-          <IconTile href="/m/team" icon={<IconTeam size={46} />} label="My team" />
+          <IconTile href="/m/team" icon={<IconTeam size={46} />} label="My Network" />
         </div>
       </section>
     </>

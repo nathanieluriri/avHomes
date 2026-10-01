@@ -20,12 +20,12 @@ export default function WorkWithUs({ joinOpen }: { joinOpen: boolean }) {
               only one way in, and offering to pay somebody who cannot sign up
               reads as a broken promise. */}
           <SectionHeading
-            eyebrow="Work With Us"
-            lead={joinOpen ? "There Is More Than One Way To" : "Bring Your Property"}
-            accent={joinOpen ? "Work With AV Homes" : "To AV Homes"}
+            eyebrow="Partner With Us"
+            lead={joinOpen ? "There’s More Than One Way To" : "Bring Your Property"}
+            accent={joinOpen ? "Partner With AV Homes" : "To AV Homes"}
             sub={
               joinOpen
-                ? "Earn on the homes you help move, or bring property of your own to the platform."
+                ? "Connecting people, properties and opportunities through trusted partnerships."
                 : "List with us and reach buyers who already trust what we put in front of them."
             }
           />
@@ -40,17 +40,17 @@ export default function WorkWithUs({ joinOpen }: { joinOpen: boolean }) {
             {joinOpen && (
               <Card
                 icon={TrendingUp}
-                title="Earn As A Marketer"
-                body="Bring buyers and tenants to AV Homes and earn commission on every deal you close. Sign people up under you and you earn from theirs as well."
-                action="Join the team"
+                title="Become an AV Homes Property Partner"
+                body="Connect clients with properties and work with our team to facilitate successful transactions. As a Property Partner, you’ll have access to our property network, marketing support and a commission structure for qualifying transactions."
+                action="Become a Partner"
                 href="/m/join"
               />
             )}
             <Card
               icon={Building2}
-              title="List Your Property"
-              body="Own or manage property that is not ours? Apply for an account, add your listings, and our team checks each one before it reaches the site."
-              action="Apply to list"
+              title="List Your Property With Us"
+              body="Have a property you’d like to sell or lease? Partner with AV Homes to bring it to a wider market. Submit your property and our team will review the details, verify the listing and work with you to connect it with suitable clients."
+              action="Partner With Us"
               href="/list-with-us"
             />
           </div>

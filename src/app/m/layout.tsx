@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AV Homes Marketers",
+  title: "AV Homes Partners",
   /*
    * Not indexed, and not the same job as the disallow in robots.ts. That file
    * asks a crawler not to fetch and is only seen by one that reads it first;

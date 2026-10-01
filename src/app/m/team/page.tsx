@@ -62,7 +62,7 @@ export default function TeamPage() {
   const team = useAsync((signal) => api.get<TeamResponse>("/marketing/team", signal), []);
 
   return (
-    <AppShell title="Your team" back="/m" tab="Your people" hero={<TeamHero team={team} />}>
+    <AppShell title="Your Network" back="/m" tab="Your partners" hero={<TeamHero team={team} />}>
       <TeamBody team={team} />
     </AppShell>
   );
@@ -177,7 +177,7 @@ function TeamBody({ team }: { team: TeamRead }) {
 
   return (
     <div className="space-y-7 px-4">
-      <section aria-label="Your people">{people}</section>
+      <section aria-label="Your partners">{people}</section>
       <HowItPays me={me} />
     </div>
   );

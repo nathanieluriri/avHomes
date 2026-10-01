@@ -57,7 +57,7 @@ export function Lockup({ size = "bar" }: { size?: "bar" | "tall" }) {
           size === "tall" ? "text-[15px]" : "text-[13px]"
         }`}
       >
-        marketers
+        Partners
       </span>
     </span>
   );
@@ -346,7 +346,7 @@ export function AppShell({
               ) : (
                 <Link
                   href="/m"
-                  aria-label="AV Homes marketers home"
+                  aria-label="AV Homes Partners home"
                   className="m-tap flex min-w-0 flex-1 items-center transition-opacity active:opacity-70"
                 >
                   <Lockup />

@@ -170,7 +170,7 @@ export function BankFields({
         )}
       </div>
 
-      {!banks.loading && !canCheck && (
+      {banks.data && !canCheck && (
         <Note tone="warn">
           The bank name check is off on this site, so nobody can confirm the name for you. Check the
           number twice.

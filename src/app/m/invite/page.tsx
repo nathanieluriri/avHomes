@@ -198,12 +198,12 @@ function InviteReady({ me }: { me: MeResponse }) {
       <Perks me={me} />
 
       <section>
-        <SectionLabel>Your team so far</SectionLabel>
+        <SectionLabel>Your Network so far</SectionLabel>
         <RowGroup>
           <StatRow
             href="/m/team"
             lead={<IconTeam size={44} />}
-            label="Your team"
+            label="Your Network"
             sub={people === 0 ? "Nobody has joined yet" : "See who joined"}
             value={
               <span className="m-num text-[17px] font-bold text-m-text">
