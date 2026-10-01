@@ -759,6 +759,7 @@ export interface DealListQuery {
   reporterId?: string;
   /** Deals anybody in this marketer's team closed, including their own. */
   sharedWith?: string;
+  listingId?: string;
   q?: string;
   limit: number;
 }
@@ -770,6 +771,7 @@ export async function listDeals(
   const filter: Filter<DealDoc> = {};
   if (query.status) filter.status = query.status;
   if (query.reporterId) filter.reporterId = query.reporterId;
+  if (query.listingId) filter.listingId = query.listingId;
   if (query.sharedWith) {
     Object.assign(filter, {
       $or: [{ reporterId: query.sharedWith }, { "shares.marketerId": query.sharedWith }],

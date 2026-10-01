@@ -24,6 +24,8 @@ export {
   listSiteStats,
   closeWithSale,
   reopenFromSale,
+  settleListing,
+  unsettleListing,
   listingFacts,
   partnerListingUsage,
   setPartnerHold,

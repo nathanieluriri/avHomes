@@ -11,6 +11,7 @@ import {
   FEE_KINDS_FOR,
   HOME_AMENITY_SUGGESTIONS,
   LISTING_TYPES,
+  OFF_MARKET_LABELS,
   OWNERSHIPS,
   OWNERSHIP_LABEL,
   PROPERTY_TYPES,
@@ -73,6 +74,8 @@ import { NumberField } from "@/components/admin/listing/NumberInput";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import { PreviewSheet } from "@/components/admin/listing/PreviewSheet";
 import { RecordSale } from "@/components/admin/RecordSale";
+import { ListingSales } from "@/components/admin/listing/ListingSales";
+import { OffMarketSheet } from "@/components/admin/listing/OffMarketSheet";
 import { SearchListing } from "@/components/admin/listing/SearchListing";
 import {
   PaymentPlanFields,
@@ -424,6 +427,14 @@ const LIFECYCLE: readonly { op: string; label: string; description: string; tone
     when: (p) => (p.status === "live" || p.status === "under-offer") && !hasOptions(p.type),
   },
   {
+    // An estate, building or plaza sells unit by unit, so this marks one unit taken.
+    op: "close",
+    label: "Record a unit sale",
+    description: "Marks the unit sold or let. Needs the amount, the buyer and proof",
+    tone: "neutral",
+    when: (p) => (p.status === "live" || p.status === "under-offer") && hasOptions(p.type),
+  },
+  {
     op: "submit",
     label: "Send for review",
     description: "Hand it to AV Homes to publish",
@@ -445,11 +456,19 @@ const LIFECYCLE: readonly { op: string; label: string; description: string; tone
     when: (p) => p.deletedAt === null && (p.status === "live" || p.status === "under-offer"),
   },
   {
+    // Archives with a reason, so the record says why it went.
+    op: "offMarket",
+    label: "Take off the market",
+    description: "No longer available. Say why; it is kept on record",
+    tone: "neutral",
+    when: (p) => p.deletedAt === null && (p.status === "live" || p.status === "under-offer" || p.status === "closed"),
+  },
+  {
     op: "archive",
     label: "Archive",
     description: "Off the site, kept on record",
     tone: "neutral",
-    when: (p) => p.status !== "archived" && p.deletedAt === null,
+    when: (p) => p.deletedAt === null && (p.status === "draft" || p.status === "submitted"),
   },
   {
     op: "unarchive",
@@ -533,6 +552,7 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
   const [busy, setBusy] = useState(false);
   /** The record-a-sale sheet, which is the only path from live to closed. */
   const [recordingSale, setRecordingSale] = useState(false);
+  const [takingOff, setTakingOff] = useState(false);
 
   /*
    * WHO IS LOOKING decides which controls are real.
@@ -829,6 +849,10 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
       setRecordingSale(true);
       return;
     }
+    if (op === "offMarket") {
+      setTakingOff(true);
+      return;
+    }
     setBusy(true);
     setSaveError(null);
     try {
@@ -1038,6 +1062,14 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
           listingType: property.listingType,
           priceMinor: property.priceMinor,
           currency: property.currency,
+          units: hasOptions(property.type)
+            ? property.prototypes.map((unit) => ({
+                key: unit.id,
+                name: prototypeLabel(unit, property.type),
+                available: unit.available,
+                priceMinor: unit.priceMinor,
+              }))
+            : undefined,
         }}
         onDone={() => {
           setRecordingSale(false);
@@ -1049,6 +1081,17 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
             .get<{ property: Property }>(`/admin/properties/${property.id}`)
             .then((res) => setProperty(res.property))
             .catch(() => {});
+        }}
+      />
+
+      <OffMarketSheet
+        open={takingOff}
+        onOpenChange={setTakingOff}
+        property={property}
+        onDone={(next) => {
+          setTakingOff(false);
+          setProperty(next);
+          if (!canFeature(next)) set("featured", next.featured);
         }}
       />
 
@@ -1524,6 +1567,21 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
               </div>
             )}
 
+            {property.status === "archived" && property.offMarket && (
+              <div className="rounded-xl border border-mist-200 bg-mist-50 p-3">
+                <p className="text-[12px] font-semibold text-plum-950">
+                  Off the market: {OFF_MARKET_LABELS[property.offMarket.reason]}
+                </p>
+                {property.offMarket.note && (
+                  <p className="mt-1 text-[12px] leading-relaxed text-slate-700">{property.offMarket.note}</p>
+                )}
+                <p className="mt-1 text-xs text-slate-600">
+                  {property.offMarket.byName ? `${property.offMarket.byName}, ` : ""}
+                  {fullDate(property.offMarket.at)}
+                </p>
+              </div>
+            )}
+
             {/* Wrapped only to carry `listing-review-only` for a partner, which is how
                 the add-a-listing walkthrough knows to say Send for review, not Publish. */}
             {!trashed && moves.length > 0 && (
@@ -1668,6 +1726,17 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
               above follows: a shell with a heading and no rows is not a
               lighter version of this panel, it is a panel with nothing to
               say. */}
+          {canSell && (
+            <ListingSales
+              listingId={property.id}
+              unitName={(key) => {
+                const unit = property.prototypes.find((p) => p.id === key);
+                return unit ? prototypeLabel(unit, property.type) : null;
+              }}
+              version={property.revision}
+            />
+          )}
+
           {history.data && history.data.items.length > 0 && (
             <Card className="space-y-3">
               <CardHead title="History" />

@@ -88,6 +88,8 @@ function RecordSaleForm({
     listingType: DealKind;
     priceMinor: number;
     currency: string;
+    /** The units of an estate, building or plaza. A sale there is one of them. */
+    units?: { key: string; name: string; available: boolean; priceMinor: number }[];
   };
   fromDeal?: {
     dealId: string;
@@ -113,6 +115,9 @@ function RecordSaleForm({
   const [amount, setAmount] = useState(
     String((fromDeal?.amountMinor ?? listing.priceMinor) / 100),
   );
+  const units = listing.units ?? [];
+  const [unitKey, setUnitKey] = useState("");
+  const unit = units.find((u) => u.key === unitKey) ?? null;
   const [buyerName, setBuyerName] = useState(fromDeal?.buyerName ?? "");
   const [buyerPhone, setBuyerPhone] = useState(fromDeal?.buyerPhone ?? "");
   const [closedOn, setClosedOn] = useState(today());
@@ -162,6 +167,7 @@ function RecordSaleForm({
           closer: { kind: closerKind },
           closedOn: Date.parse(`${closedOn}T12:00:00`),
         }) ??
+        (units.length > 0 && !unit ? "Pick which unit was sold or let." : null) ??
         (closerKind === "marketer" && !marketer ? "Pick which marketer closed it." : null));
 
   /* The live breakdown. Re-read whenever the amount or the closer changes, because
@@ -258,7 +264,7 @@ function RecordSaleForm({
     try {
       await api.post("/admin/marketing/sales", {
         listingId: listing.id,
-        unitKey: "",
+        unitKey: unit?.key ?? "",
         kind: listing.listingType,
         amountMinor,
         buyerName: buyerName.trim(),
@@ -297,9 +303,13 @@ function RecordSaleForm({
           >
             {busy
               ? "Recording..."
-              : sold
-                ? "Record it and close this listing"
-                : "Record it and mark this let"}
+              : units.length > 0
+                ? sold
+                  ? "Record it and mark the unit sold"
+                  : "Record it and mark the unit let"
+                : sold
+                  ? "Record it and close this listing"
+                  : "Record it and mark this let"}
           </Button>
         </div>
       }
@@ -322,6 +332,28 @@ function RecordSaleForm({
               : "Somebody else's property, so it pays a smaller commission."}
           </span>
         </div>
+
+        {units.length > 0 && (
+          <Field label="Which unit" hint="Taken units cannot be sold twice.">
+            <select
+              className={inputClass}
+              value={unitKey}
+              onChange={(e) => {
+                setUnitKey(e.target.value);
+                const picked = units.find((u) => u.key === e.target.value);
+                if (picked && picked.priceMinor > 0) setAmount(String(picked.priceMinor / 100));
+              }}
+            >
+              <option value="">Choose one</option>
+              {units.map((u) => (
+                <option key={u.key} value={u.key} disabled={!u.available}>
+                  {u.name}
+                  {u.available ? "" : " (taken)"}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         <Field
           label={sold ? "What it sold for" : "What was paid"}
@@ -478,8 +510,9 @@ function RecordSaleForm({
         {!refusal && shownSplit && (
           <p className="text-[12px] leading-relaxed text-slate-600">
             This records {formatMoney(amountMinor, listing.currency)} against{" "}
-            {listing.title} and takes it off the market. It can be reversed by
-            cancelling the deal.
+            {unit ? `${unit.name} at ${listing.title}` : listing.title} and{" "}
+            {unit ? "marks that unit taken, so it cannot be sold again" : "takes it off the market"}. It can
+            be reversed by cancelling the deal.
           </p>
         )}
       </div>

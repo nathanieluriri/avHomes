@@ -36,7 +36,8 @@ import {
 import { auditRoutes, auditTrail } from "@avhomes/audit";
 import {
   authorize,
-  closeWithSale,
+  settleListing,
+  unsettleListing,
   getPropertyById,
   listProperties,
   listingFacts,
@@ -305,11 +306,11 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     accrue: accrueForDeal,
     reverseFunds: reverseForDeal,
     listingFacts,
-    closeListing: async (
-      db: Db,
-      input: { listingId: string; dealId: string; actorId: string; actorName: string },
-    ) => {
-      await closeWithSale(db, { listingId: input.listingId, dealId: input.dealId });
+    closeListing: async (db: Db, input: { listingId: string; unitKey: string; dealId: string }) => {
+      await settleListing(db, input);
+    },
+    reopenListing: async (db: Db, input: { listingId: string; unitKey: string; dealId: string }) => {
+      await unsettleListing(db, input);
     },
   } satisfies Partial<MarketingDeps>;
 

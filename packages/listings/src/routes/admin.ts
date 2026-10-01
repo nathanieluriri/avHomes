@@ -35,6 +35,7 @@ import {
   LISTING_TYPES,
   limitRefusal,
   NO_PARTNER,
+  OFF_MARKET_REASONS,
   PROPERTY_STATUSES,
   OWNERSHIPS,
   PROPERTY_TYPES,
@@ -66,6 +67,7 @@ import {
   toHandle,
   type AuthUser,
   type ListingFee,
+  type OffMarketReason,
   type Property,
   type SiteStat,
   type Testimonial,
@@ -257,6 +259,15 @@ const BulkBody = z
     to: str().min(1).max(120).optional(),
     /** The revision each row was listed at. Patch and trash need one per id, as their single routes do. */
     revisions: z.record(str().max(120), z.number().int().min(0)).optional(),
+  })
+  .strict();
+
+const OffMarketBody = z
+  .object({
+    offMarket: z
+      .object({ reason: z.enum(OFF_MARKET_REASONS), note: str().max(300).default("") })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -598,6 +609,7 @@ async function moveListing(
   id: string,
   operation: LifecycleOp,
   onBefore: OnBefore,
+  offMarket?: { reason: OffMarketReason; note: string },
 ): Promise<Property> {
   const current = await getPropertyById(db, id);
   if (!current) throw new NotFoundError(`property ${id}`);
@@ -684,7 +696,12 @@ async function moveListing(
 
   // Written against the revision just checked, so a listing edited since is a
   // 409 rather than a move the checks above never saw.
-  return transitionProperty(db, current, operation);
+  return transitionProperty(
+    db,
+    current,
+    operation,
+    offMarket ? { ...offMarket, byName: user.displayName } : undefined,
+  );
 }
 
 type AgentCard = Property["agent"];
@@ -979,8 +996,15 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
         { path: "op", message: `unknown operation, expected one of ${Object.keys(TRANSITIONS).join(", ")}` },
       ]);
     }
-    const property = await moveListing(db, currentUser(c), id, op as LifecycleOp, (doc) =>
-      auditBefore(c, doc as unknown as Record<string, unknown>),
+    // Archiving can say why it came off the market; no other move takes a body.
+    const offMarket = op === "archive" ? (await readJsonOrEmpty(c, OffMarketBody)).offMarket : undefined;
+    const property = await moveListing(
+      db,
+      currentUser(c),
+      id,
+      op as LifecycleOp,
+      (doc) => auditBefore(c, doc as unknown as Record<string, unknown>),
+      offMarket,
     );
     return c.json({ property });
   });
