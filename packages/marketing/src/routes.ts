@@ -29,6 +29,7 @@ import {
   readJson,
   readJsonOrEmpty,
   readQuery,
+  requestOrigin,
   pathParam,
   str,
   email as emailString,
@@ -205,6 +206,11 @@ export interface MarketingDeps {
    * may not know how a phone is reached. Never throws.
    */
   tell?: (db: Db, userIds: string[], message: PushMessage, options?: { urgency?: "high" | "normal" }) => Promise<void>;
+  /**
+   * Puts a new marketer on the newsletter list. Injected, because the list lives
+   * in the audience package. Never undoes an earlier unsubscribe.
+   */
+  subscribe?: (db: Db, email: string, ctx: { origin: string; requestId: string; route: string }) => Promise<void>;
   /**
    * Live listings published since `sinceMs`, newest first, at most `limit`.
    * Injected, because this package may not read the listings package's collection.
@@ -660,7 +666,7 @@ const SettingsBody = z
 
 /* ══════════════════════════════════════════════════════════════════ PUBLIC ══ */
 
-export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell"> = {}): Hono<AppEnv> {
+export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscribe"> = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   /** What the join page needs before anybody types: who invited them, and the banks. */
@@ -783,6 +789,17 @@ export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell"> = {}): H
     const { token, expiresAt } = await createSession(db, user.id, c.req.header("user-agent") ?? null);
     setSessionCookie(c, token, expiresAt);
     auditEntityId(c, marketer.id);
+
+    // The join form says so. Never fatal: the account exists either way.
+    try {
+      await deps.subscribe?.(db, address, {
+        origin: requestOrigin(c.req),
+        requestId: c.get("requestId"),
+        route: "POST /public/marketing/join",
+      });
+    } catch (err) {
+      console.error("[marketing]", JSON.stringify({ requestId: c.get("requestId"), subscribe: String(err) }));
+    }
 
     if (marketer.parentId) {
       await tellMarketers(deps, db, [

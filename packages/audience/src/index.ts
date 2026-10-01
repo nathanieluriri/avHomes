@@ -82,6 +82,59 @@ function isDuplicateKey(error: unknown): boolean {
 }
 
 /**
+ * Puts an address on the list and welcomes it, once.
+ *
+ * AN UPSERT, NOT A READ THEN A WRITE, and the unique index is what makes it
+ * correct. Two tabs pressing Subscribe together both find nothing on a read
+ * and both insert, and the reader is then on the list twice: they receive
+ * every message twice, and the second copy is what earns a spam report.
+ *
+ * `$setOnInsert` carries everything that describes the FIRST yes, so a second
+ * submission of the same address cannot rewrite when they joined or relabel
+ * which post brought them in.
+ *
+ * `resubscribe` is for somebody typing their own address into the form: their
+ * returning yes beats an earlier no. A subscription made on somebody's behalf,
+ * such as a marketer signing up, passes false, so it never undoes an opt-out.
+ */
+export async function subscribeAddress(
+  db: Db,
+  mailer: Mailer | undefined,
+  input: { email: string; source: string | null; origin: string; resubscribe: boolean },
+  ctx: { requestId: string; route: string },
+): Promise<void> {
+  const now = Date.now();
+  try {
+    const res = await subscribers(db).updateOne(
+      { email: input.email },
+      {
+        $setOnInsert: {
+          _id: newId("sub", now),
+          email: input.email,
+          source: input.source,
+          createdAt: now,
+          confirmedAt: null,
+        },
+        $set: { updatedAt: now },
+        ...(input.resubscribe ? { $unset: { unsubscribedAt: "" } } : {}),
+      },
+      { upsert: true },
+    );
+    // Welcomed once, on the first yes; a repeat sends nothing.
+    if (res.upsertedCount > 0 && res.upsertedId && mailer) {
+      const message = await welcomeEmail(db, input.origin, { _id: String(res.upsertedId), email: input.email });
+      await trySend(mailer, message, ctx);
+    }
+  } catch (error) {
+    /*
+     * Two upserts for one unseen address race, both miss, and the loser hits
+     * the unique index. The list is exactly right either way.
+     */
+    if (!isDuplicateKey(error)) throw error;
+  }
+}
+
+/**
  * The subscribe intake.
  *
  * A public MUTATION, so it is mounted BELOW the origin guard and deliberately
@@ -107,55 +160,12 @@ export function audiencePublicRoutes(deps: { mailer?: Mailer } = {}): Hono<AppEn
       return c.json({ ok: true }, 201);
     }
 
-    const now = Date.now();
-
-    /*
-     * AN UPSERT, NOT A READ THEN A WRITE, and the unique index is what makes it
-     * correct. Two tabs pressing Subscribe together both find nothing on a read
-     * and both insert, and the reader is then on the list twice: they receive
-     * every message twice, and the second copy is what earns a spam report.
-     *
-     * `$setOnInsert` carries everything that describes the FIRST yes, so a
-     * second submission of the same address cannot rewrite when they joined or
-     * relabel which post brought them in. `updatedAt` moves, because knowing
-     * the address was offered again is worth having.
-     */
-    try {
-      const res = await subscribers(db).updateOne(
-        { email: body.email },
-        {
-          $setOnInsert: {
-            _id: newId("sub", now),
-            email: body.email,
-            source: body.source ?? null,
-            createdAt: now,
-            confirmedAt: null,
-          },
-          $set: { updatedAt: now },
-          /*
-           * Clearing this is the point of re-subscribing. It is separate from
-           * `$setOnInsert` because someone who left and came back is not a new
-           * row: their original join date is a fact, and the returning yes has
-           * to beat the earlier no on the row that already exists.
-           */
-          $unset: { unsubscribedAt: "" },
-        },
-        { upsert: true },
-      );
-      // Welcomed once, on the first yes; a repeat submission sends nothing.
-      if (res.upsertedCount > 0 && res.upsertedId && deps.mailer) {
-        const message = await welcomeEmail(db, requestOrigin(c.req), { _id: String(res.upsertedId), email: body.email });
-        await trySend(deps.mailer, message, { requestId: c.get("requestId"), route: "POST /public/subscribe" });
-      }
-    } catch (error) {
-      /*
-       * Two upserts for one unseen address race, both miss, and the loser hits
-       * the unique index. The list is exactly right either way, so this is a
-       * success from the reader's side: raising a 500 at them would be
-       * reporting a collision they cannot act on and did not cause.
-       */
-      if (!isDuplicateKey(error)) throw error;
-    }
+    await subscribeAddress(db, deps.mailer, {
+      email: body.email,
+      source: body.source ?? null,
+      origin: requestOrigin(c.req),
+      resubscribe: true,
+    }, { requestId: c.get("requestId"), route: "POST /public/subscribe" });
 
     /*
      * The SAME answer whether the address was new or already on the list.
