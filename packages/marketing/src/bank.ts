@@ -172,8 +172,9 @@ const NIP_FOR_PAYSTACK: Record<string, string> = {
   "999991": "100033", // PalmPay
   "50211": "090267", // Kuda
   "50515": "090405", // Moniepoint
-  "50126": "090325", // Sparkle
-  "50823": "090328", // Carbon
+  "50126": "090328", // Eyowo
+  "51310": "090325", // Sparkle
+  "50823": "090154", // CEMCS
   "100004": "100004", // already NIP, left so the map reads as the whole story
 };
 
