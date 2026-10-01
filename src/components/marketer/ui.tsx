@@ -12,7 +12,7 @@ import {
 } from "react";
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { DEAL_STATUS_LABEL, minorUnitsFor, type DealStatus } from "@avhomes/contracts";
-import { ApiError } from "@/lib/admin/client";
+import { ApiError, humanIssues } from "@/lib/admin/client";
 import { PhoneInput } from "@/components/PhoneInput";
 import { useMediaQuery } from "@/lib/admin/hooks";
 import { isAppPath } from "@/lib/marketer/api";
@@ -773,11 +773,11 @@ export function ErrorNote({
   return (
     <div role="alert" className={`m-tone-bad rounded-[16px] p-4 ${className}`}>
       <p className="text-[14px] font-semibold [overflow-wrap:anywhere]">{error.message}</p>
-      {error.body.issues && error.body.issues.length > 0 && (
+      {humanIssues(error.body).length > 0 && (
         <ul className="mt-2 space-y-1 text-[13px] opacity-90">
-          {error.body.issues.map((issue) => (
-            <li key={`${issue.path}-${issue.message}`} className="[overflow-wrap:anywhere]">
-              {issue.message}
+          {humanIssues(error.body).map((issue) => (
+            <li key={issue} className="[overflow-wrap:anywhere]">
+              {issue}
             </li>
           ))}
         </ul>
