@@ -520,8 +520,9 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
     const db = await currentDb(c);
     const banks = await listBanks(db);
     /* Private, not public: the list now depends on which provider this site has
-       chosen, so a shared cache could hand one site another's codes. */
-    c.header("cache-control", "private, max-age=3600");
+       chosen, so a shared cache could hand one site another's codes. Short,
+       because `checked` flips the moment a key is saved in the console. */
+    c.header("cache-control", "private, max-age=300");
     return c.json({ banks, checked: (await providerState(db)).ready });
   });
 

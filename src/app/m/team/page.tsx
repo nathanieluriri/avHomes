@@ -262,20 +262,20 @@ function HowItPays({ me }: { me: MeResponse | null }) {
     ? [
         {
           rate: pct(sale[0]),
-          title: "You close a deal yourself",
-          line: "Your own share of a home you sold or rented.",
+          title: "Your Direct Transaction",
+          line: "When you personally facilitate a qualifying sale or rental, you receive your applicable partner commission.",
           tone: "bg-[linear-gradient(180deg,#c24a6b_0%,#8a2342_100%)] text-white shadow-[inset_0_1px_0_0_rgb(255_214_226/0.45)]",
         },
         {
           rate: pct(sale[1]),
-          title: "Somebody you invited closes one",
-          line: `On top of their own ${pct(sale[0])}, not taken from it.`,
+          title: "Your Partner Network",
+          line: "When a partner you introduced successfully facilitates a qualifying transaction, you receive an additional network commission, without reducing their own commission.",
           tone: "bg-(--m-act-bg) text-(--m-act-fg) ring-1 ring-[#5a2233]",
         },
         {
           rate: pct(sale[2]),
-          title: "One of their people closes one",
-          line: "That is as far as it goes.",
+          title: "Extended Network",
+          line: "When a partner within your extended network facilitates a qualifying transaction, you receive the applicable network commission.",
           tone: "bg-m-raised text-m-text ring-1 ring-m-line",
         },
       ]
@@ -288,9 +288,9 @@ function HowItPays({ me }: { me: MeResponse | null }) {
           <IconTeam size={64} className="-my-2 -ml-1 shrink-0" />
           <div className="min-w-0">
             <h2 id="how-it-pays" className="text-[17px] font-bold leading-snug text-m-text">
-              How your team earns you money
+              How Partnership Rewards Work
             </h2>
-            <p className="mt-0.5 text-[13px] text-m-muted">Three steps, and no more.</p>
+            <p className="mt-0.5 text-[13px] text-m-muted">Simple, transparent and based on successful transactions.</p>
           </div>
         </div>
 
@@ -337,8 +337,11 @@ function HowItPays({ me }: { me: MeResponse | null }) {
         )}
 
         <p className="mt-5 border-t border-m-line pt-4 text-[13px] leading-relaxed text-m-muted">
-          Nobody earns from somebody joining. Only a real home, sold or rented and checked by AV
-          Homes, pays anybody.
+          <span className="block font-semibold text-m-text">
+            AV Homes rewards successful property transactions, not recruitment.
+          </span>
+          Joining the network is free, and commissions are earned only when a verified property
+          transaction is successfully completed.
         </p>
       </Card>
     </section>
