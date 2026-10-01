@@ -10,7 +10,7 @@ import {
   type Mailer,
 } from "@avhomes/core";
 import { getDb, type Db } from "@avhomes/db";
-import { isVideoUrl, type FundKind } from "@avhomes/contracts";
+import { isVideoUrl, type EmailTemplateKey, type FundKind } from "@avhomes/contracts";
 import {
   applicationAdminRoutes,
   applicationPublicRoutes,
@@ -52,6 +52,7 @@ import {
   senderChosen,
   signatureRoutes,
   emailTemplateRoutes,
+  renderEmail,
   mailSettingsRoutes,
   mailboxRoutes,
   mailStateRoutes,
@@ -163,6 +164,10 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   /* The Hostinger mailbox chosen in Settings when a key is set, else the Resend
      environment. Reads settings at send time, never at construction. */
   const mailer = deps.mailer ?? appMailer(resolveDb);
+  const templateMail = {
+    mailer,
+    render: (db: Db, key: EmailTemplateKey, text: Record<string, string>) => renderEmail(db, key, { text }),
+  };
   const notify = developerNotifier(mailer);
 
   /*
@@ -383,7 +388,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, marketingPublicRoutes());
   /* Applying to list property. A public MUTATION, so it sits here rather than in
      the cacheable /public/* router, the same placement the enquiry intake has. */
-  app.route(API_PREFIX, applicationPublicRoutes({ mailer }));
+  app.route(API_PREFIX, applicationPublicRoutes(templateMail));
 
   /* ═════════════════ 9. session, the domain gate, then the audit trail ═════════ */
 
@@ -410,10 +415,10 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, clerkRoutes());
   app.route(API_PREFIX, passwordRoutes({ mailer }));
 
-  app.route(API_PREFIX, teamRoutes({ mailer }));
-  app.route(API_PREFIX, applicationAdminRoutes({ mailer }));
-  app.route(API_PREFIX, partnerAdminRoutes({ mailer, ...partnerPorts }));
-  app.route(API_PREFIX, companyRoutes({ mailer, ...partnerPorts }));
+  app.route(API_PREFIX, teamRoutes(templateMail));
+  app.route(API_PREFIX, applicationAdminRoutes(templateMail));
+  app.route(API_PREFIX, partnerAdminRoutes({ ...templateMail, ...partnerPorts }));
+  app.route(API_PREFIX, companyRoutes({ ...templateMail, ...partnerPorts }));
   /*
    * BEFORE listingsAdminRoutes, deliberately. Its second route, GET
    * /admin/properties/:id/history, sits on a path listingsAdminRoutes also

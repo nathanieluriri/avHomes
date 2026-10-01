@@ -10,9 +10,7 @@ import {
   pathParam,
   readJson,
   str,
-  trySend,
   type AppEnv,
-  type Mailer,
 } from "@avhomes/core";
 import {
   APPLICATION_STATUSES,
@@ -27,6 +25,7 @@ import { createInvite } from "../repo/invites";
 import { upsertPartnerForApplication } from "../repo/partners";
 import { limit } from "../repo/ratelimit";
 import { requireAdmin, requireAuth } from "../middleware";
+import { sendTemplate, type TemplateMail } from "../mail";
 
 /**
  * Applying to list property, and the queue that decides.
@@ -67,7 +66,7 @@ const DecideBody = z
  * and that router's whole safety property is that a shared cache may store its
  * responses.
  */
-export function applicationPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
+export function applicationPublicRoutes(deps: TemplateMail): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.post("/public/partner-applications", async (c) => {
@@ -82,19 +81,12 @@ export function applicationPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> 
     /* Told what happens next, because an application with no stated outcome is an
        application people chase by phone. Never fatal: a confirmation that failed
        to send must not undo the application it confirms. */
-    await trySend(
-      deps.mailer,
-      {
-        to: application.email,
-        subject: "AV Homes has your application",
-        text: [
-          `Thank you ${application.name}.`,
-          "",
-          "We have your request to list property with AV Homes. Somebody reads every",
-          "one of these, and you will hear back either way. If we go ahead you will get",
-          "a link to sign in and add your first property.",
-        ].join("\n"),
-      },
+    await sendTemplate(
+      deps,
+      db,
+      application.email,
+      "partner-application-received",
+      { name: application.name },
       { requestId: c.get("requestId"), route: "POST /public/partner-applications" },
     );
 
@@ -105,7 +97,7 @@ export function applicationPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> 
   return routes;
 }
 
-export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
+export function applicationAdminRoutes(deps: TemplateMail): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.get("/admin/applications", requireAuth(), async (c) => {
@@ -153,20 +145,12 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     }
 
     if (!body.approve) {
-      await trySend(
-        deps.mailer,
-        {
-          to: application.email,
-          subject: "About your AV Homes application",
-          text: [
-            `Thank you for asking to list with AV Homes, ${application.name}.`,
-            "",
-            "We are not going ahead this time.",
-            body.reason ? `\n${body.reason}` : "",
-            "",
-            "You are welcome to apply again.",
-          ].join("\n"),
-        },
+      await sendTemplate(
+        deps,
+        db,
+        application.email,
+        "partner-application-declined",
+        { name: application.name, reason: body.reason ?? "" },
         { requestId: c.get("requestId"), route: "POST /admin/applications/:id/decide" },
       );
       return c.json({ application, url: null, already: false });
@@ -203,20 +187,12 @@ export function applicationAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
        address the door verifies. */
     const url = `${deploymentOrigin(c.req)}/admin/sign-in`;
 
-    await trySend(
-      deps.mailer,
-      {
-        to: application.email,
-        subject: "You can list with AV Homes",
-        text: [
-          `Good news, ${application.name}.`,
-          "",
-          "AV Homes has approved your account. Sign in here to add your first property:",
-          url,
-          "",
-          "Use this same email address and you'll be sent a 6-digit code to confirm it. Your listings go live once AV Homes has read them.",
-        ].join("\n"),
-      },
+    await sendTemplate(
+      deps,
+      db,
+      application.email,
+      "partner-application-approved",
+      { name: application.name, signInLink: url },
       { requestId: c.get("requestId"), route: "POST /admin/applications/:id/decide" },
     );
 

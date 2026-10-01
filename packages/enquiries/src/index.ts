@@ -330,15 +330,6 @@ async function conversationEmail(
   );
 }
 
-function transcript(doc: EnquiryDoc): string {
-  return (doc.messages ?? [])
-    .map((m) => {
-      const who = m.from === "visitor" ? doc.name || "You" : m.authorName;
-      return `${who} · ${new Date(m.createdAt).toUTCString()}\n${m.body}`;
-    })
-    .join("\n\n");
-}
-
 /**
  * `origin` is threaded in from the request rather than read from configuration,
  * because there is no configured origin any more. A mail sent from a preview
@@ -359,34 +350,25 @@ function propertyLine(doc: EnquiryDoc, origin: string): string {
  * mail is the durable one.
  */
 async function mailTranscript(
+  db: Db,
   mailer: Mailer,
   doc: EnquiryDoc,
   ctx: { requestId: string; route: string; origin: string; adminOrigin: string },
   replyLink: string,
 ): Promise<void> {
-  const subject = doc.propertyTitle
-    ? `Your conversation about ${doc.propertyTitle}`
-    : "Your conversation with AVHomes";
-  await trySend(
-    mailer,
-    {
-      to: doc.email,
-      subject,
-      text: [
-        `Hello ${doc.name || "there"},`,
-        "",
-        "Here is your conversation with our team so far.",
-        propertyLine(doc, ctx.origin),
-        "",
-        "------------------------",
-        transcript(doc),
-        "------------------------",
-        "",
-        `Continue the chat from any device: ${replyLink}`,
-      ].join("\n"),
+  const lines = conversationLines(doc);
+  const email = await renderEmail(db, "enquiry-transcript", {
+    text: {
+      name: doc.name || "there",
+      property: doc.propertyTitle ?? "your enquiry",
+      propertyLink: doc.propertySlug ? `${ctx.origin}/listings/${doc.propertySlug}` : "",
+      conversation: conversationText(lines),
+      replyLink,
     },
-    ctx,
-  );
+    html: { conversation: conversationHtml(lines) },
+    origin: ctx.origin,
+  });
+  await trySend(mailer, { to: doc.email, subject: email.subject, text: email.text, html: email.html }, ctx);
 }
 
 /**
@@ -638,7 +620,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
     await notifyTeam(deps.mailer, doc, `New chat from ${doc.name}`, ctx);
     // The buyer's own copy, from the first message: it is the receipt that says
     // the thread exists and how to get back to it if the tab is gone.
-    await mailTranscript(deps.mailer, doc, ctx, await mintReplyLink(db, doc, ctx.origin));
+    await mailTranscript(db, deps.mailer, doc, ctx, await mintReplyLink(db, doc, ctx.origin));
 
     return c.json({ id: doc._id, token, thread: await toThread(db, doc) }, 201);
   });

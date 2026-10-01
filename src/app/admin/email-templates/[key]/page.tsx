@@ -177,7 +177,11 @@ function Editor({ template, onSaved }: { template: EmailTemplate; onSaved: () =>
                 rows={14}
                 className={`${inputClass} font-mono text-[13px] leading-relaxed`}
               />
-              <p className="mt-1 text-xs text-slate-600">A blank line starts a new paragraph. Links become clickable.</p>
+              <p className="mt-1 text-xs text-slate-600">
+                A blank line starts a new paragraph. Links become clickable. Write{" "}
+                <code className="text-wine-700">[words](link)</code> to show the words as the link instead of the
+                address.
+              </p>
             </div>
 
             <div>
