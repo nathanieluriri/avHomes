@@ -11,10 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ESTATE_TYPE } from "@/lib/types";
+import { BUILDING_TYPE, ESTATE_TYPE } from "@/lib/types";
 
 const TYPES = [
   ESTATE_TYPE,
+  BUILDING_TYPE,
   "Villa",
   "Apartment",
   "Duplex",
@@ -52,7 +53,7 @@ function statusLabel(value: string): string {
 function typeLabel(value: string): string {
   if (value === ANY) return "Any type";
   // The same word the category chips use for the group.
-  return value === ESTATE_TYPE ? "Estates" : value;
+  return value === ESTATE_TYPE ? "Estates" : value === BUILDING_TYPE ? "Apartment Buildings" : value;
 }
 
 function bedsLabel(value: string): string {

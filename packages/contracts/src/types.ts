@@ -98,6 +98,7 @@ export const PROPERTY_TYPES = [
   "Mansion",
   "Terrace",
   "Estate Land",
+  "Apartment Building",
 ] as const;
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
@@ -107,6 +108,13 @@ export type PropertyType = (typeof PROPERTY_TYPES)[number];
  * count are DERIVED from its prototypes on save; see `estateSummary`.
  */
 export const ESTATE_TYPE = "Estate Land" satisfies PropertyType;
+
+/**
+ * One building with several flats, listed once with each unit as an option.
+ * Unlike an estate it can be a sale or a rent; its price and bedroom count are
+ * derived from its units the same way.
+ */
+export const BUILDING_TYPE = "Apartment Building" satisfies PropertyType;
 
 /** A prototype is a house design on a plot, or the bare plot. */
 export const PROTOTYPE_KINDS = ["house", "plot"] as const;
@@ -259,7 +267,7 @@ export interface Property {
   featured: boolean;
   amenities: string[];
   images: string[];
-  /** Estate Land only; empty on every other type. See `fieldsFor`. */
+  /** Estate Land and Apartment Building only; empty on every other type. See `fieldsFor`. */
   prototypes: EstatePrototype[];
   /** Estate Land only. */
   paymentPlan: PaymentPlan | null;

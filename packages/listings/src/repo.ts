@@ -14,6 +14,7 @@ import {
 } from "@avhomes/core";
 import {
   DEFAULT_CURRENCY,
+  BUILDING_TYPE,
   ESTATE_TYPE,
   FEATURABLE_STATUSES,
   LIVE_LIMIT_STATUSES,
@@ -21,6 +22,7 @@ import {
   PROPERTY_STATUSES,
   PUBLIC_PROPERTY_STATUSES,
   REVIEW_LIMIT_STATUSES,
+  hasOptions,
   isEstate,
   type Agent,
   type ListingType,
@@ -131,7 +133,7 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
     and.push({ status: { $in: [...FEATURABLE_STATUSES] }, deletedAt: null });
     // A sold-out estate advertises something nobody can buy.
     and.push({
-      $or: [{ type: { $ne: ESTATE_TYPE } }, { prototypes: { $elemMatch: { available: true } } }],
+      $or: [{ type: { $nin: [ESTATE_TYPE, BUILDING_TYPE] } }, { prototypes: { $elemMatch: { available: true } } }],
     } as Filter<PropertyDoc>);
   }
   if (query.agentUserId) and.push({ agentUserId: query.agentUserId });
@@ -430,8 +432,8 @@ export async function saveProperty(
   // at PRICE_HISTORY_MAX; an unrelated field change appends none.
   const change: PriceChange | null =
     before &&
-    !isEstate(before.type) &&
-    !isEstate(patch.type ?? before.type) &&
+    !hasOptions(before.type) &&
+    !hasOptions(patch.type ?? before.type) &&
     patch.priceMinor !== undefined &&
     before.priceMinor > 0 &&
     patch.priceMinor > 0 &&
@@ -547,10 +549,12 @@ export function assertTransition(current: Property, op: LifecycleOp): void {
   const trashed = current.deletedAt !== null;
   // An estate sells option by option, so "under offer" and "closed" would contradict
   // its options' own availability. It stays live until archived.
-  if (!trashed && isEstate(current.type) && (op === "markOffer" || op === "close")) {
+  if (!trashed && hasOptions(current.type) && (op === "markOffer" || op === "close")) {
     throw new PreconditionFailedError("invalid_transition", {
       propertyId: current.id,
-      detail: "An estate is sold option by option. Mark the options that have sold as sold out instead.",
+      detail: isEstate(current.type)
+        ? "An estate is sold option by option. Mark the options that have sold as sold out instead."
+        : "A building is let or sold unit by unit. Mark the units that are taken as unavailable instead.",
     });
   }
   if (trashed === rule.trashed && rule.from.includes(current.status)) return;
@@ -698,7 +702,7 @@ export async function listingFacts(
     location: doc.location ?? "",
     /* An estate's own name is its title; a unit inside one carries the estate in
        `location`. The deal snapshot wants whichever names the development. */
-    estate: isEstate(doc.type) ? (doc.title ?? "") : "",
+    estate: hasOptions(doc.type) ? (doc.title ?? "") : "",
     listingType: doc.listingType,
     priceMinor: doc.priceMinor ?? 0,
     currency: doc.currency ?? DEFAULT_CURRENCY,

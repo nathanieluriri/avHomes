@@ -25,7 +25,10 @@ import {
   formatPriceShort,
   formatSqm,
   hasDomain,
+  hasOptions,
+  isBuilding,
   isEstate,
+  optionNoun,
   isScopedRole,
   isShortMapLink,
   listingPublishBlockers,
@@ -311,21 +314,23 @@ function draftToProperty(saved: Property, d: Draft): Property {
   };
 }
 
-/** "From ₦25M · 3 options · 2 to 4 bed", the estate's price as its options decide it. */
-function estatePriceLine(s: EstateSummary, currency: string): string {
-  if (s.count === 0) return "No options yet";
+/** "From ₦25M · 3 options · 2 to 4 bed", the price as the options or units decide it. */
+function estatePriceLine(
+  s: EstateSummary,
+  shape: { listingType: ListingType; rentPeriod: RentPeriod | null; currency: string },
+  noun = "option",
+): string {
+  if (s.count === 0) return `No ${noun}s yet`;
   const parts: string[] = [];
-  if (s.fromMinor > 0) {
-    parts.push(`From ${formatPriceShort(s.fromMinor, { listingType: "sale", rentPeriod: null, currency })}`);
-  }
-  parts.push(`${s.count} ${s.count === 1 ? "option" : "options"}`);
+  if (s.fromMinor > 0) parts.push(`From ${formatPriceShort(s.fromMinor, shape)}`);
+  parts.push(`${s.count} ${s.count === 1 ? noun : `${noun}s`}`);
   if (s.bedroomsMax > 0) {
     // A house row added blank has 0 beds; it is not the smallest option.
     const min = s.bedroomsMin > 0 ? s.bedroomsMin : s.bedroomsMax;
     parts.push(min === s.bedroomsMax ? `${min} bed` : `${min} to ${s.bedroomsMax} bed`);
   }
   if (s.plotSqmMin > 0) parts.push(`plots from ${formatSqm(s.plotSqmMin)}`);
-  if (s.soldOut) parts.push("sold out");
+  if (s.soldOut) parts.push(shape.listingType === "rent" ? "fully let" : "sold out");
   return parts.join(" · ");
 }
 
@@ -394,7 +399,7 @@ const LIFECYCLE: readonly { op: string; label: string; description: string; tone
     description: "A buyer is committed; it stays visible",
     tone: "amber",
     // An estate sells option by option; its options carry the sold out state.
-    when: (p) => p.status === "live" && !isEstate(p.type),
+    when: (p) => p.status === "live" && !hasOptions(p.type),
   },
   {
     // Under offer and closed both need a way back to live, or a collapsed deal
@@ -413,7 +418,7 @@ const LIFECYCLE: readonly { op: string; label: string; description: string; tone
        one-tap change should learn that before they tap. */
     description: "Sold or let. Needs the amount, the buyer and proof",
     tone: "neutral",
-    when: (p) => (p.status === "live" || p.status === "under-offer") && !isEstate(p.type),
+    when: (p) => (p.status === "live" || p.status === "under-offer") && !hasOptions(p.type),
   },
   {
     op: "submit",
@@ -656,8 +661,11 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
   // The same idea as the fee notice, for whole sections a type or deal switch hid.
   const hiddenNotice = [
     !fields.prototypes &&
-      (draft.prototypes.length > 0 || draft.paymentPlan.on || draft.buildStage !== null) &&
-      "Estate options, the payment plan and the build stage are only saved for Estate Land.",
+      draft.prototypes.length > 0 &&
+      "Options and units are only saved for Estate Land and Apartment Building.",
+    !fields.paymentPlan &&
+      (draft.paymentPlan.on || draft.buildStage !== null) &&
+      "The payment plan and the build stage are only saved for Estate Land.",
     !fields.rentTerms &&
       (draft.rentTerms.furnishing !== null ||
         draft.rentTerms.serviced ||
@@ -714,7 +722,7 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
     if (fields.prototypes) {
       const read = readPrototypes(withoutUntouched(draft.prototypes), draft.currency);
       if (read.issues.length > 0) {
-        refuse("Fix the option prices before saving.", read.issues);
+        refuse(`Fix the ${optionNoun(draft.type)} prices before saving.`, read.issues);
         return;
       }
       prototypes = read.prototypes;
@@ -1161,9 +1169,15 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
                 <div>
                   <span className={LABEL}>Price</span>
                   <p className="rounded-lg bg-mist-50 px-3 py-2 text-[13px] font-semibold text-plum-950">
-                    {estatePriceLine(estateSummary(liveOptions), draft.currency)}
+                    {estatePriceLine(
+                      estateSummary(liveOptions),
+                      { listingType: dealType, rentPeriod: fields.rentPeriod ? draft.rentPeriod : null, currency: draft.currency },
+                      optionNoun(draft.type),
+                    )}
                   </p>
-                  <span className="mt-1 block text-xs text-slate-600">Worked out from the options below.</span>
+                  <span className="mt-1 block text-xs text-slate-600">
+                    Worked out from the {optionNoun(draft.type, 2)} below.
+                  </span>
                 </div>
               )}
               <Field
@@ -1271,23 +1285,27 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
 
           {fields.prototypes && (
             <Card>
-              <CardHead title="Options" />
+              <CardHead title={isBuilding(draft.type) ? "Units" : "Options"} />
               <div data-spotlight="listing-options">
                 <PrototypeTable
                   rows={draft.prototypes}
                   onChange={(rows) => set("prototypes", rows)}
                   currency={draft.currency}
                   readOnly={trashed}
+                  variant={isBuilding(draft.type) ? "building" : "estate"}
+                  rent={dealType === "rent"}
                 />
               </div>
-              <div className="mt-4 border-t border-mist-200 pt-4" data-spotlight="listing-payment-plan">
-                <PaymentPlanFields
-                  value={draft.paymentPlan}
-                  onChange={(patch) => setDraft((d) => ({ ...d, paymentPlan: { ...d.paymentPlan, ...patch } }))}
-                  example={cheapest && { label: prototypeLabel(cheapest), priceMinor: cheapest.priceMinor }}
-                  currency={draft.currency}
-                />
-              </div>
+              {fields.paymentPlan && (
+                <div className="mt-4 border-t border-mist-200 pt-4" data-spotlight="listing-payment-plan">
+                  <PaymentPlanFields
+                    value={draft.paymentPlan}
+                    onChange={(patch) => setDraft((d) => ({ ...d, paymentPlan: { ...d.paymentPlan, ...patch } }))}
+                    example={cheapest && { label: prototypeLabel(cheapest), priceMinor: cheapest.priceMinor }}
+                    currency={draft.currency}
+                  />
+                </div>
+              )}
             </Card>
           )}
 
