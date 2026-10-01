@@ -10,7 +10,17 @@ import {
   type Mailer,
 } from "@avhomes/core";
 import { getDb, type Db } from "@avhomes/db";
-import { isVideoUrl, type EmailTemplateKey, type FundKind } from "@avhomes/contracts";
+import {
+  hasDomain,
+  isVideoUrl,
+  type Domain,
+  type EmailTemplateKey,
+  type FundKind,
+  type NotificationInput,
+  type NotificationKind,
+  type PushMessage,
+} from "@avhomes/contracts";
+import { pushRoutes, pushToConsole, pushToUsers, sentWithin } from "@avhomes/push";
 import {
   applicationAdminRoutes,
   applicationPublicRoutes,
@@ -49,15 +59,21 @@ import {
 import { enquiriesAdminRoutes, enquiriesPublicRoutes } from "@avhomes/enquiries";
 import {
   appMailer,
+  ensureMailWatch,
   senderChosen,
   signatureRoutes,
   emailTemplateRoutes,
   renderEmail,
+  mailFailureRoutes,
+  mailHookRoutes,
   mailSettingsRoutes,
+  mailWatchRoutes,
   mailboxRoutes,
   mailStateRoutes,
   settingsPublicRoutes,
   settingsRoutes,
+  type MailFailureHook,
+  type NewMail,
 } from "@avhomes/settings";
 import { feedbackRoutes } from "@avhomes/feedback";
 import { analyticsPublicRoutes } from "@avhomes/analytics";
@@ -151,6 +167,76 @@ async function recentListings(db: Db, sinceMs: number, limit: number): Promise<R
     }));
 }
 
+/* ═════════════════════════════ push, the ports ═════════════════════════════ */
+
+/*
+ * Who in the console hears about each kind of inbox notification. The
+ * developer's own requests stay with developers; anything from the partner app
+ * goes to everyone who works Marketers, the owner included, who never got the
+ * developer inbox rows.
+ */
+const NOTIFY_AUDIENCE: Record<NotificationKind, Domain | "developer"> = {
+  "quota-request": "developer",
+  "note-created": "developer",
+  "note-updated": "developer",
+  "template-request": "developer",
+  "marketing-deal": "marketing",
+  "marketing-issue": "marketing",
+  "marketing-bank": "marketing",
+};
+
+function consolePush(db: Db, input: NotificationInput): Promise<void> {
+  return pushToConsole(
+    db,
+    NOTIFY_AUDIENCE[input.kind],
+    { kind: input.kind, title: input.title, body: input.body, url: input.href },
+    { exceptUserId: input.actorId, urgency: input.kind.startsWith("marketing-") ? "high" : "normal" },
+  );
+}
+
+/** One notification per delivery, naming the sender when there is one message and counting when there are more. */
+function announceMail(db: Db, mail: NewMail): Promise<void> {
+  const [first] = mail.messages;
+  if (!first) return Promise.resolve();
+  const who = (m: NewMail["messages"][number]) => m.fromName.trim() || m.fromAddress || "Someone";
+  const one = mail.messages.length === 1;
+  const names = [...new Set(mail.messages.map(who))];
+  return pushToConsole(
+    db,
+    "danger",
+    {
+      kind: "mail-received",
+      title: one ? who(first) : `${mail.messages.length} new emails to ${mail.address}`,
+      body: one
+        ? first.subject.trim() || "(no subject)"
+        : `From ${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""}.`,
+      url: one
+        ? `/admin/mail?mailbox=${encodeURIComponent(mail.mailboxId)}&open=${encodeURIComponent(`INBOX:${first.uid}`)}`
+        : `/admin/mail?mailbox=${encodeURIComponent(mail.mailboxId)}`,
+      tag: one ? `mail-${mail.mailboxId}-${first.uid}` : `mail-${mail.mailboxId}`,
+    },
+    { urgency: "high", ttlSeconds: 6 * 60 * 60 },
+  );
+}
+
+/** A mail outage is one notification every half hour, not one per refused message. */
+const announceMailFailure: MailFailureHook = async (db, failures) => {
+  const [first] = failures;
+  if (!first || (await sentWithin(db, "mail-failed", 30 * 60 * 1000))) return;
+  await pushToConsole(
+    db,
+    "danger",
+    {
+      kind: "mail-failed",
+      title: failures.length === 1 ? `An email to ${first.to} did not send` : `${failures.length} emails did not send`,
+      body: first.reason,
+      url: "/admin/settings#unsent-mail",
+      tag: "mail-failed",
+    },
+    { urgency: "high" },
+  );
+};
+
 export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
@@ -163,12 +249,26 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   /* The Hostinger mailbox chosen in Settings when a key is set, else the Resend
      environment. Reads settings at send time, never at construction. */
-  const mailer = deps.mailer ?? appMailer(resolveDb);
+  const mailer = deps.mailer ?? appMailer(resolveDb, { onFailure: announceMailFailure });
   const templateMail = {
     mailer,
     render: (db: Db, key: EmailTemplateKey, text: Record<string, string>) => renderEmail(db, key, { text }),
   };
-  const notify = developerNotifier(mailer);
+  /* The developer inbox row and email as before, then a push to whoever works the area. */
+  const inbox = developerNotifier(mailer);
+  const notify = async (db: Db, input: NotificationInput): Promise<void> => {
+    await inbox(db, input);
+    await consolePush(db, input);
+  };
+  /* The partner app's phones. pushToUsers never throws. */
+  const tell = async (
+    db: Db,
+    userIds: string[],
+    message: PushMessage,
+    options?: { urgency?: "high" | "normal" },
+  ): Promise<void> => {
+    await pushToUsers(db, userIds, "m", message, options);
+  };
 
   /*
    * The funds' display names, which an admin can rename and which live in
@@ -298,17 +398,18 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   /* ═════════════════ 5. machine callbacks ════════════════════════════ */
 
   /*
-   * THE SLOT IS EMPTY, AND THAT IS THE CURRENT DESIGN.
-   *
    * A route belongs here only if it is a server-to-server POST that carries its
-   * own cryptographic authority AND reads no cookie. The one candidate is a
-   * client-side upload completion callback, which the media package
-   * deliberately does not use: uploads go through the server.
+   * own cryptographic authority AND reads no cookie.
    *
    * Reading a cookie is the single thing that would make such a route unsafe,
    * because CSRF borrows a victim's AMBIENT authority and a route that reads no
    * cookie has none to borrow.
+   *
+   * The one tenant is Hostinger's new-mail webhook. Its authority is the bearer
+   * secret Hostinger was given when the webhook was made, checked against the
+   * sealed copy before anything is read.
    */
+  app.route(API_PREFIX, mailHookRoutes({ onNewMail: announceMail }));
 
   /* ═════════════════ 6. public reads, ABOVE sessionMiddleware ═════════ */
 
@@ -360,7 +461,13 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * It reads no session, so being driven from another page buys a caller
    * nothing they could not do by posting the form themselves.
    */
-  app.route(API_PREFIX, enquiriesPublicRoutes({ mailer }));
+  app.route(
+    API_PREFIX,
+    enquiriesPublicRoutes({
+      mailer,
+      announce: (db, message) => pushToConsole(db, "enquiries", message, { urgency: "high" }),
+    }),
+  );
 
   /*
    * The visit beacon, in the same slot and for the same two reasons. It is a
@@ -385,10 +492,13 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * reason as the subscribe intake: nothing here reads a cookie. Signing up
    * WRITES one, which is a different thing and is safe above the gate.
    */
-  app.route(API_PREFIX, marketingPublicRoutes());
+  app.route(API_PREFIX, marketingPublicRoutes({ tell }));
   /* Applying to list property. A public MUTATION, so it sits here rather than in
      the cacheable /public/* router, the same placement the enquiry intake has. */
-  app.route(API_PREFIX, applicationPublicRoutes(templateMail));
+  app.route(
+    API_PREFIX,
+    applicationPublicRoutes({ ...templateMail, announce: (db, message) => pushToConsole(db, "team", message) }),
+  );
 
   /* ═════════════════ 9. session, the domain gate, then the audit trail ═════════ */
 
@@ -455,6 +565,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, mailSettingsRoutes({ mailer }));
   app.route(API_PREFIX, mailboxRoutes());
   app.route(API_PREFIX, mailStateRoutes());
+  app.route(API_PREFIX, mailWatchRoutes());
+  app.route(API_PREFIX, mailFailureRoutes());
   app.route(API_PREFIX, signatureRoutes({ senderChosen }));
   app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin, notify }));
   app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
@@ -467,11 +579,12 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       storage,
       sniff: sniffImage,
       notify,
+      tell,
       recentListings,
       ...marketingPorts,
     }),
   );
-  app.route(API_PREFIX, marketingAdminRoutes({ notify, ...marketingPorts }));
+  app.route(API_PREFIX, marketingAdminRoutes({ notify, tell, ...marketingPorts }));
   /* The funds sit beside marketing because that is what feeds them, and they take
      their display names from marketing's settings as a port rather than an
      import: a renameable label is not a reason for one feature package to know
@@ -480,6 +593,18 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
   app.route(API_PREFIX, notificationsRoutes());
+  /* A person's own devices, at /api/push so the partner app reaches it, and the
+     key pair at /api/admin/push, which the gate keeps to owner and developer.
+     The first console device an owner or developer turns on from the live site
+     points the mailboxes' webhooks here, so new mail announces itself. */
+  app.route(
+    API_PREFIX,
+    pushRoutes({
+      onConsoleDevice: async (db, user, origin) => {
+        if (hasDomain(user.role, "danger")) await ensureMailWatch(db, origin);
+      },
+    }),
+  );
 
   /*
    * LAST, and the position is not arbitrary. Hono resolves two routers claiming

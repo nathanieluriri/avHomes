@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ConsoleShell } from "@/components/admin/ConsoleShell";
+import { INSTALL_CAPTURE } from "@/lib/install-capture";
 
 /**
  * The console's route segment: a SERVER component that owns the tab title, over
@@ -47,8 +48,21 @@ export const metadata: Metadata = {
     nocache: true,
     googleBot: { index: false, follow: false },
   },
+  /* Installable on its own, scoped to /admin. See public/admin.webmanifest. */
+  manifest: "/admin.webmanifest",
+  icons: { apple: "/pwa/admin-apple-180.png" },
+  /* `black`, not translucent: the console's bar does not pad itself under the clock. */
+  appleWebApp: { capable: true, title: "AV Console", statusBarStyle: "black" },
 };
 
+/* The chrome's own colour, for the browser bar and an installed window's title bar. */
+export const viewport: Viewport = { themeColor: "#321119" };
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <ConsoleShell>{children}</ConsoleShell>;
+  return (
+    <>
+      <script dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE }} />
+      <ConsoleShell>{children}</ConsoleShell>
+    </>
+  );
 }

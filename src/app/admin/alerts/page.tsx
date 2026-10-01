@@ -6,6 +6,7 @@ import { api } from "@/lib/admin/client";
 import { useAsync, useIsPhone, useSession } from "@/lib/admin/hooks";
 import { homeFor } from "@/components/admin/nav";
 import { AlertRow } from "@/components/admin/Alerts";
+import { ConsoleDeviceAlert } from "@/components/admin/StayInTouch";
 import { EmptyState, ErrorNote, PageHeader, Skeleton } from "@/components/admin/ui";
 import { TutorialsNudge } from "../tutorials/TutorialsNudge";
 
@@ -73,6 +74,8 @@ export default function AlertsPage() {
             : "What the public site is getting wrong."
         }
       />
+
+      {user && <ConsoleDeviceAlert user={user} />}
 
       {error && <ErrorNote error={error} onRetry={reload} />}
 

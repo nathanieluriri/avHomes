@@ -17,6 +17,7 @@ import { useAsync, useSession } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { SaveBar } from "@/components/admin/SaveBar";
 import { SignatureEditor } from "@/components/admin/mail/SignatureEditor";
+import { ConsoleNotificationsCard } from "@/components/admin/StayInTouch";
 import {
   Card,
   CardHead,
@@ -324,6 +325,8 @@ function ProfileEditor({
               )}
             </Card>
           </section>
+
+          <ConsoleNotificationsCard user={user} />
         </div>
       </PageColumns>
     </>

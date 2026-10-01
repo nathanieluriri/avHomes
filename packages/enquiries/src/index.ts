@@ -35,6 +35,7 @@ import {
   type EnquiryMessage,
   type EnquiryStatus,
   type EnquiryThread,
+  type PushMessage,
 } from "@avhomes/contracts";
 import {
   CHAT_MAX_BODY,
@@ -525,7 +526,28 @@ function openingDoc(
  * cache away from handing one buyer's conversation to the next visitor. It sets
  * `no-store` itself and says so below.
  */
-export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
+/** A push to the team that answers enquiries. Injected at the composition root; never throws. */
+export type EnquiryAnnounce = (db: Db, message: PushMessage) => Promise<void>;
+
+function announceEnquiry(
+  deps: { announce?: EnquiryAnnounce },
+  db: Db,
+  doc: EnquiryDoc,
+  title: string,
+  text: string,
+): Promise<void> {
+  if (!deps.announce) return Promise.resolve();
+  const about = doc.propertyTitle ? `About ${doc.propertyTitle}. ` : "";
+  return deps.announce(db, {
+    kind: "enquiry",
+    title,
+    body: `${about}${text.replace(/\s+/gu, " ").trim()}`.slice(0, 160),
+    url: `/admin/enquiries/${doc._id}`,
+    tag: `enquiry-${doc._id}`,
+  });
+}
+
+export function enquiriesPublicRoutes(deps: { mailer: Mailer; announce?: EnquiryAnnounce }): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.post("/enquiries", async (c) => {
@@ -559,6 +581,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       origin: requestOrigin(c.req),
       adminOrigin: deploymentOrigin(c.req),
     });
+    await announceEnquiry(deps, db, doc, `New enquiry from ${doc.name}`, doc.message);
 
     // The id is returned so a client can reference it in a support conversation.
     // Nothing else is: the caller wrote it, they do not need it read back.
@@ -618,6 +641,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       adminOrigin: deploymentOrigin(c.req),
     };
     await notifyTeam(deps.mailer, doc, `New chat from ${doc.name}`, ctx);
+    await announceEnquiry(deps, db, doc, `New chat from ${doc.name}`, doc.message);
     // The buyer's own copy, from the first message: it is the receipt that says
     // the thread exists and how to get back to it if the tab is gone.
     await mailTranscript(db, deps.mailer, doc, ctx, await mintReplyLink(db, doc, ctx.origin));
@@ -677,6 +701,7 @@ export function enquiriesPublicRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       origin: requestOrigin(c.req),
       adminOrigin: deploymentOrigin(c.req),
     });
+    await announceEnquiry(deps, db, after, `Reply from ${after.name}`, body.body);
 
     return c.json({ thread: await toThread(db, after) });
   });

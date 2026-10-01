@@ -18,6 +18,7 @@ import {
 import { Sheet } from "@/components/marketer/Sheet";
 import { UpdatesEmpty, UpdatesRail, UpdatesSkeleton } from "@/components/marketer/Updates";
 import { AlertCard, AlertCardSkeleton, sortAlerts } from "@/components/marketer/alerts";
+import { DeviceAskCard, useDeviceAsks } from "@/components/marketer/StayInTouch";
 import {
   IconCheckBadge,
   IconDeals,
@@ -395,9 +396,14 @@ function HeroSkeleton() {
 function HomeBody({ alerts }: { alerts: AlertsRead }) {
   const updates = useAsync((signal) => api.get<UpdatesResponse>("/marketing/updates", signal), []);
   const block = useReportBlock();
+  const device = useDeviceAsks();
 
   const items = alerts.items ?? [];
   const toDo = items.filter((alert) => alert.tone === "act").length;
+  /* This phone's asks ride the strip after anything stopping money and before the rest. */
+  const strip = items.slice(0, HOME_ALERTS);
+  const firstCalm = strip.findIndex((alert) => alert.tone !== "act");
+  const split = firstCalm < 0 ? strip.length : firstCalm;
   // Named for what it holds: good news alone is not something that needs you.
   const title = toDo > 0 ? "Needs you" : "For you";
 
@@ -447,7 +453,7 @@ function HomeBody({ alerts }: { alerts: AlertsRead }) {
               <AlertCardSkeleton />
             </div>
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && device.asks.length === 0 ? (
           <div className="px-4">
             <EmptyState
               compact
@@ -458,13 +464,24 @@ function HomeBody({ alerts }: { alerts: AlertsRead }) {
           </div>
         ) : (
           <ul className="m-rail m-rail--cards" aria-label={title}>
-            {items.slice(0, HOME_ALERTS).map((alert) => (
+            {strip.slice(0, split).map((alert) => (
+              <li key={alert.id}>
+                <AlertCard alert={alert} />
+              </li>
+            ))}
+            {device.asks.map((ask) => (
+              <li key={`device-${ask.id}`}>
+                <DeviceAskCard ask={ask} />
+              </li>
+            ))}
+            {strip.slice(split).map((alert) => (
               <li key={alert.id}>
                 <AlertCard alert={alert} />
               </li>
             ))}
           </ul>
         )}
+        {device.guide}
       </section>
 
       {/* Three places not already on the first screen. Report a deal is the orb's alone. */}

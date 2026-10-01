@@ -1,0 +1,23 @@
+{
+  "id": "/m",
+  "name": "AV Homes Partners",
+  "short_name": "AV Partners",
+  "description": "Report deals, invite partners and see what AV Homes owes you.",
+  "start_url": "/m",
+  "scope": "/m",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#140b0e",
+  "theme_color": "#7d2c40",
+  "categories": ["business", "finance"],
+  "icons": [
+    { "src": "/pwa/m-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/m-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/m-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Report a deal", "url": "/m/deals/new", "icons": [{ "src": "/pwa/m-192.png", "sizes": "192x192" }] },
+    { "name": "Alerts", "url": "/m/alerts", "icons": [{ "src": "/pwa/m-192.png", "sizes": "192x192" }] },
+    { "name": "My money", "url": "/m/money", "icons": [{ "src": "/pwa/m-192.png", "sizes": "192x192" }] }
+  ]
+}

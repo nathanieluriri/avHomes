@@ -19,6 +19,7 @@ import { useAsync, useKeyboardInset } from "@/lib/admin/hooks";
 import type { MeResponse } from "@/lib/marketer/api";
 import { NavBar, type NavKey } from "./NavBar";
 import { PaperContext, usePaper } from "./paper";
+import { PushKeeper, WelcomeSheet } from "./StayInTouch";
 import { Skeleton } from "./ui";
 
 /**
@@ -411,6 +412,10 @@ export function AppShell({
               supportPhone={me.data?.supportPhone ?? ""}
             />
           )}
+
+          {/* Only once the session is known good: every push route needs one. */}
+          {gate.data && <PushKeeper alertCount={alertCount ?? me.data?.alertCount} />}
+          {gate.data && home && <WelcomeSheet />}
         </div>
       </PaperContext.Provider>
     </MarketerCtx.Provider>

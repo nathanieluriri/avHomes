@@ -31,6 +31,8 @@ import { Palette } from "./Palette";
 import { ResponsiveMenu } from "./BottomSheet";
 import { ButtonLink, Spinner } from "./ui";
 import { SpotlightHost } from "./spotlight/Spotlight";
+import { ConsolePushKeeper, ConsoleWelcome } from "./StayInTouch";
+import { forgetThisDevice } from "@/lib/push";
 import "@/app/admin/console.css";
 
 /** Routes whose page takes the whole content area, with no width cap or page scroll. */
@@ -507,6 +509,9 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
       </div>
 
       <Palette open={paletteOpen} onClose={() => setPaletteOpen(false)} user={user} />
+      {/* The icon's number is everything the rail is already counting. */}
+      <ConsolePushKeeper badge={unread + dealsWaiting + mailUnread} />
+      <ConsoleWelcome user={user} />
     </div>
   );
 
@@ -673,15 +678,18 @@ function AvatarNag({ user, pathname }: { user: AuthUser; pathname: string }) {
 function UserMenu({ user }: { user: AuthUser }) {
   function signOut() {
     // Logout never fails: an expired session and a live one both end with the
-    // cookie gone, so the redirect is unconditional.
-    void api.post("/auth/logout").finally(() => {
-      // A FULL navigation, not router.push. The session cookie just changed and
-      // the shell stays mounted across a client-side route change, so its
-      // useSession effect would never re-run and the console would render the
-      // old identity.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/admin/sign-in";
-    });
+    // cookie gone, so the redirect is unconditional. This device's notifications
+    // are dropped first, while the session can still say whose they are.
+    void forgetThisDevice("admin")
+      .then(() => api.post("/auth/logout"))
+      .finally(() => {
+        // A FULL navigation, not router.push. The session cookie just changed and
+        // the shell stays mounted across a client-side route change, so its
+        // useSession effect would never re-run and the console would render the
+        // old identity.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.href = "/admin/sign-in";
+      });
   }
 
   const trigger = (

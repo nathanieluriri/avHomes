@@ -10,6 +10,7 @@ import {
   sortAlerts,
 } from "@/components/marketer/alerts";
 import { IconCheckBadge } from "@/components/marketer/icons3d";
+import { DeviceAskRows } from "@/components/marketer/StayInTouch";
 import {
   Chip,
   EmptyState,
@@ -89,6 +90,9 @@ export default function AlertsPage() {
         )}
 
         {lead && <AlertGroup items={lead.items} />}
+
+        {/* After the group on the tab, whose name the tab already carries, and before the calmer ones. */}
+        {alerts.data && <DeviceAskRows className={lead ? "mt-7" : "mt-2"} />}
 
         {rest.map((group) => (
           <section key={group.tone} className="mt-7">

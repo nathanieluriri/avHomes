@@ -18,7 +18,8 @@ const nextConfig: NextConfig = {
   ],
   // The driver uses node:net/node:tls and must never be traced into a client
   // bundle or a route's module graph analysis.
-  serverExternalPackages: ["mongodb", "@clerk/backend"],
+  // web-push is CommonJS over node:https and node:crypto, so it is required at runtime rather than bundled.
+  serverExternalPackages: ["mongodb", "@clerk/backend", "web-push"],
   images: {
     localPatterns: [
       // Next's default: any local path, no query string.

@@ -18,6 +18,15 @@ export {
   type MySignatureResponse,
 } from "./signature";
 export { mailboxRoutes } from "./mailbox";
+export { mailFailureRoutes, openMailFailures, recordingMailer, type MailFailureHook } from "./mail-failures";
+export {
+  ensureMailWatch,
+  mailHookRoutes,
+  mailWatchRoutes,
+  readMailWatch,
+  type MailWatchDeps,
+  type NewMail,
+} from "./mail-watch";
 export { mailStateRoutes } from "./mail-state";
 export {
   conversationHtml,

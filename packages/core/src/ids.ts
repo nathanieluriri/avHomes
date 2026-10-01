@@ -57,6 +57,8 @@ export const ID_PREFIXES = {
   partner: "ptnr",
   /* Minted in the browser, so a draft has its id before its first save. */
   mailDraft: "mdrf",
+  pushLog: "push",
+  mailFailure: "mlf",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

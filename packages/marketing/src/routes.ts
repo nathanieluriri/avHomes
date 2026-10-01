@@ -60,6 +60,8 @@ import {
   updateRefusal,
   leadRefusal,
   namesMatch,
+  formatMoney,
+  payMonthLabel,
   type CommissionMatrix,
   type Deal,
   type DealKind,
@@ -70,7 +72,10 @@ import {
   type MarketingUpdate,
   type NotificationInput,
   type Ownership,
+  type PayIssue,
+  type PayRun,
   type PropertyStatus,
+  type PushMessage,
 } from "@avhomes/contracts";
 import {
   burnPasswordTime,
@@ -151,6 +156,8 @@ import {
   teamFor,
   updateMarketerBank,
   updateMarketerProfile,
+  userIdsFor,
+  activeMarketerUserIds,
 } from "./repo";
 
 /** A marketer signing up is a write, so it is rate limited per address. */
@@ -193,6 +200,11 @@ export interface MarketingDeps {
   sniff?: (buffer: ArrayBuffer) => { contentType: string; extension: string };
   /** Tells the console something needs a person. Injected at the composition root. */
   notify?: (db: Db, input: NotificationInput) => Promise<void>;
+  /**
+   * A push to these accounts in the partner app. Injected, because this package
+   * may not know how a phone is reached. Never throws.
+   */
+  tell?: (db: Db, userIds: string[], message: PushMessage, options?: { urgency?: "high" | "normal" }) => Promise<void>;
   /**
    * Live listings published since `sinceMs`, newest first, at most `limit`.
    * Injected, because this package may not read the listings package's collection.
@@ -239,6 +251,162 @@ export interface ListingFacts {
   priceMinor: number;
   currency: string;
   status: PropertyStatus;
+}
+
+/* ════════════════════════════════════════════════════════════ PUSH NOTES ══ */
+
+/*
+ * What lands on a marketer's phone. Each one is an alert `alertsFor` will also
+ * list, said the moment it happens instead of the next time they open the app,
+ * and each opens the same screen the alert's action does.
+ */
+
+interface Note {
+  marketerId: string;
+  message: PushMessage;
+  urgent?: boolean;
+}
+
+async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
+  const tell = deps.tell;
+  if (!tell || notes.length === 0) return;
+  try {
+    const users = await userIdsFor(db, notes.map((note) => note.marketerId));
+    await Promise.all(
+      notes.map(async (note) => {
+        const userId = users.get(note.marketerId);
+        if (userId) await tell(db, [userId], note.message, { urgency: note.urgent ? "high" : "normal" });
+      }),
+    );
+  } catch (err) {
+    console.error("[push]", JSON.stringify({ where: "marketing", message: err instanceof Error ? err.message : String(err) }));
+  }
+}
+
+function firstName(name: string): string {
+  return name.trim().split(/\s+/u)[0] || name;
+}
+
+/** A settled, refused or sent back deal, for everyone it touches. */
+function decisionNotes(deal: Deal, recorded = false): Note[] {
+  const url = `/m/deals/${deal.id}`;
+  if (deal.status === "approved") {
+    return (deal.shares ?? []).map((share) => {
+      const own = share.level === 1;
+      return {
+        marketerId: share.marketerId,
+        message: {
+          kind: own ? "deal-approved" : "share-earned",
+          title: `You earned ${formatMoney(share.amountMinor, deal.currency)}`,
+          body: own
+            ? recorded
+              ? `AV Homes recorded your sale of ${deal.listingTitle}.`
+              : `${deal.listingTitle} was approved.`
+            : `Your level ${share.level} share of ${firstName(deal.closerName || deal.reporterName)}'s deal on ${deal.listingTitle}.`,
+          url,
+          tag: `deal-${deal.id}`,
+        },
+      };
+    });
+  }
+  if (deal.status === "rejected") {
+    return [
+      {
+        marketerId: deal.reporterId,
+        message: {
+          kind: "deal-refused",
+          title: `${deal.listingTitle} was not approved`,
+          body: deal.reason.trim() || "Open it to read why, so your next report goes through.",
+          url,
+          tag: `deal-${deal.id}`,
+        },
+      },
+    ];
+  }
+  if (deal.status === "info") {
+    return [
+      {
+        marketerId: deal.reporterId,
+        urgent: true,
+        message: {
+          kind: "deal-info",
+          title: `${deal.listingTitle} needs more info`,
+          body: deal.reason.trim() || "Send the proof AV Homes asked for.",
+          url,
+          tag: `deal-${deal.id}`,
+        },
+      },
+    ];
+  }
+  return [];
+}
+
+function paidNote(run: PayRun, marketerId: string): Note[] {
+  const item = run.items.find((row) => row.marketerId === marketerId);
+  if (!item || item.status !== "paid") return [];
+  const where = item.bank ? `the account ending ${item.bank.accountNumber.slice(-4)}` : "your bank account";
+  return [
+    {
+      marketerId,
+      message: {
+        kind: "pay-sent",
+        title: `${formatMoney(item.totalMinor, run.currency)} was sent to you`,
+        body: `Your ${payMonthLabel(run.month)} pay went to ${where}.`,
+        url: `/m/money/${run.id}`,
+        tag: `pay-${run.id}`,
+      },
+    },
+  ];
+}
+
+function issueNote(issue: PayIssue, resolved: boolean): Note[] {
+  const last = issue.messages.at(-1);
+  return [
+    {
+      marketerId: issue.marketerId,
+      urgent: !resolved,
+      message: {
+        kind: "issue-reply",
+        title: resolved
+          ? `Your ${payMonthLabel(issue.month)} payment problem is sorted`
+          : `AV Homes replied about your ${payMonthLabel(issue.month)} pay`,
+        body: (last?.text ?? "").trim().slice(0, 160) || "Open it to read what they said.",
+        url: `/m/money/${issue.payRunId}#thread`,
+        tag: `issue-${issue.id}`,
+      },
+    },
+  ];
+}
+
+/**
+ * An Update card going live now, to every active marketer. Once per card: a
+ * save that leaves a live card live is an edit, not news. A card scheduled for
+ * later is not announced, because nothing runs at its start time to do it.
+ */
+async function announceUpdate(
+  deps: MarketingDeps,
+  db: Db,
+  update: MarketingUpdate,
+  before: MarketingUpdate | null,
+): Promise<void> {
+  const tell = deps.tell;
+  if (!tell) return;
+  const now = Date.now();
+  const showing = (u: MarketingUpdate) =>
+    u.status === "live" && u.startsAt <= now + 60_000 && (u.endsAt === null || u.endsAt > now);
+  if (!showing(update) || (before && showing(before))) return;
+  try {
+    const users = await activeMarketerUserIds(db);
+    await tell(db, users, {
+      kind: "update",
+      title: update.title,
+      body: update.body.slice(0, 160),
+      url: "/m",
+      tag: `update-${update.id}`,
+    });
+  } catch (err) {
+    console.error("[push]", JSON.stringify({ where: "update", message: err instanceof Error ? err.message : String(err) }));
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════ BODIES ══ */
@@ -492,7 +660,7 @@ const SettingsBody = z
 
 /* ══════════════════════════════════════════════════════════════════ PUBLIC ══ */
 
-export function marketingPublicRoutes(): Hono<AppEnv> {
+export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell"> = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   /** What the join page needs before anybody types: who invited them, and the banks. */
@@ -615,6 +783,20 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
     const { token, expiresAt } = await createSession(db, user.id, c.req.header("user-agent") ?? null);
     setSessionCookie(c, token, expiresAt);
     auditEntityId(c, marketer.id);
+
+    if (marketer.parentId) {
+      await tellMarketers(deps, db, [
+        {
+          marketerId: marketer.parentId,
+          message: {
+            kind: "partner-joined",
+            title: `${firstName(marketer.displayName)} joined your network`,
+            body: "You earn a share of every deal they close.",
+            url: "/m/team",
+          },
+        },
+      ]);
+    }
     return c.json({ marketer }, 201);
   });
 
@@ -1358,7 +1540,27 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       c,
       z.object({ status: z.enum(MARKETER_STATUSES), reason: str().max(300).default("") }).strict(),
     );
+    const before = await findMarketerById(db, id);
     const marketer = await setMarketerStatus(db, id, body.status, body.reason);
+    // Only a change is news. A closed account is told by whoever closed it, not by a lock screen.
+    if (before && before.status !== marketer.status && marketer.status !== "banned") {
+      const paused = marketer.status === "paused";
+      await tellMarketers(deps, db, [
+        {
+          marketerId: marketer.id,
+          urgent: paused,
+          message: {
+            kind: paused ? "account-paused" : "account-active",
+            title: paused ? "Your account is paused" : "Your account is back on",
+            body: paused
+              ? body.reason.trim() || "Talk to AV Homes to turn it back on."
+              : "You can report deals and earn again.",
+            url: "/m",
+            tag: "account",
+          },
+        },
+      ]);
+    }
     return c.json({ marketer });
   });
 
@@ -1586,6 +1788,8 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         actorName: user.displayName,
       });
     }
+    // Settling a deal a marketer reported reads as an approval; a sale typed in here, as one recorded for them.
+    await tellMarketers(deps, db, decisionNotes(deal, !body.dealId));
 
     return c.json({ deal }, 201);
   });
@@ -1654,6 +1858,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       settings,
       accrue,
     );
+    await tellMarketers(deps, db, decisionNotes(deal));
     return c.json({ deal });
   });
 
@@ -1816,6 +2021,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       reference: body.reference,
       paidByName: user.displayName,
     });
+    await tellMarketers(deps, db, paidNote(run, body.marketerId));
     return c.json({ run });
   });
 
@@ -1857,14 +2063,14 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         .object({ text: str().min(1).max(600), proof: z.array(str().max(600)).max(3).default([]) })
         .strict(),
     );
-    return c.json({
-      issue: await replyToIssue(db, id, {
-        byName: user.displayName,
-        bySide: "admin",
-        text: body.text,
-        proof: body.proof,
-      }),
+    const issue = await replyToIssue(db, id, {
+      byName: user.displayName,
+      bySide: "admin",
+      text: body.text,
+      proof: body.proof,
     });
+    await tellMarketers(deps, db, issueNote(issue, false));
+    return c.json({ issue });
   });
 
   routes.post("/admin/marketing/issues/:id/resolve", requireAuth(), async (c) => {
@@ -1872,13 +2078,13 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const user = currentUser(c);
     const id = pathParam(c, "id");
     const body = await readJson(c, z.object({ text: str().max(600).default("") }).strict());
-    return c.json({
-      issue: await resolveIssue(db, id, {
-        byName: user.displayName,
-        bySide: "admin",
-        text: body.text || "Sorted.",
-      }),
+    const issue = await resolveIssue(db, id, {
+      byName: user.displayName,
+      bySide: "admin",
+      text: body.text || "Sorted.",
     });
+    await tellMarketers(deps, db, issueNote(issue, true));
+    return c.json({ issue });
   });
 
   /* ─────────────────────────────── updates ─────────────────────────────── */
@@ -1896,6 +2102,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     assertUpdate(input);
     const update = await createUpdate(db, input, { id: user.id, name: user.displayName });
     auditEntityId(c, update.id);
+    await announceUpdate(deps, db, update, null);
     return c.json({ update }, 201);
   });
 
@@ -1909,7 +2116,9 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const patch = body.startsAt === 0 ? { ...body, startsAt: Date.now() } : body;
     // Checked as the card will stand after the write, not as the patch alone.
     assertUpdate({ ...toMarketingUpdate(current), ...patch });
-    return c.json({ update: await saveUpdate(db, id, patch) });
+    const update = await saveUpdate(db, id, patch);
+    await announceUpdate(deps, db, update, toMarketingUpdate(current));
+    return c.json({ update });
   });
 
   routes.delete("/admin/marketing/updates/:id", requireAuth(), async (c) => {

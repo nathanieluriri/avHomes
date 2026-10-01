@@ -23,6 +23,7 @@ import { ApiError, api } from "@/lib/admin/client";
 import { useAsync, useSession } from "@/lib/admin/hooks";
 import ImagePicker from "@/components/admin/ImagePicker";
 import { MailDeliveryCard } from "@/components/admin/MailDeliveryCard";
+import { PushSettingsCard, UnsentMailCard } from "@/components/admin/PushSettingsCard";
 import { SaveBar } from "@/components/admin/SaveBar";
 import { SignatureEditor } from "@/components/admin/mail/SignatureEditor";
 import {
@@ -649,9 +650,17 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
 
           {/* Owner and developer only, the same line the server draws. */}
           {me && isAdminRole(me.role) && (
-            <div id="email-delivery" className="scroll-mt-24">
-              <MailDeliveryCard defaultTestTo={me.email} />
-            </div>
+            <>
+              <div id="email-delivery" className="scroll-mt-24">
+                <MailDeliveryCard defaultTestTo={me.email} />
+              </div>
+              <div id="unsent-mail" className="scroll-mt-24">
+                <UnsentMailCard />
+              </div>
+              <div id="push-notifications" className="scroll-mt-24">
+                <PushSettingsCard />
+              </div>
+            </>
           )}
         </div>
       </PageColumns>

@@ -54,6 +54,11 @@ export const COLLECTIONS = {
   mailPrefs: "mail_prefs",
   mailDrafts: "mail_drafts",
   mailContacts: "mail_contacts",
+  /* Push: one row per subscribed browser, one per notification sent to a
+     person, and one per email the site could not send. */
+  pushDevices: "push_devices",
+  pushLog: "push_log",
+  mailFailures: "mail_failures",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

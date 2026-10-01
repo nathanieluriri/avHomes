@@ -38,6 +38,8 @@ import {
   type MeResponse,
 } from "@/lib/marketer/api";
 import { forgetAccount } from "@/lib/marketer/last-account";
+import { forgetThisDevice } from "@/lib/push";
+import { NotificationsSection } from "@/components/marketer/StayInTouch";
 import { NIGERIAN_STATES } from "@/lib/marketer/states";
 
 /**
@@ -213,6 +215,8 @@ function AccountReady({ me, reload }: { me: MeResponse; reload: () => void }) {
           />
         </div>
       </section>
+
+      <NotificationsSection />
 
       <section>
         <SectionLabel>Get help</SectionLabel>
@@ -511,6 +515,8 @@ function SignOutButton() {
 
   async function out() {
     setBusy(true);
+    // First, while the session can still say whose subscription it is.
+    await forgetThisDevice("m");
     try {
       await api.post("/auth/logout");
     } catch {

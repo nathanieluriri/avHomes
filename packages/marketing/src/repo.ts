@@ -150,6 +150,21 @@ function uplineFor(parent: MarketerDoc | null): string[] {
   return [parent._id, ...(parent.upline ?? [])].slice(0, 2);
 }
 
+/** Marketer id to account id, for a notification. Unknown ids are left out. */
+export async function userIdsFor(db: Db, marketerIds: readonly string[]): Promise<Map<string, string>> {
+  if (marketerIds.length === 0) return new Map();
+  const rows = await marketers(db)
+    .find({ _id: { $in: [...new Set(marketerIds)] } }, { projection: { _id: 1, userId: 1 } })
+    .toArray();
+  return new Map(rows.map((row) => [row._id, row.userId] as const));
+}
+
+/** Every active marketer's account, for news meant for all of them. */
+export async function activeMarketerUserIds(db: Db): Promise<string[]> {
+  const rows = await marketers(db).find({ status: "active" }, { projection: { userId: 1 } }).toArray();
+  return rows.map((row) => row.userId);
+}
+
 export async function createMarketer(db: Db, input: JoinInput): Promise<Marketer> {
   const now = Date.now();
   const existing = await marketers(db).findOne({ userId: input.userId });

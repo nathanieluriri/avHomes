@@ -24,6 +24,7 @@ import {
 } from "@avhomes/core";
 import type { MailProvider, MailSettingsView } from "@avhomes/contracts";
 import { requireAdmin } from "@avhomes/identity";
+import { recordingMailer, type MailFailureHook } from "./mail-failures";
 import { signingMailer } from "./signature";
 
 /**
@@ -116,12 +117,13 @@ export function cachedMailSender(resolveDb: () => Promise<Db>): Promise<Hostinge
 /**
  * The one transport the whole app sends through: the Hostinger mailbox when a
  * key is set, the Resend environment otherwise. Every message is signed on the
- * way through.
+ * way through, and every refused one is written down in `mail_failures`.
  */
-export function appMailer(resolveDb: () => Promise<Db>): Mailer {
-  return signingMailer(
-    mailerWithFallback(hostingerMailer(() => cachedMailSender(resolveDb)), resendMailer()),
+export function appMailer(resolveDb: () => Promise<Db>, options: { onFailure?: MailFailureHook } = {}): Mailer {
+  return recordingMailer(
+    signingMailer(mailerWithFallback(hostingerMailer(() => cachedMailSender(resolveDb)), resendMailer()), resolveDb),
     resolveDb,
+    options.onFailure,
   );
 }
 

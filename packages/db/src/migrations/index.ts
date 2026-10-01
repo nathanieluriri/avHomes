@@ -18,6 +18,7 @@ import { migration0016 } from "./0016_invites_know_every_role";
 import { migration0017 } from "./0017_partner_companies";
 import { migration0018 } from "./0018_mail_console_state";
 import { migration0019 } from "./0019_property_types_follow_contracts";
+import { migration0020 } from "./0020_push_and_unsent_mail";
 
 /**
  * The ordered list. Append only, and never renumber a tag that has shipped:
@@ -47,4 +48,5 @@ export const MIGRATIONS: readonly Migration[] = [
   migration0017,
   migration0018,
   migration0019,
+  migration0020,
 ];

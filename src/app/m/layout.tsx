@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { INSTALL_CAPTURE } from "@/lib/install-capture";
 import "./m.css";
 
 /**
@@ -25,6 +26,12 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "AV Homes Partners",
+  /* Installable on its own, scoped to /m, so the home screen icon opens the app
+     and not the storefront. See public/m.webmanifest. */
+  manifest: "/m.webmanifest",
+  icons: { apple: "/pwa/m-apple-180.png" },
+  /* The hero already pads itself below the status bar, so on iPhone the wine runs under the clock. */
+  appleWebApp: { capable: true, title: "AV Partners", statusBarStyle: "black-translucent" },
   /*
    * Not indexed, and not the same job as the disallow in robots.ts. That file
    * asks a crawler not to fetch and is only seen by one that reads it first;
@@ -41,5 +48,10 @@ export const metadata: Metadata = {
 };
 
 export default function MarketerLayout({ children }: { children: ReactNode }) {
-  return <div className="m-app">{children}</div>;
+  return (
+    <div className="m-app">
+      <script dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE }} />
+      {children}
+    </div>
+  );
 }

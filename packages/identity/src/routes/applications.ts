@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import type { Db } from "@avhomes/db";
+import type { PushMessage } from "@avhomes/contracts";
 import {
   auditEntityId,
   clientIp,
@@ -66,7 +68,12 @@ const DecideBody = z
  * and that router's whole safety property is that a shared cache may store its
  * responses.
  */
-export function applicationPublicRoutes(deps: TemplateMail): Hono<AppEnv> {
+export function applicationPublicRoutes(
+  deps: TemplateMail & {
+    /** A push to whoever decides applications. Injected at the composition root; never throws. */
+    announce?: (db: Db, message: PushMessage) => Promise<void>;
+  },
+): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.post("/public/partner-applications", async (c) => {
@@ -89,6 +96,13 @@ export function applicationPublicRoutes(deps: TemplateMail): Hono<AppEnv> {
       { name: application.name },
       { requestId: c.get("requestId"), route: "POST /public/partner-applications" },
     );
+    await deps.announce?.(db, {
+      kind: "partner-application",
+      title: `${body.company.trim() || body.name.trim()} wants to list property`,
+      body: body.about.replace(/\s+/gu, " ").trim().slice(0, 160),
+      url: "/admin/partners/applications",
+      tag: `application-${application.id}`,
+    });
 
     /* The id only. A stranger learns that it landed and nothing about the queue. */
     return c.json({ ok: true, id: application.id }, 201);

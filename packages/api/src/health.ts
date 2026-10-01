@@ -16,9 +16,10 @@ import {
   visibleAlerts,
   type AuthUser,
   type SignatureHealth,
+  type SiteAlert,
   type SiteHealthSnapshot,
 } from "@avhomes/contracts";
-import { readPublicSettings, readSettings } from "@avhomes/settings";
+import { openMailFailures, readPublicSettings, readSettings } from "@avhomes/settings";
 import { marketingCounts, readMarketingSettings } from "@avhomes/marketing";
 import { soldStillListed } from "./awaiting-close";
 
@@ -61,18 +62,43 @@ export function healthRoutes(): Hono<AppEnv> {
        neither a partner's business nor something they can fix. Their own
        listing's gaps are listed on the listing, where they can act on them. */
     if (isScopedRole(user.role)) return c.json({ alerts: [] });
-    const [snapshot, signatures] = await Promise.all([gather(db), signatureHealth(db, user)]);
+    const [snapshot, signatures, unsent] = await Promise.all([
+      gather(db),
+      signatureHealth(db, user),
+      isAdminRole(user.role) ? openMailFailures(db) : Promise.resolve(null),
+    ]);
     const alerts = visibleAlerts(siteAlerts(snapshot), (domain) =>
       domain === null ? isAdminRole(user.role) : hasDomain(user.role, domain),
     );
     // Already cut to the reader in signatureHealth: their own gaps, and the rest only for an admin.
-    const all = [...alerts, ...signatureAlerts(signatures)];
+    const all = [...alerts, ...signatureAlerts(signatures), ...unsentMailAlerts(unsent)];
     const rank = (a: (typeof all)[number]) => ALERT_SEVERITIES.indexOf(a.severity);
     // Stable, so each severity keeps the registry's own order.
     return c.json({ alerts: all.sort((a, b) => rank(a) - rank(b)) });
   });
 
   return routes;
+}
+
+/**
+ * Email the site could not send since the list was last cleared. A blocker,
+ * because what fails is sign-in codes, invites and replies to buyers, and the
+ * person waiting on one has no way to know it is not coming.
+ */
+function unsentMailAlerts(unsent: { count: number; lastAt: number } | null): SiteAlert[] {
+  if (!unsent || unsent.count === 0) return [];
+  const many = unsent.count > 1;
+  return [
+    {
+      id: "unsent-mail",
+      severity: "blocker",
+      domain: null,
+      title: many ? `${unsent.count} emails did not send` : "An email did not send",
+      message:
+        "The mail provider refused or never took them. Sign-in codes, invites and replies to buyers go the same way, so whoever was waiting on one is still waiting. The list says who and why.",
+      action: { label: "See what did not send", href: "/admin/settings#unsent-mail" },
+    },
+  ];
 }
 
 /* The accounts that send mail from the console. Marketers and partners do not. */
