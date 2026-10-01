@@ -21,12 +21,11 @@ import {
   pathParam,
   readJson,
   str,
-  trySend,
   type AppEnv,
-  type Mailer,
 } from "@avhomes/core";
 import type { Db } from "@avhomes/db";
 import { requireAuth } from "../middleware";
+import { sendTemplate, type TemplateMail } from "../mail";
 import { offboardPartnerAccount, type PartnerPorts } from "../partner-accounts";
 import {
   countStaffSeats,
@@ -95,7 +94,7 @@ async function viewFor(db: Db, c: Parameters<typeof currentUser>[0], ports: Part
   };
 }
 
-export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<AppEnv> {
+export function companyRoutes(deps: TemplateMail & PartnerPorts): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.get("/admin/company", requireAuth(), requireCompany(), async (c) => {
@@ -191,19 +190,12 @@ export function companyRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<App
 
     // The deployment's own host, never the request's, for the reason team invites give.
     const url = `${deploymentOrigin(c.req)}/admin/sign-in`;
-    const emailed = await trySend(
-      deps.mailer,
-      {
-        to: address,
-        subject: `${actor.displayName} added you to ${partner.name} on AV Homes`,
-        text: [
-          `${actor.displayName} has added you to ${partner.name}'s account on AV Homes.`,
-          "",
-          `Sign in here: ${url}`,
-          "",
-          "Sign in with this same email address and you'll be sent a 6-digit code to confirm it. The invite expires in seven days.",
-        ].join("\n"),
-      },
+    const emailed = await sendTemplate(
+      deps,
+      db,
+      address,
+      "company-staff-invite",
+      { inviterName: actor.displayName, company: partner.name, signInLink: url },
       { requestId: c.get("requestId"), route: "POST /admin/company/staff/invites" },
     );
     return c.json({ ...(await viewFor(db, c, deps)), url, emailed }, 201);

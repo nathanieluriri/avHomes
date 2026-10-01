@@ -17,12 +17,11 @@ import {
   pathParam,
   readJson,
   str,
-  trySend,
   type AppEnv,
-  type Mailer,
 } from "@avhomes/core";
 import type { Db } from "@avhomes/db";
 import { requireAdmin, requireAuth } from "../middleware";
+import { sendTemplate, type TemplateMail } from "../mail";
 import { offboardPartnerAccount, type PartnerPorts } from "../partner-accounts";
 import {
   countStaffSeats,
@@ -84,13 +83,7 @@ async function detailFor(db: Db, id: string, ports: PartnerPorts): Promise<Partn
   };
 }
 
-/** A mail to the company's contact address. Never fatal: the change has happened. */
-async function tell(mailer: Mailer, to: string, subject: string, lines: string[], ctx: { requestId: string; route: string }) {
-  if (to === "") return false;
-  return trySend(mailer, { to, subject, text: lines.join("\n") }, ctx);
-}
-
-export function partnerAdminRoutes(deps: { mailer: Mailer } & PartnerPorts): Hono<AppEnv> {
+export function partnerAdminRoutes(deps: TemplateMail & PartnerPorts): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.get("/admin/partners", requireAuth(), async (c) => {
@@ -145,19 +138,12 @@ export function partnerAdminRoutes(deps: { mailer: Mailer } & PartnerPorts): Hon
     for (const userId of await partnerUserIds(db, id)) sessionsEnded += await endAllSessions(db, userId);
     const listingsHeld = await deps.holdListings(db, id, true);
     auditEntityId(c, id);
-    await tell(
-      deps.mailer,
+    await sendTemplate(
+      deps,
+      db,
       partner.contactEmail,
-      "Your AV Homes access is suspended",
-      [
-        `Hello ${partner.contactName || partner.name},`,
-        "",
-        "AV Homes has suspended your company's access, and your listings are off the site for now.",
-        "",
-        reason,
-        "",
-        "Reply to this email or call AV Homes to talk about it.",
-      ],
+      "partner-suspended",
+      { name: partner.contactName || partner.name, reason },
       { requestId: c.get("requestId"), route: "POST /admin/partners/:id/suspend" },
     );
     return c.json({ ...(await detailFor(db, id, deps)), sessionsEnded, listingsHeld });
@@ -174,17 +160,12 @@ export function partnerAdminRoutes(deps: { mailer: Mailer } & PartnerPorts): Hon
     if (!partner) throw new NotFoundError(`partner ${id}`);
     const listingsBack = await deps.holdListings(db, id, false);
     auditEntityId(c, id);
-    await tell(
-      deps.mailer,
+    await sendTemplate(
+      deps,
+      db,
       partner.contactEmail,
-      "Your AV Homes access is back",
-      [
-        `Hello ${partner.contactName || partner.name},`,
-        "",
-        "AV Homes has restored your company's access, and your listings are back on the site.",
-        "",
-        reason,
-      ],
+      "partner-restored",
+      { name: partner.contactName || partner.name, reason },
       { requestId: c.get("requestId"), route: "POST /admin/partners/:id/reinstate" },
     );
     return c.json({ ...(await detailFor(db, id, deps)), listingsBack });

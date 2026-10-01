@@ -23,12 +23,11 @@ import {
   readQuery,
   deploymentOrigin,
   str,
-  trySend,
   type AppEnv,
-  type Mailer,
 } from "@avhomes/core";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { requireAdmin } from "../middleware";
+import { sendTemplate, type TemplateMail } from "../mail";
 import {
   createInvite,
   findInvite,
@@ -164,7 +163,7 @@ async function workCounts(db: Db, userIds: string[]): Promise<Map<string, { list
   return out;
 }
 
-export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
+export function teamRoutes(deps: TemplateMail): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   routes.get("/admin/users", requireAdmin(), async (c) => {
@@ -384,20 +383,16 @@ export function teamRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
      */
     const url = `${deploymentOrigin(c.req)}/admin/sign-in`;
 
-    const emailed = await trySend(
-      deps.mailer,
+    const emailed = await sendTemplate(
+      deps,
+      db,
+      address,
+      "team-invite",
       {
-        to: address,
-        subject: `${actor.displayName} invited you to AVHomes`,
-        text: [
-          role === "owner"
-            ? `${actor.displayName} has invited you to take over the AVHomes admin as its owner.`
-            : `${actor.displayName} has invited you to the AVHomes admin as ${role}.`,
-          "",
-          `Sign in here: ${url}`,
-          "",
-          "Sign in with this same email address and you'll be sent a 6-digit code to confirm it. The invite expires in seven days.",
-        ].join("\n"),
+        inviterName: actor.displayName,
+        invitedAs:
+          role === "owner" ? "to take over the AVHomes admin as its owner" : `to the AVHomes admin as ${role}`,
+        signInLink: url,
       },
       { requestId: c.get("requestId"), route: "POST /admin/invites" },
     );

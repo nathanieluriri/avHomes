@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight, MailOpen, MailPlus } from "lucide-react";
-import { EMAIL_TEMPLATES, type EmailTemplate } from "@avhomes/contracts";
+import { EMAIL_TEMPLATE_GROUPS, EMAIL_TEMPLATES, type EmailTemplate } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
@@ -31,31 +31,47 @@ export default function EmailTemplatesPage() {
       <MailNotConfiguredAlert />
       {error && <ErrorNote error={error} onRetry={reload} />}
       {loading && !data && <Skeleton className="h-64" />}
-      <ul className="flex flex-col gap-2">
-        {data?.items.map((template) => {
-          const info = EMAIL_TEMPLATES[template.key];
+      {data &&
+        EMAIL_TEMPLATE_GROUPS.map((group) => {
+          const items = data.items.filter((template) => EMAIL_TEMPLATES[template.key].group === group);
+          if (items.length === 0) return null;
           return (
-            <li key={template.key}>
-              <Link
-                href={`/admin/email-templates/${template.key}`}
-                className="group flex items-center gap-4 rounded-xl border border-mist-200 bg-white px-4 py-3.5 transition-colors hover:border-wine-500 focus-visible:border-wine-500"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-plum-950">{info.label}</span>
-                  <span className="mt-0.5 block text-[13px] text-slate-600">{info.when}</span>
-                  <span className="mt-1 block truncate text-xs text-slate-500">Subject: {template.subject}</span>
-                </span>
-                <Badge tone={template.customised ? "wine" : "neutral"}>
-                  {template.customised
-                    ? `Edited${template.updatedAt ? ` ${shortDate(template.updatedAt)}` : ""}`
-                    : "Default"}
-                </Badge>
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </Link>
-            </li>
+            <section key={group} className="mb-6">
+              <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">{group}</h2>
+              <TemplateList items={items} />
+            </section>
           );
         })}
-      </ul>
     </>
+  );
+}
+
+function TemplateList({ items }: { items: EmailTemplate[] }) {
+  return (
+    <ul className="flex flex-col gap-2">
+      {items.map((template) => {
+        const info = EMAIL_TEMPLATES[template.key];
+        return (
+          <li key={template.key}>
+            <Link
+              href={`/admin/email-templates/${template.key}`}
+              className="group flex items-center gap-4 rounded-xl border border-mist-200 bg-white px-4 py-3.5 transition-colors hover:border-wine-500 focus-visible:border-wine-500"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-plum-950">{info.label}</span>
+                <span className="mt-0.5 block text-[13px] text-slate-600">{info.when}</span>
+                <span className="mt-1 block truncate text-xs text-slate-500">Subject: {template.subject}</span>
+              </span>
+              <Badge tone={template.customised ? "wine" : "neutral"}>
+                {template.customised
+                  ? `Edited${template.updatedAt ? ` ${shortDate(template.updatedAt)}` : ""}`
+                  : "Default"}
+              </Badge>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

@@ -134,9 +134,36 @@ export function conversationHtml(lines: readonly ConversationLine[]): string {
     .join("\n");
 }
 
+/** `[label](https://...)` in a template: the label becomes the link in HTML, and reads "label: url" in text. */
+const LABELLED = /\[([^\]\n]+)\]\((https?:\/\/[^\s)<]+)\)/gu;
+const LINK = /\[([^\]\n]+)\]\((https?:\/\/[^\s)<]+)\)|(https?:\/\/[^\s<]+[^\s<.,;:!?)])/gu;
+const LINK_STYLE = "color:#8f2d4a;text-decoration:underline";
+
 /** Fills a plain text template. Unknown placeholders are left blank rather than printed raw. */
 function fillText(template: string, vars: EmailVars): string {
-  return template.replace(PLACEHOLDER, (_, name: string) => vars.text[name] ?? "");
+  return template
+    .replace(PLACEHOLDER, (_, name: string) => vars.text[name] ?? "")
+    .replace(LABELLED, "$1: $2")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}
+
+/** Escapes a filled block and makes its links clickable, leaving pre-rendered HTML values untouched. */
+function blockHtml(block: string, vars: EmailVars, linkStyle = LINK_STYLE): string {
+  const rich: string[] = [];
+  const filled = block.replace(PLACEHOLDER, (_, name: string) => {
+    const html = vars.html?.[name];
+    if (html === undefined) return vars.text[name] ?? "";
+    rich.push(html);
+    return `\u0000${rich.length - 1}\u0000`;
+  });
+  return escapeHtml(filled)
+    .replace(LINK, (_, label: string | undefined, href: string | undefined, bare: string | undefined) =>
+      label && href
+        ? `<a href="${href}" style="${linkStyle}">${label}</a>`
+        : `<a href="${bare}" style="${linkStyle}">${bare}</a>`,
+    )
+    .replace(/\u0000(\d+)\u0000/gu, (_, i: string) => rich[Number(i)] ?? "");
 }
 
 /**
@@ -153,11 +180,19 @@ function fillHtml(template: string, vars: EmailVars): string {
       const slot = i === unsubscribeAt ? `${SIGNATURE_SLOT}\n` : "";
       const only = block.trim().match(/^\{\{\s*([a-zA-Z]+)\s*\}\}$/u);
       if (only && vars.html?.[only[1] ?? ""] !== undefined) return `${slot}${vars.html[only[1] ?? ""]}`;
-      const html = linkify(escapeHtml(block)).replace(PLACEHOLDER, (_, name: string) => {
-        const rich = vars.html?.[name];
-        if (rich !== undefined) return rich;
-        return linkify(escapeHtml(vars.text[name] ?? ""));
-      });
+      if (i === unsubscribeAt) {
+        // The way out reads as small print under the message, never as part of it.
+        const labelled = block.replace(/(?<!\]\()\{\{\s*unsubscribeLink\s*\}\}/gu, "[Unsubscribe]({{unsubscribeLink}})");
+        const html = blockHtml(
+          labelled,
+          vars,
+          "display:inline-block;margin:8px 0 0;padding:5px 14px;border:1px solid #cbd5e1;border-radius:999px;color:#64748b;font-size:12px;text-decoration:none",
+        );
+        return `${slot}<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee5ea;font-size:12px;line-height:1.5;color:#94a3b8">${html.replace(/\n/gu, "<br>")}</p>`;
+      }
+      const html = blockHtml(block, vars);
+      // An optional placeholder left empty (a decline with no reason) leaves no blank paragraph behind.
+      if (html.trim() === "") return slot;
       return `${slot}<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1e1b2e">${html.replace(/\n/gu, "<br>")}</p>`;
     })
     .join("\n");
@@ -295,6 +330,11 @@ function sampleVars(origin: string): EmailVars {
       unsubscribeLink: `${origin}/unsubscribe`,
       subject: "What is new at AVHomes this month",
       content: "The newsletter you write appears here.",
+      inviterName: "Tolu Ade",
+      invitedAs: "to the AVHomes admin as editor",
+      company: "Lekki Homes Ltd",
+      signInLink: `${origin}/admin/sign-in`,
+      reason: "The note an admin writes appears here.",
     },
     html: {
       conversation: conversationHtml(lines),
