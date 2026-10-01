@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import LocationInput from "@/components/LocationInput";
-import { ESTATE_TYPE, type PropertyType } from "@/lib/types";
+import { BUILDING_TYPE, ESTATE_TYPE, type PropertyType } from "@/lib/types";
 import {
   Select,
   SelectContent,
@@ -16,6 +16,7 @@ import {
 // Estates first, as in the category chips. The value is the stored type, the label what a buyer calls it.
 const TYPES: { value: PropertyType; label: string }[] = [
   { value: ESTATE_TYPE, label: "Estates" },
+  { value: BUILDING_TYPE, label: "Apartment Buildings" },
   { value: "Villa", label: "Villa" },
   { value: "Apartment", label: "Apartment" },
   { value: "Duplex", label: "Duplex" },

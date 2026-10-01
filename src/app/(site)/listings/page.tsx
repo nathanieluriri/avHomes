@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { estateSummary, getListingUniverse, isEstate, prototypeLabel } from "@/lib/data";
+import { estateSummary, getListingUniverse, hasOptions, prototypeLabel } from "@/lib/data";
 import { ESTATE_TYPE, ListingType, PropertyStatus, PropertyType } from "@/lib/types";
 import { placesWithStock } from "@/lib/places";
 import CategoryChips from "@/components/CategoryChips";
@@ -66,7 +66,7 @@ export default async function ListingsPage({
     if (sp.q) {
       const q = sp.q.toLowerCase();
       // An estate's options are searchable by name, so "plot" or "3 bedroom" finds the estate.
-      const options = p.prototypes.map(prototypeLabel).join(" ");
+      const options = p.prototypes.map((o) => prototypeLabel(o, p.type)).join(" ");
       const haystack = `${p.title} ${p.location} ${p.city} ${p.address} ${options}`.toLowerCase();
       if (!haystack.includes(q)) return false;
     }
@@ -78,7 +78,7 @@ export default async function ListingsPage({
     if (sp.type && p.type !== (sp.type as PropertyType)) return false;
     // An estate counts its largest AVAILABLE option, read live like its card, so "3+ beds"
     // finds one still offering a 3 bed and not one whose only 4 bed has sold.
-    const beds = isEstate(p.type) ? estateSummary(p.prototypes).bedroomsMax : p.bedrooms;
+    const beds = hasOptions(p.type) ? estateSummary(p.prototypes).bedroomsMax : p.bedrooms;
     if (sp.beds && beds < Number(sp.beds)) return false;
     return true;
   });

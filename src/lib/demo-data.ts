@@ -1,5 +1,5 @@
 import type { Agent, ListingFee, PriceChange, Property, RentPeriod, SiteStat, Testimonial } from "@avhomes/contracts";
-import { derivedEstateColumns, isEstate, normalizeFees, readRentPeriod } from "@avhomes/contracts";
+import { derivedEstateColumns, hasOptions, normalizeFees, readRentPeriod } from "@avhomes/contracts";
 
 /**
  * Bundled fixtures.
@@ -757,6 +757,99 @@ const propertySeeds: PropertySeed[] = [
     images: [`${L}/av-render-03.jpg`, `${L}/av-render-01.jpg`, `${L}/av-render-02.jpg`],
     agent: agents[2],
     createdAt: "2026-09-02",
+  },  {
+    id: "24",
+    slug: "wuse-court-apartments",
+    title: "Wuse Court Apartments",
+    tagline: "Six serviced flats in one gated block, minutes from Wuse Market",
+    description:
+      "A six-flat block on a quiet close in Wuse 2, with a shared generator, borehole and gated parking. Each flat is let on its own, from a one bedroom on the top floor to a three bedroom penthouse with its own terrace.",
+    // Price, bedrooms and bathrooms are derived from the units in `toProperty`.
+    price: 0,
+    status: "For Rent",
+    type: "Apartment Building",
+    location: "Wuse 2, Abuja",
+    city: "Abuja",
+    address: "Off Aminu Kano Crescent, Wuse 2, Abuja",
+    bedrooms: 0,
+    bathrooms: 0,
+    areaSqft: 0,
+    parkingSpaces: 8,
+    yearBuilt: 2023,
+    prototypes: [
+      {
+        id: "pt_wuse1",
+        kind: "house",
+        name: "Flat 1, ground floor",
+        bedrooms: 2,
+        bathrooms: 2,
+        sizeSqm: 95,
+        priceMinor: naira(4_500_000),
+        image: null,
+        available: true,
+      },
+      {
+        id: "pt_wuse2",
+        kind: "house",
+        name: "Flat 2, ground floor",
+        bedrooms: 2,
+        bathrooms: 2,
+        sizeSqm: 95,
+        priceMinor: naira(4_500_000),
+        image: null,
+        available: false,
+      },
+      {
+        id: "pt_wuse3",
+        kind: "house",
+        name: "Flat 3, first floor",
+        bedrooms: 3,
+        bathrooms: 3,
+        sizeSqm: 130,
+        priceMinor: naira(6_000_000),
+        image: null,
+        available: true,
+      },
+      {
+        id: "pt_wuse4",
+        kind: "house",
+        name: "Flat 4, first floor",
+        bedrooms: 3,
+        bathrooms: 3,
+        sizeSqm: 130,
+        priceMinor: naira(6_000_000),
+        image: null,
+        available: true,
+      },
+      {
+        id: "pt_wuse5",
+        kind: "house",
+        name: "Flat 5, second floor",
+        bedrooms: 1,
+        bathrooms: 1,
+        sizeSqm: 60,
+        priceMinor: naira(3_000_000),
+        image: null,
+        available: true,
+      },
+      {
+        id: "pt_wuse6",
+        kind: "house",
+        name: "Penthouse, top floor",
+        bedrooms: 3,
+        bathrooms: 4,
+        sizeSqm: 170,
+        priceMinor: naira(8_500_000),
+        image: null,
+        available: true,
+      },
+    ],
+    furnishing: "unfurnished",
+    serviced: true,
+    amenities: ["Gated Estate", "Backup Power", "Borehole", "24/7 Security", "Secure Parking", "Prepaid Meter"],
+    images: [`${L}/exterior-05.jpg`, `${L}/interior-03.jpg`, `${L}/interior-07.jpg`],
+    agent: agents[1],
+    createdAt: "2026-09-20",
   },
 ];
 
@@ -780,7 +873,7 @@ function toProperty(seed: PropertySeed): Property {
   void _isoDate;
   const prototypes = seed.prototypes ?? [];
   // The same derivation the server runs on every estate save.
-  const derived = isEstate(seed.type) ? derivedEstateColumns(prototypes) : null;
+  const derived = hasOptions(seed.type) ? derivedEstateColumns(prototypes) : null;
   return {
     ...fields,
     // 100 kobo per naira. The fixture writes naira; the contract stores minor units.

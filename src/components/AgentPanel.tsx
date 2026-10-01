@@ -1,11 +1,13 @@
 import Image from "next/image";
 import AgentChat from "@/components/AgentChat";
 import { OptionAwareContact } from "@/components/listing/EnquiryOption";
+import { allTakenLabel } from "@/components/listing/estate-text";
 import type { FeeKind, ListingFee, Property, RentPeriod } from "@/lib/types";
 import { RECURRING_FEE_KINDS } from "@/lib/types";
 import {
   estateSummary,
   formatPrice,
+  hasOptions,
   isEstate,
   isPriceReduced,
   listingLabel,
@@ -109,9 +111,10 @@ export default function AgentPanel({ property }: { property: Property }) {
   const { agent } = property;
   const telHref = `tel:${agent.phone.replace(/[^+\d]/g, "")}`;
   const estate = isEstate(property.type);
-  // An estate's from-price moves when options sell or change, which is not a price cut.
-  const reduced = !estate && isPriceReduced(property.priceHistory);
-  const summary = estate ? estateSummary(property.prototypes) : null;
+  const multi = hasOptions(property.type);
+  // A from-price moves when options sell or change, which is not a price cut.
+  const reduced = !multi && isPriceReduced(property.priceHistory);
+  const summary = multi ? estateSummary(property.prototypes) : null;
   const soldOut = summary?.soldOut ?? false;
   const priceMinor = summary ? summary.fromMinor : property.priceMinor;
 
@@ -120,7 +123,7 @@ export default function AgentPanel({ property }: { property: Property }) {
       <div className="rounded-2xl border border-mist-200 bg-white p-6 sm:p-7">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center rounded-full bg-wine-50 px-3.5 py-1.5 text-xs font-semibold text-wine-700">
-            {soldOut ? "Sold out" : listingLabel(property.listingType, property.status)}
+            {soldOut ? allTakenLabel(property) : listingLabel(property.listingType, property.status)}
           </span>
           {reduced && (
             <span className="inline-flex items-center rounded-full bg-wine-600 px-3.5 py-1.5 text-xs font-semibold text-white">
@@ -131,12 +134,12 @@ export default function AgentPanel({ property }: { property: Property }) {
 
         {priceMinor > 0 && (
           <>
-            {estate && (
+            {multi && (
               <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">From</p>
             )}
             <p
               className={`break-words text-3xl font-bold leading-[1.05] tracking-tight text-plum-950 sm:text-4xl ${
-                estate ? "mt-1" : "mt-4"
+                multi ? "mt-1" : "mt-4"
               }`}
             >
               {formatPrice(priceMinor, {
@@ -196,7 +199,7 @@ export default function AgentPanel({ property }: { property: Property }) {
             resolves them live from the thread, so an agent who uploads a photo
             or a site that switches to a team identity is reflected in an open
             conversation without this page knowing anything about it. */}
-        {estate ? (
+        {multi ? (
           // Carries the option picked in the Options list, when there is one.
           <OptionAwareContact
             propertyId={property.id}

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Building2, LandPlot, Plus, Star, Trash2 } from "lucide-react";
 import {
+  BUILDING_TYPE,
   ESTATE_TYPE,
   LISTING_TYPES,
   PROPERTY_STATUSES,
@@ -13,8 +14,10 @@ import {
   estateSummary,
   formatPriceShort,
   formatSqm,
+  hasOptions,
   isAdminRole,
   isEstate,
+  optionNoun,
   partnerScopeOf,
   prototypeLabel,
   statusLabel,
@@ -67,6 +70,7 @@ const SORTS = [
 ] as const;
 
 type Kind = "home" | "estate";
+type NewKind = Kind | "building";
 
 const KINDS = [
   { value: "", label: "All" },
@@ -77,6 +81,7 @@ const KINDS = [
 const NEW_KINDS = [
   { value: "home", label: "Home" },
   { value: "estate", label: "Estate" },
+  { value: "building", label: "Building" },
 ] as const;
 
 const STATUS_TONE: Record<PropertyStatus, Tone> = {
@@ -158,11 +163,11 @@ function PropertiesScreen() {
    */
   const [namingNew, setNamingNew] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const [newKind, setNewKind] = useState<Kind>("home");
+  const [newKind, setNewKind] = useState<NewKind>("home");
   const newTitleRef = useRef<HTMLInputElement>(null);
 
   // Starts in Estate mode while the estates view is on, since that is what the reader is looking at.
-  function startNew(kindOfNew: Kind = kind === "estate" ? "estate" : "home") {
+  function startNew(kindOfNew: NewKind = kind === "estate" ? "estate" : "home") {
     setNewKind(kindOfNew);
     setNamingNew(true);
     // `autoFocus` only fires on mount, so a form that is already open needs the focus moved by hand.
@@ -273,13 +278,17 @@ function PropertiesScreen() {
     { keepPrevious: true },
   );
 
-  async function create(title: string, kindOfNew: Kind) {
+  async function create(title: string, kindOfNew: NewKind) {
     setCreating(true);
     setCreateError(null);
     try {
       const res = await api.post<{ property: Property }>(
         "/admin/properties",
-        kindOfNew === "estate" ? { title, type: ESTATE_TYPE } : { title },
+        kindOfNew === "estate"
+          ? { title, type: ESTATE_TYPE }
+          : kindOfNew === "building"
+            ? { title, type: BUILDING_TYPE }
+            : { title },
       );
       router.push(`/admin/properties/${res.property.id}`);
     } catch (err) {
@@ -330,10 +339,11 @@ function PropertiesScreen() {
       primary: true,
       render: (p) => {
         const estate = isEstate(p.type);
-        // An estate with no photos of its own yet can still show an option's render.
-        const thumb = p.images[0] || (estate ? p.prototypes.find((o) => o.image)?.image : null);
+        const multi = hasOptions(p.type);
+        // An estate or building with no photos of its own yet can still show an option's render.
+        const thumb = p.images[0] || (multi ? p.prototypes.find((o) => o.image)?.image : null);
         const meta = [p.type, p.city].filter(Boolean).join(" · ") || "No location yet";
-        const options = estate ? optionNames(p) : "";
+        const options = multi ? optionNames(p) : "";
         const featured = isFeatured(p);
         return (
           <IdCell
@@ -414,9 +424,9 @@ function PropertiesScreen() {
             </Badge>
             {/* The card's chip line only. The table says it under Spec, beside
                 the availability it summarises. */}
-            {estate && estateSummary(p.prototypes).soldOut && (
+            {hasOptions(p.type) && estateSummary(p.prototypes).soldOut && (
               <span className="md:hidden">
-                <Badge tone="amber">Sold out</Badge>
+                <Badge tone="amber">{soldOutLabel(p)}</Badge>
               </span>
             )}
             {isFeatured(p) && (
@@ -440,16 +450,16 @@ function PropertiesScreen() {
       // bed count is one of the two facts that actually govern a scan here.
       mobile: "keep",
       render: (p) => {
-        if (isEstate(p.type)) {
+        if (hasOptions(p.type)) {
           const options = optionNames(p);
           const summary = estateSummary(p.prototypes);
           return (
             <span className="text-slate-600">
               <span className="md:flex md:items-center md:gap-2">
-                {estateSpec(summary, p.prototypes)}
+                {estateSpec(summary, p.prototypes, optionNoun(p.type))}
                 {summary.soldOut && (
                   <span className="hidden md:inline-flex">
-                    <Badge tone="amber">Sold out</Badge>
+                    <Badge tone="amber">{soldOutLabel(p)}</Badge>
                   </span>
                 )}
               </span>
@@ -481,7 +491,7 @@ function PropertiesScreen() {
           rentPeriod: p.rentPeriod,
           currency: p.currency,
         };
-        if (isEstate(p.type)) {
+        if (hasOptions(p.type)) {
           const { fromMinor } = estateSummary(p.prototypes);
           if (fromMinor === 0) return <span className="text-slate-600">Not set</span>;
           return (
@@ -555,9 +565,19 @@ function PropertiesScreen() {
                   maxLength={300}
                   value={newTitle}
                   placeholder={
-                    newKind === "estate" ? "Estate name, like Kuje Estate" : "What is it called?"
+                    newKind === "estate"
+                      ? "Estate name, like Kuje Estate"
+                      : newKind === "building"
+                        ? "Building name, like Wuse Court"
+                        : "What is it called?"
                   }
-                  aria-label={newKind === "estate" ? "New estate name" : "New listing title"}
+                  aria-label={
+                    newKind === "estate"
+                      ? "New estate name"
+                      : newKind === "building"
+                        ? "New building name"
+                        : "New listing title"
+                  }
                   onChange={(event) => setNewTitle(event.target.value)}
                 />
                 <Button type="submit" disabled={creating || newTitle.trim() === ""} size="lg">
@@ -845,7 +865,7 @@ function isFeatured(p: Property): boolean {
 
 /** "2 bedroom, 3 bedroom, 500 sqm plot and 1 more": the first few options, for a scan. */
 function optionNames(p: Property): string {
-  const names = p.prototypes.map(prototypeLabel);
+  const names = p.prototypes.map((o) => prototypeLabel(o, p.type));
   const shown = names.slice(0, 3).join(", ");
   return names.length > 3 ? `${shown} and ${names.length - 3} more` : shown;
 }
@@ -855,12 +875,17 @@ function optionNames(p: Property): string {
  * mixed estate. With some options sold out the count becomes "2 of 3 available"
  * and the ranges describe only what can still be bought, as `estateSummary` does.
  */
-function estateSpec(s: EstateSummary, prototypes: readonly EstatePrototype[]): string {
-  if (s.count === 0) return "No options yet";
+/** Every option gone: a sold-out estate, a building whose units are all taken. */
+function soldOutLabel(p: Property): string {
+  return isEstate(p.type) || p.listingType === "sale" ? "Sold out" : "Fully let";
+}
+
+function estateSpec(s: EstateSummary, prototypes: readonly EstatePrototype[], noun = "option"): string {
+  if (s.count === 0) return `No ${noun}s yet`;
   const partial = s.availableCount > 0 && s.availableCount < s.count;
   const options = partial
     ? `${s.availableCount} of ${s.count} available`
-    : `${s.count} ${s.count === 1 ? "option" : "options"}`;
+    : `${s.count} ${s.count === 1 ? noun : `${noun}s`}`;
   const beds =
     s.bedroomsMax === 0
       ? ""

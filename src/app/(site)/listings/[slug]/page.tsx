@@ -6,7 +6,7 @@ import {
   getPropertyDetail,
   estateSummary,
   formatPrice,
-  isEstate,
+  hasOptions,
   listingSeoDescription,
   listingSeoTitle,
 } from "@/lib/data";
@@ -54,7 +54,7 @@ export async function generateMetadata({
   if (!detail) return {};
   const { property } = detail;
 
-  const estate = isEstate(property.type);
+  const estate = hasOptions(property.type);
   const summary = estate ? estateSummary(property.prototypes) : null;
   const price = formatPrice(summary ? summary.fromMinor : property.priceMinor, property);
   // Written in the editor's search listing card, or assembled from the facts.
@@ -136,7 +136,7 @@ export default async function PropertyPage({
   // Reached through an address the listing used to have: send the reader, and
   // the link's search ranking, to the current one.
   if (property.slug && property.slug !== slug) permanentRedirect(`/listings/${property.slug}`);
-  const estate = isEstate(property.type);
+  const estate = hasOptions(property.type);
   const summary = estate ? estateSummary(property.prototypes) : null;
 
   /*

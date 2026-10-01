@@ -1,10 +1,10 @@
 import { Bed, Bath, Maximize, Car, Calendar, Home } from "lucide-react";
 import type { Property } from "@/lib/types";
-import { formatSqm, isEstate, sqftToSqm } from "@/lib/data";
+import { formatSqm, hasOptions, sqftToSqm } from "@/lib/data";
 
 export default function SpecGrid({ property }: { property: Property }) {
-  // An estate's rooms live on its options, and its own columns are derived or unset.
-  if (isEstate(property.type)) return null;
+  // An estate's or building's rooms live on its options, and its own columns are derived or unset.
+  if (hasOptions(property.type)) return null;
 
   const specs = [
     { label: "Bedrooms", value: property.bedrooms, icon: Bed },

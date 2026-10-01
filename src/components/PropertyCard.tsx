@@ -7,12 +7,15 @@ import {
   formatPriceShort,
   formatSqm,
   FURNISHING_LABELS,
+  hasOptions,
+  isBuilding,
   isEstate,
+  optionNoun,
   isPriceReduced,
   listingLabel,
   sqftToSqm,
 } from "@/lib/data";
-import { estateFacts } from "@/components/listing/estate-text";
+import { allTakenLabel, estateFacts } from "@/components/listing/estate-text";
 
 export default function PropertyCard({
   property,
@@ -22,10 +25,11 @@ export default function PropertyCard({
   priority?: boolean;
 }) {
   const estate = isEstate(property.type);
-  // An estate's from-price moves when options sell or change, which is not a price cut.
-  const reduced = !estate && isPriceReduced(property.priceHistory);
-  const summary = estate ? estateSummary(property.prototypes) : null;
-  const facts = summary ? estateFacts(summary) : null;
+  const multi = hasOptions(property.type);
+  // A from-price moves when options sell or change, which is not a price cut.
+  const reduced = !multi && isPriceReduced(property.priceHistory);
+  const summary = multi ? estateSummary(property.prototypes) : null;
+  const facts = summary ? estateFacts(summary, optionNoun(property.type)) : null;
   const soldOut = summary?.soldOut ?? false;
   // An estate's own price column is its "from" price; the summary is the same number, read live.
   const priceMinor = summary ? summary.fromMinor : property.priceMinor;
@@ -46,11 +50,11 @@ export default function PropertyCard({
         <div className="absolute left-3 top-3 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-plum-950 backdrop-blur">
             {/* "For Sale" beside nothing left to buy would contradict itself. */}
-            {soldOut ? "Sold out" : listingLabel(property.listingType, property.status)}
+            {soldOut ? allTakenLabel(property) : listingLabel(property.listingType, property.status)}
           </span>
-          {estate && (
+          {multi && (
             <span className="rounded-full bg-plum-950 px-3 py-1 text-xs font-semibold text-white">
-              Estate
+              {isBuilding(property.type) ? "Building" : "Estate"}
             </span>
           )}
         </div>
@@ -121,7 +125,7 @@ export default function PropertyCard({
                 <span
                   className={`text-lg font-bold tracking-tight ${soldOut ? "text-slate-500" : "text-plum-950"}`}
                 >
-                  {estate && "From "}
+                  {multi && "From "}
                   {formatPriceShort(priceMinor, {
                     listingType: property.listingType,
                     rentPeriod: property.rentPeriod,

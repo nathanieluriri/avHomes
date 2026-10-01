@@ -8,6 +8,7 @@ import {
   estateSummary,
   formatPrice,
   isAnimatedImageUrl,
+  hasOptions,
   isEstate,
   isVideoUrl,
   videoPosterUrl,
@@ -50,9 +51,9 @@ export function listingPlace(property: Property): string {
   return `${area}, ${city}`;
 }
 
-/** An estate is priced from its cheapest option still for sale. */
+/** An estate or building is priced from its cheapest option still available. */
 export function listingPrice(property: Property): { minor: number; from: boolean } {
-  if (!isEstate(property.type)) return { minor: property.priceMinor, from: false };
+  if (!hasOptions(property.type)) return { minor: property.priceMinor, from: false };
   const summary = estateSummary(property.prototypes);
   return summary.fromMinor > 0
     ? { minor: summary.fromMinor, from: true }

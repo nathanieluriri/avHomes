@@ -1,12 +1,13 @@
 import MediaFrame, { firstImage } from "@/components/MediaFrame";
 import { Bath, Bed, LandPlot, Maximize } from "lucide-react";
 import type { EstatePrototype, Property } from "@/lib/types";
-import { estateSummary, formatSqm, prototypeLabel } from "@/lib/data";
+import { estateSummary, formatPrice, formatSqm, isBuilding, prototypeLabel } from "@/lib/data";
 import { AskAboutOption } from "./EnquiryOption";
-import { availabilityLine, estateRangeLine, planLine, saleMoney } from "./estate-text";
+import { availabilityLine, estateRangeLine, planLine } from "./estate-text";
 
 /**
- * The house types and plots inside one estate, in the order the team set.
+ * The house types and plots inside one estate, or the units in one building,
+ * in the order the team set.
  *
  * A sold out option stays on the list, muted and labelled, so a buyer can see
  * what went and at what price. Every row can start an enquiry that names it.
@@ -15,7 +16,7 @@ export default function EstateOptions({ property }: { property: Property }) {
   const { prototypes } = property;
   if (prototypes.length === 0) return null;
   const summary = estateSummary(prototypes);
-  const availability = availabilityLine(summary);
+  const availability = availabilityLine(summary, property);
   // Availability is already in the heading row, so this line is only the ranges.
   const range = estateRangeLine(summary);
 
@@ -23,7 +24,7 @@ export default function EstateOptions({ property }: { property: Property }) {
     <section aria-labelledby="estate-options">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <h2 id="estate-options" className="text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl">
-          Options
+          {isBuilding(property.type) ? "Units" : "Options"}
         </h2>
         {availability && (
           <p className="text-sm font-semibold text-wine-700">{availability}</p>
@@ -41,8 +42,9 @@ export default function EstateOptions({ property }: { property: Property }) {
 }
 
 function OptionRow({ option, property }: { option: EstatePrototype; property: Property }) {
-  const label = prototypeLabel(option);
+  const label = prototypeLabel(option, property.type);
   const sold = !option.available;
+  const takenLabel = property.listingType === "rent" ? "Let" : "Sold out";
   const src = option.image ?? firstImage(property.images) ?? property.images[0] ?? null;
   const plot = option.kind === "plot";
 
@@ -63,7 +65,7 @@ function OptionRow({ option, property }: { option: EstatePrototype; property: Pr
         )}
         {sold && (
           <span className="absolute left-1.5 top-1.5 rounded-full bg-plum-950 px-2.5 py-0.5 text-[11px] font-semibold text-white">
-            Sold out
+            {takenLabel}
           </span>
         )}
       </div>
@@ -107,8 +109,8 @@ function OptionRow({ option, property }: { option: EstatePrototype; property: Pr
           <p
             className={`mt-2 text-lg font-bold tracking-tight ${sold ? "text-slate-500" : "text-plum-950"}`}
           >
-            {saleMoney(option.priceMinor, property)}
-            {sold && <span className="sr-only"> (sold out)</span>}
+            {formatPrice(option.priceMinor, property)}
+            {sold && <span className="sr-only"> ({takenLabel.toLowerCase()})</span>}
           </p>
         )}
 

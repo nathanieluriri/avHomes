@@ -12,14 +12,14 @@ export interface EstateFacts {
  * nothing to say is null. The ranges cover available options only (`estateSummary`),
  * so the count does too whenever something has sold.
  */
-export function estateFacts(s: EstateSummary): EstateFacts {
+export function estateFacts(s: EstateSummary, noun = "option"): EstateFacts {
   return {
     options:
       s.count === 0
         ? null
         : !s.soldOut && s.availableCount < s.count
           ? `${s.availableCount} of ${s.count} available`
-          : `${s.count} ${s.count === 1 ? "option" : "options"}`,
+          : `${s.count} ${s.count === 1 ? noun : `${noun}s`}`,
     beds:
       s.hasHouses && s.bedroomsMax > 0
         ? s.bedroomsMin === s.bedroomsMax || s.bedroomsMin === 0
@@ -36,10 +36,15 @@ export function estateRangeLine(s: EstateSummary): string {
   return [f.beds, f.plots].filter(Boolean).join(" · ");
 }
 
+/** "Sold out", or "Fully let" for a building whose units are let. */
+export function allTakenLabel(property: Pick<Property, "listingType">): string {
+  return property.listingType === "rent" ? "Fully let" : "Sold out";
+}
+
 /** "3 of 4 available", or "Sold out" once nothing is left. */
-export function availabilityLine(s: EstateSummary): string | null {
+export function availabilityLine(s: EstateSummary, property?: Pick<Property, "listingType">): string | null {
   if (s.count === 0) return null;
-  if (s.soldOut) return "Sold out";
+  if (s.soldOut) return property ? allTakenLabel(property) : "Sold out";
   if (s.availableCount === s.count) return s.count === 1 ? "Available" : `All ${s.count} available`;
   return `${s.availableCount} of ${s.count} available`;
 }

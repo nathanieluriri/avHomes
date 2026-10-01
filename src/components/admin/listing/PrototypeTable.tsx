@@ -103,7 +103,8 @@ function blankRow(kind: PrototypeKind, rooms: number, speculative = false): Prot
     kind,
     name: "",
     bedrooms: kind === "house" ? rooms : 0,
-    bathrooms: kind === "house" ? rooms : 0,
+    // A studio still has a bathroom.
+    bathrooms: kind === "house" ? Math.max(rooms, 1) : 0,
     sizeSqm: 0,
     price: "",
     image: null,
@@ -112,12 +113,22 @@ function blankRow(kind: PrototypeKind, rooms: number, speculative = false): Prot
   };
 }
 
-const QUICK_ADD: readonly { label: string; kind: PrototypeKind; rooms: number }[] = [
-  { label: "2 bed", kind: "house", rooms: 2 },
-  { label: "3 bed", kind: "house", rooms: 3 },
-  { label: "4 bed", kind: "house", rooms: 4 },
-  { label: "Plot", kind: "plot", rooms: 0 },
-];
+export type PrototypeVariant = "estate" | "building";
+
+const QUICK_ADD: Record<PrototypeVariant, readonly { label: string; kind: PrototypeKind; rooms: number }[]> = {
+  estate: [
+    { label: "2 bed", kind: "house", rooms: 2 },
+    { label: "3 bed", kind: "house", rooms: 3 },
+    { label: "4 bed", kind: "house", rooms: 4 },
+    { label: "Plot", kind: "plot", rooms: 0 },
+  ],
+  building: [
+    { label: "Studio", kind: "house", rooms: 0 },
+    { label: "1 bed", kind: "house", rooms: 1 },
+    { label: "2 bed", kind: "house", rooms: 2 },
+    { label: "3 bed", kind: "house", rooms: 3 },
+  ],
+};
 
 const ROOMS_MAX = 20;
 
@@ -172,14 +183,22 @@ export function PrototypeTable({
   onChange,
   currency,
   readOnly = false,
+  variant = "estate",
+  rent = false,
 }: {
   rows: PrototypeDraft[];
   onChange: (rows: PrototypeDraft[]) => void;
   currency: string;
   /** In the trash. The photo sheet, whose picker uploads, is never mounted. */
   readOnly?: boolean;
+  /** A building's rows are units: no plots, and worded as units. */
+  variant?: PrototypeVariant;
+  /** Each unit's price is its rent. */
+  rent?: boolean;
 }) {
   const uid = useId();
+  const building = variant === "building";
+  const noun = building ? "unit" : "option";
   const pendingFocus = useRef<string | null>(null);
   const full = rows.length >= PROTOTYPES_MAX;
 
@@ -251,14 +270,14 @@ export function PrototypeTable({
   }
 
   const chips = (
-    <div role="group" aria-label="Add an option" className="flex flex-wrap items-center gap-2">
-      {QUICK_ADD.map((q, i) => (
+    <div role="group" aria-label={`Add ${building ? "a unit" : "an option"}`} className="flex flex-wrap items-center gap-2">
+      {QUICK_ADD[variant].map((q, i) => (
         <button
           key={q.label}
           id={i === 0 ? quickId : undefined}
           type="button"
           disabled={full}
-          aria-label={`Add ${q.label.toLowerCase()} option`}
+          aria-label={`Add ${q.label.toLowerCase()} ${noun}`}
           onClick={() => insert(blankRow(q.kind, q.rooms), rows.length, firstControl(q.kind))}
           className={`${CHIP_BOX} bg-mist-100 text-slate-600 hover:bg-mist-200/70 hover:text-plum-950 disabled:opacity-60`}
         >
@@ -273,7 +292,7 @@ export function PrototypeTable({
         onClick={() => insert(blankRow("house", 0), rows.length, "name")}
         className={`${CHIP_BOX} c-bevel bg-white text-plum-950 hover:bg-mist-50`}
       >
-        Add option
+        Add {noun}
       </button>
     </div>
   );
@@ -281,11 +300,11 @@ export function PrototypeTable({
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border-2 border-dashed border-mist-200 bg-mist-50 p-4 sm:p-5">
-        <p className="text-[13px] font-semibold text-plum-950">No options yet</p>
+        <p className="text-[13px] font-semibold text-plum-950">No {noun}s yet</p>
         <p className="mt-1 max-w-md text-[13px] leading-relaxed text-slate-600">
-          An option is one thing a buyer can pick inside this estate: a house type such as a 3 bedroom
-          detached, or a plot size. Each has its own price, and the estate&apos;s &quot;from&quot; price is worked
-          out from them.
+          {building
+            ? `Add each flat in the building, such as Flat 1, a 2 bedroom. Each has its own ${rent ? "rent" : "price"} and can be marked taken, and the building's "from" price is worked out from them.`
+            : `An option is one thing a buyer can pick inside this estate: a house type such as a 3 bedroom detached, or a plot size. Each has its own price, and the estate's "from" price is worked out from them.`}
         </p>
         <div className="mt-3">{chips}</div>
       </div>
@@ -299,12 +318,12 @@ export function PrototypeTable({
         className={`hidden gap-1.5 border-b border-mist-200 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 @xl:grid ${COLUMNS}`}
       >
         <span />
-        <span>Kind</span>
+        <span>{building ? "" : "Kind"}</span>
         <span>Name</span>
         <span>Beds</span>
         <span>Baths</span>
         <span>Sqm</span>
-        <span>Price</span>
+        <span>{rent ? "Rent" : "Price"}</span>
         <span>Available</span>
         <span />
       </div>
@@ -320,6 +339,8 @@ export function PrototypeTable({
             controlId={controlId}
             canAdd={!full}
             readOnly={readOnly}
+            building={building}
+            rent={rent}
             onUpdate={(patch) => update(row.id, patch)}
             onMove={(to, via) => move(index, to, via)}
             onDuplicate={() => duplicate(index)}
@@ -334,8 +355,8 @@ export function PrototypeTable({
         {chips}
         <p className="text-xs text-slate-600">
           {full
-            ? `That is the most one estate can hold (${PROTOTYPES_MAX}).`
-            : `Prices in ${currency}. Enter in a price moves to the next one, or adds the next option once the last is priced.`}
+            ? `That is the most one ${building ? "building" : "estate"} can hold (${PROTOTYPES_MAX}).`
+            : `${rent ? "Rents" : "Prices"} in ${currency}. Enter in a price moves to the next one, or adds the next ${noun} once the last is priced.`}
         </p>
       </div>
     </div>
@@ -350,6 +371,8 @@ function PrototypeRow({
   controlId,
   canAdd,
   readOnly,
+  building,
+  rent,
   onUpdate,
   onMove,
   onDuplicate,
@@ -364,6 +387,8 @@ function PrototypeRow({
   controlId: (rowId: string, control: Control) => string;
   canAdd: boolean;
   readOnly: boolean;
+  building: boolean;
+  rent: boolean;
   onUpdate: (patch: Partial<PrototypeDraft>) => void;
   onMove: (to: number, via: "up" | "down" | "menu") => void;
   onDuplicate: () => void;
@@ -371,7 +396,7 @@ function PrototypeRow({
   onPriceEnter: () => void;
   onFieldEnter: () => void;
 }) {
-  const label = prototypeLabel(row);
+  const label = prototypeLabel(row, building ? "Apartment Building" : undefined);
   const house = row.kind === "house";
   const priceId = controlId(row.id, "price");
   const priceError =
@@ -407,17 +432,21 @@ function PrototypeRow({
         />
         <label className="min-w-0">
           <span className={CELL_LABEL}>Kind</span>
-          <select
-            className={CELL}
-            value={row.kind}
-            onChange={(e) => onUpdate({ kind: e.target.value as PrototypeKind })}
-          >
-            {PROTOTYPE_KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {PROTOTYPE_KIND_LABELS[kind]}
-              </option>
-            ))}
-          </select>
+          {building ? (
+            <span className="block py-2 text-[13px] font-semibold text-slate-600 @xl:py-1.5 @xl:text-[12px]">Unit</span>
+          ) : (
+            <select
+              className={CELL}
+              value={row.kind}
+              onChange={(e) => onUpdate({ kind: e.target.value as PrototypeKind })}
+            >
+              {PROTOTYPE_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {PROTOTYPE_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
       </div>
 
@@ -428,7 +457,7 @@ function PrototypeRow({
           className={CELL}
           autoComplete="off"
           maxLength={120}
-          placeholder={prototypeLabel({ ...row, name: "" })}
+          placeholder={prototypeLabel({ ...row, name: "" }, building ? "Apartment Building" : undefined)}
           value={row.name}
           onChange={(e) => onUpdate({ name: e.target.value })}
           onKeyDown={toPrice}
@@ -480,7 +509,7 @@ function PrototypeRow({
 
       <div className="col-span-6 min-w-0 @xl:col-span-1">
         <label htmlFor={priceId} className={CELL_LABEL}>
-          Price ({currency})
+          {rent ? "Rent" : "Price"} ({currency})
         </label>
         <MoneyInput
           id={priceId}
@@ -513,7 +542,7 @@ function PrototypeRow({
             checked={row.available}
             onChange={(e) => onUpdate({ available: e.target.checked })}
           />
-          <span className="@xl:sr-only">Available</span>
+          <span className="@xl:sr-only">{building && rent ? "Available to let" : "Available"}</span>
         </label>
 
         {/* Visible buttons on a card, where there is room for them and a menu
@@ -684,7 +713,7 @@ function PrototypePhoto({
           open={open}
           onOpenChange={setOpen}
           title={`Photo for ${label}`}
-          description="One render or photo. Without one, the estate's main photo is shown."
+          description="One render or photo. Without one, the listing's main photo is shown."
           footer={
             <div className="flex justify-end">
               <Button className="w-full sm:w-auto" onClick={() => setOpen(false)}>

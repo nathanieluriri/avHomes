@@ -1,5 +1,6 @@
 import { formatPrice, formatPriceShort, listingLabel } from "./money";
 import {
+  BUILDING_TYPE,
   ESTATE_TYPE,
   FEATURABLE_STATUSES,
   type BuildStage,
@@ -45,17 +46,33 @@ export function isEstate(type: PropertyType): boolean {
   return type === ESTATE_TYPE;
 }
 
+export function isBuilding(type: PropertyType): boolean {
+  return type === BUILDING_TYPE;
+}
+
+/** Listed once with several options inside: an estate's house types and plots, a building's units. */
+export function hasOptions(type: PropertyType): boolean {
+  return isEstate(type) || isBuilding(type);
+}
+
+/** What one option is called on screen: "unit" in a building, "option" in an estate. */
+export function optionNoun(type: PropertyType, count = 1): string {
+  const noun = isBuilding(type) ? "unit" : "option";
+  return count === 1 ? noun : `${noun}s`;
+}
+
 export function fieldsFor(shape: { type: PropertyType; listingType: ListingType }): ListingFields {
   const estate = isEstate(shape.type);
+  const options = hasOptions(shape.type);
   const rent = !estate && shape.listingType === "rent";
   return {
     dealChoice: !estate,
-    price: !estate,
+    price: !options,
     rentPeriod: rent,
-    rooms: !estate,
-    area: !estate,
+    rooms: !options,
+    area: !options,
     yearBuilt: !estate,
-    prototypes: estate,
+    prototypes: options,
     paymentPlan: estate,
     buildStage: estate,
     titleDocument: !rent,
@@ -74,7 +91,7 @@ export function canFeature(listing: {
   prototypes?: readonly EstatePrototype[];
 }): boolean {
   if (listing.deletedAt !== null || !FEATURABLE_STATUSES.includes(listing.status)) return false;
-  if (listing.type !== undefined && isEstate(listing.type)) {
+  if (listing.type !== undefined && hasOptions(listing.type)) {
     return !estateSummary(listing.prototypes ?? []).soldOut;
   }
   return true;
@@ -156,12 +173,16 @@ export function derivedEstateColumns(prototypes: readonly EstatePrototype[]): {
   return { priceMinor: s.fromMinor, bedrooms: s.bedroomsMax, bathrooms: s.bathroomsMax };
 }
 
-/** "3 bedroom" or "500 sqm plot", for a row whose name was left blank. */
-export function prototypeLabel(p: Pick<EstatePrototype, "name" | "kind" | "bedrooms" | "sizeSqm">): string {
+/** "3 bedroom" or "500 sqm plot", for a row whose name was left blank. A building's 0 bedroom unit is a studio. */
+export function prototypeLabel(
+  p: Pick<EstatePrototype, "name" | "kind" | "bedrooms" | "sizeSqm">,
+  type?: PropertyType,
+): string {
   const name = p.name.trim();
   if (name !== "") return name;
   if (p.kind === "plot") return p.sizeSqm > 0 ? `${formatSqm(p.sizeSqm)} plot` : "Plot";
-  return p.bedrooms > 0 ? `${p.bedrooms} bedroom` : "House";
+  if (p.bedrooms > 0) return `${p.bedrooms} bedroom`;
+  return type !== undefined && isBuilding(type) ? "Studio" : "House";
 }
 
 export function formatSqm(sqm: number): string {
@@ -226,11 +247,12 @@ function whereLine(p: Pick<Property, "location" | "city">): string {
 /** The description assembled from the facts, used whenever none was written. Price first. */
 export function listingMetaDescription(p: Property): string {
   const where = whereLine(p);
-  if (isEstate(p.type)) {
+  if (hasOptions(p.type)) {
     const s = estateSummary(p.prototypes);
     const from = s.fromMinor > 0 ? ` from ${formatPriceShort(s.fromMinor, p)}` : "";
     const inWhere = where ? ` in ${where}` : "";
-    return [`Estate Land${inWhere}. ${s.count} ${s.count === 1 ? "option" : "options"}${from}.`, p.tagline]
+    const deal = isBuilding(p.type) ? (p.listingType === "rent" ? " to let" : " for sale") : "";
+    return [`${p.type}${inWhere}. ${s.count} ${optionNoun(p.type, s.count)}${deal}${from}.`, p.tagline]
       .filter(Boolean)
       .join(" ");
   }
@@ -295,6 +317,24 @@ export function seoTitleSuggestions(p: Property): string[] {
   const where = whereLine(p);
   const doc = p.titleDocument ? TITLE_DOCUMENT_SHORT[p.titleDocument] : null;
 
+  if (isBuilding(p.type)) {
+    const s = estateSummary(p.prototypes);
+    const from = s.fromMinor > 0 ? ` from ${formatPriceShort(s.fromMinor, p)}` : "";
+    return p.listingType === "rent"
+      ? shortlist(
+          [`Apartments for Rent in ${where}`, `Flats to Let in ${area}${from}`, `Apartment Building in ${where}`],
+          SEO_TITLE_ADVISED,
+        )
+      : shortlist(
+          [
+            `Apartment Building for Sale in ${where}`,
+            `Block of Flats for Sale in ${area}${doc ? ` with ${doc}` : ""}`,
+            s.count > 0 ? `${s.count} Unit Apartment Building for Sale in ${area}` : null,
+          ],
+          SEO_TITLE_ADVISED,
+        );
+  }
+
   if (isEstate(p.type)) {
     const s = estateSummary(p.prototypes);
     // An estate of houses is not land, and one selling both is both.
@@ -345,6 +385,21 @@ export function seoDescriptionSuggestions(p: Property): string[] {
      is the promise the front page already makes, said once, in the place a
      search result shows it. */
   const checked = "Inspected on the ground before it went live.";
+
+  if (isBuilding(p.type)) {
+    const s = estateSummary(p.prototypes);
+    const from = s.fromMinor > 0 ? ` from ${formatPriceShort(s.fromMinor, p)}` : "";
+    const units = `${s.count} ${optionNoun(p.type, s.count)}${from}`;
+    const deal = p.listingType === "rent" ? "to let" : "for sale";
+    return shortlist(
+      [
+        `Apartments ${deal} in ${where}. ${units}.${doc && p.listingType === "sale" ? ` ${doc}.` : ""} ${checked}`,
+        p.city ? `Moving to ${p.city}? Apartments ${deal} in ${where}. ${units}. ${checked}` : null,
+        p.tagline.trim() ? `Apartments ${deal} in ${where}. ${units}. ${p.tagline.trim()}` : null,
+      ],
+      SEO_DESCRIPTION_ADVISED,
+    );
+  }
 
   if (isEstate(p.type)) {
     const s = estateSummary(p.prototypes);

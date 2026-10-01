@@ -4,9 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Check, X } from "lucide-react";
 import {
+  BUILDING_TYPE,
   ESTATE_TYPE,
   formatMoney,
   formatSqm,
+  hasOptions,
   leadRefusal,
   prototypeLabel,
   type DealKind,
@@ -403,7 +405,7 @@ function ListingPick({ onPick }: { onPick: (picked: Picked) => void }) {
       options={items.map((property) => ({
         value: property.id,
         label: property.title,
-        hint: [property.city, property.type === ESTATE_TYPE ? "Estate" : ""]
+        hint: [property.city, property.type === ESTATE_TYPE ? "Estate" : property.type === BUILDING_TYPE ? "Building" : ""]
           .filter(Boolean)
           .join(" · "),
         trailing:
@@ -418,7 +420,7 @@ function ListingPick({ onPick }: { onPick: (picked: Picked) => void }) {
           title: property.title,
           kind: property.listingType === "rent" ? "rent" : "sale",
           currency: property.currency,
-          prototypes: property.type === ESTATE_TYPE ? (property.prototypes ?? []) : [],
+          prototypes: hasOptions(property.type) ? (property.prototypes ?? []) : [],
         });
       }}
       onType={setTerm}

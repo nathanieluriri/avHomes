@@ -1,4 +1,4 @@
-import { estateSummary, formatPriceShort, isEstate, toHandle, type Property } from "@avhomes/contracts";
+import { estateSummary, formatPriceShort, hasOptions, toHandle, type Property } from "@avhomes/contracts";
 
 /**
  * The places this agency actually has stock in, derived rather than configured.
@@ -66,7 +66,7 @@ export function placeTrail(p: Pick<Property, "location" | "city">): string[] {
 /** Sales only, and 0 for anything with no price on it yet. See `fromMinor`. */
 function saleFrom(p: Property): number {
   if (p.listingType !== "sale") return 0;
-  return isEstate(p.type) ? estateSummary(p.prototypes ?? []).fromMinor : p.priceMinor;
+  return hasOptions(p.type) ? estateSummary(p.prototypes ?? []).fromMinor : p.priceMinor;
 }
 
 export function placesWithStock(properties: readonly Property[]): PlaceSummary[] {

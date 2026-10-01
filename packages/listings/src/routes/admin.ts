@@ -48,6 +48,7 @@ import {
   fieldsFor,
   PUBLIC_PROPERTY_STATUSES,
   isAdminRole,
+  hasOptions,
   isEstate,
   listingPublishBlockers,
   MAP_LINK_MAX,
@@ -376,6 +377,7 @@ async function patchListing(
   // so a patch that switches type and fills the new fields in one save works.
   const type = body.patch.type ?? current.type;
   const estate = isEstate(type);
+  const options = hasOptions(type);
 
   // Refused rather than coerced: a caller asking for a let estate has the
   // wrong idea of what it is editing, and silently selling it would hide that.
@@ -427,7 +429,7 @@ async function patchListing(
     throw new PreconditionFailedError("not_featurable", {
       propertyId: id,
       detail: canFeature({ status: current.status, deletedAt: current.deletedAt })
-        ? "An estate with every option sold out cannot be featured."
+        ? `${estate ? "An estate" : "A building"} with every ${estate ? "option sold out" : "unit taken"} cannot be featured.`
         : "Only a live or under offer listing can be featured.",
     });
   }
@@ -442,14 +444,19 @@ async function patchListing(
   // A plot has no rooms, whatever the row held before its kind was switched.
   if (patch.prototypes !== undefined) {
     patch.prototypes = patch.prototypes.map((prototype) =>
-      prototype.kind === "plot" ? { ...prototype, bedrooms: 0, bathrooms: 0 } : prototype,
+      prototype.kind === "plot"
+        ? // A building has flats, not plots.
+          options && !estate
+          ? { ...prototype, kind: "house" }
+          : { ...prototype, bedrooms: 0, bathrooms: 0 }
+        : prototype,
     );
   }
 
-  if (estate) {
-    patch.listingType = "sale";
-    // Recomputed on every estate save, whatever the client sent for these
-    // three, so the list's sort and filters never read a stale from-price.
+  if (estate) patch.listingType = "sale";
+  if (options) {
+    // Recomputed on every save, whatever the client sent for these three, so
+    // the list's sort and filters never read a stale from-price.
     Object.assign(patch, derivedEstateColumns(patch.prototypes ?? current.prototypes));
   }
 

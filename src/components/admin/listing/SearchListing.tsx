@@ -9,7 +9,7 @@ import {
   SEO_TITLE_MAX,
   estateSummary,
   formatPrice,
-  isEstate,
+  hasOptions,
   listingSeoDescription,
   listingSeoTitle,
   seoDescriptionSuggestions,
@@ -115,7 +115,7 @@ export function SearchListing({
   const description = listingSeoDescription(preview);
   const handle = toHandle(value.handle) ?? savedSlug ?? toHandle(preview.title) ?? "";
   const moved = published && savedSlug !== null && toHandle(value.handle) !== null && toHandle(value.handle) !== savedSlug;
-  const summary = isEstate(preview.type) ? estateSummary(preview.prototypes) : null;
+  const summary = hasOptions(preview.type) ? estateSummary(preview.prototypes) : null;
   const priceMinor = summary ? summary.fromMinor : preview.priceMinor;
   const price = priceMinor > 0 ? `${summary ? "From " : ""}${formatPrice(priceMinor, preview)}` : null;
   /* From `preview`, so they follow the type, price and location being edited in

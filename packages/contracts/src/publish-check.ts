@@ -1,6 +1,6 @@
 import type { DocNode } from "./doc";
 import { docToText } from "./doc";
-import { isEstate, prototypeLabel } from "./listing-rules";
+import { hasOptions, optionNoun, prototypeLabel } from "./listing-rules";
 import type { EstatePrototype, PropertyType } from "./types";
 
 export interface PublishWarning {
@@ -217,20 +217,24 @@ export function listingPublishBlockers(listing: {
     });
   }
 
-  if (listing.type !== undefined && isEstate(listing.type)) {
-    // An estate's price is derived from its options, so the options are what to fix.
+  if (listing.type !== undefined && hasOptions(listing.type)) {
+    // An estate's or building's price is derived from its options, so the options are what to fix.
+    const type = listing.type;
     const prototypes = listing.prototypes ?? [];
     if (prototypes.length === 0) {
       out.push({
         field: "prototypes",
-        message: "Add at least one option, such as a 3 bedroom or a 500 sqm plot.",
+        message:
+          optionNoun(type) === "unit"
+            ? "Add at least one unit, such as a 2 bedroom flat."
+            : "Add at least one option, such as a 3 bedroom or a 500 sqm plot.",
       });
     }
     const unpriced = prototypes.filter((p) => p.priceMinor <= 0);
     if (unpriced.length > 0) {
       out.push({
         field: "prototypes",
-        message: `Set a price on ${unpriced.map((p) => prototypeLabel(p)).join(", ")}.`,
+        message: `Set a price on ${unpriced.map((p) => prototypeLabel(p, type)).join(", ")}.`,
       });
     }
   } else if (listing.priceMinor <= 0) {

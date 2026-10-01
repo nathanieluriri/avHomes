@@ -7,6 +7,7 @@ import {
   listingMapEmbedSrc,
   mapDirectionsHref,
   formatPrice,
+  hasOptions,
   isEstate,
   listingLabel,
   TITLE_DOCUMENT_LABELS,
@@ -22,7 +23,7 @@ import PaymentPlanCard from "@/components/listing/PaymentPlanCard";
 import { RentTerms } from "@/components/listing/ListingFacts";
 import { EnquiryOptionProvider } from "@/components/listing/EnquiryOption";
 import LocationMap from "@/components/listing/LocationMap";
-import { availabilityLine } from "@/components/listing/estate-text";
+import { allTakenLabel, availabilityLine } from "@/components/listing/estate-text";
 
 /**
  * A listing's page, below the navbar. Data in, markup out, no reads of its own,
@@ -30,7 +31,8 @@ import { availabilityLine } from "@/components/listing/estate-text";
  */
 export default function ListingDetail({ property, similar }: { property: Property; similar: Property[] }) {
   const estate = isEstate(property.type);
-  const summary = estate ? estateSummary(property.prototypes) : null;
+  const multi = hasOptions(property.type);
+  const summary = multi ? estateSummary(property.prototypes) : null;
   const heroPriceMinor = summary ? summary.fromMinor : property.priceMinor;
   // A sold out estate already says so in the chip above the title.
   const heroAvailability = summary && !summary.soldOut ? availabilityLine(summary) : null;
@@ -65,7 +67,7 @@ export default function ListingDetail({ property, similar }: { property: Propert
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-wine-50 px-3.5 py-1.5 text-xs font-semibold text-wine-700">
-                {summary?.soldOut ? "Sold out" : listingLabel(property.listingType, property.status)}
+                {summary?.soldOut ? allTakenLabel(property) : listingLabel(property.listingType, property.status)}
               </span>
               <span className="inline-flex items-center rounded-full bg-mist-100 px-3.5 py-1.5 text-xs font-semibold text-plum-950">
                 {property.type}
@@ -97,7 +99,7 @@ export default function ListingDetail({ property, similar }: { property: Propert
 
           {heroPriceMinor > 0 && (
             <div className="mt-8 shrink-0 border-t border-mist-200 pt-6 lg:mt-0 lg:border-t-0 lg:pt-0 lg:text-right">
-              {estate && (
+              {multi && (
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">From</p>
               )}
               <p className="break-words text-3xl font-bold leading-none tracking-tight text-plum-950 sm:text-4xl">
@@ -137,8 +139,15 @@ export default function ListingDetail({ property, similar }: { property: Propert
                 </div>
               </Reveal>
 
-              {estate ? (
+              {multi ? (
                 <>
+                  {!estate && (
+                    <Reveal delay={80}>
+                      <div className="mt-12">
+                        <RentTerms property={property} />
+                      </div>
+                    </Reveal>
+                  )}
                   {property.prototypes.length > 0 && (
                     <Reveal delay={80}>
                       <div className="mt-12">
