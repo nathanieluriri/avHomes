@@ -9,7 +9,9 @@ import {
   FURNISHING_LABELS,
   hasOptions,
   isBuilding,
+  isCommercial,
   isEstate,
+  isPlaza,
   optionNoun,
   isPriceReduced,
   listingLabel,
@@ -54,7 +56,7 @@ export default function PropertyCard({
           </span>
           {multi && (
             <span className="rounded-full bg-plum-950 px-3 py-1 text-xs font-semibold text-white">
-              {isBuilding(property.type) ? "Building" : "Estate"}
+              {isBuilding(property.type) ? "Building" : isPlaza(property.type) ? "Plaza" : "Estate"}
             </span>
           )}
         </div>
@@ -96,14 +98,18 @@ export default function PropertyCard({
           )
         ) : (
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1.5">
-              <Bed className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
-              {property.bedrooms} Beds
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Bath className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
-              {property.bathrooms} Baths
-            </span>
+            {!isCommercial(property.type) && (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <Bed className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
+                  {property.bedrooms} Beds
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Bath className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
+                  {property.bathrooms} Baths
+                </span>
+              </>
+            )}
             <span className="inline-flex items-center gap-1.5">
               <Maximize className="h-4 w-4 text-wine-600" strokeWidth={1.8} />
               {formatSqm(sqftToSqm(property.areaSqft))}

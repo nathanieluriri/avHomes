@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import LocationInput from "@/components/LocationInput";
-import { BUILDING_TYPE, ESTATE_TYPE, type PropertyType } from "@/lib/types";
+import { BUILDING_TYPE, ESTATE_TYPE, PLAZA_TYPE, SHOP_TYPE, type PropertyType } from "@/lib/types";
 import {
   Select,
   SelectContent,
@@ -17,6 +17,8 @@ import {
 const TYPES: { value: PropertyType; label: string }[] = [
   { value: ESTATE_TYPE, label: "Estates" },
   { value: BUILDING_TYPE, label: "Apartment Buildings" },
+  { value: PLAZA_TYPE, label: "Plazas" },
+  { value: SHOP_TYPE, label: "Shops" },
   { value: "Villa", label: "Villa" },
   { value: "Apartment", label: "Apartment" },
   { value: "Duplex", label: "Duplex" },

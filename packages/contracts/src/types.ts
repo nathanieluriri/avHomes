@@ -99,6 +99,8 @@ export const PROPERTY_TYPES = [
   "Terrace",
   "Estate Land",
   "Apartment Building",
+  "Shop",
+  "Plaza",
 ] as const;
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
@@ -115,6 +117,15 @@ export const ESTATE_TYPE = "Estate Land" satisfies PropertyType;
  * derived from its units the same way.
  */
 export const BUILDING_TYPE = "Apartment Building" satisfies PropertyType;
+
+/** One shop on its own: a normal listing with a size and no bedrooms. */
+export const SHOP_TYPE = "Shop" satisfies PropertyType;
+
+/** A plaza listed once with each shop inside it as an option, like a building's units. */
+export const PLAZA_TYPE = "Plaza" satisfies PropertyType;
+
+/** Every type listed once with options inside it. */
+export const OPTION_TYPES: readonly PropertyType[] = [ESTATE_TYPE, BUILDING_TYPE, PLAZA_TYPE];
 
 /** A prototype is a house design on a plot, or the bare plot. */
 export const PROTOTYPE_KINDS = ["house", "plot"] as const;

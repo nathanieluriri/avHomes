@@ -50,6 +50,7 @@ import {
   isAdminRole,
   hasOptions,
   isEstate,
+  isPlaza,
   listingPublishBlockers,
   MAP_LINK_MAX,
   mapLinkRefusal,
@@ -443,14 +444,14 @@ async function patchListing(
 
   // A plot has no rooms, whatever the row held before its kind was switched.
   if (patch.prototypes !== undefined) {
-    patch.prototypes = patch.prototypes.map((prototype) =>
-      prototype.kind === "plot"
-        ? // A building has flats, not plots.
-          options && !estate
-          ? { ...prototype, kind: "house" }
-          : { ...prototype, bedrooms: 0, bathrooms: 0 }
-        : prototype,
-    );
+    const plaza = isPlaza(type);
+    patch.prototypes = patch.prototypes.map((prototype) => {
+      let row = prototype;
+      // Only an estate holds plots; a building's and a plaza's rows are its units.
+      if (row.kind === "plot") row = options && !estate ? { ...row, kind: "house" } : { ...row, bedrooms: 0, bathrooms: 0 };
+      if (plaza) row = { ...row, bedrooms: 0 };
+      return row;
+    });
   }
 
   if (estate) patch.listingType = "sale";

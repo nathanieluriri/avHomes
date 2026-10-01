@@ -227,7 +227,9 @@ export function listingPublishBlockers(listing: {
         message:
           optionNoun(type) === "unit"
             ? "Add at least one unit, such as a 2 bedroom flat."
-            : "Add at least one option, such as a 3 bedroom or a 500 sqm plot.",
+            : optionNoun(type) === "shop"
+              ? "Add at least one shop, such as Shop 1 on the ground floor."
+              : "Add at least one option, such as a 3 bedroom or a 500 sqm plot.",
       });
     }
     const unpriced = prototypes.filter((p) => p.priceMinor <= 0);

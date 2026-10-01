@@ -1,7 +1,7 @@
 import MediaFrame, { firstImage } from "@/components/MediaFrame";
 import { Bath, Bed, LandPlot, Maximize } from "lucide-react";
 import type { EstatePrototype, Property } from "@/lib/types";
-import { estateSummary, formatPrice, formatSqm, isBuilding, prototypeLabel } from "@/lib/data";
+import { estateSummary, formatPrice, formatSqm, isBuilding, isPlaza, prototypeLabel } from "@/lib/data";
 import { AskAboutOption } from "./EnquiryOption";
 import { availabilityLine, estateRangeLine, planLine } from "./estate-text";
 
@@ -24,7 +24,7 @@ export default function EstateOptions({ property }: { property: Property }) {
     <section aria-labelledby="estate-options">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <h2 id="estate-options" className="text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl">
-          {isBuilding(property.type) ? "Units" : "Options"}
+          {isBuilding(property.type) ? "Units" : isPlaza(property.type) ? "Shops" : "Options"}
         </h2>
         {availability && (
           <p className="text-sm font-semibold text-wine-700">{availability}</p>

@@ -11,11 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BUILDING_TYPE, ESTATE_TYPE } from "@/lib/types";
+import { BUILDING_TYPE, ESTATE_TYPE, PLAZA_TYPE, SHOP_TYPE } from "@/lib/types";
 
 const TYPES = [
   ESTATE_TYPE,
   BUILDING_TYPE,
+  PLAZA_TYPE,
+  SHOP_TYPE,
   "Villa",
   "Apartment",
   "Duplex",
