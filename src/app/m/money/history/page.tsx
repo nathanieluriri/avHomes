@@ -46,6 +46,7 @@ export default function HistoryPage() {
   const statement = useAsync(
     (signal) => api.get<StatementResponse>("/marketing/statement", signal),
     [],
+    { cache: "statement" },
   );
 
   const [today] = useState(() => nowMs());

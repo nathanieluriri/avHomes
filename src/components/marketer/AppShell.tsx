@@ -270,8 +270,8 @@ export function AppShell({
   const router = useRouter();
   useKeyboardInset();
 
-  const gate = useAsync((signal) => api.get<{ user: AuthUser }>("/auth/me", signal), []);
-  const me = useAsync((signal) => api.get<MeResponse>("/marketing/me", signal), []);
+  const gate = useAsync((signal) => api.get<{ user: AuthUser }>("/auth/me", signal), [], { cache: "auth/me" });
+  const me = useAsync((signal) => api.get<MeResponse>("/marketing/me", signal), [], { cache: "marketing/me" });
 
   const titleRef = useRef<HTMLHeadingElement>(null);
   const compact = useScrolledPast(titleRef, variant === "page" && Boolean(title));

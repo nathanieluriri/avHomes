@@ -201,8 +201,23 @@ function composeSignal(signal: AbortSignal | undefined, timeoutMs: number) {
   };
 }
 
+/**
+ * What the app's reads last answered, kept for the session.
+ *
+ * `useAsync` opens a screen on this and refreshes it behind the reader, so a
+ * tap on Menu lands on a drawn screen rather than a row of skeletons. Any write
+ * to the API empties it, because a list read before a deal was reported is a
+ * list without that deal, and so does a session that turns out to be over.
+ * Device registration and tutorial progress are the exceptions: they are
+ * written on every visit and change nothing a screen shows.
+ */
+export const readCache = new Map<string, unknown>();
+
+const KEEPS_READS = ["/push/", "/admin/tutorials/"];
+
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, signal, form, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const write = method !== "GET" && !KEEPS_READS.some((prefix) => path.startsWith(prefix));
 
   const composed = composeSignal(signal, timeoutMs);
 
@@ -243,6 +258,8 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     throw err;
   }
   composed.done();
+
+  if (res.status === 401 || (write && res.ok)) readCache.clear();
 
   if (res.status === 204) return undefined as T;
 

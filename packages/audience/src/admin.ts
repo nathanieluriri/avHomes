@@ -26,6 +26,8 @@ import {
   validateDoc,
   NEWSLETTER_FORMATS,
   type DocNode,
+  type NewsArticle,
+  type NewsItem,
   type Newsletter,
   type NewsletterFormat,
   type NewsletterStatus,
@@ -70,6 +72,8 @@ interface NewsletterDoc {
   sentAt: number | null;
   sentCount: number;
   failedCount: number;
+  /** The preheader or the opening words, written at send time for the partner app. */
+  summary?: string;
   createdAt: number;
   updatedAt: number;
   createdBy: string;
@@ -175,6 +179,74 @@ async function newsletterEmail(
   return { to: to.email, ...rendered, headers: oneClickHeaders(origin, to.id) };
 }
 
+const SUMMARY_MAX = 110;
+
+/** The preheader, else the opening words, cut at a word so a card can hold it whole. */
+export function newsSummary(letter: Pick<NewsletterDoc, "preheader" | "content" | "format" | "html">): string {
+  const preheader = letter.preheader.trim();
+  if (preheader !== "") return preheader.length > SUMMARY_MAX ? `${preheader.slice(0, SUMMARY_MAX - 1).trimEnd()}…` : preheader;
+  const raw = letter.format === "html" ? htmlToText(sanitizeEmailHtml(letter.html ?? "")) : docToEmailText(letter.content);
+  // A heading runs into the line under it once the breaks go, so each line ends in a stop.
+  const text = raw
+    .split(/\n+/u)
+    .map((line) => line.replace(/\s+/gu, " ").trim())
+    .filter((line) => line !== "")
+    .map((line) => (/[.!?:…]$/u.test(line) ? line : `${line}.`))
+    .join(" ");
+  if (text.length <= SUMMARY_MAX) return text;
+  const cut = text.slice(0, SUMMARY_MAX);
+  const atWord = cut.lastIndexOf(" ");
+  return `${(atWord > 60 ? cut.slice(0, atWord) : cut).trimEnd()}…`;
+}
+
+function toNewsItem(doc: NewsletterDoc): NewsItem {
+  return {
+    id: doc._id,
+    subject: doc.subject.trim() || "AV Homes",
+    summary: doc.summary ?? newsSummary(doc),
+    sentAt: doc.sentAt ?? doc.updatedAt,
+  };
+}
+
+/**
+ * Newsletters sent since `sinceMs` for one reader, newest first. None at all
+ * for an address that unsubscribed: leaving the list means leaving it everywhere.
+ */
+export async function recentNewsFor(db: Db, email: string, sinceMs: number, limit: number): Promise<NewsItem[]> {
+  const row = await subscribers(db).findOne({ email }, { projection: { unsubscribedAt: 1 } });
+  if (row?.unsubscribedAt) return [];
+  const docs = await newsletters(db)
+    .find({ status: "sent", sentAt: { $gte: sinceMs } }, { projection: { content: 0, html: 0 } })
+    .sort({ sentAt: -1, _id: -1 })
+    .limit(limit)
+    .toArray();
+  return docs.map(toNewsItem);
+}
+
+/** Which of these addresses said no. The partner app's own notice of a send skips them. */
+export async function unsubscribedAmong(db: Db, emails: readonly string[]): Promise<Set<string>> {
+  if (emails.length === 0) return new Set();
+  const rows = await subscribers(db)
+    .find({ email: { $in: [...new Set(emails)] }, unsubscribedAt: { $ne: null } }, { projection: { email: 1 } })
+    .toArray();
+  return new Set(rows.map((row) => row.email));
+}
+
+/**
+ * A sent newsletter for one reader to open in the partner app: the email as it
+ * went out, with their own unsubscribe link when they are on the list.
+ */
+export async function newsletterArticle(db: Db, origin: string, id: string, email: string): Promise<NewsArticle | null> {
+  const doc = await newsletters(db).findOne({ _id: id, status: "sent" });
+  if (!doc) return null;
+  const row = await subscribers(db).findOne({ email }, { projection: { _id: 1 } });
+  const message = appendSignature(
+    await newsletterEmail(db, origin, doc, { id: row?._id ?? "", email }),
+    await companySignature(db, signatureOrigin({ url: origin })),
+  );
+  return { ...toNewsItem(doc), html: message.html ?? "" };
+}
+
 /* ─────────────────────────────── schemas ──────────────────────────────── */
 
 const SubscriberQuery = z
@@ -227,7 +299,11 @@ function csvCell(value: string): string {
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const BATCH = 100;
 
-export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
+export function audienceAdminRoutes(deps: {
+  mailer: Mailer;
+  /** Tells the partner app's phones a newsletter went out. Never throws. */
+  announce?: (db: Db, letter: NewsItem) => Promise<void>;
+}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   /* ── subscribers ── */
@@ -448,11 +524,22 @@ export function audienceAdminRoutes(deps: { mailer: Mailer }): Hono<AppEnv> {
       }
     }
 
+    const summary = newsSummary(claimed);
     const after = await newsletters(db).findOneAndUpdate(
       { _id: id },
-      { $set: { status: "sent", sentAt: Date.now(), sentCount: sent, failedCount: failed, updatedAt: Date.now() }, $inc: { revision: 1 } },
+      {
+        $set: { status: "sent", sentAt: Date.now(), sentCount: sent, failedCount: failed, summary, updatedAt: Date.now() },
+        $inc: { revision: 1 },
+      },
       { returnDocument: "after" },
     );
+    if (after && deps.announce) {
+      try {
+        await deps.announce(db, toNewsItem(after));
+      } catch (err) {
+        console.error("[newsletter]", JSON.stringify({ id, announce: err instanceof Error ? err.message : String(err) }));
+      }
+    }
     return c.json({ newsletter: after ? toNewsletter(after) : null, sent, failed });
   });
 

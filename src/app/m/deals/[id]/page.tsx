@@ -94,6 +94,7 @@ export default function DealPage() {
   const read = useAsync(
     (signal) => api.get<DealView>(`/marketing/deals/${encodeURIComponent(id)}`, signal),
     [id],
+    { cache: "deal" },
   );
   // The resubmit answers with the deal as it now stands, so the screen shows that without a reload.
   const [answered, setAnswered] = useState<{ id: string; view: DealView } | null>(null);

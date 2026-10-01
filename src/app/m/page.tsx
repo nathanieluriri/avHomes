@@ -119,7 +119,7 @@ interface AlertsRead {
 
 export default function MarketerHome() {
   // Read here rather than in the body, so the bell counts the same list the body shows.
-  const alerts = useAsync((signal) => api.get<AlertsResponse>("/marketing/alerts", signal), []);
+  const alerts = useAsync((signal) => api.get<AlertsResponse>("/marketing/alerts", signal), [], { cache: "alerts" });
   const items = alerts.data ? sortAlerts(alerts.data.items) : null;
   const toDo = items ? items.filter((alert) => alert.tone === "act").length : undefined;
 
@@ -394,7 +394,7 @@ function HeroSkeleton() {
 /* ═══════════════════════════════════════════════════════════════════ BODY ══ */
 
 function HomeBody({ alerts }: { alerts: AlertsRead }) {
-  const updates = useAsync((signal) => api.get<UpdatesResponse>("/marketing/updates", signal), []);
+  const updates = useAsync((signal) => api.get<UpdatesResponse>("/marketing/updates", signal), [], { cache: "updates" });
   const block = useReportBlock();
   const device = useDeviceAsks();
 

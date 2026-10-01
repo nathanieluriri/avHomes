@@ -81,10 +81,14 @@ import { analyticsPublicRoutes } from "@avhomes/analytics";
 import {
   audienceAdminRoutes,
   audiencePublicRoutes,
+  newsletterArticle,
+  recentNewsFor,
   subscribeAddress,
   unsubscribePublicRoutes,
+  unsubscribedAmong,
 } from "@avhomes/audience";
 import {
+  activeMarketerContacts,
   marketingAdminRoutes,
   marketingAppRoutes,
   marketingPublicRoutes,
@@ -582,7 +586,28 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   app.route(API_PREFIX, mailFailureRoutes());
   app.route(API_PREFIX, signatureRoutes({ senderChosen }));
   app.route(API_PREFIX, emailTemplateRoutes({ mailer, origin: requestOrigin, notify }));
-  app.route(API_PREFIX, audienceAdminRoutes({ mailer }));
+  /*
+   * A newsletter reaches the partner app too: a push to every active marketer's
+   * phone, and a row in their Alerts, unless that address unsubscribed. Both
+   * sides are read here, because audience may not know marketing exists.
+   */
+  app.route(
+    API_PREFIX,
+    audienceAdminRoutes({
+      mailer,
+      announce: async (db, letter) => {
+        const people = await activeMarketerContacts(db);
+        const left = await unsubscribedAmong(db, people.map((person) => person.email));
+        const ids = people.filter((person) => !left.has(person.email)).map((person) => person.userId);
+        await tell(
+          db,
+          ids,
+          { kind: "newsletter", title: letter.subject, body: letter.summary, url: `/m/news/${letter.id}`, tag: `news-${letter.id}` },
+          { urgency: "normal" },
+        );
+      },
+    }),
+  );
   /* The marketer app first, then the console's side of the same feature. The
      app's routes are the only admin-tier surface a marketer role can reach,
      which is why they live under /api/marketing and not /api/admin. */
@@ -594,6 +619,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       notify,
       tell,
       recentListings,
+      recentNews: recentNewsFor,
+      newsletterFor: (db, input) => newsletterArticle(db, input.origin, input.id, input.email),
       ...marketingPorts,
     }),
   );

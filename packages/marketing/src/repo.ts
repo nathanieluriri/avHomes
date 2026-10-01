@@ -43,6 +43,7 @@ import {
   type LedgerStatus,
   type Marketer,
   type MarketerAlert,
+  type NewsItem,
   type MarketerAlertTone,
   type MarketerBalance,
   type MarketerBank,
@@ -163,6 +164,12 @@ export async function userIdsFor(db: Db, marketerIds: readonly string[]): Promis
 export async function activeMarketerUserIds(db: Db): Promise<string[]> {
   const rows = await marketers(db).find({ status: "active" }, { projection: { userId: 1 } }).toArray();
   return rows.map((row) => row.userId);
+}
+
+/** The same people with the address each is known by, so a send can honour an unsubscribe. */
+export async function activeMarketerContacts(db: Db): Promise<{ userId: string; email: string }[]> {
+  const rows = await marketers(db).find({ status: "active" }, { projection: { userId: 1, email: 1 } }).toArray();
+  return rows.map((row) => ({ userId: row.userId, email: row.email }));
 }
 
 export async function createMarketer(db: Db, input: JoinInput): Promise<Marketer> {
@@ -1653,6 +1660,8 @@ const TONE_RANK: Record<MarketerAlertTone, number> = { act: 0, "heads-up": 1, go
 export interface AlertContext {
   /** Whether this site can check a bank account at all. An unchecked account is only news when it can. */
   bankCheck: boolean;
+  /** Newsletters sent lately that this marketer did not opt out of. Read through a port; none when it is not wired. */
+  news?: readonly NewsItem[];
   now?: number;
 }
 
@@ -1887,6 +1896,19 @@ export async function alertsFor(
       detail: "",
       action: { label: "Invite someone", href: "/m/invite" },
       at: marketer.joinedAt,
+    });
+  }
+
+  for (const item of context.news ?? []) {
+    out.push({
+      id: `news:${item.id}`,
+      tone: "heads-up",
+      icon: "updates",
+      title: item.subject,
+      body: item.summary,
+      detail: "",
+      action: { label: "Read it", href: `/m/news/${item.id}` },
+      at: item.sentAt,
     });
   }
 

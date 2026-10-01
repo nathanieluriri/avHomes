@@ -348,8 +348,23 @@ export const MARKETER_ALERT_ICONS = [
   "photo",
   "check",
   "alerts",
+  "updates",
 ] as const;
 export type MarketerAlertIcon = (typeof MARKETER_ALERT_ICONS)[number];
+
+/** A sent newsletter, as the partner app's Alerts and its push see it. */
+export interface NewsItem {
+  id: string;
+  subject: string;
+  /** The preheader, or the opening words, short enough for a home card. */
+  summary: string;
+  sentAt: number;
+}
+
+/** A sent newsletter opened in the partner app: the email as it went out. */
+export interface NewsArticle extends NewsItem {
+  html: string;
+}
 
 export interface MarketerAlert {
   /** Stable across reads, such as `deal-info:deal_...`, so a list can key on it. */

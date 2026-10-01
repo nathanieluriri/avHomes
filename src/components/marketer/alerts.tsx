@@ -15,6 +15,7 @@ import {
   IconPhoto,
   IconShield,
   IconTeam,
+  IconUpdates,
   type IconProps,
 } from "./icons3d";
 import { AppLink, Chip, Skeleton, type ChipTone } from "./ui";
@@ -53,6 +54,7 @@ const ALERT_ICON: Record<MarketerAlertIcon, ComponentType<IconProps>> = {
   photo: IconPhoto,
   check: IconCheckBadge,
   alerts: IconAlerts,
+  updates: IconUpdates,
 };
 
 /** Act first, then heads up, then good news; newest first inside each. */

@@ -98,7 +98,7 @@ function groupLines(lines: readonly LedgerLine[]): { month: string; lines: Ledge
 }
 
 export default function MoneyPage() {
-  const money = useAsync((signal) => api.get<MoneyResponse>("/marketing/money", signal), []);
+  const money = useAsync((signal) => api.get<MoneyResponse>("/marketing/money", signal), [], { cache: "money" });
 
   return (
     <AppShell title="Your money" back="/m" hero={<MoneyHero money={money} />} tab="Totals">
