@@ -48,7 +48,7 @@ interface MenuEntry {
    row no longer sits inset: every row now has a raised middle tile. */
 const MENU: readonly MenuEntry[] = [
   { href: "/m/deals", label: "Deals", Icon: IconDeals, column: "1 / span 2", row: 1 },
-  { href: "/m/team", label: "Team", Icon: IconTeam, column: "3 / span 2", row: 1, up: true },
+  { href: "/m/team", label: "Network", Icon: IconTeam, column: "3 / span 2", row: 1, up: true },
   { href: "/m/money", label: "Money", Icon: IconMoney, column: "5 / span 2", row: 1 },
   { href: "/m/buyers", label: "Buyers", Icon: IconHandshake, column: "1 / span 2", row: 2 },
   { href: "/m/invite", label: "Invite", Icon: IconInvite, column: "3 / span 2", row: 2, up: true },
