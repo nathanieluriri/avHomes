@@ -17,3 +17,4 @@ export {
   type MigrationResult,
 } from "./migrate";
 export { MIGRATIONS } from "./migrations";
+export { withFreshPropertiesValidator } from "./refresh";

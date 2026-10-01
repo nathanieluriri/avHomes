@@ -1,5 +1,5 @@
 import type { Filter } from "mongodb";
-import { COLLECTIONS, collection, type Db } from "@avhomes/db";
+import { COLLECTIONS, collection, withFreshPropertiesValidator, type Db } from "@avhomes/db";
 import {
   DuplicateError,
   NotFoundError,
@@ -364,7 +364,7 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     deletedAt: null,
     revision: 1,
   };
-  await properties(db).insertOne(doc);
+  await withFreshPropertiesValidator(db, () => properties(db).insertOne(doc));
   return toProperty(doc);
 }
 
@@ -448,14 +448,16 @@ export async function saveProperty(
         }
       : null;
 
-  const after = await properties(db).findOneAndUpdate(
-    { _id: id, revision: baseRevision, deletedAt: null },
-    {
-      $set: { ...patch, updatedAt: now },
-      $inc: { revision: 1 },
-      ...(change ? { $push: { priceHistory: { $each: [change], $slice: -PRICE_HISTORY_MAX } } } : {}),
-    },
-    { returnDocument: "after" },
+  const after = await withFreshPropertiesValidator(db, () =>
+    properties(db).findOneAndUpdate(
+      { _id: id, revision: baseRevision, deletedAt: null },
+      {
+        $set: { ...patch, updatedAt: now },
+        $inc: { revision: 1 },
+        ...(change ? { $push: { priceHistory: { $each: [change], $slice: -PRICE_HISTORY_MAX } } } : {}),
+      },
+      { returnDocument: "after" },
+    ),
   );
   if (after) return toProperty(after);
 

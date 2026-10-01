@@ -151,7 +151,7 @@ export default function AgentPanel({ property }: { property: Property }) {
           </>
         )}
 
-        {estate && property.paymentPlan && !soldOut && (
+        {property.paymentPlan && !soldOut && (
           <p className="mt-3 text-sm text-plum-950/80">
             Payment plan: {property.paymentPlan.depositPercent}% deposit, balance over{" "}
             {property.paymentPlan.months} {property.paymentPlan.months === 1 ? "month" : "months"}.

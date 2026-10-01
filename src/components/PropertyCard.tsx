@@ -10,7 +10,6 @@ import {
   hasOptions,
   isBuilding,
   isCommercial,
-  isEstate,
   isPlaza,
   optionNoun,
   isPriceReduced,
@@ -26,7 +25,6 @@ export default function PropertyCard({
   property: Property;
   priority?: boolean;
 }) {
-  const estate = isEstate(property.type);
   const multi = hasOptions(property.type);
   // A from-price moves when options sell or change, which is not a price cut.
   const reduced = !multi && isPriceReduced(property.priceHistory);
@@ -139,7 +137,7 @@ export default function PropertyCard({
                   })}
                 </span>
               )}
-              {estate && property.paymentPlan && !soldOut && (
+              {property.paymentPlan && !soldOut && (
                 <span className="rounded-full bg-wine-50 px-2.5 py-0.5 text-xs font-semibold text-wine-700">
                   Payment plan
                 </span>

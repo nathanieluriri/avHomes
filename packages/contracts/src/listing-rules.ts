@@ -84,8 +84,9 @@ export function fieldsFor(shape: { type: PropertyType; listingType: ListingType 
     area: !options,
     yearBuilt: !estate,
     prototypes: options,
-    paymentPlan: estate,
-    buildStage: estate,
+    // Anything bought can be paid off over time or bought off-plan; a rent cannot.
+    paymentPlan: !rent,
+    buildStage: !rent,
     titleDocument: !rent,
     rentTerms: rent,
   };

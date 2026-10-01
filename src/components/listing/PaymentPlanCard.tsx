@@ -13,10 +13,16 @@ export default function PaymentPlanCard({ property }: { property: Property }) {
 
   const priced = property.prototypes.filter((p) => p.priceMinor > 0);
   const pool = priced.some((p) => p.available) ? priced.filter((p) => p.available) : priced;
-  const example = pool.reduce<(typeof pool)[number] | null>(
+  const cheapest = pool.reduce<(typeof pool)[number] | null>(
     (low, p) => (low === null || p.priceMinor < low.priceMinor ? p : low),
     null,
   );
+  // A listing with no options is worked through on its own asking price.
+  const example = cheapest
+    ? { label: `the ${prototypeLabel(cheapest, property.type)}`, joiner: "at", priceMinor: cheapest.priceMinor }
+    : property.prototypes.length === 0 && property.priceMinor > 0
+      ? { label: "the asking price", joiner: "of", priceMinor: property.priceMinor }
+      : null;
   const note = plan.note.trim();
 
   return (
@@ -49,8 +55,7 @@ export default function PaymentPlanCard({ property }: { property: Property }) {
           <div className="space-y-2 border-t border-mist-200 bg-mist-50 px-5 py-4 sm:px-6">
             {example && (
               <p className="text-sm leading-relaxed text-plum-950/80">
-                On the{" "}
-                <span className="font-semibold text-plum-950">{prototypeLabel(example)}</span> at{" "}
+                On <span className="font-semibold text-plum-950">{example.label}</span> {example.joiner}{" "}
                 {saleMoney(example.priceMinor, property)}:{" "}
                 {planLine(example.priceMinor, plan, property)}.
               </p>
