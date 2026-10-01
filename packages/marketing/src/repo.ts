@@ -1865,7 +1865,7 @@ export async function alertsFor(
       id: "no-team",
       tone: "heads-up",
       icon: "team",
-      title: "Invite your first marketer",
+      title: "Invite your 1st partner",
       body: "Earn a share of every deal they close.",
       detail: "",
       action: { label: "Invite someone", href: "/m/invite" },

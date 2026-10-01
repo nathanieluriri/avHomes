@@ -43,12 +43,14 @@ const PAYSTACK = "https://api.paystack.co";
 const KORA = "https://api.korapay.com/merchant/api/v1";
 const TIMEOUT_MS = 8_000;
 
-async function ask(url: string, init: RequestInit): Promise<unknown> {
+async function ask(url: string, init: RequestInit, timeoutMs = TIMEOUT_MS): Promise<unknown> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
     return await res.json().catch(() => null);
+  } catch {
+    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -89,8 +91,16 @@ export async function listBanks(db: Db): Promise<BankOption[]> {
     return bankCache.banks;
   }
 
-  const banks =
-    accountProvider === "paystack" ? await paystackBanks() : await nipBanks();
+  /* NUBAPI's file has gone down for good stretches (Cloudflare 522), which left
+     the join form with no list and no check. Paystack's list is keyless and
+     its codes reach Kora through `forKora`, so it stands in until NUBAPI is back. */
+  let banks: BankOption[];
+  if (accountProvider === "paystack") {
+    banks = await paystackBanks();
+  } else {
+    const [nip, stand] = await Promise.all([nipBanks(), paystackBanks(true)]);
+    banks = nip.length > 0 ? nip : stand;
+  }
 
   // A missing list is not worth a 500: the join form falls back to a plain bank
   // name field and the account is taken unverified.
@@ -120,16 +130,26 @@ function tidy(rows: { code?: unknown; name?: unknown; active?: unknown }[]): Ban
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function paystackBanks(): Promise<BankOption[]> {
+/** `nip` swaps in the NIBSS code Paystack keeps as `longcode`, for Kora to resolve. */
+async function paystackBanks(nip = false): Promise<BankOption[]> {
   const body = (await ask(`${PAYSTACK}/bank?currency=NGN&perPage=100`, {
     headers: { accept: "application/json" },
-  })) as { status?: boolean; data?: { code: string; name: string; active?: boolean }[] } | null;
+  })) as {
+    status?: boolean;
+    data?: { code: string; longcode?: string; name: string; active?: boolean }[];
+  } | null;
   if (!body || body.status !== true || !Array.isArray(body.data)) return [];
-  return tidy(body.data);
+  if (!nip) return tidy(body.data);
+  return tidy(
+    body.data.map((row) => ({
+      ...row,
+      code: /^\d{6}$/u.test(row.longcode ?? "") ? row.longcode : row.code,
+    })),
+  );
 }
 
 async function nipBanks(): Promise<BankOption[]> {
-  const body = (await ask(NIP_LIST, { headers: { accept: "application/json" } })) as
+  const body = (await ask(NIP_LIST, { headers: { accept: "application/json" } }, 3_000)) as
     | { code: string; name: string; active?: boolean }[]
     | { data?: { code: string; name: string; active?: boolean }[] }
     | null;
