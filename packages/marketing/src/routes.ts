@@ -536,7 +536,7 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
     }
     const db = await currentDb(c);
     await limit(db, `bankcheck:${clientIp(c)}`, 20, JOIN_WINDOW_MS);
-    const resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
+    const resolved = await resolveAccount(db, body.accountNumber, body.bankCode, body.bankName);
     return c.json({ accountName: resolved?.accountName ?? "", checked: resolved !== null });
   });
 
@@ -575,9 +575,14 @@ export function marketingPublicRoutes(): Hono<AppEnv> {
           { path: "bank.accountNumber", message: "an account number is ten digits" },
         ]);
       }
-      const resolved = await resolveAccount(db, body.bank.accountNumber, body.bank.bankCode);
+      const resolved = await resolveAccount(
+        db,
+        body.bank.accountNumber,
+        body.bank.bankCode,
+        body.bank.bankName,
+      );
       bank = {
-        bankCode: body.bank.bankCode,
+        bankCode: resolved?.bankCode ?? body.bank.bankCode,
         bankName: body.bank.bankName,
         accountNumber: body.bank.accountNumber,
         accountName: resolved?.accountName ?? "",
@@ -853,10 +858,10 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
      * gets `checked` back, because the bug this replaces was a button that spun,
      * returned 200, and left the card reading "Not checked" with nothing said.
      */
-    let resolved: { accountName: string; verifiedAt: number } | null = null;
+    let resolved: Awaited<ReturnType<typeof resolveAccount>> = null;
     let reachable = true;
     try {
-      resolved = await resolveAccount(db, body.accountNumber, body.bankCode);
+      resolved = await resolveAccount(db, body.accountNumber, body.bankCode, body.bankName);
     } catch {
       // The provider is down or refused. Different from "no such account", and
       // the marketer must not be told their own details are wrong.
@@ -864,7 +869,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     }
 
     const bank: MarketerBank = {
-      bankCode: body.bankCode,
+      bankCode: resolved?.bankCode ?? body.bankCode,
       bankName: body.bankName,
       accountNumber: body.accountNumber,
       accountName: resolved?.accountName ?? marketer.bank?.accountName ?? "",
@@ -1389,7 +1394,12 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       });
     }
 
-    const resolved = await resolveAccount(db, marketer.bank.accountNumber, marketer.bank.bankCode);
+    const resolved = await resolveAccount(
+      db,
+      marketer.bank.accountNumber,
+      marketer.bank.bankCode,
+      marketer.bank.bankName,
+    );
     if (!resolved) {
       return c.json({
         marketer,
@@ -1402,6 +1412,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
 
     const bank: MarketerBank = {
       ...marketer.bank,
+      bankCode: resolved.bankCode,
       accountName: resolved.accountName,
       verifiedAt: resolved.verifiedAt,
     };

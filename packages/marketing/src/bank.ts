@@ -249,11 +249,57 @@ export async function resolveAccount(
   db: Db,
   accountNumber: string,
   bankCode: string,
-): Promise<{ accountName: string; verifiedAt: number } | null> {
+  bankName = "",
+): Promise<{ accountName: string; verifiedAt: number; bankCode: string } | null> {
   const { accountProvider } = await readMarketingSettings(db);
+  const code = await currentCode(db, bankCode, bankName);
   const name =
     accountProvider === "paystack"
-      ? await viaPaystack(db, accountNumber, bankCode)
-      : await viaKora(accountNumber, forKora(bankCode));
-  return name === null ? null : { accountName: name, verifiedAt: Date.now() };
+      ? await viaPaystack(db, accountNumber, code)
+      : await viaKora(accountNumber, forKora(code));
+  return name === null ? null : { accountName: name, verifiedAt: Date.now(), bankCode: code };
+}
+
+/* Short names people type for banks whose listed name says something else. */
+const BANK_ALIASES: Record<string, string> = {
+  gtb: "guarantytrust",
+  gtbank: "guarantytrust",
+  gtco: "guarantytrust",
+  uba: "unitedforafrica",
+  fcmb: "firstcitymonument",
+  firstbank: "first",
+  stanbic: "stanbicibtc",
+};
+
+const FILLER = new Set(["bank", "plc", "limited", "ltd", "nigeria", "of", "the", "mfb", "microfinance"]);
+
+function bankKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/gu, " and ")
+    .replace(/[^a-z0-9]+/gu, " ")
+    .split(" ")
+    .filter((word) => word !== "" && !FILLER.has(word))
+    .join("");
+}
+
+/**
+ * The code the current provider knows this bank by.
+ *
+ * Accounts saved while the bank list was down carry a typed name and no code,
+ * and accounts saved under the other provider carry that provider's code. Both
+ * resolve to "not found" as they stand, though the account is real.
+ */
+async function currentCode(db: Db, bankCode: string, bankName: string): Promise<string> {
+  const banks = await listBanks(db);
+  if (banks.length === 0 || banks.some((bank) => bank.code === bankCode)) return bankCode;
+  const typed = bankKey(bankName);
+  const want = BANK_ALIASES[typed] ?? typed;
+  if (want === "") return bankCode;
+  const exact = banks.find((bank) => bankKey(bank.name) === want);
+  if (exact) return exact.code;
+  const near = new Set(
+    banks.filter((bank) => bankKey(bank.name).startsWith(want)).map((bank) => bank.code),
+  );
+  return near.size === 1 ? [...near][0]! : bankCode;
 }
