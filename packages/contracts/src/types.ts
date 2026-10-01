@@ -175,6 +175,24 @@ export const TITLE_DOCUMENTS = [
 ] as const;
 export type TitleDocument = (typeof TITLE_DOCUMENTS)[number];
 
+/** Why a listing came off the market without a sale recorded through AV Homes. */
+export const OFF_MARKET_REASONS = ["elsewhere", "withdrawn", "unavailable", "other"] as const;
+export type OffMarketReason = (typeof OFF_MARKET_REASONS)[number];
+
+export const OFF_MARKET_LABELS: Record<OffMarketReason, string> = {
+  elsewhere: "Sold or let elsewhere",
+  withdrawn: "Owner withdrew it",
+  unavailable: "No longer available",
+  other: "Other",
+};
+
+export interface OffMarket {
+  reason: OffMarketReason;
+  note: string;
+  at: number;
+  byName: string;
+}
+
 export const FURNISHINGS = ["furnished", "semi-furnished", "unfurnished"] as const;
 export type Furnishing = (typeof FURNISHINGS)[number];
 
@@ -300,6 +318,8 @@ export interface Property {
   seoDescription: string;
   /** Web addresses this listing used to have. Each one redirects to `slug`. */
   previousSlugs: string[];
+  /** Set when it was taken off the market without a sale through AV Homes. Cleared on relisting. */
+  offMarket: OffMarket | null;
   agent: Agent;
   /** The account that owns this listing, for per-record authorization. */
   agentUserId: string | null;

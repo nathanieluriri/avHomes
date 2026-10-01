@@ -29,6 +29,7 @@ import {
   readJson,
   readJsonOrEmpty,
   readQuery,
+  requestOrigin,
   pathParam,
   str,
   email as emailString,
@@ -206,6 +207,11 @@ export interface MarketingDeps {
    */
   tell?: (db: Db, userIds: string[], message: PushMessage, options?: { urgency?: "high" | "normal" }) => Promise<void>;
   /**
+   * Puts a new marketer on the newsletter list. Injected, because the list lives
+   * in the audience package. Never undoes an earlier unsubscribe.
+   */
+  subscribe?: (db: Db, email: string, ctx: { origin: string; requestId: string; route: string }) => Promise<void>;
+  /**
    * Live listings published since `sinceMs`, newest first, at most `limit`.
    * Injected, because this package may not read the listings package's collection.
    */
@@ -233,11 +239,16 @@ export interface MarketingDeps {
    */
   accrue?: FundAccrual;
   reverseFunds?: FundReversal;
-  /** Closes a listing once its sale is recorded. Owned by @avhomes/listings. */
+  /**
+   * A recorded sale reaching its listing: the unit sold is marked taken, or a
+   * listing that is one thing closes. Owned by @avhomes/listings.
+   */
   closeListing?: (
     db: Db,
-    input: { listingId: string; dealId: string; actorId: string; actorName: string },
+    input: { listingId: string; unitKey: string; dealId: string; actorId: string; actorName: string },
   ) => Promise<void>;
+  /** The reverse, for a cancelled sale: the unit is offered again, or the listing reopens. */
+  reopenListing?: (db: Db, input: { listingId: string; unitKey: string; dealId: string }) => Promise<void>;
 }
 
 /** The listing facts marketing needs and may not read for itself. */
@@ -251,6 +262,8 @@ export interface ListingFacts {
   priceMinor: number;
   currency: string;
   status: PropertyStatus;
+  /** The units a sale can name. Empty on a listing that is one thing. */
+  units: { key: string; name: string; available: boolean }[];
 }
 
 /* ════════════════════════════════════════════════════════════ PUSH NOTES ══ */
@@ -265,6 +278,61 @@ interface Note {
   marketerId: string;
   message: PushMessage;
   urgent?: boolean;
+}
+
+/**
+ * An approved sale reaching its listing, so nothing is sold twice.
+ *
+ * A unit is marked taken whatever the listing's status. A listing that is one
+ * thing closes only while it is on the market: a draft or archived listing is
+ * not taken down by a sale recorded against it. Never fatal, because the money
+ * is already written; a single listing left live shows in the awaiting-close
+ * list, and the deal's own "Take off the market" finishes either case.
+ */
+async function settleDeal(
+  deps: MarketingDeps,
+  db: Db,
+  deal: Deal,
+  actor: { id: string; name: string },
+): Promise<void> {
+  if (deal.status !== "approved" || !deps.closeListing) return;
+  try {
+    if (deal.unitKey === "") {
+      const facts = deps.listingFacts ? await deps.listingFacts(db, deal.listingId) : null;
+      if (!facts || (facts.status !== "live" && facts.status !== "under-offer")) return;
+      // A listing with units never closes whole for a sale that named none.
+      if (facts.units.length > 0) return;
+    }
+    await deps.closeListing(db, {
+      listingId: deal.listingId,
+      unitKey: deal.unitKey,
+      dealId: deal.id,
+      actorId: actor.id,
+      actorName: actor.name,
+    });
+  } catch (err) {
+    console.error("[marketing]", JSON.stringify({ settle: deal.id, message: String(err) }));
+  }
+}
+
+/** A sale that fell through: its unit is offered again, or the listing it closed reopens. */
+async function unsettleDeal(deps: MarketingDeps, db: Db, deal: Deal): Promise<void> {
+  if (!deps.reopenListing) return;
+  try {
+    await deps.reopenListing(db, { listingId: deal.listingId, unitKey: deal.unitKey, dealId: deal.id });
+  } catch (err) {
+    console.error("[marketing]", JSON.stringify({ unsettle: deal.id, message: String(err) }));
+  }
+}
+
+/** A sale must name a real unit of a listing with units, and none on a listing without. */
+function assertUnit(facts: ListingFacts, unitKey: string): void {
+  if (facts.units.length > 0 && unitKey === "") {
+    throw new BadRequestError("unitKey", [{ path: "unitKey", message: "Pick which unit was sold or let." }]);
+  }
+  if (unitKey !== "" && !facts.units.some((u) => u.key === unitKey)) {
+    throw new BadRequestError("unitKey", [{ path: "unitKey", message: "That unit is not on this listing any more." }]);
+  }
 }
 
 async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
@@ -660,7 +728,7 @@ const SettingsBody = z
 
 /* ══════════════════════════════════════════════════════════════════ PUBLIC ══ */
 
-export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell"> = {}): Hono<AppEnv> {
+export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscribe"> = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   /** What the join page needs before anybody types: who invited them, and the banks. */
@@ -783,6 +851,17 @@ export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell"> = {}): H
     const { token, expiresAt } = await createSession(db, user.id, c.req.header("user-agent") ?? null);
     setSessionCookie(c, token, expiresAt);
     auditEntityId(c, marketer.id);
+
+    // The join form says so. Never fatal: the account exists either way.
+    try {
+      await deps.subscribe?.(db, address, {
+        origin: requestOrigin(c.req),
+        requestId: c.get("requestId"),
+        route: "POST /public/marketing/join",
+      });
+    } catch (err) {
+      console.error("[marketing]", JSON.stringify({ requestId: c.get("requestId"), subscribe: String(err) }));
+    }
 
     if (marketer.parentId) {
       await tellMarketers(deps, db, [
@@ -1148,6 +1227,15 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
      * person being paid choose their own rate.
      */
     const facts = deps.listingFacts ? await deps.listingFacts(db, body.listingId) : null;
+    if (facts) {
+      assertUnit(facts, body.unitKey);
+      const unit = facts.units.find((u) => u.key === body.unitKey);
+      if (unit && !unit.available) {
+        throw new PreconditionFailedError("unit_taken", {
+          detail: `${unit.name} is already taken. Pick another, or ask the office if this sale is the one that took it.`,
+        });
+      }
+    }
     const deal = await createDeal(
       db,
       marketer,
@@ -1572,10 +1660,11 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         .object({
           status: z.enum(["pending", "approved", "rejected", "info", "cancelled"]).optional(),
           q: str().max(120).optional(),
+          listingId: str().max(64).optional(),
         })
         .strict(),
     );
-    const page = await listDeals(db, { status: q.status, q: q.q, limit: 60 });
+    const page = await listDeals(db, { status: q.status, q: q.q, listingId: q.listingId, limit: 60 });
     return c.json(page);
   });
 
@@ -1750,6 +1839,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
 
     const facts = deps.listingFacts ? await deps.listingFacts(db, body.listingId) : null;
     if (!facts) throw new NotFoundError(`listing ${body.listingId}`);
+    assertUnit(facts, body.unitKey);
 
     const deal = await recordSale(
       db,
@@ -1783,6 +1873,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     if (deps.closeListing) {
       await deps.closeListing(db, {
         listingId: body.listingId,
+        unitKey: deal.unitKey,
         dealId: deal.id,
         actorId: user.id,
         actorName: user.displayName,
@@ -1820,13 +1911,23 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         detail: "Approve the deal first. A listing comes off the market once its sale is on the record.",
       });
     }
-    if (deal.unitKey !== "") {
-      throw new PreconditionFailedError("estate_unit", {
-        detail: "This sale is one unit of an estate, so the estate stays on the market for the rest.",
-      });
-    }
     const facts = deps.listingFacts ? await deps.listingFacts(db, deal.listingId) : null;
     if (!facts) throw new NotFoundError(`listing ${deal.listingId}`);
+    // A unit: only that unit comes off, and the rest stay on the market.
+    if (deal.unitKey !== "") {
+      if (!deps.closeListing) throw new Error("closeListing port is not wired");
+      const unit = facts.units.find((u) => u.key === deal.unitKey);
+      if (unit && !unit.available) return c.json({ closed: true, already: true });
+      await deps.closeListing(db, {
+        listingId: deal.listingId,
+        unitKey: deal.unitKey,
+        dealId: deal.id,
+        actorId: user.id,
+        actorName: user.displayName,
+      });
+      auditEntityId(c, deal.id);
+      return c.json({ closed: true, already: false });
+    }
     // Already down is the answer the caller wanted, so it is not an error.
     if (facts.status === "closed") return c.json({ closed: true, already: true });
     if (facts.status !== "live" && facts.status !== "under-offer") {
@@ -1837,6 +1938,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     if (!deps.closeListing) throw new Error("closeListing port is not wired");
     await deps.closeListing(db, {
       listingId: deal.listingId,
+      unitKey: "",
       dealId: deal.id,
       actorId: user.id,
       actorName: user.displayName,
@@ -1858,6 +1960,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       settings,
       accrue,
     );
+    await settleDeal(deps, db, deal, { id: user.id, name: user.displayName });
     await tellMarketers(deps, db, decisionNotes(deal));
     return c.json({ deal });
   });
@@ -1867,6 +1970,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const user = currentUser(c);
     const id = pathParam(c, "id");
     const body = await readJson(c, z.object({ reason: str().max(400).default("") }).strict());
+    const before = await getDeal(db, id);
     const deal = await cancelDeal(
       db,
       id,
@@ -1874,6 +1978,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       { id: user.id, name: user.displayName },
       reverseFunds,
     );
+    if (before?.status === "approved") await unsettleDeal(deps, db, deal);
     return c.json({ deal });
   });
 
@@ -1913,6 +2018,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     auditBefore(c, before as unknown as Record<string, unknown>);
 
     const body = await readJson(c, MoveBody);
+    const wonDeal = before.state === "won" && before.dealId ? await getDeal(db, before.dealId) : null;
     const lead = await moveLead(
       db,
       id,
@@ -1921,6 +2027,8 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       { id: user.id, name: user.displayName, side: "admin" },
       reverseFunds,
     );
+    // Leaving won cancels its deal, so its unit or listing goes back on the market.
+    if (wonDeal?.status === "approved" && lead.state !== "won") await unsettleDeal(deps, db, wonDeal);
     auditEntityId(c, lead.id);
     return c.json(lead);
   });
@@ -1956,6 +2064,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     /* Whose property it is comes from the listing, not the body, for the same
        reason a reported deal's does: it decides the commission. */
     const facts = deps.listingFacts ? await deps.listingFacts(db, body.listingId) : null;
+    if (facts) assertUnit(facts, body.unitKey);
     const { lead, dealId } = await winLead(
       db,
       id,
@@ -1969,6 +2078,8 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       settings,
       accrue,
     );
+    const won = dealId ? await getDeal(db, dealId) : null;
+    if (won) await settleDeal(deps, db, won, { id: user.id, name: user.displayName });
     auditEntityId(c, lead.id);
     return c.json({ lead, dealId });
   });

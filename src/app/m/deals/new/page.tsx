@@ -6,6 +6,9 @@ import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } fr
 import { Check, ChevronRight, Search } from "lucide-react";
 import {
   formatMoney,
+  hasOptions,
+  optionNoun,
+  prototypeLabel,
   readRentPeriod,
   type DealKind,
   type Page,
@@ -595,6 +598,7 @@ export default function NewDealPage() {
   const [showErrors, setShowErrors] = useState(false);
 
   const [picked, setPicked] = useState<Property | null>(null);
+  const [unitKey, setUnitKey] = useState("");
   const [kind, setKind] = useState<DealKind>("sale");
   const [amountMinor, setAmountMinor] = useState(0);
   const [buyerName, setBuyerName] = useState("");
@@ -608,6 +612,7 @@ export default function NewDealPage() {
 
   function pick(property: Property) {
     setPicked(property);
+    setUnitKey("");
     setKind(property.listingType);
     // The asking price is a starting point, never the answer.
     setAmountMinor(listingPrice(property).minor);
@@ -640,12 +645,15 @@ export default function NewDealPage() {
   const notFound = listingId !== null && presetFor === listingId && picked === null;
 
   const currency = picked?.currency ?? "NGN";
+  // An estate, building or plaza sells unit by unit, so the deal names which one.
+  const units = picked && hasOptions(picked.type) ? picked.prototypes : [];
+  const unitOk = units.length === 0 || unitKey !== "";
 
   const stepOk =
     step === 1
       ? picked !== null
       : step === 2
-        ? amountMinor > 0 && buyerName.trim().length >= 2 && closedOn !== ""
+        ? unitOk && amountMinor > 0 && buyerName.trim().length >= 2 && closedOn !== ""
         : uploads.items.length > 0;
 
   async function submit() {
@@ -662,7 +670,7 @@ export default function NewDealPage() {
         listingLocation: [picked.location, picked.city].filter(Boolean).join(", ").slice(0, 200),
         listingEstate: "",
         listingType: kind,
-        unitKey: "",
+        unitKey,
         amountMinor,
         buyerName: buyerName.trim(),
         buyerPhone: buyerPhone.trim(),
@@ -752,6 +760,31 @@ export default function NewDealPage() {
                 )}
                 <PickHome onPick={pick} />
               </>
+            )}
+
+            {step === 2 && picked && units.length > 0 && (
+              <Field
+                label={`Which ${optionNoun(picked.type)}?`}
+                error={showErrors && !unitOk ? `Pick the ${optionNoun(picked.type)} that sold or was let.` : undefined}
+              >
+                <select
+                  className={inputCls}
+                  value={unitKey}
+                  onChange={(e) => {
+                    setUnitKey(e.target.value);
+                    const unit = units.find((u) => u.id === e.target.value);
+                    if (unit && unit.priceMinor > 0) setAmountMinor(unit.priceMinor);
+                  }}
+                >
+                  <option value="">Choose one</option>
+                  {units.map((unit) => (
+                    <option key={unit.id} value={unit.id} disabled={!unit.available}>
+                      {prototypeLabel(unit, picked.type)}
+                      {unit.available ? "" : " (taken)"}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             )}
 
             {step === 2 && (

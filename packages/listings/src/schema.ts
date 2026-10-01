@@ -7,6 +7,7 @@ import {
   type Furnishing,
   type ListingFee,
   type ListingType,
+  type OffMarket,
   type PaymentPlan,
   type PriceChange,
   type Ownership,
@@ -85,6 +86,7 @@ export interface PropertyDoc {
   seoTitle?: string;
   seoDescription?: string;
   previousSlugs?: string[];
+  offMarket?: OffMarket | null;
   agent: Agent;
   agentUserId: string | null;
   /** The partner company. Absent on rows written before companies existed. */
@@ -163,6 +165,7 @@ export function toProperty(doc: PropertyDoc): Property {
     seoTitle: doc.seoTitle ?? "",
     seoDescription: doc.seoDescription ?? "",
     previousSlugs: doc.previousSlugs ?? [],
+    offMarket: doc.offMarket ?? null,
     featured: doc.featured,
     amenities: doc.amenities,
     images: doc.images,

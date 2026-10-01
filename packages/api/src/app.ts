@@ -36,7 +36,8 @@ import {
 import { auditRoutes, auditTrail } from "@avhomes/audit";
 import {
   authorize,
-  closeWithSale,
+  settleListing,
+  unsettleListing,
   getPropertyById,
   listProperties,
   listingFacts,
@@ -77,7 +78,12 @@ import {
 } from "@avhomes/settings";
 import { feedbackRoutes } from "@avhomes/feedback";
 import { analyticsPublicRoutes } from "@avhomes/analytics";
-import { audienceAdminRoutes, audiencePublicRoutes, unsubscribePublicRoutes } from "@avhomes/audience";
+import {
+  audienceAdminRoutes,
+  audiencePublicRoutes,
+  subscribeAddress,
+  unsubscribePublicRoutes,
+} from "@avhomes/audience";
 import {
   marketingAdminRoutes,
   marketingAppRoutes,
@@ -300,11 +306,11 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     accrue: accrueForDeal,
     reverseFunds: reverseForDeal,
     listingFacts,
-    closeListing: async (
-      db: Db,
-      input: { listingId: string; dealId: string; actorId: string; actorName: string },
-    ) => {
-      await closeWithSale(db, { listingId: input.listingId, dealId: input.dealId });
+    closeListing: async (db: Db, input: { listingId: string; unitKey: string; dealId: string }) => {
+      await settleListing(db, input);
+    },
+    reopenListing: async (db: Db, input: { listingId: string; unitKey: string; dealId: string }) => {
+      await unsettleListing(db, input);
     },
   } satisfies Partial<MarketingDeps>;
 
@@ -492,7 +498,14 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * reason as the subscribe intake: nothing here reads a cookie. Signing up
    * WRITES one, which is a different thing and is safe above the gate.
    */
-  app.route(API_PREFIX, marketingPublicRoutes({ tell }));
+  app.route(
+    API_PREFIX,
+    marketingPublicRoutes({
+      tell,
+      subscribe: (db, email, ctx) =>
+        subscribeAddress(db, mailer, { email, source: "marketer-signup", origin: ctx.origin, resubscribe: false }, ctx),
+    }),
+  );
   /* Applying to list property. A public MUTATION, so it sits here rather than in
      the cacheable /public/* router, the same placement the enquiry intake has. */
   app.route(

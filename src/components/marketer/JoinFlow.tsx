@@ -422,6 +422,10 @@ export function JoinFlow({ code }: { code: string }) {
               <PrimaryButton busy={busy} onClick={() => void create()}>
                 Create my account
               </PrimaryButton>
+              <p className="mt-3 text-center text-[12px] leading-relaxed text-m-muted">
+                You will also get the AV Homes newsletter with new listings. Unsubscribe from any
+                email.
+              </p>
             </div>
           </Card>
         )}

@@ -22,10 +22,14 @@ import {
   PROPERTY_STATUSES,
   PUBLIC_PROPERTY_STATUSES,
   REVIEW_LIMIT_STATUSES,
+  canFeature,
+  derivedEstateColumns,
   hasOptions,
   isEstate,
+  prototypeLabel,
   type Agent,
   type ListingType,
+  type OffMarket,
   type Ownership,
   type Page,
   type PriceChange,
@@ -355,6 +359,7 @@ export async function createProperty(db: Db, args: CreatePropertyArgs): Promise<
     seoTitle: "",
     seoDescription: "",
     previousSlugs: [],
+    offMarket: null,
     agent: args.agent,
     agentUserId: args.agentUserId,
     partnerId: args.partnerId ?? null,
@@ -578,6 +583,7 @@ export async function transitionProperty(
   db: Db,
   current: Property,
   op: LifecycleOp,
+  offMarket?: Omit<OffMarket, "at">,
 ): Promise<Property> {
   assertTransition(current, op);
   const now = Date.now();
@@ -585,6 +591,9 @@ export async function transitionProperty(
   const status = TRANSITIONS[op].to;
 
   const set: Partial<PropertyDoc> = { status, updatedAt: now };
+  // Why it came off is kept while it is off, and dropped when it goes back on.
+  if (op === "archive") set.offMarket = offMarket ? { ...offMarket, at: now } : null;
+  if (op === "publish" || op === "relist" || op === "unarchive") set.offMarket = null;
   // A sold or unpublished listing on the home page advertises something nobody
   // can act on, so leaving the featurable statuses takes the flag with it.
   if (!FEATURABLE_STATUSES.includes(status)) set.featured = false;
@@ -647,15 +656,69 @@ export async function closeWithSale(
   return after ? toProperty(after) : null;
 }
 
-/** The reverse, for a deal that fell through. Back to live, and the link cleared. */
-export async function reopenFromSale(db: Db, listingId: string): Promise<Property | null> {
+/**
+ * The reverse, for a deal that fell through. Back to live, and the link cleared.
+ * Only when THIS deal closed it: a listing closed by a later sale stays closed.
+ */
+export async function reopenFromSale(db: Db, listingId: string, dealId?: string): Promise<Property | null> {
   const now = Date.now();
   const after = await properties(db).findOneAndUpdate(
-    { _id: listingId, status: "closed" },
+    { _id: listingId, status: "closed", ...(dealId ? { closedDealId: dealId } : {}) },
     { $set: { status: "live", closedDealId: null, updatedAt: now }, $inc: { revision: 1 } },
     { returnDocument: "after" },
   );
   return after ? toProperty(after) : null;
+}
+
+/**
+ * One unit of an estate, building or plaza taken or freed by a sale.
+ *
+ * Re-derives the from-price and room columns in the same write, as a save does,
+ * so the list and the site stop offering a unit the moment it sells. Retried on
+ * a revision race rather than skipped: a recorded sale must always reach the
+ * listing, or the unit is sold twice.
+ */
+export async function setUnitAvailable(
+  db: Db,
+  input: { listingId: string; unitKey: string; available: boolean },
+): Promise<Property | null> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const doc = await properties(db).findOne({ _id: input.listingId });
+    if (!doc) return null;
+    const current = toProperty(doc);
+    if (!current.prototypes.some((p) => p.id === input.unitKey)) return current;
+    const prototypes = current.prototypes.map((p) =>
+      p.id === input.unitKey ? { ...p, available: input.available } : p,
+    );
+    const set: Partial<PropertyDoc> = { prototypes, ...derivedEstateColumns(prototypes), updatedAt: Date.now() };
+    // The last unit gone takes the listing off the home page with it.
+    if (!canFeature({ ...current, prototypes })) set.featured = false;
+    const after = await properties(db).findOneAndUpdate(
+      { _id: input.listingId, revision: current.revision },
+      { $set: set, $inc: { revision: 1 } },
+      { returnDocument: "after" },
+    );
+    if (after) return toProperty(after);
+  }
+  throw new Error(`listing ${input.listingId} kept changing while marking unit ${input.unitKey}`);
+}
+
+/** A recorded sale reaching its listing: the unit is taken, or the whole listing closes. */
+export async function settleListing(
+  db: Db,
+  input: { listingId: string; unitKey: string; dealId: string },
+): Promise<Property | null> {
+  if (input.unitKey !== "") return setUnitAvailable(db, { ...input, available: false });
+  return closeWithSale(db, input);
+}
+
+/** A cancelled sale leaving its listing: the unit is offered again, or the listing reopens. */
+export async function unsettleListing(
+  db: Db,
+  input: { listingId: string; unitKey: string; dealId: string },
+): Promise<Property | null> {
+  if (input.unitKey !== "") return setUnitAvailable(db, { ...input, available: true });
+  return reopenFromSale(db, input.listingId, input.dealId);
 }
 
 /**
@@ -678,6 +741,8 @@ export async function listingFacts(
   priceMinor: number;
   currency: string;
   status: PropertyStatus;
+  /** The units a sale can name. Empty on a listing that is one thing. */
+  units: { key: string; name: string; available: boolean }[];
 } | null> {
   const doc = await properties(db).findOne(
     { _id: listingId },
@@ -693,10 +758,14 @@ export async function listingFacts(
         currency: 1,
         status: 1,
         type: 1,
+        prototypes: 1,
       },
     },
   );
   if (!doc) return null;
+  const units = hasOptions(doc.type)
+    ? (doc.prototypes ?? []).map((p) => ({ key: p.id, name: prototypeLabel(p, doc.type), available: p.available }))
+    : [];
   return {
     id: doc._id,
     ownership: doc.ownership ?? "av",
@@ -709,6 +778,7 @@ export async function listingFacts(
     priceMinor: doc.priceMinor ?? 0,
     currency: doc.currency ?? DEFAULT_CURRENCY,
     status: doc.status,
+    units,
   };
 }
 

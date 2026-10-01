@@ -77,6 +77,7 @@ type PropertySeed = Omit<
   | "seoTitle"
   | "seoDescription"
   | "previousSlugs"
+  | "offMarket"
   | "mapUrl"
   /* The fixtures are AV Homes' own stock and none of them has sold through the
      recorded-sale flow, so all three are supplied by the mapper below rather than
@@ -992,6 +993,7 @@ function toProperty(seed: PropertySeed): Property {
     seoTitle: "",
     seoDescription: "",
     previousSlugs: [],
+    offMarket: null,
     // No fixture carries a pin, so the map falls back to the address, which is
     // exactly what a real listing with no link does.
     mapUrl: "",

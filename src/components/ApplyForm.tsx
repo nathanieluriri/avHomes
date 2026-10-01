@@ -81,7 +81,7 @@ export function ApplyForm() {
     <form onSubmit={submit} className="space-y-5">
       <div>
         <label className={labelClass} htmlFor="apply-name">
-          Your name
+          Full name
         </label>
         <input id="apply-name" name="name" required minLength={2} className={fieldClass} />
       </div>
@@ -121,7 +121,7 @@ export function ApplyForm() {
 
       <div>
         <label className={labelClass} htmlFor="apply-portfolio">
-          How much property
+          How many properties?
         </label>
         <select id="apply-portfolio" name="portfolio" className={fieldClass} defaultValue="Just one">
           {PORTFOLIO.map((option) => (
