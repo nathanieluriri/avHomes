@@ -14,8 +14,8 @@ import {
 } from "@avhomes/core";
 import {
   DEFAULT_CURRENCY,
-  BUILDING_TYPE,
   ESTATE_TYPE,
+  OPTION_TYPES,
   FEATURABLE_STATUSES,
   LIVE_LIMIT_STATUSES,
   PRICE_HISTORY_MAX,
@@ -133,7 +133,7 @@ function buildFilter(query: ListQuery): Filter<PropertyDoc> {
     and.push({ status: { $in: [...FEATURABLE_STATUSES] }, deletedAt: null });
     // A sold-out estate advertises something nobody can buy.
     and.push({
-      $or: [{ type: { $nin: [ESTATE_TYPE, BUILDING_TYPE] } }, { prototypes: { $elemMatch: { available: true } } }],
+      $or: [{ type: { $nin: [...OPTION_TYPES] } }, { prototypes: { $elemMatch: { available: true } } }],
     } as Filter<PropertyDoc>);
   }
   if (query.agentUserId) and.push({ agentUserId: query.agentUserId });

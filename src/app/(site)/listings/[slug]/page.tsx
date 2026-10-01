@@ -7,6 +7,7 @@ import {
   estateSummary,
   formatPrice,
   hasOptions,
+  isCommercial,
   listingSeoDescription,
   listingSeoTitle,
 } from "@/lib/data";
@@ -199,11 +200,13 @@ export default async function PropertyPage({
     },
     ...(estate
       ? {}
-      : {
-          numberOfBedrooms: property.bedrooms,
-          numberOfBathroomsTotal: property.bathrooms,
-          floorSize: { "@type": "QuantitativeValue", value: property.areaSqft, unitCode: "FTK" },
-        }),
+      : isCommercial(property.type)
+        ? { floorSize: { "@type": "QuantitativeValue", value: property.areaSqft, unitCode: "FTK" } }
+        : {
+            numberOfBedrooms: property.bedrooms,
+            numberOfBathroomsTotal: property.bathrooms,
+            floorSize: { "@type": "QuantitativeValue", value: property.areaSqft, unitCode: "FTK" },
+          }),
     offers,
   };
 

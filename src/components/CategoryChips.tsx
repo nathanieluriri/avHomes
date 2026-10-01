@@ -1,13 +1,15 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { BUILDING_TYPE, ESTATE_TYPE, PropertyType } from "@/lib/types";
+import { BUILDING_TYPE, ESTATE_TYPE, PLAZA_TYPE, PropertyType, SHOP_TYPE } from "@/lib/types";
 
 // Estates sit right after All: they are the other group the listings page shows.
 const TYPES: (PropertyType | "All")[] = [
   "All",
   ESTATE_TYPE,
   BUILDING_TYPE,
+  PLAZA_TYPE,
+  SHOP_TYPE,
   "Villa",
   "Apartment",
   "Duplex",

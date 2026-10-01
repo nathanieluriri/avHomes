@@ -6,6 +6,7 @@ import { Building2 } from "lucide-react";
 import {
   BUILD_STAGES,
   BUILD_STAGE_LABELS,
+  COMMERCIAL_AMENITY_SUGGESTIONS,
   ESTATE_AMENITY_SUGGESTIONS,
   FEE_KINDS_FOR,
   HOME_AMENITY_SUGGESTIONS,
@@ -27,7 +28,9 @@ import {
   hasDomain,
   hasOptions,
   isBuilding,
+  isCommercial,
   isEstate,
+  isPlaza,
   optionNoun,
   isScopedRole,
   isShortMapLink,
@@ -1285,14 +1288,14 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
 
           {fields.prototypes && (
             <Card>
-              <CardHead title={isBuilding(draft.type) ? "Units" : "Options"} />
+              <CardHead title={isBuilding(draft.type) ? "Units" : isPlaza(draft.type) ? "Shops" : "Options"} />
               <div data-spotlight="listing-options">
                 <PrototypeTable
                   rows={draft.prototypes}
                   onChange={(rows) => set("prototypes", rows)}
                   currency={draft.currency}
                   readOnly={trashed}
-                  variant={isBuilding(draft.type) ? "building" : "estate"}
+                  variant={isBuilding(draft.type) ? "building" : isPlaza(draft.type) ? "plaza" : "estate"}
                   rent={dealType === "rent"}
                 />
               </div>
@@ -1408,7 +1411,13 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
             <AmenityPicker
               value={draft.amenities}
               onChange={(amenities) => set("amenities", amenities)}
-              suggestions={isEstate(draft.type) ? ESTATE_AMENITY_SUGGESTIONS : HOME_AMENITY_SUGGESTIONS}
+              suggestions={
+                isEstate(draft.type)
+                  ? ESTATE_AMENITY_SUGGESTIONS
+                  : isCommercial(draft.type)
+                    ? COMMERCIAL_AMENITY_SUGGESTIONS
+                    : HOME_AMENITY_SUGGESTIONS
+              }
             />
             {/* `as="group"`, not a label. ImagePicker owns a hidden file input,
                 and a bare label forwards a tap on any of its own whitespace to

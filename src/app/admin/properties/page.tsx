@@ -8,6 +8,8 @@ import { Building2, LandPlot, Plus, Star, Trash2 } from "lucide-react";
 import {
   BUILDING_TYPE,
   ESTATE_TYPE,
+  PLAZA_TYPE,
+  SHOP_TYPE,
   LISTING_TYPES,
   PROPERTY_STATUSES,
   canFeature,
@@ -16,10 +18,12 @@ import {
   formatSqm,
   hasOptions,
   isAdminRole,
+  isCommercial,
   isEstate,
   optionNoun,
   partnerScopeOf,
   prototypeLabel,
+  sqftToSqm,
   statusLabel,
   type AuthUser,
   type EstatePrototype,
@@ -70,7 +74,7 @@ const SORTS = [
 ] as const;
 
 type Kind = "home" | "estate";
-type NewKind = Kind | "building";
+type NewKind = Kind | "building" | "plaza" | "shop";
 
 const KINDS = [
   { value: "", label: "All" },
@@ -82,6 +86,8 @@ const NEW_KINDS = [
   { value: "home", label: "Home" },
   { value: "estate", label: "Estate" },
   { value: "building", label: "Building" },
+  { value: "plaza", label: "Plaza" },
+  { value: "shop", label: "Shop" },
 ] as const;
 
 const STATUS_TONE: Record<PropertyStatus, Tone> = {
@@ -288,7 +294,11 @@ function PropertiesScreen() {
           ? { title, type: ESTATE_TYPE }
           : kindOfNew === "building"
             ? { title, type: BUILDING_TYPE }
-            : { title },
+            : kindOfNew === "plaza"
+              ? { title, type: PLAZA_TYPE }
+              : kindOfNew === "shop"
+                ? { title, type: SHOP_TYPE }
+                : { title },
       );
       router.push(`/admin/properties/${res.property.id}`);
     } catch (err) {
@@ -475,7 +485,13 @@ function PropertiesScreen() {
         }
         return (
           <span className="text-slate-600">
-            {p.bedrooms || p.bathrooms ? `${p.bedrooms} bed · ${p.bathrooms} bath` : "Not set"}
+            {isCommercial(p.type)
+              ? p.areaSqft > 0
+                ? formatSqm(sqftToSqm(p.areaSqft))
+                : "Not set"
+              : p.bedrooms || p.bathrooms
+                ? `${p.bedrooms} bed · ${p.bathrooms} bath`
+                : "Not set"}
           </span>
         );
       },
@@ -569,14 +585,22 @@ function PropertiesScreen() {
                       ? "Estate name, like Kuje Estate"
                       : newKind === "building"
                         ? "Building name, like Wuse Court"
-                        : "What is it called?"
+                        : newKind === "plaza"
+                          ? "Plaza name, like Banex Plaza"
+                          : newKind === "shop"
+                            ? "Shop name, like Shop 4, Area 11"
+                            : "What is it called?"
                   }
                   aria-label={
                     newKind === "estate"
                       ? "New estate name"
                       : newKind === "building"
                         ? "New building name"
-                        : "New listing title"
+                        : newKind === "plaza"
+                          ? "New plaza name"
+                          : newKind === "shop"
+                            ? "New shop name"
+                            : "New listing title"
                   }
                   onChange={(event) => setNewTitle(event.target.value)}
                 />
