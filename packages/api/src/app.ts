@@ -595,6 +595,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     API_PREFIX,
     audienceAdminRoutes({
       mailer,
+      partners: activeMarketerContacts,
       announce: async (db, letter) => {
         const people = await activeMarketerContacts(db);
         const left = await unsubscribedAmong(db, people.map((person) => person.email));
