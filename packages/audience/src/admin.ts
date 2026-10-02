@@ -223,6 +223,28 @@ export async function recentNewsFor(db: Db, email: string, sinceMs: number, limi
   return docs.map(toNewsItem);
 }
 
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+
+/**
+ * Puts addresses on the list that are not on it, and touches nothing else:
+ * never re-subscribes a leaver, because an import is not their consent. The
+ * count is how many were new.
+ */
+export async function ensureOnList(db: Db, emails: readonly string[], source: string): Promise<number> {
+  const now = Date.now();
+  const clean = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => EMAIL_SHAPE.test(e)))];
+  let added = 0;
+  for (const address of clean) {
+    const res = await subscribers(db).updateOne(
+      { email: address },
+      { $setOnInsert: { _id: newId("sub", now), email: address, source, createdAt: now, updatedAt: now, confirmedAt: null } },
+      { upsert: true },
+    );
+    if (res.upsertedCount > 0) added += 1;
+  }
+  return added;
+}
+
 /** Which of these addresses said no. The partner app's own notice of a send skips them. */
 export async function unsubscribedAmong(db: Db, emails: readonly string[]): Promise<Set<string>> {
   if (emails.length === 0) return new Set();
@@ -296,13 +318,14 @@ function csvCell(value: string): string {
   return `"${guarded.replace(/"/gu, '""')}"`;
 }
 
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const BATCH = 100;
 
 export function audienceAdminRoutes(deps: {
   mailer: Mailer;
   /** Tells the partner app's phones a newsletter went out. Never throws. */
   announce?: (db: Db, letter: NewsItem) => Promise<void>;
+  /** The partners' addresses, put on the list before every send so none is left out. */
+  partners?: (db: Db) => Promise<{ email: string }[]>;
 }): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
@@ -328,18 +351,7 @@ export function audienceAdminRoutes(deps: {
   routes.post("/admin/subscribers", requireAuth(), async (c) => {
     const { emails } = await readJson(c, AddSubscribersBody);
     const db = await currentDb(c);
-    const now = Date.now();
-    const clean = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => EMAIL_SHAPE.test(e)))];
-    let added = 0;
-    for (const address of clean) {
-      // Never re-subscribes a leaver: an import is not their consent.
-      const res = await subscribers(db).updateOne(
-        { email: address },
-        { $setOnInsert: { _id: newId("sub", now), email: address, source: "console", createdAt: now, updatedAt: now, confirmedAt: null } },
-        { upsert: true },
-      );
-      if (res.upsertedCount > 0) added += 1;
-    }
+    const added = await ensureOnList(db, emails, "console");
     return c.json({ added, skipped: emails.length - added });
   });
 
@@ -500,6 +512,12 @@ export function audienceAdminRoutes(deps: {
       });
     }
 
+    // A partner who signed up before the list did, or whose sign-up failed to
+    // reach it, is added now rather than missed. A leaver stays a leaver.
+    if (deps.partners) {
+      const people = await deps.partners(db);
+      await ensureOnList(db, people.map((person) => person.email), "partner");
+    }
     const audience = await subscribers(db)
       .find({ unsubscribedAt: null }, { projection: { _id: 1, email: 1 } })
       .toArray();

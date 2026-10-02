@@ -18,6 +18,7 @@ import { welcomeEmail } from "./admin";
 
 export {
   audienceAdminRoutes,
+  ensureOnList,
   newsletterArticle,
   recentNewsFor,
   unsubscribe,
