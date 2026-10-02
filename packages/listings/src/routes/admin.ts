@@ -73,7 +73,7 @@ import {
   type Testimonial,
 } from "@avhomes/contracts";
 import { type Db } from "@avhomes/db";
-import { findUserById, limitsForPartner, requireAdmin, requireAuth } from "@avhomes/identity";
+import { agentCardOf, findUserById, limitsForPartner, requireAdmin, requireAuth } from "@avhomes/identity";
 import { assertAuthorized, isScopedCaller } from "../authorize";
 import { expandMapLink } from "../maps";
 import {
@@ -860,16 +860,10 @@ export function listingsAdminRoutes(): Hono<AppEnv> {
       ownership: scope !== null ? "partner" : "av",
       partnerId: scope,
       agentUserId: user.id,
-      // Seeded from the creating account so a new listing is never agent-less on
-      // screen. Every field stays editable afterwards.
-      agent: {
-        id: user.id,
-        name: user.displayName,
-        role: "Sales agent",
-        phone: "",
-        email: user.email,
-        avatarUrl: "",
-      },
+      // Seeded from the creating account's whole card, photo and title included,
+      // so a new listing is never agent-less on screen. Every field stays
+      // editable afterwards.
+      agent: agentCardOf(user),
     });
     auditEntityId(c, property.id);
     return c.json({ property }, 201);

@@ -20,6 +20,7 @@ import {
   listTestimonials,
 } from "../repo";
 import { PROPERTY_SORT_NAMES } from "../schema";
+import { agentCardOf, findUserById } from "@avhomes/identity";
 
 /**
  * The public listing reads.
@@ -127,8 +128,14 @@ export function listingsPublicRoutes(): Hono<AppEnv> {
   routes.get("/public/properties/:slug", async (c) => {
     const db = await currentDb(c);
     const slug = pathParam(c, "slug");
-    const property = await getPropertyBySlug(db, slug);
-    if (!property) throw new NotFoundError(`property ${slug}`);
+    const stored = await getPropertyBySlug(db, slug);
+    if (!stored) throw new NotFoundError(`property ${slug}`);
+    /* The card on a listing is a copy taken when it was made, and the person
+       changes their photo and title afterwards. While the card still names the
+       account that owns the listing, the account's own card is what the page
+       shows, so every listing of one agent shows the same person. */
+    const owner = stored.agentUserId && stored.agent.id === stored.agentUserId ? await findUserById(db, stored.agentUserId) : null;
+    const property = owner ? { ...stored, agent: agentCardOf(owner.user) } : stored;
     const similar = await getSimilarProperties(db, property);
     c.header("cache-control", DETAIL_CACHE);
     return c.json({ property, similar });
