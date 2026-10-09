@@ -72,6 +72,12 @@ export function optionNoun(type: PropertyType, count = 1): string {
   return count === 1 ? noun : `${noun}s`;
 }
 
+/** What a single available item is called: a shop in a plaza, a unit everywhere else. */
+export function unitsAvailableLine(units: number, type?: PropertyType): string {
+  const noun = type && isPlaza(type) ? "shop" : "unit";
+  return `${units} ${noun}${units === 1 ? "" : "s"} available`;
+}
+
 export function fieldsFor(shape: { type: PropertyType; listingType: ListingType }): ListingFields {
   const estate = isEstate(shape.type);
   const options = hasOptions(shape.type);

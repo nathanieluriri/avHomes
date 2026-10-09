@@ -65,14 +65,15 @@ export const NEWSLETTER_TEMPLATES: NewsletterTemplate[] = [
     build: ({ listings, origin, payCutoffDay, now }) => {
       const cards = listings.slice(0, 3).map((listing) => card(cardFromProperty(listing, origin)));
       const count = homesWord(cards.length);
+      const homes = cards.length === 1 ? "home" : "homes";
       return {
-        subject: `${count} new homes to share this month`,
+        subject: `${count} new ${homes} to share this month`,
         preheader: "Every one pays the full partner rate.",
         content: {
           type: "doc",
           content: [
             small(`${monthName(now)} ${now.getFullYear()}`),
-            h2(`${count} new homes to share`),
+            h2(`${count} new ${homes} to share`),
             p("Hello partners. We opened new listings this month, and every one of them pays the full partner rate. Share them with the buyers you know, and report the deal in the app the moment it closes."),
             ...cards,
             callout({

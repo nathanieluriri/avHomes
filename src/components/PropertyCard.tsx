@@ -11,7 +11,6 @@ import {
   isBuilding,
   isCommercial,
   isPlaza,
-  optionNoun,
   isPriceReduced,
   listingLabel,
   sqftToSqm,
@@ -29,7 +28,7 @@ export default function PropertyCard({
   // A from-price moves when options sell or change, which is not a price cut.
   const reduced = !multi && isPriceReduced(property.priceHistory);
   const summary = multi ? estateSummary(property.prototypes) : null;
-  const facts = summary ? estateFacts(summary, optionNoun(property.type)) : null;
+  const facts = summary ? estateFacts(summary, property.type) : null;
   const soldOut = summary?.soldOut ?? false;
   // An estate's own price column is its "from" price; the summary is the same number, read live.
   const priceMinor = summary ? summary.fromMinor : property.priceMinor;

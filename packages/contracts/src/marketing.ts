@@ -857,6 +857,8 @@ export interface WhatsappPartnerRow {
   marketerId: string;
   name: string;
   code: string;
+  /** When they were first sent the invite (email or push), else null. */
+  invitedAt: number | null;
   /** When they first opened the group link themselves, else null. */
   joinedAt: number | null;
   selfClicks: number;
@@ -886,10 +888,13 @@ export interface WhatsappReport {
     /** Distinct browsers that opened any link. */
     people: number;
     partners: number;
+    partnersInvited: number;
     partnersJoined: number;
   };
   partners: WhatsappPartnerRow[];
   recent: WhatsappClickRow[];
+  /** Set on a save of the link: how many partners were sent the invite just now. */
+  justInvited?: number;
 }
 
 /** The referral link a marketer shares. One place, so every surface agrees. */

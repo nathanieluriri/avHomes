@@ -335,7 +335,7 @@ export function PrototypeTable({
         <span>{plaza ? "" : "Baths"}</span>
         <span>Sqm</span>
         <span>{rent ? "Rent" : "Price"}</span>
-        <span>How many</span>
+        <span>{plaza ? "Shops" : "Units"}</span>
         <span>Available</span>
         <span />
       </div>

@@ -113,7 +113,7 @@ import {
   writePaystackKey,
 } from "./settings";
 import { toMarketingUpdate } from "./schema";
-import { remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
+import { inviteUninvited, remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
 import {
   alertsFor,
   balanceFor,
@@ -2277,7 +2277,11 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       ]);
     }
     await writeMarketingSettings(db, { whatsappGroupUrl: body.url });
-    return c.json(await whatsappReport(db));
+    const { invited } = await inviteUninvited(deps, db, requestOrigin(c.req), {
+      requestId: c.get("requestId"),
+      route: "PUT /admin/marketing/whatsapp",
+    });
+    return c.json({ ...(await whatsappReport(db)), justInvited: invited });
   });
 
   routes.post("/admin/marketing/whatsapp/remind", requireAuth(), async (c) => {

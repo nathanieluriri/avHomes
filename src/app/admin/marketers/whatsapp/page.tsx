@@ -39,9 +39,17 @@ export default function WhatsappGroupPage() {
     setActionError(null);
     setNotice("");
     try {
-      setReport(await api.put<WhatsappReport>("/admin/marketing/whatsapp", { url: url.trim() }));
+      const next = await api.put<WhatsappReport>("/admin/marketing/whatsapp", { url: url.trim() });
+      setReport(next);
       setDraft(null);
-      setNotice(url.trim() ? "Saved. Partners' links now open this group." : "Removed. Partner links now go to the Partner With Us page.");
+      const sent = next.justInvited ?? 0;
+      setNotice(
+        !url.trim()
+          ? "Removed. Partner links now go to the Partner With Us page."
+          : sent > 0
+            ? `Saved. Sent the invite to ${sent} partner${sent === 1 ? "" : "s"} who had not had it yet.`
+            : "Saved. Every partner has already been sent the invite, so nobody was sent it again.",
+      );
     } catch (err) {
       setActionError(toApiError(err));
     } finally {
@@ -76,6 +84,12 @@ export default function WhatsappGroupPage() {
       header: "Partner",
       primary: true,
       render: (row) => <IdCell title={row.name} meta={row.code} />,
+    },
+    {
+      key: "invited",
+      header: "Invited",
+      mobile: "tablet",
+      render: (row) => <span className="text-slate-600">{row.invitedAt ? shortDate(row.invitedAt) : "Not yet"}</span>,
     },
     {
       key: "joined",
@@ -187,8 +201,9 @@ export default function WhatsappGroupPage() {
               )}
             </div>
             <p className="text-[12px] leading-relaxed text-slate-600">
-              New partners get an email and a push with their link the moment they sign up, and a pinned card on their app
-              home screen until they open it. Each partner&apos;s link looks like{" "}
+              Saving the link sends the invite, by email and push, to every partner who has not had it yet. Partners who join
+              later get it with their welcome. Nobody is sent it twice, and changing the link later sends nothing new: their
+              short links simply open the new group. Until they open it, partners also see a pinned card on their app home screen. Each partner&apos;s link looks like{" "}
               <button
                 type="button"
                 className="inline-flex items-center gap-1 font-semibold text-wine-700"
@@ -201,7 +216,8 @@ export default function WhatsappGroupPage() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <StatTile label="Partners invited" value={t ? `${t.partnersInvited} of ${t.partners}` : "…"} scope="Sent the invite by email or push" />
           <StatTile label="Partners joined" value={t ? `${t.partnersJoined} of ${t.partners}` : "…"} scope="Opened their own link" />
           <StatTile label="Total opens" value={t ? String(t.clicks) : "…"} scope="Every partner link, all time" />
           <StatTile label="Forwarded opens" value={t ? String(t.forwardClicks) : "…"} scope="Opened by someone other than the link's partner" />
