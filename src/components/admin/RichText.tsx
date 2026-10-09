@@ -10,9 +10,13 @@ import { TableKit } from "@tiptap/extension-table";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import { Placeholder } from "@tiptap/extensions";
+import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import {
   Bold,
+  Building2,
   Code,
+  GripVertical,
+  Megaphone,
   Heading2,
   Heading3,
   ImagePlus,
@@ -36,6 +40,10 @@ import { useIsPhone } from "@/lib/admin/hooks";
 import { BottomSheet } from "./BottomSheet";
 import { Button, inputClass } from "./ui";
 import { PasteRepair } from "./editor/paste";
+import { Callout, ListingCard, ListingPicker } from "./newsletter/blocks";
+
+/* Hoisted: DragHandle re-registers its plugin whenever this object's identity changes. */
+const DRAG_HANDLE_POSITION = { placement: "left-start" } as const;
 
 /**
  * The post body editor.
@@ -57,8 +65,9 @@ import { PasteRepair } from "./editor/paste";
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-function buildExtensions(placeholder: string) {
+function buildExtensions(placeholder: string, blocks: boolean) {
   return [
+    ...(blocks ? [ListingCard, Callout] : []),
     StarterKit.configure({
       // The reader renders h2 and h3. Offering h1 would produce a heading the
       // page cannot draw and a second document title on every post.
@@ -116,6 +125,8 @@ const CAPTIONS: Record<string, string> = {
   "Bulleted list": "List",
   Link: "Link",
   "Insert image": "Image",
+  "Listing card": "Listing",
+  Callout: "Callout",
 };
 
 export default function RichText({
@@ -124,6 +135,7 @@ export default function RichText({
   onLockedChange,
   placeholder = "Write the post...",
   ariaLabel = "Post body",
+  blocks = false,
 }: {
   /** The stored document. Hydrated ONCE; remount via `key` to reset. */
   value: unknown;
@@ -138,6 +150,8 @@ export default function RichText({
   onLockedChange?: (locked: boolean) => void;
   placeholder?: string;
   ariaLabel?: string;
+  /** Newsletter blocks: listing cards, callouts and a drag handle to reorder any block. */
+  blocks?: boolean;
 }) {
   const imageInputId = useId();
   const isPhone = useIsPhone();
@@ -149,9 +163,10 @@ export default function RichText({
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkDraft, setLinkDraft] = useState("");
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [pickingListing, setPickingListing] = useState(false);
 
   const editor = useEditor({
-    extensions: buildExtensions(placeholder),
+    extensions: buildExtensions(placeholder, blocks),
     content: undefined,
     autofocus: false,
     // Next renders this component on the server first, and TipTap warns that
@@ -415,6 +430,20 @@ export default function RichText({
           }}
         />
 
+        {blocks && (
+          <>
+            <span className="rte__sep" aria-hidden="true" />
+            {tool("Listing card", <Building2 aria-hidden="true" />, false, () => setPickingListing(true))}
+            {tool("Callout", <Megaphone aria-hidden="true" />, false, () =>
+              editor
+                ?.chain()
+                .focus()
+                .insertContent({ type: "callout", attrs: { eyebrow: "", title: "", text: "" } })
+                .run(),
+            )}
+          </>
+        )}
+
         <span className="rte__spacer" />
 
         {tool(
@@ -539,6 +568,14 @@ export default function RichText({
 
       {uploadError && <p className="rte__error rte__error--row">{uploadError}</p>}
 
+      {blocks && (
+        <ListingPicker
+          open={pickingListing}
+          onClose={() => setPickingListing(false)}
+          onPick={(attrs) => editor?.chain().focus().insertContent({ type: "listingCard", attrs }).run()}
+        />
+      )}
+
       <div className="rte__body">
         {/*
           A READ-ONLY RENDER, not an empty editor.
@@ -550,6 +587,13 @@ export default function RichText({
           most useful thing available.
         */}
         {locked ? <DocRenderer doc={value as DocNode} /> : <EditorContent editor={editor} />}
+        {blocks && editor && !locked && (
+          <DragHandle editor={editor} computePositionConfig={DRAG_HANDLE_POSITION}>
+            <div className="draghandle" aria-hidden="true">
+              <GripVertical />
+            </div>
+          </DragHandle>
+        )}
       </div>
 
       {locked && (

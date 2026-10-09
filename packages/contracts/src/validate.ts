@@ -40,6 +40,8 @@ const ALLOWED_NODES = new Set([
   "tableRow",
   "tableCell",
   "tableHeader",
+  "listingCard",
+  "callout",
 ]);
 
 const ALLOWED_MARKS = new Set([
@@ -117,12 +119,32 @@ function visit(node: DocNode, path: string, depth: number, counter: { nodes: num
   }
 
   if (node.type === "image") assertSafeSrc(path, node.attrs);
+  if (node.type === "listingCard") assertListingCard(path, node.attrs);
+  if (node.type === "callout") assertStrings(path, node.attrs, { eyebrow: 60, title: 160, text: 600 });
 
   if (node.content !== undefined) {
     if (!Array.isArray(node.content)) {
       throw new InvalidDocumentError(`${path}.content`, "content is not an array");
     }
     node.content.forEach((child, i) => visit(child, `${path}.content[${i}]`, depth + 1, counter));
+  }
+}
+
+function assertStrings(path: string, attrs: unknown, caps: Record<string, number>): void {
+  if (!isRecord(attrs)) throw new InvalidDocumentError(path, "block has no attrs");
+  for (const [key, max] of Object.entries(caps)) {
+    const value = attrs[key] ?? "";
+    if (typeof value !== "string") throw new InvalidDocumentError(`${path}.attrs.${key}`, "not a string");
+    if (value.length > max) throw new InvalidDocumentError(`${path}.attrs.${key}`, `longer than ${max}`);
+  }
+}
+
+function assertListingCard(path: string, attrs: unknown): void {
+  assertStrings(path, attrs, { propertyId: 64, title: 160, blurb: 400, price: 60, href: 2000, imageUrl: 2000 });
+  const { href, imageUrl } = attrs as { href?: string; imageUrl?: string };
+  if (href) assertProtocol(path, href, "href");
+  if (imageUrl && !/^https:\/\//iu.test(imageUrl)) {
+    throw new InvalidDocumentError(`${path}.attrs.imageUrl`, "picture must be an https address");
   }
 }
 

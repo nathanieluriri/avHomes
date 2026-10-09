@@ -508,3 +508,51 @@ label.rte__btn[data-disabled="true"] {
   cursor: not-allowed;
   pointer-events: none;
 }
+
+/* ───────────────────── newsletter blocks and the drag handle ─────────────── */
+
+.rte__body {
+  position: relative;
+}
+
+.rte__body .tiptap {
+  padding-left: 1.25rem;
+}
+
+.rte .draghandle {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  color: var(--mist-300);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.rte__body:hover .draghandle,
+.rte .draghandle:hover {
+  opacity: 1;
+}
+
+.rte .draghandle:hover {
+  background: var(--mist-100);
+  color: var(--slate-500);
+}
+
+.rte .draghandle svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+@media (pointer: coarse) {
+  .rte .draghandle {
+    opacity: 1;
+  }
+}
+
+.rte__body .nl-block.ProseMirror-selectednode > div {
+  outline: 2px solid var(--wine-500);
+  outline-offset: 2px;
+}

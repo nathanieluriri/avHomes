@@ -12,6 +12,7 @@ import {
   newId,
   pathParam,
   readJson,
+  readJsonOrEmpty,
   readQuery,
   requestOrigin,
   str,
@@ -390,12 +391,23 @@ export function audienceAdminRoutes(deps: {
   routes.post("/admin/newsletters", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const user = currentUser(c);
+    // A starter template arrives here; an empty body is a blank newsletter.
+    const start = await readJsonOrEmpty(
+      c,
+      z
+        .object({
+          subject: str().max(200).default(""),
+          preheader: str().max(200).default(""),
+          content: z.unknown().optional(),
+        })
+        .strict(),
+    );
     const now = Date.now();
     const doc: NewsletterDoc = {
       _id: newId("nwsl", now),
-      subject: "",
-      preheader: "",
-      content: emptyDoc(),
+      subject: start.subject.trim(),
+      preheader: start.preheader.trim(),
+      content: start.content === undefined ? emptyDoc() : validateDoc(start.content),
       format: "doc",
       html: "",
       status: "draft",

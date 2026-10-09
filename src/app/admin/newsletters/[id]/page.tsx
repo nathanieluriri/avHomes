@@ -320,8 +320,9 @@ function Editor({ initial }: { initial: Newsletter }) {
                   <RichText
                     value={content}
                     onChange={change(setContent)}
-                    placeholder="Write the newsletter. Type / for headings, images and lists."
+                    placeholder="Write the newsletter. Add listing cards and callouts from the toolbar, and drag the handle to reorder."
                     ariaLabel="Newsletter body"
+                    blocks
                   />
                 </div>
               </div>

@@ -40,6 +40,11 @@ export function docToText(node: DocNode): string {
 
 function walk(node: DocNode, out: string[]): void {
   if (typeof node.text === "string") out.push(node.text);
+  if (node.type === "listingCard" || node.type === "callout") {
+    const a = node.attrs ?? {};
+    const parts = node.type === "listingCard" ? [a.title, a.blurb, a.price, a.href] : [a.eyebrow, a.title, a.text];
+    out.push(...parts.filter((part): part is string => typeof part === "string" && part !== ""), "\n");
+  }
   if (Array.isArray(node.content)) {
     for (const child of node.content) walk(child, out);
     // Separated so two paragraphs do not run their last and first words together.
