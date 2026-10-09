@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpRight, Trash2, X } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Trash2, X } from "lucide-react";
 import { NOTE_STATUSES, type DesignNote, type NoteStatus } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { dateTime } from "@/lib/admin/format";
@@ -9,6 +9,7 @@ import { Badge, Button, ConfirmButton, ErrorNote, type Tone } from "@/components
 import { StatusSelect } from "@/components/admin/StatusSelect";
 import { BottomSheet } from "@/components/admin/BottomSheet";
 import { MarkLayer } from "./marks";
+import { useMarkedShot } from "./marked-shot";
 
 /**
  * One note, its picture, and everything that has happened to it.
@@ -74,6 +75,32 @@ export function NoteReview({
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const marked = useMarkedShot(note);
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+
+  async function copyPicture() {
+    if (!marked) return;
+    try {
+      const html = `<img src="${marked.dataUrl}" alt=""><p>${escapeHtml(note.comment)}</p><p>${escapeHtml(note.path)}</p>`;
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": marked.blob,
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([`${note.comment}\n${note.path}`], { type: "text/plain" }),
+        }),
+      ]);
+      setCopied("done");
+    } catch {
+      // Some browsers take an image only on its own.
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": marked.blob })]);
+        setCopied("done");
+      } catch {
+        setCopied("failed");
+      }
+    }
+    window.setTimeout(() => setCopied("idle"), 2000);
+  }
 
   async function patch(body: { status?: NoteStatus; reply?: string }) {
     setBusy(true);
@@ -111,18 +138,39 @@ export function NoteReview({
 
   const body = (
     <>
-      <a
-        href={note.shotUrl}
-        target="_blank"
-        rel="noreferrer"
-        title="Open the full picture"
-        className="relative block overflow-hidden rounded-xl border border-mist-200"
-        style={{ aspectRatio: `${note.shotWidth} / ${note.shotHeight}` }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={note.shotUrl} alt={`The page at ${note.path}`} className="block h-full w-full object-contain" />
-        <MarkLayer marks={note.marks} width={note.shotWidth} height={note.shotHeight} />
-      </a>
+      <div>
+        <a
+          href={marked?.objectUrl ?? note.shotUrl}
+          target="_blank"
+          rel="noreferrer"
+          title="Open the full picture"
+          className="relative block overflow-hidden rounded-xl border border-mist-200"
+          style={{ aspectRatio: `${note.shotWidth} / ${note.shotHeight}` }}
+        >
+          {/* Once flattened, the marks are part of the picture, so the browser's own copy and save keep them. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={marked?.dataUrl ?? note.shotUrl}
+            alt={`The page at ${note.path}`}
+            className="block h-full w-full object-contain"
+          />
+          {!marked && <MarkLayer marks={note.marks} width={note.shotWidth} height={note.shotHeight} />}
+        </a>
+        {marked && (
+          <button
+            type="button"
+            onClick={() => void copyPicture()}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-semibold text-wine-700 hover:bg-wine-50"
+          >
+            {copied === "done" ? (
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {copied === "done" ? "Copied" : copied === "failed" ? "Could not copy" : "Copy picture with markup"}
+          </button>
+        )}
+      </div>
 
       <div>
         <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-plum-950">
@@ -314,4 +362,8 @@ function asApiError(err: unknown): ApiError {
   return err instanceof ApiError
     ? err
     : new ApiError(0, { error: "upstream_failed", detail: String(err) });
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"]/gu, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c);
 }
