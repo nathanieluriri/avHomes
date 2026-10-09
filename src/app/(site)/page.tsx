@@ -5,7 +5,7 @@ import FeaturedListings from "@/components/FeaturedListings";
 import WhyChooseUs from "@/components/WhyChooseUs";
 import LogoMarquee from "@/components/LogoMarquee";
 import Testimonials from "@/components/Testimonials";
-import WorkWithUs from "@/components/WorkWithUs";
+import PartnerCta from "@/components/PartnerCta";
 import CTABanner from "@/components/CTABanner";
 import JsonLd from "@/components/JsonLd";
 import { SITE_DOMAIN, SITE_NAME } from "@/lib/api-config";
@@ -69,9 +69,9 @@ export default async function Home() {
       <LogoMarquee clients={site.clientLogos.map((c) => ({ name: c.name, logo: c.imageUrl }))} />
       <WhyChooseUs stats={stats} />
       <Testimonials testimonials={testimonials} />
-      {/* After the proof, before the closing ask: the two doors that are not
-          buying. CTABanner keeps the last word, and its id="contact" anchor. */}
-      <WorkWithUs joinOpen={joinOpen} />
+      {/* After the proof, before the closing ask. The two ways in live on
+          /partner-with-us; CTABanner keeps the last word and its id="contact". */}
+      <PartnerCta joinOpen={joinOpen} />
       <CTABanner />
     </>
   );

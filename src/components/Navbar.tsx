@@ -22,7 +22,7 @@ const links = [
   { href: "/listings?status=For+Sale", label: "Buy" },
   { href: "/listings?status=For+Rent", label: "Rent" },
   { href: "/buying-from-abroad", label: "Buying From Abroad" },
-  { href: "/list-with-us", label: "List With Us" },
+  { href: "/partner-with-us", label: "Partner With Us" },
   { href: "/posts", label: "Insights" },
   { href: "/#about", label: "About Us" },
   { href: "/contact", label: "Contact" },
@@ -39,7 +39,7 @@ function activeLink(pathname: string, status: string | null): NavLabel | null {
     return null;
   }
   if (pathname.startsWith("/buying-from-abroad")) return "Buying From Abroad";
-  if (pathname.startsWith("/list-with-us")) return "List With Us";
+  if (pathname.startsWith("/partner-with-us") || pathname.startsWith("/list-with-us")) return "Partner With Us";
   if (pathname.startsWith("/posts") || pathname.startsWith("/blog")) return "Insights";
   if (pathname.startsWith("/contact")) return "Contact";
   return null;
@@ -110,7 +110,7 @@ function DeskLinks({
         href={l.href}
         onClick={() => onPick?.(l)}
         aria-current={current ? "page" : undefined}
-        className={`relative whitespace-nowrap py-1 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-wine-600 after:transition-transform after:duration-300 ${
+        className={`relative whitespace-nowrap py-1 text-sm ${l.label === "Home" ? "hidden xl:inline" : ""} font-medium transition-colors after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-wine-600 after:transition-transform after:duration-300 ${
           current
             ? "text-plum-950 after:scale-x-100"
             : "text-slate-500 after:scale-x-0 hover:text-plum-950"
@@ -231,7 +231,7 @@ export default function Navbar({
           <div className="flex items-center gap-3">
             <Link
               href="/listings"
-              className="hidden rounded-full bg-wine-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 lg:inline-flex"
+              className="hidden whitespace-nowrap rounded-full bg-wine-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-wine-700 lg:inline-flex"
             >
               Find Property
             </Link>
