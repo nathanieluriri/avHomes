@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Mail, Plus } from "lucide-react";
+import { FileText, Handshake, Home, Mail, Megaphone, Plus, type LucideIcon } from "lucide-react";
 import type { MarketingSettings, Newsletter, NewsletterStatus, Page, Property } from "@avhomes/contracts";
 import { NEWSLETTER_TEMPLATES, type NewsletterTemplate } from "@/lib/admin/newsletter-templates";
 import { BottomSheet } from "@/components/admin/BottomSheet";
@@ -12,6 +12,12 @@ import { useAsync } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
 import { MailNotConfiguredAlert } from "@/components/admin/MailStatus";
 import { Badge, Button, EmptyState, ErrorNote, PageHeader, Skeleton, type Tone } from "@/components/admin/ui";
+
+const TEMPLATE_ICON: Record<string, LucideIcon> = {
+  "partners-update": Handshake,
+  "new-listings": Home,
+  announcement: Megaphone,
+};
 
 const TONE: Record<NewsletterStatus, Tone> = { draft: "amber", sending: "wine", sent: "green" };
 const LABEL: Record<NewsletterStatus, string> = { draft: "Draft", sending: "Sending", sent: "Sent" };
@@ -81,13 +87,21 @@ export default function NewslettersPage() {
                 onClick={() => void create(template)}
                 className="flex w-full items-start gap-3 rounded-xl border border-mist-200 bg-white p-3 text-left transition-colors hover:border-wine-500 disabled:opacity-60"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-wine-50 text-wine-700">
-                  <FileText className="h-4 w-4" aria-hidden="true" />
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-wine-50 text-wine-700">
+                  {(() => {
+                    const Icon = (template && TEMPLATE_ICON[template.id]) || FileText;
+                    return <Icon className="h-[18px] w-[18px]" aria-hidden="true" />;
+                  })()}
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-plum-950">{template?.name ?? "Blank"}</span>
                   <span className="block text-xs text-slate-600">{template?.description ?? "An empty page."}</span>
                 </span>
+                {template && template.listings > 0 && (
+                  <span className="shrink-0 self-center rounded-full bg-mist-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                    {template.listings} newest listings
+                  </span>
+                )}
               </button>
             </li>
           ))}

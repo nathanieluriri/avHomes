@@ -21,6 +21,7 @@ import { migration0019 } from "./0019_property_types_follow_contracts";
 import { migration0020 } from "./0020_push_and_unsent_mail";
 import { migration0021 } from "./0021_partners_on_the_list";
 import { migration0022 } from "./0022_whatsapp_clicks";
+import { migration0023 } from "./0023_whatsapp_link_history";
 
 /**
  * The ordered list. Append only, and never renumber a tag that has shipped:
@@ -53,4 +54,5 @@ export const MIGRATIONS: readonly Migration[] = [
   migration0020,
   migration0021,
   migration0022,
+  migration0023,
 ];

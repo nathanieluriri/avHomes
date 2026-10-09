@@ -9,7 +9,15 @@ import assert from "node:assert/strict";
 import { MongoClient, type Db } from "mongodb";
 import type { Marketer, PushMessage } from "@avhomes/contracts";
 import { writeMarketingSettings } from "./settings";
-import { inviteUninvited, remindPartners, welcomePartner, whatsappReport, type InviteDeps } from "./whatsapp";
+import {
+  inviteUninvited,
+  listLinkChanges,
+  recordLinkChange,
+  remindPartners,
+  welcomePartner,
+  whatsappReport,
+  type InviteDeps,
+} from "./whatsapp";
 
 const uri = process.env.MONGODB_URI;
 const GROUP = "https://chat.whatsapp.com/AbCdEfGhIjKlMnOp12";
@@ -200,6 +208,28 @@ describe("WhatsApp group invites", { skip: uri ? false : "set MONGODB_URI to run
     const report = await whatsappReport(db);
     assert.equal(report.totals.partnersInvited, 1);
     assert.notEqual(report.partners[0]!.invitedAt, null);
+    await db.dropDatabase();
+  });
+
+  test("link changes are kept newest first, and the report shows the latest", async () => {
+    assert.equal((await whatsappReport(db)).lastChange, null);
+    await recordLinkChange(db, { url: GROUP, previousUrl: "", reason: "first-link", note: "", byId: "u1", byName: "Tolu", invited: 3 });
+    await new Promise((r) => setTimeout(r, 5));
+    await recordLinkChange(db, {
+      url: "https://chat.whatsapp.com/ZyXwVuTsRqPoNm98",
+      previousUrl: GROUP,
+      reason: "link-leaked",
+      note: "Posted on a public page",
+      byId: "u2",
+      byName: "Ada",
+      invited: 0,
+    });
+    const changes = await listLinkChanges(db);
+    assert.deepEqual(changes.map((c) => c.reason), ["link-leaked", "first-link"]);
+    assert.equal(changes[0]!.previousUrl, GROUP);
+    assert.equal(changes[0]!.note, "Posted on a public page");
+    const report = await whatsappReport(db);
+    assert.equal(report.lastChange?.byName, "Ada");
     await db.dropDatabase();
   });
 });

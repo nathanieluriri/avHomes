@@ -46,6 +46,8 @@ export interface NewsletterTemplate {
   id: string;
   name: string;
   description: string;
+  /** How many live listings it pulls in, for the picker to say so. */
+  listings: number;
   build: (input: TemplateInput) => { subject: string; preheader: string; content: DocNode };
 }
 
@@ -62,6 +64,7 @@ export const NEWSLETTER_TEMPLATES: NewsletterTemplate[] = [
     id: "partners-update",
     name: "Partners update",
     description: "New listings to share as cards, then the pay day notice.",
+    listings: 3,
     build: ({ listings, origin, payCutoffDay, now }) => {
       const cards = listings.slice(0, 3).map((listing) => card(cardFromProperty(listing, origin)));
       const count = homesWord(cards.length);
@@ -91,6 +94,7 @@ export const NEWSLETTER_TEMPLATES: NewsletterTemplate[] = [
     id: "new-listings",
     name: "New listings",
     description: "For subscribers: the latest homes as cards and a line on how to ask.",
+    listings: 4,
     build: ({ listings, origin }) => ({
       subject: "Fresh on AV Homes",
       preheader: "Homes we have checked on the ground, new this week.",
@@ -109,6 +113,7 @@ export const NEWSLETTER_TEMPLATES: NewsletterTemplate[] = [
     id: "announcement",
     name: "Announcement",
     description: "A heading, a few lines and one highlighted notice.",
+    listings: 0,
     build: () => ({
       subject: "",
       preheader: "",
