@@ -173,7 +173,66 @@ export interface InviteDeps {
   mail?: SendTemplate;
 }
 
-/** The welcome a new partner gets: an email, and a push in case a device is already registered. */
+/**
+ * One row per partner who has been sent the WhatsApp invite, so nobody gets it twice.
+ *
+ * The email and the push are tracked apart: with mail not set up the push still
+ * goes, and the email follows on a later run once it is, without a second push.
+ * `claimAt` is a short lease, so two admins saving the link at once cannot both
+ * send to the same partner.
+ */
+interface InviteDoc {
+  _id: string;
+  firstAt: number;
+  emailedAt: number | null;
+  pushedAt: number | null;
+  claimAt: number | null;
+}
+
+function invites(db: Db) {
+  return collection<InviteDoc>(db, COLLECTIONS.whatsappInvites);
+}
+
+const CLAIM_LEASE_MS = 10 * 60_000;
+
+/** True when this caller now owns sending this partner's invite email. */
+async function claimInvite(db: Db, marketerId: string, now: number): Promise<boolean> {
+  try {
+    const res = await invites(db).updateOne(
+      {
+        _id: marketerId,
+        emailedAt: null,
+        $or: [{ claimAt: null }, { claimAt: { $lt: now - CLAIM_LEASE_MS } }],
+      },
+      { $set: { claimAt: now }, $setOnInsert: { firstAt: now, pushedAt: null } },
+      { upsert: true },
+    );
+    return res.modifiedCount + res.upsertedCount > 0;
+  } catch (err) {
+    // The upsert collided with a row that is already emailed or claimed.
+    if ((err as { code?: number }).code === 11000) return false;
+    throw err;
+  }
+}
+
+async function settleInvite(db: Db, marketerId: string, emailed: boolean, pushed: boolean, now: number) {
+  await invites(db).updateOne(
+    { _id: marketerId },
+    {
+      $set: {
+        claimAt: null,
+        ...(emailed ? { emailedAt: now } : {}),
+        ...(pushed ? { pushedAt: now } : {}),
+      },
+    },
+  );
+}
+
+function firstNameOf(name: string): string {
+  return name.trim().split(/\s+/u)[0] || name;
+}
+
+/** The welcome a new partner gets. With a group set, it carries their link and counts as their invite. */
 export async function welcomePartner(
   deps: InviteDeps,
   db: Db,
@@ -183,22 +242,71 @@ export async function welcomePartner(
 ): Promise<void> {
   const settings = await readMarketingSettings(db);
   const hasGroup = isWhatsappGroupUrl(settings.whatsappGroupUrl);
-  const first = marketer.displayName.trim().split(/\s+/u)[0] || marketer.displayName;
-  await deps.mail?.(
-    db,
-    marketer.email,
-    "property-partner-welcome",
-    {
-      name: first,
-      appLink: `${origin}/m`,
-      whatsappLink: hasGroup ? whatsappLink(origin, marketer.code) : "",
-    },
-    ctx,
-  );
-  if (hasGroup) await deps.tell?.(db, [marketer.userId], { ...WHATSAPP_PUSH, tag: "whatsapp-invite" });
+  const now = Date.now();
+  const claimed = hasGroup && (await claimInvite(db, marketer.id, now));
+  const emailed =
+    (await deps.mail?.(
+      db,
+      marketer.email,
+      "property-partner-welcome",
+      {
+        name: firstNameOf(marketer.displayName),
+        appLink: `${origin}/m`,
+        whatsappLink: hasGroup ? whatsappLink(origin, marketer.code) : "",
+      },
+      ctx,
+    )) ?? false;
+  if (!claimed) return;
+  await deps.tell?.(db, [marketer.userId], { ...WHATSAPP_PUSH, tag: "whatsapp-invite" });
+  await settleInvite(db, marketer.id, emailed, true, now);
 }
 
-/** Push and email every active partner who has not opened the group yet. */
+/**
+ * Invite every active partner who has not been sent the group yet.
+ *
+ * Run when an admin saves the link, so partners who joined before there was a
+ * group are caught up. Anyone already invited is skipped, so saving the link
+ * again, or changing it, sends nothing new: their /wa link follows the new group
+ * on its own.
+ */
+export async function inviteUninvited(
+  deps: InviteDeps,
+  db: Db,
+  origin: string,
+  ctx: { requestId: string; route: string },
+): Promise<{ invited: number; emailed: number }> {
+  const settings = await readMarketingSettings(db);
+  if (!isWhatsappGroupUrl(settings.whatsappGroupUrl)) return { invited: 0, emailed: 0 };
+
+  const done = new Set(
+    (await invites(db).find({ emailedAt: { $ne: null } }, { projection: { _id: 1 } }).toArray()).map((row) => row._id),
+  );
+  const pending = (await activePartners(db)).filter((m) => !done.has(m._id));
+  const now = Date.now();
+  let invited = 0;
+  let emailed = 0;
+
+  for (const m of pending) {
+    if (!(await claimInvite(db, m._id, now))) continue;
+    const row = await invites(db).findOne({ _id: m._id }, { projection: { pushedAt: 1 } });
+    const pushNow = !row?.pushedAt;
+    if (pushNow) await deps.tell?.(db, [m.userId], { ...WHATSAPP_PUSH, tag: "whatsapp-invite" });
+    const sent =
+      (await deps.mail?.(
+        db,
+        m.email,
+        "property-partner-whatsapp",
+        { name: firstNameOf(m.displayName), whatsappLink: whatsappLink(origin, m.code) },
+        ctx,
+      )) ?? false;
+    await settleInvite(db, m._id, sent, pushNow, now);
+    if (pushNow || sent) invited += 1;
+    if (sent) emailed += 1;
+  }
+  return { invited, emailed };
+}
+
+/** Push and email every active partner who has not opened the group yet, invited or not. */
 export async function remindPartners(
   deps: InviteDeps,
   db: Db,
@@ -209,6 +317,7 @@ export async function remindPartners(
   if (!isWhatsappGroupUrl(settings.whatsappGroupUrl)) return { partners: 0, emailed: 0 };
   const joined = new Set(await clicks(db).distinct("ownerId", { kind: "self" }));
   const pending = (await activePartners(db)).filter((m) => !joined.has(m._id));
+  const now = Date.now();
 
   await deps.tell?.(
     db,
@@ -217,15 +326,23 @@ export async function remindPartners(
   );
   let emailed = 0;
   for (const m of pending) {
-    const first = m.displayName.trim().split(/\s+/u)[0] || m.displayName;
     const sent = await deps.mail?.(
       db,
       m.email,
       "property-partner-whatsapp",
-      { name: first, whatsappLink: whatsappLink(origin, m.code) },
+      { name: firstNameOf(m.displayName), whatsappLink: whatsappLink(origin, m.code) },
       ctx,
     );
     if (sent) emailed += 1;
+    // A reminder is an invite too, so a later save of the link does not send it again.
+    await invites(db).updateOne(
+      { _id: m._id },
+      {
+        $set: { pushedAt: now, claimAt: null, ...(sent ? { emailedAt: now } : {}) },
+        $setOnInsert: { firstAt: now, ...(sent ? {} : { emailedAt: null }) },
+      },
+      { upsert: true },
+    );
   }
   return { partners: pending.length, emailed };
 }
@@ -247,9 +364,10 @@ function activePartners(db: Db): Promise<PartnerRow[]> {
 }
 
 export async function whatsappReport(db: Db): Promise<WhatsappReport> {
-  const [settings, partners, grouped, totals, recent] = await Promise.all([
+  const [settings, partners, sentInvites, grouped, totals, recent] = await Promise.all([
     readMarketingSettings(db),
     activePartners(db),
+    invites(db).find({}, { projection: { _id: 1, firstAt: 1 } }).toArray(),
     clicks(db)
       .aggregate<{
         _id: string;
@@ -288,12 +406,14 @@ export async function whatsappReport(db: Db): Promise<WhatsappReport> {
   ]);
 
   const byOwner = new Map(grouped.map((row) => [row._id, row]));
+  const invitedAt = new Map(sentInvites.map((row) => [row._id, row.firstAt]));
   const rows: WhatsappPartnerRow[] = partners.map((m) => {
     const g = byOwner.get(m._id);
     return {
       marketerId: m._id,
       name: m.displayName,
       code: m.code,
+      invitedAt: invitedAt.get(m._id) ?? null,
       joinedAt: g?.firstSelfAt ?? null,
       selfClicks: g?.selfClicks ?? 0,
       forwardClicks: g?.forwardClicks ?? 0,
@@ -321,6 +441,7 @@ export async function whatsappReport(db: Db): Promise<WhatsappReport> {
       forwardClicks: t.clicks - t.selfClicks,
       people: t.people,
       partners: rows.length,
+      partnersInvited: rows.filter((row) => row.invitedAt !== null).length,
       partnersJoined: rows.filter((row) => row.joinedAt !== null).length,
     },
     partners: rows,
