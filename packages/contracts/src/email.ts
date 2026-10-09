@@ -18,10 +18,12 @@ export const EMAIL_TEMPLATE_KEYS = [
   "partner-suspended",
   "partner-restored",
   "team-invite",
+  "property-partner-welcome",
+  "property-partner-whatsapp",
 ] as const;
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
 
-export const EMAIL_TEMPLATE_GROUPS = ["Buyers", "Subscribers", "Listing partners", "Your team"] as const;
+export const EMAIL_TEMPLATE_GROUPS = ["Buyers", "Subscribers", "Listing partners", "Property partners", "Your team"] as const;
 export type EmailTemplateGroup = (typeof EMAIL_TEMPLATE_GROUPS)[number];
 
 export interface EmailTemplateInfo {
@@ -249,6 +251,42 @@ export const EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateInfo> = {
       "Sign in here: {{signInLink}}",
       "",
       "Sign in with this same email address and you’ll be sent a 6-digit code to confirm it. The invite expires in seven days.",
+    ].join("\n"),
+  },
+  "property-partner-welcome": {
+    label: "Welcome to a new Property Partner",
+    group: "Property partners",
+    when: "Sent when somebody joins as a Property Partner.",
+    variables: [
+      { name: "name", description: "The partner's first name" },
+      { name: "appLink", description: "The partner app" },
+      { name: "whatsappLink", description: "Their link to the partners' WhatsApp group, or empty when none is set" },
+    ],
+    defaultSubject: "Welcome to AV Homes, {{name}}",
+    defaultBody: [
+      "Welcome, {{name}}.",
+      "",
+      "You are now an AV Homes Property Partner. Share our listings with the people you know, log buyers in the app, and you earn when a deal closes.",
+      "",
+      "Open the app: {{appLink}}",
+      "",
+      "Join the partners' WhatsApp group for new listings, site visits and pay day news: {{whatsappLink}}",
+    ].join("\n"),
+  },
+  "property-partner-whatsapp": {
+    label: "WhatsApp group invite",
+    group: "Property partners",
+    when: "Sent when an admin reminds partners who have not joined the WhatsApp group yet.",
+    variables: [
+      { name: "name", description: "The partner's first name" },
+      { name: "whatsappLink", description: "Their link to the partners' WhatsApp group" },
+    ],
+    defaultSubject: "Join the AV Homes partners on WhatsApp",
+    defaultBody: [
+      "Hello {{name}},",
+      "",
+      "New listings, site visit days and pay day news go to the partners' WhatsApp group first. Tap to join:",
+      "{{whatsappLink}}",
     ].join("\n"),
   },
 };

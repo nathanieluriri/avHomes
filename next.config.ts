@@ -61,6 +61,13 @@ const nextConfig: NextConfig = {
      * phones on Lagos mobile data.
      */
   },
+  // A partner's short link to the WhatsApp group, counted by the API before it redirects.
+  async rewrites() {
+    return [
+      { source: "/wa", destination: "/api/wa" },
+      { source: "/wa/:code", destination: "/api/wa/:code" },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -15,6 +15,8 @@ export {
   type RecentListing,
 } from "./routes";
 
+export { whatsappRedirectRoutes } from "./whatsapp";
+
 export {
   paystackKeySaved,
   readMarketingSettings,

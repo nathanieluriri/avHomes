@@ -30,6 +30,7 @@ import {
   partnerAdminRoutes,
   passwordRoutes,
   rolePermissions,
+  sendTemplate,
   sessionMiddleware,
   teamRoutes,
 } from "@avhomes/identity";
@@ -92,6 +93,7 @@ import {
   marketingAdminRoutes,
   marketingAppRoutes,
   marketingPublicRoutes,
+  whatsappRedirectRoutes,
   readMarketingSettings,
   type MarketingDeps,
   type RecentListing,
@@ -506,6 +508,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     API_PREFIX,
     marketingPublicRoutes({
       tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
       subscribe: (db, email, ctx) =>
         subscribeAddress(db, mailer, { email, source: "marketer-signup", origin: ctx.origin, resubscribe: false }, ctx),
     }),
@@ -625,7 +628,17 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       ...marketingPorts,
     }),
   );
-  app.route(API_PREFIX, marketingAdminRoutes({ notify, tell, ...marketingPorts }));
+  app.route(
+    API_PREFIX,
+    marketingAdminRoutes({
+      notify,
+      tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
+      ...marketingPorts,
+    }),
+  );
+  /* After the session, so a partner opening their own link is told apart from a forward. Requires nothing. */
+  app.route(API_PREFIX, whatsappRedirectRoutes());
   /* The funds sit beside marketing because that is what feeds them, and they take
      their display names from marketing's settings as a port rather than an
      import: a renameable label is not a reason for one feature package to know

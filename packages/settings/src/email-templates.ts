@@ -335,6 +335,8 @@ function sampleVars(origin: string): EmailVars {
       company: "Lekki Homes Ltd",
       signInLink: `${origin}/admin/sign-in`,
       reason: "The note an admin writes appears here.",
+      appLink: `${origin}/m`,
+      whatsappLink: `${origin}/wa/AV-0001`,
     },
     html: {
       conversation: conversationHtml(lines),
