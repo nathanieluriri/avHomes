@@ -291,6 +291,8 @@ export default function TestimonialsPage() {
           <div className="space-y-4">
             {actionError && <ErrorNote error={actionError} />}
 
+            <Preview draft={sheet.draft} />
+
             <Field label="What they said">
               <textarea
                 className={`${inputClass} resize-none`}
@@ -342,12 +344,13 @@ export default function TestimonialsPage() {
                     />
                   </button>
                 ))}
+                <span className="ml-2 self-center text-[13px] text-slate-600">{sheet.draft.rating} of 5</span>
               </div>
             </Field>
 
             <Field
               label="Photo"
-              hint="Optional. A square face shot. Without one the site shows a stock portrait."
+              hint="Optional. A square photo of their face, at least 200 pixels wide."
               as="group"
             >
               <ImagePicker
@@ -361,5 +364,42 @@ export default function TestimonialsPage() {
         )}
       </BottomSheet>
     </>
+  );
+}
+
+/** The card as the homepage draws it, so the quote is judged where it will be read. */
+function Preview({ draft }: { draft: Draft }) {
+  const initials = (draft.initials.trim() || initialsOf(draft.name)) || "?";
+  return (
+    <div className="rounded-2xl bg-mist-50 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">On the homepage</p>
+      <figure className="rounded-2xl border border-mist-200 bg-white p-5">
+        <div className="flex items-center gap-1 text-wine-600">
+          {Array.from({ length: draft.rating }).map((_, i) => (
+            <Star key={i} className="h-3.5 w-3.5 fill-current" strokeWidth={0} aria-hidden="true" />
+          ))}
+          <span className="ml-1.5 text-[12px] font-semibold text-plum-950">{draft.rating.toFixed(1)}</span>
+        </div>
+        <blockquote className="mt-3 line-clamp-4 text-[14px] leading-relaxed text-plum-950/80">
+          {draft.quote.trim() || "What they said appears here."}
+        </blockquote>
+        <figcaption className="mt-4 flex items-center gap-2.5 border-t border-mist-200 pt-3">
+          {draft.photoUrl ? (
+            <img src={draft.photoUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+          ) : (
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-mist-100 text-[11px] font-semibold text-slate-600">
+              {initials}
+            </span>
+          )}
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] font-semibold text-plum-950">{draft.name.trim() || "Their name"}</span>
+            <span className="block truncate text-[11.5px] text-slate-500">{draft.role.trim() || "Who they are"}</span>
+          </span>
+        </figcaption>
+      </figure>
+      {!draft.photoUrl && (
+        <p className="mt-2 text-[11.5px] text-slate-500">Without a photo, the site shows a stock portrait in place of these initials.</p>
+      )}
+    </div>
   );
 }
