@@ -597,6 +597,7 @@ const LeadBody = z
   .object({
     buyerName: str().trim().min(2).max(160),
     buyerPhone: str().trim().min(7).max(40),
+    buyerEmail: z.union([z.literal(""), emailString()]).default(""),
     listingId: str().max(64).nullable().default(null),
     listingTitle: str().max(300).default(""),
     /* Which options inside an estate. Snapshotted by the client from the

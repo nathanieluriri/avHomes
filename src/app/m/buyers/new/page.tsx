@@ -74,6 +74,7 @@ export default function LogBuyerPage() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [listing, setListing] = useState<Picked | null>(null);
   const [units, setUnits] = useState<LeadUnit[]>([]);
   const [kind, setKind] = useState<DealKind>("sale");
@@ -88,6 +89,7 @@ export default function LogBuyerPage() {
   const draft = {
     buyerName: name,
     buyerPhone: phone,
+    buyerEmail: email,
     listingId: listing?.id ?? null,
     wantArea: area,
     wantBudgetMinor: budget,
@@ -103,6 +105,7 @@ export default function LogBuyerPage() {
       const lead = await api.post<LeadRow>("/marketing/leads", {
         buyerName: name.trim(),
         buyerPhone: phone.trim(),
+        buyerEmail: email.trim(),
         listingId: listing?.id ?? null,
         listingTitle: listing?.title ?? "",
         wantUnits: units,
@@ -136,6 +139,8 @@ export default function LogBuyerPage() {
         setName={setName}
         phone={phone}
         setPhone={setPhone}
+        email={email}
+        setEmail={setEmail}
         listing={listing}
         setListing={(next) => {
           setListing(next);
@@ -179,6 +184,8 @@ interface FieldsProps {
   setName: (v: string) => void;
   phone: string;
   setPhone: (v: string) => void;
+  email: string;
+  setEmail: (v: string) => void;
   listing: Picked | null;
   setListing: (v: Picked | null) => void;
   units: LeadUnit[];
@@ -202,6 +209,8 @@ function Fields({
   setName,
   phone,
   setPhone,
+  email,
+  setEmail,
   listing,
   setListing,
   units,
@@ -267,6 +276,25 @@ function Fields({
             aria-invalid={bad("buyerPhone") || undefined}
             aria-label="Their phone number"
             invalid={bad("buyerPhone")}
+          />
+        </Field>
+
+        <Field
+          label="Their email"
+          hint="Optional."
+          error={bad("buyerEmail") ? refusal!.message : ""}
+        >
+          <input
+            type="email"
+            inputMode="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="chidi@example.com"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-invalid={bad("buyerEmail") || undefined}
+            className={`${inputCls} ${bad("buyerEmail") ? "m-bad" : ""}`}
           />
         </Field>
 

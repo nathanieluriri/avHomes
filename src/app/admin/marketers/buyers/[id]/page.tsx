@@ -222,6 +222,13 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
                 {formatPhone(lead.buyerPhone)}
               </a>
             </DRow>
+            {lead.buyerEmail !== "" && (
+              <DRow label="Email">
+                <a href={`mailto:${lead.buyerEmail}`} className="underline">
+                  {lead.buyerEmail}
+                </a>
+              </DRow>
+            )}
             <DRow label="Looking for">{leadWantLine(lead)}</DRow>
             {units.length > 0 && (
               <DRow label="Options">

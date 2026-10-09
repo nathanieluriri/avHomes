@@ -1194,6 +1194,8 @@ export interface Lead {
   id: string;
   buyerName: string;
   buyerPhone: string;
+  /** Optional. Empty when the marketer did not have one. */
+  buyerEmail: string;
   /** Set when the buyer already has a property in mind. */
   listingId: string | null;
   /** Snapshot, so a renamed listing cannot rewrite a settled lead. */
@@ -1260,6 +1262,7 @@ export function leadMoveRefusal(move: {
 export function leadRefusal(lead: {
   buyerName: string;
   buyerPhone: string;
+  buyerEmail?: string;
   listingId: string | null;
   wantArea: string;
   wantBudgetMinor: number;
@@ -1269,6 +1272,10 @@ export function leadRefusal(lead: {
   }
   if (!/^[0-9+\s()-]{7,20}$/u.test(lead.buyerPhone.trim())) {
     return { path: "buyerPhone", message: "Add a phone number we can reach them on." };
+  }
+  const email = (lead.buyerEmail ?? "").trim();
+  if (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)) {
+    return { path: "buyerEmail", message: "That email does not look right. Check it or leave it empty." };
   }
   const hasWant = lead.wantArea.trim() !== "" || lead.wantBudgetMinor > 0;
   if (!lead.listingId && !hasWant) {

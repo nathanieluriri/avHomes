@@ -94,7 +94,7 @@ function figureSize(whole: string): string {
 
 async function shareLink(code: string) {
   const link = joinLink(window.location.origin, code);
-  const text = "Join AV Homes with me and earn money on every home you help sell or rent.";
+  const text = "Partner with me at AV Homes and earn money from successful deals.";
   if (typeof navigator.share === "function") {
     try {
       await navigator.share({ title: "Join AV Homes", text, url: link });

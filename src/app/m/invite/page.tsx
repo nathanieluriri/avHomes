@@ -36,7 +36,7 @@ import type { MeResponse } from "@/lib/marketer/api";
  * the tab and needs no scroll to reach WhatsApp on a 360px phone.
  */
 
-const INVITE_TEXT = "Join AV Homes with me and earn money on every home you help sell or rent.";
+const INVITE_TEXT = "Partner with me at AV Homes and earn money from successful deals.";
 
 export default function InvitePage() {
   return (
