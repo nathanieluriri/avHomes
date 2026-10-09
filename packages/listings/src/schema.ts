@@ -170,7 +170,7 @@ export function toProperty(doc: PropertyDoc): Property {
     featured: doc.featured,
     amenities: doc.amenities,
     images: doc.images,
-    prototypes: doc.prototypes ?? [],
+    prototypes: (doc.prototypes ?? []).map((p) => ({ ...p, units: p.units ?? 1 })),
     paymentPlan: doc.paymentPlan ?? null,
     buildStage: doc.buildStage ?? null,
     titleDocument: doc.titleDocument ?? null,

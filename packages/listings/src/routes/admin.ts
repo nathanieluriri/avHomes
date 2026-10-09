@@ -125,6 +125,7 @@ const PrototypeInput = z
     priceMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
     image: str().max(2000).nullable(),
     available: z.boolean(),
+    units: z.number().int().min(1).max(1_000_000).default(1),
   })
   .strict();
 

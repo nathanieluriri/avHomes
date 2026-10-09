@@ -706,6 +706,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(28_500_000),
         image: null,
         available: true,
+        units: 1,
       },
       {
         id: "pt_kuje3beddetached",
@@ -717,6 +718,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(45_000_000),
         image: `${L}/av-render-01.jpg`,
         available: true,
+        units: 1,
       },
       {
         id: "pt_kuje4bedduplex",
@@ -728,6 +730,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(72_000_000),
         image: `${L}/av-render-02.jpg`,
         available: false,
+        units: 1,
       },
       {
         // Name left blank on purpose: it reads "500 sqm plot" through `prototypeLabel`.
@@ -740,6 +743,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(12_000_000),
         image: null,
         available: true,
+        units: 1,
       },
     ],
     paymentPlan: { depositPercent: 30, months: 12, note: "No interest across the twelve months." },
@@ -788,6 +792,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(4_500_000),
         image: null,
         available: true,
+        units: 1,
       },
       {
         id: "pt_wuse2",
@@ -799,6 +804,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(4_500_000),
         image: null,
         available: false,
+        units: 1,
       },
       {
         id: "pt_wuse3",
@@ -810,6 +816,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(6_000_000),
         image: null,
         available: true,
+        units: 1,
       },
       {
         id: "pt_wuse4",
@@ -821,6 +828,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(6_000_000),
         image: null,
         available: true,
+        units: 1,
       },
       {
         id: "pt_wuse5",
@@ -832,6 +840,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(3_000_000),
         image: null,
         available: true,
+        units: 1,
       },
       {
         id: "pt_wuse6",
@@ -843,6 +852,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(8_500_000),
         image: null,
         available: true,
+        units: 1,
       },
     ],
     furnishing: "unfurnished",
@@ -881,6 +891,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(2_400_000),
         image: null,
         available: true,
+        units: 1,
       },
       {
         id: "pt_banex2",
@@ -892,6 +903,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(2_400_000),
         image: null,
         available: false,
+        units: 1,
       },
       {
         id: "pt_banex3",
@@ -903,6 +915,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(3_200_000),
         image: null,
         available: true,
+        units: 1,
       },
       {
         id: "pt_banex4",
@@ -914,6 +927,7 @@ const propertySeeds: PropertySeed[] = [
         priceMinor: naira(1_500_000),
         image: null,
         available: true,
+        units: 1,
       },
     ],
     amenities: ["Ample Parking", "24/7 Security", "Backup Power", "Road Frontage", "CCTV"],
