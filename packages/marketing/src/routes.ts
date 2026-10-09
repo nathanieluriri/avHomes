@@ -37,6 +37,8 @@ import {
 } from "@avhomes/core";
 import {
   ACCOUNT_PROVIDERS,
+  WHATSAPP_CHANGE_REASONS,
+  WHATSAPP_NOTE_MAX,
   isWhatsappGroupUrl,
   whatsappLink,
   DEAL_KINDS,
@@ -113,7 +115,7 @@ import {
   writePaystackKey,
 } from "./settings";
 import { toMarketingUpdate } from "./schema";
-import { inviteUninvited, remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
+import { inviteUninvited, listLinkChanges, recordLinkChange, remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
 import {
   alertsFor,
   balanceFor,
@@ -2268,18 +2270,54 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     return c.json(await whatsappReport(await currentDb(c)));
   });
 
+  routes.get("/admin/marketing/whatsapp/history", requireAuth(), async (c) => {
+    return c.json({ items: await listLinkChanges(await currentDb(c)) });
+  });
+
+  /*
+   * Changing the link is recorded with who, when and why, because every partner's
+   * short link follows it the moment it is saved, and "why did the group move"
+   * is the first question anybody asks afterwards.
+   */
   routes.put("/admin/marketing/whatsapp", requireAuth(), async (c) => {
     const db = await currentDb(c);
-    const body = await readJson(c, z.object({ url: str().trim().max(300) }).strict());
+    const user = currentUser(c);
+    const body = await readJson(
+      c,
+      z
+        .object({
+          url: str().trim().max(300),
+          reason: z.enum(WHATSAPP_CHANGE_REASONS),
+          note: str().trim().max(WHATSAPP_NOTE_MAX).default(""),
+        })
+        .strict(),
+    );
     if (body.url !== "" && !isWhatsappGroupUrl(body.url)) {
       throw new BadRequestError("url", [
         { path: "url", message: "Paste the group's invite link, which starts https://chat.whatsapp.com/" },
       ]);
     }
+    if (body.reason === "other" && body.note.length < 3) {
+      throw new BadRequestError("note", [{ path: "note", message: "Say in a few words why the link is changing." }]);
+    }
+    const previous = (await readMarketingSettings(db)).whatsappGroupUrl;
+    if (previous === body.url) {
+      throw new BadRequestError("url", [{ path: "url", message: "That is already the group link." }]);
+    }
+
     await writeMarketingSettings(db, { whatsappGroupUrl: body.url });
     const { invited } = await inviteUninvited(deps, db, requestOrigin(c.req), {
       requestId: c.get("requestId"),
       route: "PUT /admin/marketing/whatsapp",
+    });
+    await recordLinkChange(db, {
+      url: body.url,
+      previousUrl: previous,
+      reason: body.url === "" ? "removed" : body.reason,
+      note: body.note,
+      byId: user.id,
+      byName: user.displayName,
+      invited,
     });
     return c.json({ ...(await whatsappReport(db)), justInvited: invited });
   });

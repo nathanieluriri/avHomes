@@ -1,255 +1,228 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { Copy, MessagesSquare, Send } from "lucide-react";
-import { isWhatsappGroupUrl, type WhatsappClickRow, type WhatsappPartnerRow, type WhatsappReport } from "@avhomes/contracts";
+import { ArrowRight, ExternalLink, Link2Off, Send } from "lucide-react";
+import {
+  WHATSAPP_CHANGE_REASON_LABELS,
+  isWhatsappGroupUrl,
+  type WhatsappReport,
+} from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
-import { relative, shortDate } from "@/lib/admin/format";
+import { shortDate } from "@/lib/admin/format";
 import { toApiError } from "@/lib/admin/marketing";
-import { StatTile } from "@/components/admin/StatTile";
-import { Badge, Button, Card, CardHead, ConfirmButton, ErrorNote, Field, PageHeader, inputClass } from "@/components/admin/ui";
-import { DataTable, IdCell, type Column } from "@/components/admin/DataTable";
+import { WhatsappHeader } from "@/components/admin/whatsapp/WhatsappTabs";
+import { Badge, ButtonLink, Card, CardHead, ConfirmButton, ErrorNote, Skeleton } from "@/components/admin/ui";
+import { ActivityLine } from "@/components/admin/whatsapp/ActivityLine";
 
 /**
- * The partners' WhatsApp group.
- *
- * Partners never see the group's invite link. Each gets their own /wa/<code>
- * link, which counts the open and redirects, so this page can say who joined,
- * whose link was forwarded and how far.
+ * The one question this page answers: is the group working, and who still needs a nudge.
+ * Setting the link, the full partner list and the activity log each have their own tab.
  */
-export default function WhatsappGroupPage() {
-  const { data, loading, error, reload } = useAsync(
+export default function WhatsappOverviewPage() {
+  const { data, error, reload } = useAsync(
     (signal) => api.get<WhatsappReport>("/admin/marketing/whatsapp", signal),
     [],
   );
-  const [draft, setDraft] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<ApiError | null>(null);
-  const [notice, setNotice] = useState("");
-  const [report, setReport] = useState<WhatsappReport | null>(null);
-
-  const shown = report ?? data;
-  const url = draft ?? shown?.url ?? "";
-  const valid = url.trim() === "" || isWhatsappGroupUrl(url);
-  const live = shown ? isWhatsappGroupUrl(shown.url) : false;
-
-  async function save() {
-    setBusy(true);
-    setActionError(null);
-    setNotice("");
-    try {
-      const next = await api.put<WhatsappReport>("/admin/marketing/whatsapp", { url: url.trim() });
-      setReport(next);
-      setDraft(null);
-      const sent = next.justInvited ?? 0;
-      setNotice(
-        !url.trim()
-          ? "Removed. Partner links now go to the Partner With Us page."
-          : sent > 0
-            ? `Saved. Sent the invite to ${sent} partner${sent === 1 ? "" : "s"} who had not had it yet.`
-            : "Saved. Every partner has already been sent the invite, so nobody was sent it again.",
-      );
-    } catch (err) {
-      setActionError(toApiError(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remind() {
-    setBusy(true);
-    setActionError(null);
-    setNotice("");
-    try {
-      const res = await api.post<{ partners: number; emailed: number }>("/admin/marketing/whatsapp/remind", {});
-      setNotice(
-        res.partners === 0
-          ? "Every partner has already opened the group."
-          : `Sent a push to ${res.partners} partner${res.partners === 1 ? "" : "s"} who have not joined, and emailed ${res.emailed}.`,
-      );
-    } catch (err) {
-      setActionError(toApiError(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const t = shown?.totals;
-  const sample = typeof window === "undefined" ? "/wa/AV-0001" : `${window.location.origin}/wa/AV-0001`;
-
-  const partnerColumns: Column<WhatsappPartnerRow>[] = [
-    {
-      key: "partner",
-      header: "Partner",
-      primary: true,
-      render: (row) => <IdCell title={row.name} meta={row.code} />,
-    },
-    {
-      key: "invited",
-      header: "Invited",
-      mobile: "tablet",
-      render: (row) => <span className="text-slate-600">{row.invitedAt ? shortDate(row.invitedAt) : "Not yet"}</span>,
-    },
-    {
-      key: "joined",
-      header: "Opened the group",
-      mobile: "keep",
-      badge: true,
-      render: (row) =>
-        row.joinedAt ? <Badge tone="green">{shortDate(row.joinedAt)}</Badge> : <Badge tone="neutral">Not yet</Badge>,
-    },
-    {
-      key: "forwards",
-      header: "Forwarded opens",
-      tight: true,
-      mobile: "keep",
-      render: (row) => <span className="c-num font-semibold text-plum-950">{row.forwardClicks}</span>,
-    },
-    {
-      key: "people",
-      header: "People reached",
-      tight: true,
-      mobile: "tablet",
-      render: (row) => <span className="c-num text-slate-600">{row.forwardPeople}</span>,
-    },
-    {
-      key: "last",
-      header: "Last open",
-      mobile: "tablet",
-      render: (row) => <span className="text-slate-600">{row.lastClickAt ? relative(row.lastClickAt) : "Never"}</span>,
-    },
-  ];
-
-  const recentColumns: Column<WhatsappClickRow>[] = [
-    {
-      key: "who",
-      header: "Link",
-      primary: true,
-      render: (row) => (
-        <IdCell
-          title={`${row.ownerName}'s link`}
-          meta={row.kind === "self" ? "Opened by the partner" : row.openedByName ? `Opened by ${row.openedByName}` : "Forwarded, opened by someone else"}
-        />
-      ),
-    },
-    {
-      key: "kind",
-      header: "Kind",
-      tight: true,
-      mobile: "keep",
-      badge: true,
-      render: (row) => <Badge tone={row.kind === "self" ? "green" : "wine"}>{row.kind === "self" ? "Joined" : "Forward"}</Badge>,
-    },
-    {
-      key: "at",
-      header: "When",
-      mobile: "keep",
-      render: (row) => <span className="text-slate-600">{relative(row.at)}</span>,
-    },
-  ];
 
   return (
     <>
-      <PageHeader
-        icon={MessagesSquare}
-        title="WhatsApp group"
-        subtitle="Partners each get their own short link to the group. Every open is counted, so you can see who joined and whose link travelled."
-      />
+      <WhatsappHeader subtitle="Where partners hear about new listings, site visits and pay day first." />
+      {error && <ErrorNote error={error} onRetry={reload} />}
+      {!data && !error && <Skeleton className="h-64" />}
+      {data && (isWhatsappGroupUrl(data.url) ? <Live report={data} onChanged={reload} /> : <NotSet report={data} />)}
+    </>
+  );
+}
 
-      {error && (
-        <div className="mb-4">
-          <ErrorNote error={error} onRetry={reload} />
-        </div>
-      )}
+function NotSet({ report }: { report: WhatsappReport }) {
+  return (
+    <Card className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-mist-100 text-slate-600">
+        <Link2Off className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-[15px] font-semibold text-plum-950">There is no group yet</h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-slate-600">
+          Add the group&apos;s invite link and all {report.totals.partners} active partner
+          {report.totals.partners === 1 ? "" : "s"} are sent their own link to it straight away. Until then, partner links open
+          the Partner With Us page.
+        </p>
+      </div>
+      <ButtonLink href="/admin/marketers/whatsapp/link">Add the group link</ButtonLink>
+    </Card>
+  );
+}
 
-      <div className="space-y-4">
-        <Card>
-          <CardHead title="The group" />
-          <div className="space-y-3">
-            <Field
-              label="Group invite link"
-              hint="From WhatsApp: Group info, Invite via link, Copy link. Partners never see this, only their own short link."
-            >
-              <input
-                className={inputClass}
-                inputMode="url"
-                placeholder="https://chat.whatsapp.com/..."
-                value={url}
-                onChange={(event) => setDraft(event.target.value)}
-                aria-invalid={!valid || undefined}
-              />
-            </Field>
-            {!valid && (
-              <p className="text-[13px] text-red-700">That is not a group invite link. It starts https://chat.whatsapp.com/</p>
-            )}
-            {actionError && <ErrorNote error={actionError} />}
-            {notice && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-[13px] text-emerald-900">{notice}</p>}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => void save()} disabled={busy || !valid || draft === null}>
-                {busy ? "Saving" : "Save link"}
-              </Button>
-              {live && (
-                <ConfirmButton
-                  confirmLabel="Yes, send it"
-                  onConfirm={() => void remind()}
-                  disabled={busy || (t ? t.partnersJoined >= t.partners : true)}
-                >
-                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
-                  Remind partners who have not joined
-                </ConfirmButton>
-              )}
+function Live({ report, onChanged }: { report: WhatsappReport; onChanged: () => void }) {
+  const t = report.totals;
+  const waiting = t.partnersInvited - t.partnersJoined;
+  const last = report.lastChange;
+  const forwarders = report.partners.filter((p) => p.forwardClicks > 0).slice(0, 3);
+  const reached = report.partners.reduce((sum, p) => sum + p.forwardPeople, 0);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card className="lg:col-span-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <Badge tone="green">Live</Badge>
+              <span className="text-[13px] text-slate-600">Partners&apos; links open this group</span>
             </div>
-            <p className="text-[12px] leading-relaxed text-slate-600">
-              Saving the link sends the invite, by email and push, to every partner who has not had it yet. Partners who join
-              later get it with their welcome. Nobody is sent it twice, and changing the link later sends nothing new: their
-              short links simply open the new group. Until they open it, partners also see a pinned card on their app home screen. Each partner&apos;s link looks like{" "}
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 font-semibold text-wine-700"
-                onClick={() => void navigator.clipboard?.writeText(sample)}
-              >
-                {sample}
-                <Copy className="h-3 w-3" aria-hidden="true" />
-              </button>
+            <p className="mt-2 truncate font-mono text-[13px] text-plum-950">{report.url}</p>
+            <p className="mt-1 text-[12px] text-slate-600">
+              {last
+                ? `Changed ${shortDate(last.at)} by ${last.byName}. ${WHATSAPP_CHANGE_REASON_LABELS[last.reason]}.`
+                : "Set before changes were recorded."}
             </p>
           </div>
-        </Card>
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <StatTile label="Partners invited" value={t ? `${t.partnersInvited} of ${t.partners}` : "…"} scope="Sent the invite by email or push" />
-          <StatTile label="Partners joined" value={t ? `${t.partnersJoined} of ${t.partners}` : "…"} scope="Opened their own link" />
-          <StatTile label="Total opens" value={t ? String(t.clicks) : "…"} scope="Every partner link, all time" />
-          <StatTile label="Forwarded opens" value={t ? String(t.forwardClicks) : "…"} scope="Opened by someone other than the link's partner" />
-          <StatTile label="People reached" value={t ? String(t.people) : "…"} scope="Distinct browsers that opened a link" />
+          <div className="flex shrink-0 gap-2">
+            <a
+              href={report.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold text-wine-700 hover:bg-wine-50"
+            >
+              Open group <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            </a>
+            <ButtonLink href="/admin/marketers/whatsapp/link" variant="ghost">
+              Change link
+            </ButtonLink>
+          </div>
         </div>
+      </Card>
 
-        <Card padded={false}>
-          <div className="px-4 pt-4 sm:px-5">
-            <CardHead title="By partner" />
-          </div>
-          <DataTable
-            caption="WhatsApp group by partner"
-            columns={partnerColumns}
-            rows={shown?.partners ?? []}
-            rowKey={(row) => row.marketerId}
-            loading={loading}
-          />
-        </Card>
+      <Card className="lg:col-span-2">
+        <CardHead title="How far the invite has got" />
+        <Funnel partners={t.partners} invited={t.partnersInvited} joined={t.partnersJoined} />
+        {waiting > 0 ? (
+          <Nudge waiting={waiting} onDone={onChanged} />
+        ) : t.partners > 0 && t.partnersJoined === t.partners ? (
+          <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2.5 text-[13px] text-emerald-900">
+            Every partner has opened the group.
+          </p>
+        ) : null}
+      </Card>
 
-        <Card padded={false}>
-          <div className="px-4 pt-4 sm:px-5">
-            <CardHead title="Recent opens" />
-          </div>
-          <DataTable
-            caption="Recent opens"
-            columns={recentColumns}
-            rows={shown?.recent ?? []}
-            rowKey={(row) => row.id}
-            loading={loading}
-          />
-        </Card>
-      </div>
-    </>
+      <Card>
+        <CardHead title="How far it has travelled" />
+        <p className="text-[13px] leading-relaxed text-slate-600">
+          Partners&apos; links were forwarded and opened{" "}
+          <span className="font-semibold text-plum-950">{t.forwardClicks}</span> time{t.forwardClicks === 1 ? "" : "s"}, by{" "}
+          <span className="font-semibold text-plum-950">{reached}</span> {reached === 1 ? "person" : "other people"}.
+        </p>
+        {forwarders.length > 0 ? (
+          <ol className="mt-3 divide-y divide-mist-100">
+            {forwarders.map((p, i) => (
+              <li key={p.marketerId} className="flex items-center gap-3 py-2">
+                <span className="w-4 text-[12px] font-semibold text-slate-500">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-plum-950">{p.name}</span>
+                <span className="text-[12px] text-slate-600">
+                  {p.forwardClicks} open{p.forwardClicks === 1 ? "" : "s"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-3 text-[13px] text-slate-500">Nobody has forwarded their link yet.</p>
+        )}
+        <Link href="/admin/marketers/whatsapp/partners" className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-wine-700">
+          Every partner <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      </Card>
+
+      <Card className="lg:col-span-3">
+        <CardHead
+          title="Latest activity"
+          action={
+            <Link href="/admin/marketers/whatsapp/activity" className="inline-flex items-center gap-1 text-[13px] font-semibold text-wine-700">
+              All activity <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          }
+        />
+        {report.recent.length === 0 ? (
+          <p className="text-[13px] text-slate-500">Nobody has opened a partner link yet.</p>
+        ) : (
+          <ul className="divide-y divide-mist-100">
+            {report.recent.slice(0, 5).map((row) => (
+              <ActivityLine key={row.id} row={row} />
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function Funnel({ partners, invited, joined }: { partners: number; invited: number; joined: number }) {
+  const steps = [
+    { label: "Partners", value: partners, hint: "Everyone who can be invited" },
+    { label: "Invited", value: invited, hint: "Sent their link by email or push" },
+    { label: "Joined", value: joined, hint: "Opened the group from their link" },
+  ];
+  return (
+    <ol className="grid grid-cols-3 gap-2 sm:gap-3">
+      {steps.map((step) => {
+        const share = partners > 0 ? Math.round((step.value / partners) * 100) : 0;
+        return (
+          <li key={step.label} className="min-w-0 rounded-xl bg-mist-50 p-2.5 sm:p-3">
+            <p className="truncate text-[12px] font-semibold text-slate-600">{step.label}</p>
+            <p className="c-num mt-1 text-[22px] font-semibold text-plum-950">
+              {step.value}
+              {step.label !== "Partners" && partners > 0 && (
+                <span className="ml-1 block text-[12px] font-medium text-slate-500 sm:ml-1.5 sm:inline sm:text-[13px]">{share}%</span>
+              )}
+            </p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist-200" aria-hidden="true">
+              <div className="h-full rounded-full bg-wine-600" style={{ width: `${partners > 0 ? share : 0}%` }} />
+            </div>
+            <p className="mt-2 hidden text-[11.5px] text-slate-500 sm:block">{step.hint}</p>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function Nudge({ waiting, onDone }: { waiting: number; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState("");
+  const [error, setError] = useState<ApiError | null>(null);
+
+  async function remind() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ partners: number; emailed: number }>("/admin/marketing/whatsapp/remind", {});
+      setDone(`Reminder sent to ${res.partners} partner${res.partners === 1 ? "" : "s"}.`);
+      onDone();
+    } catch (err) {
+      setError(toApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 sm:flex-row sm:items-center">
+      <p className="min-w-0 flex-1 text-[13px] text-amber-900">
+        <span className="font-semibold">{waiting} partner{waiting === 1 ? " has" : "s have"}</span> been invited but not opened the
+        group yet.{" "}
+        <Link href="/admin/marketers/whatsapp/partners?filter=waiting" className="font-semibold underline">
+          See who
+        </Link>
+      </p>
+      {done ? (
+        <span className="text-[13px] font-semibold text-emerald-800">{done}</span>
+      ) : (
+        <ConfirmButton variant="primary" size="sm" confirmLabel={`Send to ${waiting}`} onConfirm={() => void remind()} disabled={busy}>
+          <Send className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+          {busy ? "Sending" : "Send a reminder"}
+        </ConfirmButton>
+      )}
+      {error && <ErrorNote error={error} />}
+    </div>
   );
 }

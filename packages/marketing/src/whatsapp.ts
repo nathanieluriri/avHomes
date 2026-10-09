@@ -11,7 +11,9 @@ import {
   type Marketer,
   type MarketingUpdate,
   type PushMessage,
+  type WhatsappChangeReason,
   type WhatsappClickKind,
+  type WhatsappLinkChange,
   type WhatsappClickRow,
   type WhatsappPartnerRow,
   type WhatsappReport,
@@ -363,8 +365,53 @@ function activePartners(db: Db): Promise<PartnerRow[]> {
     .toArray();
 }
 
+interface LinkChangeDoc {
+  _id: string;
+  url: string;
+  previousUrl: string;
+  reason: WhatsappChangeReason;
+  note: string;
+  byId: string;
+  byName: string;
+  at: number;
+  invited: number;
+}
+
+function linkHistory(db: Db) {
+  return collection<LinkChangeDoc>(db, COLLECTIONS.whatsappLinkHistory);
+}
+
+function toLinkChange(doc: LinkChangeDoc): WhatsappLinkChange {
+  return {
+    id: doc._id,
+    url: doc.url,
+    previousUrl: doc.previousUrl,
+    reason: doc.reason,
+    note: doc.note,
+    byName: doc.byName,
+    at: doc.at,
+    invited: doc.invited,
+  };
+}
+
+export async function recordLinkChange(
+  db: Db,
+  change: Omit<LinkChangeDoc, "_id" | "at">,
+): Promise<WhatsappLinkChange> {
+  const now = Date.now();
+  const doc: LinkChangeDoc = { _id: newId("wal", now), at: now, ...change };
+  await linkHistory(db).insertOne(doc);
+  return toLinkChange(doc);
+}
+
+export async function listLinkChanges(db: Db, limit = 100): Promise<WhatsappLinkChange[]> {
+  const docs = await linkHistory(db).find({}, { sort: { at: -1, _id: -1 }, limit }).toArray();
+  return docs.map(toLinkChange);
+}
+
 export async function whatsappReport(db: Db): Promise<WhatsappReport> {
-  const [settings, partners, sentInvites, grouped, totals, recent] = await Promise.all([
+  const [lastChange, settings, partners, sentInvites, grouped, totals, recent] = await Promise.all([
+    linkHistory(db).findOne({}, { sort: { at: -1, _id: -1 } }),
     readMarketingSettings(db),
     activePartners(db),
     invites(db).find({}, { projection: { _id: 1, firstAt: 1 } }).toArray(),
@@ -402,7 +449,7 @@ export async function whatsappReport(db: Db): Promise<WhatsappReport> {
         { $project: { _id: 0, clicks: 1, selfClicks: 1, people: { $size: "$visitors" } } },
       ])
       .toArray(),
-    clicks(db).find({}, { sort: { at: -1 }, limit: 50 }).toArray(),
+    clicks(db).find({}, { sort: { at: -1 }, limit: 200 }).toArray(),
   ]);
 
   const byOwner = new Map(grouped.map((row) => [row._id, row]));
@@ -446,5 +493,6 @@ export async function whatsappReport(db: Db): Promise<WhatsappReport> {
     },
     partners: rows,
     recent: recentRows,
+    lastChange: lastChange ? toLinkChange(lastChange) : null,
   };
 }

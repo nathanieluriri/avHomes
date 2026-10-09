@@ -60,6 +60,7 @@ export const ID_PREFIXES = {
   pushLog: "push",
   mailFailure: "mlf",
   whatsappClick: "wac",
+  whatsappLinkChange: "wal",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

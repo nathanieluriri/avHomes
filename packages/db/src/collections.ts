@@ -42,6 +42,7 @@ export const COLLECTIONS = {
   marketingLeads: "marketing_leads",
   whatsappClicks: "whatsapp_clicks",
   whatsappInvites: "whatsapp_invites",
+  whatsappLinkHistory: "whatsapp_link_history",
   /* The two pots that belong to nobody. Their own collection rather than rows in
      marketing_ledger, because reconcile() proves that one balances against what
      marketers are owed and a row with no person behind it would break it. */

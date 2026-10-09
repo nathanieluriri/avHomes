@@ -879,6 +879,35 @@ export interface WhatsappClickRow {
   openedByName: string | null;
 }
 
+/** Why an admin changed the group link. `other` takes a written note. */
+export const WHATSAPP_CHANGE_REASONS = ["first-link", "link-reset", "new-group", "group-full", "link-leaked", "removed", "other"] as const;
+export type WhatsappChangeReason = (typeof WHATSAPP_CHANGE_REASONS)[number];
+
+export const WHATSAPP_CHANGE_REASON_LABELS: Record<WhatsappChangeReason, string> = {
+  "first-link": "Setting up the group",
+  "link-reset": "The invite link was reset in WhatsApp",
+  "new-group": "Moving partners to a new group",
+  "group-full": "The group is full",
+  "link-leaked": "The link was shared outside the partners",
+  removed: "Taking the group down",
+  other: "Something else",
+};
+
+export const WHATSAPP_NOTE_MAX = 300;
+
+export interface WhatsappLinkChange {
+  id: string;
+  /** Empty when the group was taken down. */
+  url: string;
+  previousUrl: string;
+  reason: WhatsappChangeReason;
+  note: string;
+  byName: string;
+  at: number;
+  /** Partners who were sent the invite because of this change. */
+  invited: number;
+}
+
 export interface WhatsappReport {
   url: string;
   totals: {
@@ -893,6 +922,8 @@ export interface WhatsappReport {
   };
   partners: WhatsappPartnerRow[];
   recent: WhatsappClickRow[];
+  /** The latest change, so the overview can say when and by whom. Null before the first link. */
+  lastChange: WhatsappLinkChange | null;
   /** Set on a save of the link: how many partners were sent the invite just now. */
   justInvited?: number;
 }
