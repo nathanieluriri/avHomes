@@ -294,9 +294,57 @@ export function docToEmailHtml(node: DocNode): string {
       return `<th style="border:1px solid #e2e8f0;text-align:left;font-size:14px">${kids().replace(/margin:0 0 16px/gu, "margin:0")}</th>`;
     case "tableCell":
       return `<td style="border:1px solid #e2e8f0;font-size:14px">${kids().replace(/margin:0 0 16px/gu, "margin:0")}</td>`;
+    case "listingCard":
+      return listingCardHtml(node.attrs ?? {});
+    case "callout":
+      return calloutHtml(node.attrs ?? {});
     default:
       return kids();
   }
+}
+
+function attr(attrs: Record<string, unknown>, key: string): string {
+  const value = attrs[key];
+  return typeof value === "string" ? value : "";
+}
+
+/** Tables, not divs: Outlook and older Gmail apps ignore most layout CSS. */
+function listingCardHtml(attrs: Record<string, unknown>): string {
+  const title = escapeHtml(attr(attrs, "title"));
+  const blurb = escapeHtml(attr(attrs, "blurb"));
+  const price = escapeHtml(attr(attrs, "price"));
+  const href = attr(attrs, "href");
+  const image = attr(attrs, "imageUrl");
+  const safeHref = /^https?:\/\//iu.test(href) ? escapeHtml(href) : "";
+  const picture = /^https:\/\//iu.test(image)
+    ? `<tr><td style="padding:0"><img src="${escapeHtml(image)}" alt="${title}" width="542" style="display:block;width:100%;max-width:542px;height:auto;border-radius:12px 12px 0 0"></td></tr>`
+    : "";
+  return [
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;border:1px solid #eadfe4;border-radius:12px;background:#fbf7f9;border-collapse:separate">`,
+    picture,
+    `<tr><td style="padding:16px 18px">`,
+    title ? `<p style="margin:0 0 4px;font-size:15px;line-height:1.4;font-weight:700;color:#1e1b2e">${title}</p>` : "",
+    blurb ? `<p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:#64748b">${blurb}</p>` : "",
+    price ? `<p style="margin:0 0 10px;font-size:19px;line-height:1.3;font-weight:700;color:#8f2d4a">${price}</p>` : "",
+    safeHref
+      ? `<a href="${safeHref}" style="font-size:13px;font-weight:600;color:#8f2d4a;text-decoration:underline">See the listing &rsaquo;</a>`
+      : "",
+    `</td></tr></table>`,
+  ].join("");
+}
+
+function calloutHtml(attrs: Record<string, unknown>): string {
+  const eyebrow = escapeHtml(attr(attrs, "eyebrow"));
+  const title = escapeHtml(attr(attrs, "title"));
+  const text = escapeHtml(attr(attrs, "text"));
+  return [
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 18px;border-radius:12px;background:#2a1420;border-collapse:separate">`,
+    `<tr><td style="padding:20px 22px">`,
+    eyebrow ? `<p style="margin:0 0 6px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#e8a0b4">${eyebrow}</p>` : "",
+    title ? `<p style="margin:0 0 8px;font-size:19px;line-height:1.35;font-weight:700;color:#ffffff">${title}</p>` : "",
+    text ? `<p style="margin:0;font-size:14px;line-height:1.6;color:#e5d9de">${text}</p>` : "",
+    `</td></tr></table>`,
+  ].join("");
 }
 
 export function docToEmailText(doc: DocNode): string {
@@ -335,6 +383,8 @@ function sampleVars(origin: string): EmailVars {
       company: "Lekki Homes Ltd",
       signInLink: `${origin}/admin/sign-in`,
       reason: "The note an admin writes appears here.",
+      appLink: `${origin}/m`,
+      whatsappLink: `${origin}/wa/AV-0001`,
     },
     html: {
       conversation: conversationHtml(lines),

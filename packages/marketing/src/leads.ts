@@ -45,6 +45,7 @@ function leads(db: Db) {
 export interface LeadInput {
   buyerName: string;
   buyerPhone: string;
+  buyerEmail: string;
   listingId: string | null;
   listingTitle: string;
   wantUnits: LeadUnit[];
@@ -85,6 +86,7 @@ export async function createLead(
     _id: newId("lead", now),
     buyerName: input.buyerName.trim(),
     buyerPhone: input.buyerPhone.trim(),
+    buyerEmail: input.buyerEmail.trim().toLowerCase(),
     listingId: input.listingId,
     listingTitle: input.listingTitle,
     wantUnits: input.wantUnits,

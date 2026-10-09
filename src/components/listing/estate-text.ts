@@ -1,5 +1,5 @@
 import type { EstateSummary, PaymentPlan, Property } from "@/lib/types";
-import { formatPrice, formatSqm, paymentPlanFor } from "@/lib/data";
+import { formatPrice, formatSqm, isPlaza, paymentPlanFor } from "@/lib/data";
 
 export interface EstateFacts {
   options: string | null;
@@ -41,12 +41,20 @@ export function allTakenLabel(property: Pick<Property, "listingType">): string {
   return property.listingType === "rent" ? "Fully let" : "Sold out";
 }
 
-/** "3 of 4 available", or "Sold out" once nothing is left. */
-export function availabilityLine(s: EstateSummary, property?: Pick<Property, "listingType">): string | null {
+/** "14 units available", or "Sold out" once nothing is left. */
+export function availabilityLine(
+  s: EstateSummary,
+  property?: Pick<Property, "listingType" | "type">,
+): string | null {
   if (s.count === 0) return null;
   if (s.soldOut) return property ? allTakenLabel(property) : "Sold out";
-  if (s.availableCount === s.count) return s.count === 1 ? "Available" : `All ${s.count} available`;
-  return `${s.availableCount} of ${s.count} available`;
+  return unitsLine(s.unitsAvailable, property);
+}
+
+/** "1 unit available", "6 shops available". */
+export function unitsLine(units: number, property?: Pick<Property, "type">): string {
+  const noun = property && isPlaza(property.type) ? "shop" : "unit";
+  return `${units} ${noun}${units === 1 ? "" : "s"} available`;
 }
 
 /** A sale price with no period suffix, in the listing's own currency. */

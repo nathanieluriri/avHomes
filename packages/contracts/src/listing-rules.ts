@@ -125,6 +125,8 @@ export function sqmToSqft(sqm: number): number {
 export interface EstateSummary {
   count: number;
   availableCount: number;
+  /** Units still available, summed over available options. */
+  unitsAvailable: number;
   /** Cheapest available priced option, else cheapest priced option, else 0. */
   fromMinor: number;
   toMinor: number;
@@ -153,9 +155,11 @@ export function estateSummary(prototypes: readonly EstatePrototype[]): EstateSum
   // A house row whose beds are not filled in yet says nothing about the range.
   const beds = houses.map((p) => p.bedrooms).filter((n) => n > 0);
   const availableCount = prototypes.filter((p) => p.available).length;
+  const unitsAvailable = prototypes.reduce((sum, p) => sum + (p.available ? Math.max(1, p.units ?? 1) : 0), 0);
   return {
     count: prototypes.length,
     availableCount,
+    unitsAvailable,
     fromMinor: range.length > 0 ? Math.min(...range) : 0,
     toMinor: range.length > 0 ? Math.max(...range) : 0,
     bedroomsMin: beds.length > 0 ? Math.min(...beds) : 0,

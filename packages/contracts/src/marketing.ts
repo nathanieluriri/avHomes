@@ -661,6 +661,8 @@ export interface MarketingSettings {
    * screenshot is not a secret. The server reads the key separately.
    */
   accountProvider: AccountProvider;
+  /** The partners' WhatsApp group invite. Partners only ever see their own /wa/<code> link to it. */
+  whatsappGroupUrl: string;
   updatedAt: number;
 }
 
@@ -679,6 +681,7 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   currency: DEFAULT_CURRENCY,
   supportPhone: "+2348143345307",
   accountProvider: "kora",
+  whatsappGroupUrl: "",
   updatedAt: 0,
 };
 
@@ -834,6 +837,59 @@ export function formatMoney(minor: number, currency = DEFAULT_CURRENCY): string 
     maximumFractionDigits: 0,
   }).format(value);
   return formatted;
+}
+
+/** A partner's own link to the WhatsApp group. Clicks on it are counted and credited to them. */
+export function whatsappLink(origin: string, code: string): string {
+  return `${origin.replace(/\/$/u, "")}/wa/${code}`;
+}
+
+/** Only an invite to a group, so the redirect can never be pointed somewhere else. */
+export function isWhatsappGroupUrl(url: string): boolean {
+  return /^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]{10,40}\/?(\?.*)?$/u.test(url.trim());
+}
+
+/** `self`: the partner opened their own link. `forward`: somebody else opened it. */
+export const WHATSAPP_CLICK_KINDS = ["self", "forward"] as const;
+export type WhatsappClickKind = (typeof WHATSAPP_CLICK_KINDS)[number];
+
+export interface WhatsappPartnerRow {
+  marketerId: string;
+  name: string;
+  code: string;
+  /** When they first opened the group link themselves, else null. */
+  joinedAt: number | null;
+  selfClicks: number;
+  /** Opens of their link by anybody else: what they forwarded. */
+  forwardClicks: number;
+  /** Distinct browsers among those forwarded opens. */
+  forwardPeople: number;
+  lastClickAt: number | null;
+}
+
+export interface WhatsappClickRow {
+  id: string;
+  at: number;
+  kind: WhatsappClickKind;
+  ownerName: string;
+  ownerCode: string;
+  /** The signed in partner who opened it, when it was one. */
+  openedByName: string | null;
+}
+
+export interface WhatsappReport {
+  url: string;
+  totals: {
+    clicks: number;
+    selfClicks: number;
+    forwardClicks: number;
+    /** Distinct browsers that opened any link. */
+    people: number;
+    partners: number;
+    partnersJoined: number;
+  };
+  partners: WhatsappPartnerRow[];
+  recent: WhatsappClickRow[];
 }
 
 /** The referral link a marketer shares. One place, so every surface agrees. */
@@ -1194,6 +1250,8 @@ export interface Lead {
   id: string;
   buyerName: string;
   buyerPhone: string;
+  /** Optional. Empty when the marketer did not have one. */
+  buyerEmail: string;
   /** Set when the buyer already has a property in mind. */
   listingId: string | null;
   /** Snapshot, so a renamed listing cannot rewrite a settled lead. */
@@ -1260,6 +1318,7 @@ export function leadMoveRefusal(move: {
 export function leadRefusal(lead: {
   buyerName: string;
   buyerPhone: string;
+  buyerEmail?: string;
   listingId: string | null;
   wantArea: string;
   wantBudgetMinor: number;
@@ -1269,6 +1328,10 @@ export function leadRefusal(lead: {
   }
   if (!/^[0-9+\s()-]{7,20}$/u.test(lead.buyerPhone.trim())) {
     return { path: "buyerPhone", message: "Add a phone number we can reach them on." };
+  }
+  const email = (lead.buyerEmail ?? "").trim();
+  if (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)) {
+    return { path: "buyerEmail", message: "That email does not look right. Check it or leave it empty." };
   }
   const hasWant = lead.wantArea.trim() !== "" || lead.wantBudgetMinor > 0;
   if (!lead.listingId && !hasWant) {

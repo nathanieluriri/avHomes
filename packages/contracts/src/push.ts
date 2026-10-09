@@ -27,6 +27,7 @@ export const PUSH_KINDS = [
   "partner-joined",
   "update",
   "newsletter",
+  "whatsapp-invite",
   // The console.
   "mail-received",
   "mail-failed",

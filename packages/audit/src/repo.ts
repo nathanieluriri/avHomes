@@ -109,7 +109,8 @@ export async function insertEntry(db: Db, doc: AuditEntryDoc): Promise<void> {
 }
 
 export async function listEntries(db: Db, query: AuditQuery): Promise<Page<AuditEntry>> {
-  const and: Filter<AuditEntryDoc>[] = [];
+  // Rows filed before push routes were unaudited. See UNAUDITED in middleware.ts.
+  const and: Filter<AuditEntryDoc>[] = [{ path: { $not: /^\/api\/push(\/|$)/u } }];
   if (query.entity) and.push({ entity: query.entity });
   if (query.entityId) and.push({ entityId: query.entityId });
   if (query.actorId) and.push({ actorId: query.actorId });

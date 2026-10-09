@@ -59,6 +59,10 @@ const UNAUDITED = [
   // A member's own signature and their snooze on the mail setup card.
   "/api/admin/signature",
   "/api/admin/mail/setup",
+  /* A browser subscribing to, opening or testing push notifications is the
+     system wiring up a device, not somebody changing a record. The entries
+     also carried the raw subscription keys. The admin key routes stay audited. */
+  "/api/push",
 ];
 
 function isUnaudited(path: string): boolean {

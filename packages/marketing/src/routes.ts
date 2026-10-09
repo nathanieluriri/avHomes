@@ -37,6 +37,8 @@ import {
 } from "@avhomes/core";
 import {
   ACCOUNT_PROVIDERS,
+  isWhatsappGroupUrl,
+  whatsappLink,
   DEAL_KINDS,
   LEAD_STATES,
   LEAD_NOTE_MAX,
@@ -111,6 +113,7 @@ import {
   writePaystackKey,
 } from "./settings";
 import { toMarketingUpdate } from "./schema";
+import { remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
 import {
   alertsFor,
   balanceFor,
@@ -213,6 +216,8 @@ export interface MarketingDeps {
    * in the audience package. Never undoes an earlier unsubscribe.
    */
   subscribe?: (db: Db, email: string, ctx: { origin: string; requestId: string; route: string }) => Promise<void>;
+  /** Sends one of the editable email templates. Injected, because templates live in the settings package. Never throws. */
+  mail?: SendTemplate;
   /**
    * Live listings published since `sinceMs`, newest first, at most `limit`.
    * Injected, because this package may not read the listings package's collection.
@@ -597,6 +602,7 @@ const LeadBody = z
   .object({
     buyerName: str().trim().min(2).max(160),
     buyerPhone: str().trim().min(7).max(40),
+    buyerEmail: z.union([z.literal(""), emailString()]).default(""),
     listingId: str().max(64).nullable().default(null),
     listingTitle: str().max(300).default(""),
     /* Which options inside an estate. Snapshotted by the client from the
@@ -737,7 +743,7 @@ const SettingsBody = z
 
 /* ══════════════════════════════════════════════════════════════════ PUBLIC ══ */
 
-export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscribe"> = {}): Hono<AppEnv> {
+export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscribe" | "mail"> = {}): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
   /** What the join page needs before anybody types: who invited them, and the banks. */
@@ -870,6 +876,15 @@ export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscr
       });
     } catch (err) {
       console.error("[marketing]", JSON.stringify({ requestId: c.get("requestId"), subscribe: String(err) }));
+    }
+
+    try {
+      await welcomePartner(deps, db, marketer, requestOrigin(c.req), {
+        requestId: c.get("requestId"),
+        route: "POST /public/marketing/join",
+      });
+    } catch (err) {
+      console.error("[marketing]", JSON.stringify({ requestId: c.get("requestId"), welcome: String(err) }));
     }
 
     if (marketer.parentId) {
@@ -1114,9 +1129,10 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
    */
   routes.get("/marketing/updates", requireAuth(), async (c) => {
     const db = await currentDb(c);
-    await currentMarketer(db, c);
+    const marketer = await currentMarketer(db, c);
     const now = Date.now();
-    const written = await liveUpdates(db, now, FEED_MAX);
+    const group = await whatsappCard(db, marketer, requestOrigin(c.req));
+    const written = [...(group ? [group] : []), ...(await liveUpdates(db, now, FEED_MAX))];
     const room = Math.min(LISTING_CARDS_MAX, FEED_MAX - written.length);
     const listings =
       room > 0 && deps.recentListings
@@ -1125,6 +1141,17 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const linked = new Set(written.map((update) => update.linkHref));
     const cards = listings.map(listingCard).filter((card) => !linked.has(card.linkHref));
     return c.json({ items: [...written, ...cards].slice(0, FEED_MAX) });
+  });
+
+  /** The partner's own link to the WhatsApp group, which is the only form of it they ever see. */
+  routes.get("/marketing/whatsapp", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    const settings = await readMarketingSettings(db);
+    return c.json({
+      link: isWhatsappGroupUrl(settings.whatsappGroupUrl) ? whatsappLink(requestOrigin(c.req), marketer.code) : null,
+      joined: await hasJoinedWhatsapp(db, marketer.id),
+    });
   });
 
   routes.patch("/marketing/me", requireAuth(), async (c) => {
@@ -2233,6 +2260,33 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     });
     await tellMarketers(deps, db, issueNote(issue, true));
     return c.json({ issue });
+  });
+
+  /* ──────────────────────────── whatsapp group ─────────────────────────── */
+
+  routes.get("/admin/marketing/whatsapp", requireAuth(), async (c) => {
+    return c.json(await whatsappReport(await currentDb(c)));
+  });
+
+  routes.put("/admin/marketing/whatsapp", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const body = await readJson(c, z.object({ url: str().trim().max(300) }).strict());
+    if (body.url !== "" && !isWhatsappGroupUrl(body.url)) {
+      throw new BadRequestError("url", [
+        { path: "url", message: "Paste the group's invite link, which starts https://chat.whatsapp.com/" },
+      ]);
+    }
+    await writeMarketingSettings(db, { whatsappGroupUrl: body.url });
+    return c.json(await whatsappReport(db));
+  });
+
+  routes.post("/admin/marketing/whatsapp/remind", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const result = await remindPartners(deps, db, requestOrigin(c.req), {
+      requestId: c.get("requestId"),
+      route: "POST /admin/marketing/whatsapp/remind",
+    });
+    return c.json(result);
   });
 
   /* ─────────────────────────────── updates ─────────────────────────────── */

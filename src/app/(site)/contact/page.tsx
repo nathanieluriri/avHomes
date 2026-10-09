@@ -20,7 +20,7 @@ export default async function ContactPage() {
   const site = await getSiteSettings();
   const whatsapp = whatsappHref(
     site.whatsappNumber,
-    "Hi, I found you on avhomesltd.com. I would like to ask about a property.",
+    "Hi, I found you on avhomesltd.com I would like to ask about a property.",
   );
   const hasAny =
     site.offices.length > 0 ||

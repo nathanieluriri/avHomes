@@ -178,6 +178,7 @@ export interface LeadDoc {
   _id: string;
   buyerName: string;
   buyerPhone: string;
+  buyerEmail?: string;
   listingId: string | null;
   listingTitle: string;
   wantUnits: LeadUnit[];
@@ -374,6 +375,7 @@ export function toLead(doc: LeadDoc): Lead {
     id: doc._id,
     buyerName: doc.buyerName ?? "",
     buyerPhone: doc.buyerPhone ?? "",
+    buyerEmail: doc.buyerEmail ?? "",
     listingId: doc.listingId ?? null,
     listingTitle: doc.listingTitle ?? "",
     wantUnits: doc.wantUnits ?? [],

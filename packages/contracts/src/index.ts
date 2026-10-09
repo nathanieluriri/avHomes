@@ -9,6 +9,7 @@ export * from "./roles";
 export * from "./types";
 export * from "./partners";
 export * from "./doc";
+export * from "./newsletter-blocks";
 export * from "./validate";
 export * from "./money";
 export * from "./publish-check";

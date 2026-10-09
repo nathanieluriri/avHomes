@@ -97,7 +97,7 @@ function complete(p: Property): Property {
   const partial = p as Partial<Property> & Property;
   return {
     ...p,
-    prototypes: partial.prototypes ?? [],
+    prototypes: (partial.prototypes ?? []).map((p) => ({ ...p, units: p.units ?? 1 })),
     paymentPlan: partial.paymentPlan ?? null,
     buildStage: partial.buildStage ?? null,
     titleDocument: partial.titleDocument ?? null,

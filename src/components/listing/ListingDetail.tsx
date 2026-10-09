@@ -35,7 +35,7 @@ export default function ListingDetail({ property, similar }: { property: Propert
   const summary = multi ? estateSummary(property.prototypes) : null;
   const heroPriceMinor = summary ? summary.fromMinor : property.priceMinor;
   // A sold out estate already says so in the chip above the title.
-  const heroAvailability = summary && !summary.soldOut ? availabilityLine(summary) : null;
+  const heroAvailability = summary && !summary.soldOut ? availabilityLine(summary, property) : null;
   const titleDocument = property.listingType === "sale" ? property.titleDocument : null;
   /* The operator's own pin when the listing carries one, and the address
      search it has always used when it does not. Both come from the same file

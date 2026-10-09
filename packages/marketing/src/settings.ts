@@ -151,6 +151,7 @@ export async function readMarketingSettings(db: Db): Promise<MarketingSettings> 
     currency: doc.currency ?? d.currency,
     supportPhone: doc.supportPhone?.trim() || d.supportPhone,
     accountProvider: provider(doc.accountProvider, d.accountProvider),
+    whatsappGroupUrl: doc.whatsappGroupUrl?.trim() ?? d.whatsappGroupUrl,
     updatedAt: doc.updatedAt ?? 0,
   };
 }
@@ -208,6 +209,7 @@ const WRITABLE = [
   "minPayoutMinor",
   "supportPhone",
   "accountProvider",
+  "whatsappGroupUrl",
 ] as const;
 
 export async function writeMarketingSettings(

@@ -32,6 +32,7 @@ export interface PrototypeDraft {
   price: string;
   image: string | null;
   available: boolean;
+  units: number;
   /** True on a row the form added that nobody has edited since. Such a row is not saved. */
   untouched?: boolean;
 }
@@ -56,6 +57,7 @@ export function toPrototypeDraft(p: EstatePrototype, currency: string): Prototyp
     price: p.priceMinor > 0 ? plainMajor(p.priceMinor, currency) : "",
     image: p.image,
     available: p.available,
+    units: p.units ?? 1,
   };
 }
 
@@ -91,6 +93,7 @@ export function readPrototypes(
       priceMinor,
       image: row.image,
       available: row.available,
+      units: Math.max(1, row.units || 1),
     };
   });
   return { prototypes, issues };
@@ -109,6 +112,7 @@ function blankRow(kind: PrototypeKind, rooms: number, speculative = false): Prot
     price: "",
     image: null,
     available: true,
+    units: 1,
     ...(speculative ? { untouched: true } : {}),
   };
 }
@@ -145,7 +149,7 @@ const NUMBER_CELL = `${CELL} [appearance:textfield] [&::-webkit-inner-spin-butto
 const CELL_LABEL = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-600 @xl:sr-only";
 /* One template for the header and every row, so the columns line up. */
 const COLUMNS =
-  "@xl:grid-cols-[2rem_4.5rem_minmax(0,1fr)_2.25rem_2.25rem_3.5rem_5.5rem_4.75rem_1.75rem]";
+  "@xl:grid-cols-[2rem_4.5rem_minmax(0,1fr)_2.25rem_2.25rem_3.5rem_5.5rem_3.75rem_4.75rem_1.75rem]";
 
 /* The quick-add chips' geometry. "Add option" shares it rather than using
    Button's `sm`, which stays 28px on a phone beside these 36px chips. */
@@ -331,6 +335,7 @@ export function PrototypeTable({
         <span>{plaza ? "" : "Baths"}</span>
         <span>Sqm</span>
         <span>{rent ? "Rent" : "Price"}</span>
+        <span>How many</span>
         <span>Available</span>
         <span />
       </div>
@@ -545,6 +550,19 @@ function PrototypeRow({
           </p>
         )}
       </div>
+
+      <label className="col-span-6 min-w-0 @xl:col-span-1">
+        <span className={CELL_LABEL}>How many {plaza ? "shops" : "units"} available</span>
+        <NumberInput
+          className={NUMBER_CELL}
+          min={1}
+          max={1_000_000}
+          value={row.units}
+          disabled={!row.available}
+          onChange={(v) => onUpdate({ units: Math.max(1, v ?? 1) })}
+          onKeyDown={toPrice}
+        />
+      </label>
 
       <div className="col-span-6 flex flex-wrap items-center gap-2 @xl:contents">
         {/* The console's checkbox switch, as on "Feature on the landing page".

@@ -158,7 +158,7 @@ function ListingsBody({ typed, onClear }: { typed: string; onClear: () => void }
     const place = listingPlace(property);
     void shareOrWhatsApp({
       title: property.title,
-      text: `Have a look at this home on AV Homes: ${property.title}${place ? `, ${place}` : ""}. ${listingPriceText(property)}.`,
+      text: `Have a look at this property on AV Homes: ${property.title}${place ? `, ${place}` : ""}. ${listingPriceText(property)}.`,
       url,
     });
   }

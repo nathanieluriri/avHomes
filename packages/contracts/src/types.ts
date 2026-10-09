@@ -149,6 +149,8 @@ export interface EstatePrototype {
   image: string | null;
   /** False is "sold out". The row stays on the page so buyers see what sold. */
   available: boolean;
+  /** How many of this option are still available. At least 1; read only while `available`. */
+  units: number;
 }
 
 /** Deposit up front, the balance spread evenly across `months`. */
@@ -342,6 +344,8 @@ export interface Testimonial {
   quote: string;
   rating: number;
   initials: string;
+  /** Optional portrait. Empty means the site draws a stock face. */
+  photoUrl: string;
   position: number;
 }
 

@@ -125,6 +125,7 @@ const PrototypeInput = z
     priceMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
     image: str().max(2000).nullable(),
     available: z.boolean(),
+    units: z.number().int().min(1).max(1_000_000).default(1),
   })
   .strict();
 
@@ -300,6 +301,7 @@ const TestimonialBody = z
     quote: str().min(1).max(2000),
     rating: z.number().int().min(1).max(5),
     initials: str().max(4).default(""),
+    photoUrl: z.union([z.literal(""), str().max(2000).url().startsWith("https://")]).default(""),
     position: z.number().int().min(0).max(999).default(0),
   })
   .strict();

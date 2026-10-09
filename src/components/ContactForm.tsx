@@ -142,7 +142,7 @@ export default function ContactForm({
         <h2 className="text-lg font-bold tracking-tight text-plum-950">Message received</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Thank you. A member of the team will respond within one business day. If it is urgent, call
-          the Lagos office on the number in the panel beside this form.
+          the office on the number in the panel beside this form.
         </p>
       </div>
     );
