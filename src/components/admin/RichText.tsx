@@ -307,6 +307,12 @@ export default function RichText({
     }
   }
 
+  /* After the selection, never over it: with a card selected, insertContent would replace the card. */
+  function insertBlock(content: { type: string; attrs: object }) {
+    if (!editor) return;
+    editor.chain().focus().insertContentAt(editor.state.selection.to, content).run();
+  }
+
   const disabled = !editor || locked;
 
   /* `c-tap` on every toolbar control at EVERY width, not only in the phone
@@ -435,11 +441,7 @@ export default function RichText({
             <span className="rte__sep" aria-hidden="true" />
             {tool("Listing card", <Building2 aria-hidden="true" />, false, () => setPickingListing(true))}
             {tool("Callout", <Megaphone aria-hidden="true" />, false, () =>
-              editor
-                ?.chain()
-                .focus()
-                .insertContent({ type: "callout", attrs: { eyebrow: "", title: "", text: "" } })
-                .run(),
+              insertBlock({ type: "callout", attrs: { eyebrow: "", title: "", text: "" } }),
             )}
           </>
         )}
@@ -572,7 +574,7 @@ export default function RichText({
         <ListingPicker
           open={pickingListing}
           onClose={() => setPickingListing(false)}
-          onPick={(attrs) => editor?.chain().focus().insertContent({ type: "listingCard", attrs }).run()}
+          onPick={(attrs) => insertBlock({ type: "listingCard", attrs })}
         />
       )}
 

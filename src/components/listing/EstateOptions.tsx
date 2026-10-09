@@ -3,7 +3,8 @@ import { Bath, Bed, LandPlot, Maximize } from "lucide-react";
 import type { EstatePrototype, Property } from "@/lib/types";
 import { estateSummary, formatPrice, formatSqm, isBuilding, isPlaza, prototypeLabel } from "@/lib/data";
 import { AskAboutOption } from "./EnquiryOption";
-import { availabilityLine, estateRangeLine, planLine, unitsLine } from "./estate-text";
+import { unitsAvailableLine } from "@avhomes/contracts";
+import { availabilityLine, estateRangeLine, planLine } from "./estate-text";
 
 /**
  * The house types and plots inside one estate, or the units in one building,
@@ -77,7 +78,7 @@ function OptionRow({ option, property }: { option: EstatePrototype; property: Pr
           </h3>
           {!sold && (
             <span className="rounded-full bg-wine-50 px-2.5 py-0.5 text-xs font-semibold text-wine-700 ring-1 ring-wine-100">
-              {unitsLine(option.units, property)}
+              {unitsAvailableLine(option.units, property.type)}
             </span>
           )}
         </div>

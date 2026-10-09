@@ -907,9 +907,9 @@ function soldOutLabel(p: Property): string {
 function estateSpec(s: EstateSummary, prototypes: readonly EstatePrototype[], noun = "option"): string {
   if (s.count === 0) return `No ${noun}s yet`;
   const partial = s.availableCount > 0 && s.availableCount < s.count;
-  const options = partial
-    ? `${s.availableCount} of ${s.count} available`
-    : `${s.count} ${s.count === 1 ? noun : `${noun}s`}`;
+  const options = s.soldOut
+    ? `${s.count} ${s.count === 1 ? noun : `${noun}s`}`
+    : `${s.unitsAvailable} ${noun === "shop" ? "shop" : "unit"}${s.unitsAvailable === 1 ? "" : "s"} available`;
   const beds =
     s.bedroomsMax === 0
       ? ""

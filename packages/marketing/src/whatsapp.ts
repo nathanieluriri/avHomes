@@ -37,7 +37,8 @@ function clicks(db: Db) {
 }
 
 const VISITOR_COOKIE = "avwa";
-const TWO_YEARS = 60 * 60 * 24 * 730;
+// Browsers cap cookie lifetime at 400 days, and Hono refuses anything longer.
+const VISITOR_MAX_AGE = 60 * 60 * 24 * 395;
 /** A double tap or a link preview fetch is one open, not two. */
 const DEBOUNCE_MS = 30_000;
 
@@ -89,7 +90,7 @@ async function recordClick(db: Db, c: Context<AppEnv>, code: string) {
       httpOnly: true,
       secure: isProduction(),
       sameSite: "Lax",
-      maxAge: TWO_YEARS,
+      maxAge: VISITOR_MAX_AGE,
     });
   }
 

@@ -1,5 +1,6 @@
-import type { EstateSummary, PaymentPlan, Property } from "@/lib/types";
-import { formatPrice, formatSqm, isPlaza, paymentPlanFor } from "@/lib/data";
+import type { EstateSummary, PaymentPlan, Property, PropertyType } from "@/lib/types";
+import { optionNoun, unitsAvailableLine } from "@avhomes/contracts";
+import { formatPrice, formatSqm, paymentPlanFor } from "@/lib/data";
 
 export interface EstateFacts {
   options: string | null;
@@ -12,14 +13,14 @@ export interface EstateFacts {
  * nothing to say is null. The ranges cover available options only (`estateSummary`),
  * so the count does too whenever something has sold.
  */
-export function estateFacts(s: EstateSummary, noun = "option"): EstateFacts {
+export function estateFacts(s: EstateSummary, type?: PropertyType): EstateFacts {
   return {
     options:
       s.count === 0
         ? null
-        : !s.soldOut && s.availableCount < s.count
-          ? `${s.availableCount} of ${s.count} available`
-          : `${s.count} ${s.count === 1 ? noun : `${noun}s`}`,
+        : s.soldOut
+          ? `${s.count} ${optionNoun(type ?? "Estate Land", s.count)}`
+          : unitsAvailableLine(s.unitsAvailable, type),
     beds:
       s.hasHouses && s.bedroomsMax > 0
         ? s.bedroomsMin === s.bedroomsMax || s.bedroomsMin === 0
@@ -48,14 +49,9 @@ export function availabilityLine(
 ): string | null {
   if (s.count === 0) return null;
   if (s.soldOut) return property ? allTakenLabel(property) : "Sold out";
-  return unitsLine(s.unitsAvailable, property);
+  return unitsAvailableLine(s.unitsAvailable, property?.type);
 }
 
-/** "1 unit available", "6 shops available". */
-export function unitsLine(units: number, property?: Pick<Property, "type">): string {
-  const noun = property && isPlaza(property.type) ? "shop" : "unit";
-  return `${units} ${noun}${units === 1 ? "" : "s"} available`;
-}
 
 /** A sale price with no period suffix, in the listing's own currency. */
 export function saleMoney(minor: number, property: Pick<Property, "currency">): string {

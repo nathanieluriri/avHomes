@@ -33,6 +33,7 @@ import {
   isEstate,
   isPlaza,
   optionNoun,
+  unitsAvailableLine,
   isScopedRole,
   isShortMapLink,
   listingPublishBlockers,
@@ -325,10 +326,12 @@ function estatePriceLine(
   s: EstateSummary,
   shape: { listingType: ListingType; rentPeriod: RentPeriod | null; currency: string },
   noun = "option",
+  type?: PropertyType,
 ): string {
   if (s.count === 0) return `No ${noun}s yet`;
   const parts: string[] = [];
   if (s.fromMinor > 0) parts.push(`From ${formatPriceShort(s.fromMinor, shape)}`);
+  if (!s.soldOut) parts.push(unitsAvailableLine(s.unitsAvailable, type));
   parts.push(`${s.count} ${s.count === 1 ? noun : `${noun}s`}`);
   if (s.bedroomsMax > 0) {
     // A house row added blank has 0 beds; it is not the smallest option.
@@ -1218,7 +1221,8 @@ function PropertyEditor({ initial, role }: { initial: Property; role: Role | nul
                     {estatePriceLine(
                       estateSummary(liveOptions),
                       { listingType: dealType, rentPeriod: fields.rentPeriod ? draft.rentPeriod : null, currency: draft.currency },
-                      optionNoun(draft.type),
+                      optionNoun(draft.type) === "unit" ? "type" : optionNoun(draft.type),
+                      draft.type,
                     )}
                   </p>
                   <span className="mt-1 block text-xs text-slate-600">

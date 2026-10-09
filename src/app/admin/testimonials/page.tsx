@@ -16,6 +16,7 @@ import {
   EmptyState,
   ErrorNote,
   Field,
+  IconButton,
   PageHeader,
   inputClass,
 } from "@/components/admin/ui";
@@ -128,7 +129,17 @@ export default function TestimonialsPage() {
     try {
       await Promise.all(
         next.map((row, position) =>
-          row.position === position && row.id !== item.id ? null : put(row.id, { ...row, position }),
+          row.position === position && row.id !== item.id
+            ? null
+            : put(row.id, {
+                name: row.name,
+                role: row.role,
+                quote: row.quote,
+                rating: row.rating,
+                initials: row.initials,
+                photoUrl: row.photoUrl,
+                position,
+              }),
         ),
       );
       reload();
@@ -189,24 +200,20 @@ export default function TestimonialsPage() {
   function RowActions({ index, item }: { index: number; item: Testimonial }) {
     return (
       <span className="inline-flex items-center gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label={`Move ${item.name} up`}
+        <IconButton
+          size="dense"
+          label={`Move ${item.name} up`}
+          icon={ArrowUp}
           disabled={busy || index <= 0}
           onClick={() => void move(index, -1)}
-        >
-          <ArrowUp className="h-4 w-4" aria-hidden="true" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label={`Move ${item.name} down`}
+        />
+        <IconButton
+          size="dense"
+          label={`Move ${item.name} down`}
+          icon={ArrowDown}
           disabled={busy || index >= rows.length - 1}
           onClick={() => void move(index, 1)}
-        >
-          <ArrowDown className="h-4 w-4" aria-hidden="true" />
-        </Button>
+        />
         <Button size="sm" variant="ghost" onClick={() => open(item)}>
           Edit
         </Button>
