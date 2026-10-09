@@ -43,7 +43,7 @@ export default function Testimonials({ testimonials }: { testimonials: Testimoni
 
                 <figcaption className="mt-6 flex items-center gap-3 border-t border-mist-200 pt-5">
                   <Image
-                    src={FACES[i % FACES.length]}
+                    src={t.photoUrl || FACES[i % FACES.length]}
                     alt={t.name}
                     width={48}
                     height={48}

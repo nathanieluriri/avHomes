@@ -16,13 +16,7 @@ import FooterSubscribe from "./FooterSubscribe";
 const columns: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "About Us",
-    links: [
-      /* Our Story, Careers and Press were href="#". An honest short column
-         beats a long one where most of it does nothing: a reader who clicks
-         two dead links stops trusting the third. Put them back when the pages
-         exist. */
-      { label: "Journal", href: "/posts" },
-    ],
+    links: [{ label: "About AV Homes", href: "/#about" }],
   },
   {
     title: "Resources",
@@ -30,7 +24,7 @@ const columns: { title: string; links: { label: string; href: string }[] }[] = [
       /* FAQs, Buying Guide, Renting Guide and Market Reports were all
          href="#". The two guides are worth writing, and when they are they are
          posts, which is where this points. */
-      { label: "Guides", href: "/posts" },
+      { label: "Insights", href: "/posts" },
       { label: "Buying from abroad", href: "/buying-from-abroad" },
       { label: "Browse by area", href: "/listings/in" },
     ],

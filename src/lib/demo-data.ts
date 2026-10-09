@@ -1029,6 +1029,7 @@ const testimonialSeeds: Omit<Testimonial, "position">[] = [
       "We could not be happier with the outcome. From the first consultation to the final touches, the team showed a level of professionalism and creativity we had not seen anywhere else.",
     rating: 5,
     initials: "JL",
+    photoUrl: "",
   },
   {
     id: "t2",
@@ -1038,6 +1039,7 @@ const testimonialSeeds: Omit<Testimonial, "position">[] = [
       "AVHomes made a stressful process feel effortless. Clear communication, honest pricing, and a home that exceeded what we had imagined we could afford.",
     rating: 5,
     initials: "MB",
+    photoUrl: "",
   },
   {
     id: "t3",
@@ -1047,6 +1049,7 @@ const testimonialSeeds: Omit<Testimonial, "position">[] = [
       "Their market read and their responsiveness set them apart. Every listing was vetted before it reached me and every question was answered the same day.",
     rating: 5,
     initials: "FA",
+    photoUrl: "",
   },
   {
     id: "t4",
@@ -1056,6 +1059,7 @@ const testimonialSeeds: Omit<Testimonial, "position">[] = [
       "I have bought through three agencies in Lagos. This is the only one that told me not to buy something. That is why I keep coming back.",
     rating: 5,
     initials: "SG",
+    photoUrl: "",
   },
 ];
 

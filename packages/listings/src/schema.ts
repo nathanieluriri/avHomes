@@ -107,6 +107,7 @@ export interface TestimonialDoc {
   quote: string;
   rating: number;
   initials: string;
+  photoUrl?: string;
   position: number;
   createdAt: number;
   updatedAt: number;
@@ -196,6 +197,7 @@ export function toTestimonial(doc: TestimonialDoc): Testimonial {
     quote: doc.quote,
     rating: doc.rating,
     initials: doc.initials,
+    photoUrl: doc.photoUrl ?? "",
     position: doc.position,
   };
 }

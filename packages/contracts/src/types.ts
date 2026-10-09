@@ -342,6 +342,8 @@ export interface Testimonial {
   quote: string;
   rating: number;
   initials: string;
+  /** Optional portrait. Empty means the site draws a stock face. */
+  photoUrl: string;
   position: number;
 }
 

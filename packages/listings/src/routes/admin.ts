@@ -300,6 +300,7 @@ const TestimonialBody = z
     quote: str().min(1).max(2000),
     rating: z.number().int().min(1).max(5),
     initials: str().max(4).default(""),
+    photoUrl: z.union([z.literal(""), str().max(2000).url().startsWith("https://")]).default(""),
     position: z.number().int().min(0).max(999).default(0),
   })
   .strict();
