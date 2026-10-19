@@ -37,6 +37,10 @@ import {
 } from "@avhomes/core";
 import {
   ACCOUNT_PROVIDERS,
+  BOARD_METRICS,
+  BOARD_PERIODS,
+  BOARD_SCOPES,
+  normalizeLeaderboardSettings,
   WHATSAPP_CHANGE_REASONS,
   WHATSAPP_NOTE_MAX,
   isWhatsappGroupUrl,
@@ -115,6 +119,7 @@ import {
   writePaystackKey,
 } from "./settings";
 import { toMarketingUpdate } from "./schema";
+import { insightsFor, leaderboardFor, uplineFor } from "./insights";
 import { inviteUninvited, listLinkChanges, recordLinkChange, remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
 import {
   alertsFor,
@@ -271,6 +276,8 @@ export interface MarketingDeps {
   ) => Promise<void>;
   /** The reverse, for a cancelled sale: the unit is offered again, or the listing reopens. */
   reopenListing?: (db: Db, input: { listingId: string; unitKey: string; dealId: string }) => Promise<void>;
+  /** The office's work email, for partners who joined without somebody's link. Owned by the settings package. */
+  officeEmail?: (db: Db) => Promise<string>;
 }
 
 /** The listing facts marketing needs and may not read for itself. */
@@ -758,6 +765,19 @@ const SettingsBody = z
        form posts every field on every save and can never prefill this one.
        null is how an admin clears it deliberately. */
     paystackKey: str().max(200).nullable().optional(),
+    leaderboard: z
+      .object({
+        enabled: z.boolean(),
+        periods: z.array(z.enum(BOARD_PERIODS)).min(1),
+        metrics: z.array(z.enum(BOARD_METRICS)).min(1),
+        scopes: z.array(z.enum(BOARD_SCOPES)).min(1),
+        stateFilter: z.boolean(),
+        defaultPeriod: z.enum(BOARD_PERIODS),
+        defaultMetric: z.enum(BOARD_METRICS),
+      })
+      .strict()
+      .transform(normalizeLeaderboardSettings)
+      .optional(),
   })
   .strict();
 
@@ -1184,6 +1204,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
           displayName: str().min(2).max(120).optional(),
           phone: str().max(30).optional(),
           state: str().max(80).optional(),
+          showPhoneToTeam: z.boolean().optional(),
         })
         .strict(),
     );
@@ -1249,8 +1270,32 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
   routes.get("/marketing/team", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const marketer = await currentMarketer(db, c);
-    const team = await teamFor(db, marketer.id);
-    return c.json({ levels: team.levels, members: team.members });
+    const settings = await readMarketingSettings(db);
+    const [team, officeEmail] = await Promise.all([
+      teamFor(db, marketer.id),
+      deps.officeEmail ? deps.officeEmail(db) : Promise.resolve(""),
+    ]);
+    const upline = await uplineFor(db, marketer, { email: officeEmail, phone: settings.supportPhone });
+    return c.json({ levels: team.levels, members: team.members, upline });
+  });
+
+  routes.get("/marketing/leaderboard", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    return c.json(
+      await leaderboardFor(db, marketer, {
+        period: c.req.query("period"),
+        metric: c.req.query("metric"),
+        scope: c.req.query("scope"),
+        state: c.req.query("state"),
+      }),
+    );
+  });
+
+  routes.get("/marketing/insights", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    return c.json(await insightsFor(db, marketer, c.req.query("period")));
   });
 
   routes.get("/marketing/deals", requireAuth(), async (c) => {

@@ -72,6 +72,7 @@ import {
   mailWatchRoutes,
   mailboxRoutes,
   mailStateRoutes,
+  readPublicSettings,
   settingsPublicRoutes,
   settingsRoutes,
   type MailFailureHook,
@@ -626,6 +627,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       recentListings,
       recentNews: recentNewsFor,
       newsletterFor: (db, input) => newsletterArticle(db, input.origin, input.id, input.email),
+      officeEmail: async (db) => (await readPublicSettings(db)).contactEmail,
       ...marketingPorts,
     }),
   );

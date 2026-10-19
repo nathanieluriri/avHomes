@@ -19,6 +19,7 @@
 import { DEFAULT_FUND_NAMES, type FundKind } from "./funds";
 import { DEFAULT_CURRENCY, minorUnitsFor } from "./money";
 import { OWNERSHIPS, OWNERSHIP_LABEL, type Ownership } from "./types";
+import { DEFAULT_LEADERBOARD_SETTINGS, type LeaderboardSettings } from "./partner-insights";
 
 /* ═══════════════════════════════════════════════════════════════ MARKETERS ══ */
 
@@ -66,6 +67,8 @@ export interface Marketer {
    */
   upline: string[];
   bank: MarketerBank | null;
+  /** False hides their phone from the people they invited. Their email always shows. */
+  showPhoneToTeam: boolean;
   /** True for a marketer who also holds an admin role. */
   isAdmin: boolean;
   joinedAt: number;
@@ -665,6 +668,8 @@ export interface MarketingSettings {
   accountProvider: AccountProvider;
   /** The partners' WhatsApp group invite. Partners only ever see their own /wa/<code> link to it. */
   whatsappGroupUrl: string;
+  /** What partners may see and filter on the app's leaderboard. */
+  leaderboard: LeaderboardSettings;
   updatedAt: number;
 }
 
@@ -684,6 +689,7 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   supportPhone: "+2348143345307",
   accountProvider: "kora",
   whatsappGroupUrl: "",
+  leaderboard: DEFAULT_LEADERBOARD_SETTINGS,
   updatedAt: 0,
 };
 

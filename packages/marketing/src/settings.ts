@@ -16,6 +16,7 @@ import {
   DEFAULT_MARKETING_SETTINGS,
   DEFAULT_RATING_WEIGHTS,
   OWNERSHIPS,
+  normalizeLeaderboardSettings,
   type AccountProvider,
   type CommissionMatrix,
   type CommissionSplit,
@@ -152,6 +153,7 @@ export async function readMarketingSettings(db: Db): Promise<MarketingSettings> 
     supportPhone: doc.supportPhone?.trim() || d.supportPhone,
     accountProvider: provider(doc.accountProvider, d.accountProvider),
     whatsappGroupUrl: doc.whatsappGroupUrl?.trim() ?? d.whatsappGroupUrl,
+    leaderboard: normalizeLeaderboardSettings(doc.leaderboard),
     updatedAt: doc.updatedAt ?? 0,
   };
 }
@@ -210,6 +212,7 @@ const WRITABLE = [
   "supportPhone",
   "accountProvider",
   "whatsappGroupUrl",
+  "leaderboard",
 ] as const;
 
 export async function writeMarketingSettings(

@@ -55,6 +55,7 @@ export interface MarketerDoc {
   /** Nearest referrer first, at most two. */
   upline: string[];
   bank: MarketerBank | null;
+  showPhoneToTeam?: boolean;
   isAdmin: boolean;
   joinedAt: number;
   createdAt: number;
@@ -233,6 +234,7 @@ export function toMarketer(doc: MarketerDoc): Marketer {
     parentId: doc.parentId ?? null,
     upline: doc.upline ?? [],
     bank: doc.bank ?? null,
+    showPhoneToTeam: doc.showPhoneToTeam ?? true,
     isAdmin: doc.isAdmin ?? false,
     joinedAt: doc.joinedAt ?? doc.createdAt,
     createdAt: doc.createdAt,
