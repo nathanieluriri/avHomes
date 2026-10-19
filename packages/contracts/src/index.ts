@@ -25,3 +25,4 @@ export * from "./analytics";
 export * from "./mail";
 export * from "./signature";
 export * from "./push";
+export * from "./tools";

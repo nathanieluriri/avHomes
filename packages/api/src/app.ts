@@ -91,9 +91,12 @@ import {
 } from "@avhomes/audience";
 import {
   activeMarketerContacts,
+  currentMarketer,
   marketingAdminRoutes,
   marketingAppRoutes,
   marketingPublicRoutes,
+  toolsAdminRoutes,
+  toolsAppRoutes,
   whatsappRedirectRoutes,
   readMarketingSettings,
   type MarketingDeps,
@@ -629,6 +632,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       ...marketingPorts,
     }),
   );
+  app.route(API_PREFIX, toolsAppRoutes(currentMarketer));
+  app.route(API_PREFIX, toolsAdminRoutes({ tell }));
   app.route(
     API_PREFIX,
     marketingAdminRoutes({
