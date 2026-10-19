@@ -106,6 +106,7 @@ import {
 import { accrueForDeal, fundsRoutes, reverseForDeal } from "@avhomes/funds";
 import { dashboardRoutes } from "./dashboard";
 import { analyticsConsoleRoutes } from "./analytics";
+import { accountsRoutes } from "./accounts";
 import { healthRoutes } from "./health";
 import { awaitingCloseRoutes } from "./awaiting-close";
 import { tutorialsRoutes } from "./tutorials";
@@ -668,6 +669,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
      import: a renameable label is not a reason for one feature package to know
      another. */
   app.route(API_PREFIX, fundsRoutes({ names: fundNames }));
+  app.route(API_PREFIX, accountsRoutes({ names: fundNames }));
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
   app.route(API_PREFIX, notificationsRoutes());
