@@ -8,6 +8,7 @@ import type { Db } from "mongodb";
 import { COLLECTIONS, collection } from "@avhomes/db";
 import { NotFoundError, PreconditionFailedError, newId } from "@avhomes/core";
 import {
+  formatMoney,
   planRefusal,
   planStanding,
   reminderKey,
@@ -23,6 +24,7 @@ import {
   type FundShare,
   type Lead,
   type DealPlan,
+  type MarketerAlert,
   type PlanStanding,
 } from "@avhomes/contracts";
 import { toDeal, toLead, type DealDoc, type LeadDoc, type LedgerDoc } from "./schema";
@@ -61,7 +63,17 @@ export function settleNumbers(
   cell: CommissionSplit,
   chain: readonly (ChainMember | null)[],
   plan: DealPlan | null,
-  deposit: { at: number; byName: string; proof: string[] },
+  /**
+   * `paidOn` is the day the deposit was paid, which is the day the deal closed, not the day it was approved.
+   * `byName` checked it; `reportedBy` sent its proof, the partner when the deal came from the app.
+   */
+  deposit: {
+    at: number;
+    paidOn?: number;
+    byName: string;
+    proof: string[];
+    reportedBy?: { side: "marketer" | "admin"; name: string };
+  },
 ): Settled {
   const full = splitDeal(amountMinor, cell, chain);
   const fullShares: DealShare[] = full.people.map((line) => ({
@@ -99,12 +111,12 @@ export function settleNumbers(
       {
         id: newId("dpay", deposit.at),
         amountMinor: paid,
-        paidOn: deposit.at,
+        paidOn: deposit.paidOn || deposit.at,
         proof: deposit.proof,
         note: "Deposit",
         status: "verified",
-        reportedBySide: "marketer",
-        reportedByName: deposit.byName,
+        reportedBySide: deposit.reportedBy?.side ?? "admin",
+        reportedByName: deposit.reportedBy?.name ?? deposit.byName,
         reviewedByName: deposit.byName,
         reviewedAt: deposit.at,
         reason: "",
@@ -392,4 +404,208 @@ export async function purchasesFor(db: Db, marketerId: string): Promise<{ intere
     deals(db).find({ reporterId: marketerId, selfPurchase: true }).sort({ createdAt: -1 }).limit(50).toArray(),
   ]);
   return { interests: leadDocs.map(toLead), deals: dealDocs.map(toDeal) };
+}
+
+/* ═════════════════════════════════════════════════════════════════ ALERTS ══ */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** As long as an approval stays on the list, so a plan's news lasts as long as a deal's. */
+const SHOWN_MS = 14 * DAY_MS;
+
+function dayWords(at: number): string {
+  return new Date(at).toLocaleDateString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "long" });
+}
+
+function isDeposit(payments: readonly DealPayment[], payment: DealPayment): boolean {
+  return payments[0] === payment && payment.note === "Deposit";
+}
+
+/**
+ * What a partner's Alerts say about payment plans and their own purchases. Like
+ * every other alert it is worked out from the records as they stand, so logging
+ * the payment or the next step happening is what clears it.
+ */
+export async function planAlertsFor(db: Db, marketerId: string, now: number): Promise<MarketerAlert[]> {
+  const recent = (at: number | null | undefined) => typeof at === "number" && at >= now - SHOWN_MS;
+  const [mine, shared, ownLeads] = await Promise.all([
+    deals(db)
+      .find({ reporterId: marketerId, $or: [{ plan: { $ne: null } }, { selfPurchase: true }] })
+      .sort({ updatedAt: -1 })
+      .limit(40)
+      .toArray(),
+    deals(db)
+      .find({ status: "approved", reporterId: { $ne: marketerId }, "payments.shares.marketerId": marketerId })
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .toArray(),
+    collection<LeadDoc>(db, COLLECTIONS.marketingLeads)
+      .find({ reporterId: marketerId, self: true, state: { $nin: ["won", "lost"] } })
+      .sort({ updatedAt: -1 })
+      .limit(10)
+      .toArray(),
+  ]);
+
+  const out: MarketerAlert[] = [];
+  for (const doc of mine) {
+    const money = (minor: number) => formatMoney(minor, doc.currency);
+    const href = `/m/deals/${doc._id}`;
+    const payments = doc.payments ?? [];
+    const paid = doc.plan ? (doc.paidMinor ?? 0) : doc.amountMinor;
+
+    if (doc.selfPurchase && doc.status === "pending") {
+      out.push({
+        id: `purchase-checking:${doc._id}`,
+        tone: "heads-up",
+        icon: "deals",
+        title: `We received your payment for ${doc.listingTitle}`,
+        body: "AV Homes is checking it and will tell you when it is verified.",
+        detail: "",
+        action: { label: "See your purchase", href: "/m/purchases" },
+        at: doc.createdAt,
+      });
+    }
+    if (doc.selfPurchase && doc.status === "rejected" && recent(doc.reviewedAt)) {
+      out.push({
+        id: `purchase-refused:${doc._id}`,
+        tone: "heads-up",
+        icon: "deals",
+        title: `Your payment for ${doc.listingTitle} was not accepted`,
+        body: "Read why, then send the proof again.",
+        detail: (doc.reason ?? "").trim(),
+        action: { label: "See why", href },
+        at: doc.reviewedAt ?? doc.updatedAt,
+      });
+    }
+    const owned = doc.selfPurchase && doc.status === "approved" && paid >= doc.amountMinor;
+    if (owned) {
+      const settled = Math.max(doc.reviewedAt ?? 0, ...payments.map((p) => (p.status === "verified" ? (p.reviewedAt ?? 0) : 0)));
+      if (recent(settled)) {
+        out.push({
+          id: `purchase-owned:${doc._id}`,
+          tone: "good",
+          icon: "check",
+          title: `Congratulations, you now own ${doc.listingTitle}`,
+          body: "Every payment is verified. AV Homes will be in touch about the papers.",
+          detail: "",
+          action: { label: "See your purchase", href: "/m/purchases" },
+          at: settled,
+        });
+      }
+    } else if (doc.selfPurchase && doc.status === "approved" && recent(doc.reviewedAt)) {
+      out.push({
+        id: `purchase-verified:${doc._id}`,
+        tone: "good",
+        icon: "check",
+        title: paid > 0 ? `Your deposit on ${doc.listingTitle} is verified` : `Your payment plan for ${doc.listingTitle} is approved`,
+        body: paid > 0 ? `${money(paid)} of ${money(doc.amountMinor)} paid so far.` : "Log each payment as you make it.",
+        detail: "",
+        action: { label: "See your purchase", href: "/m/purchases" },
+        at: doc.reviewedAt ?? doc.updatedAt,
+      });
+    }
+
+    if (doc.status !== "approved" || !doc.plan) continue;
+    if (paid < doc.amountMinor) {
+      const standing = planStanding(doc.amountMinor, doc.plan, payments, now);
+      const next = standing.next;
+      if (next && next.dueOn > 0 && (standing.state === "overdue" || standing.state === "due-soon")) {
+        const late = standing.state === "overdue";
+        out.push({
+          id: `plan-${late ? "overdue" : "due"}:${doc._id}:${next.n}`,
+          tone: late ? "act" : "heads-up",
+          icon: "payday",
+          title: late ? `A payment on ${doc.listingTitle} is overdue` : `A payment on ${doc.listingTitle} is due soon`,
+          body: `${money(standing.nextLeftMinor)} ${late ? "was due" : "is due"} on ${dayWords(next.dueOn)}. Log it once it is paid.`,
+          detail: "",
+          action: { label: "Log a payment", href },
+          at: late ? next.dueOn : now,
+        });
+      }
+    }
+    for (const payment of payments) {
+      if (!recent(payment.reviewedAt) || isDeposit(payments, payment)) continue;
+      if (payment.status === "rejected") {
+        out.push({
+          id: `plan-refused:${payment.id}`,
+          tone: "heads-up",
+          icon: "money",
+          title: `A payment on ${doc.listingTitle} was not accepted`,
+          body: "Read why, then log it again with the right proof.",
+          detail: payment.reason.trim(),
+          action: { label: "See why", href },
+          at: payment.reviewedAt ?? doc.updatedAt,
+        });
+        continue;
+      }
+      if (payment.status !== "verified") continue;
+      const share = payment.shares.find((row) => row.marketerId === marketerId);
+      if (doc.selfPurchase) {
+        if (owned) continue;
+        out.push({
+          id: `plan-verified:${payment.id}`,
+          tone: "good",
+          icon: "check",
+          title: `Your payment of ${money(payment.amountMinor)} is verified`,
+          body: `On ${doc.listingTitle}. ${money(paid)} of ${money(doc.amountMinor)} paid so far.`,
+          detail: "",
+          action: { label: "See your purchase", href: "/m/purchases" },
+          at: payment.reviewedAt ?? doc.updatedAt,
+        });
+      } else if (share) {
+        out.push({
+          id: `plan-earned:${payment.id}`,
+          tone: "good",
+          icon: "money",
+          title: `You earned ${money(share.amountMinor)}`,
+          body: `From a ${money(payment.amountMinor)} payment on ${doc.listingTitle}.`,
+          detail: "",
+          action: { label: "See the deal", href },
+          at: payment.reviewedAt ?? doc.updatedAt,
+        });
+      }
+    }
+  }
+
+  for (const doc of shared) {
+    const money = (minor: number) => formatMoney(minor, doc.currency);
+    const payments = doc.payments ?? [];
+    const closer = (doc.closerName || doc.reporterName).trim().split(/\s+/u)[0] || doc.reporterName;
+    for (const payment of payments) {
+      // The deposit's share was announced with the approval.
+      if (payment.status !== "verified" || !recent(payment.reviewedAt) || isDeposit(payments, payment)) continue;
+      const share = payment.shares.find((row) => row.marketerId === marketerId);
+      if (!share) continue;
+      out.push({
+        id: `plan-earned:${payment.id}:${share.level}`,
+        tone: "good",
+        icon: "money",
+        title: `You earned ${money(share.amountMinor)}`,
+        body: `Your level ${share.level} share of a payment on ${closer}'s deal on ${doc.listingTitle}.`,
+        detail: "",
+        action: { label: "See the deal", href: `/m/deals/${doc._id}` },
+        at: payment.reviewedAt ?? doc.updatedAt,
+      });
+    }
+  }
+
+  for (const lead of ownLeads) {
+    const paying = mine.some(
+      (doc) => (doc.leadId === lead._id || (lead.listingId && doc.listingId === lead.listingId)) && doc.status !== "rejected" && doc.status !== "cancelled",
+    );
+    if (paying) continue;
+    out.push({
+      id: `purchase-interest:${lead._id}`,
+      tone: "heads-up",
+      icon: "deals",
+      title: `We received your interest in ${lead.listingTitle || "a property"}`,
+      body: "Once you have paid, send the proof from My purchases.",
+      detail: "",
+      action: lead.listingId
+        ? { label: "Send the proof", href: `/m/deals/new?listing=${encodeURIComponent(lead.listingId)}&self=1&lead=${encodeURIComponent(lead._id)}` }
+        : { label: "See your purchases", href: "/m/purchases" },
+      at: lead.createdAt,
+    });
+  }
+
+  return out;
 }

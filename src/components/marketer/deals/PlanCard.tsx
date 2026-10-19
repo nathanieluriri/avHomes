@@ -73,14 +73,23 @@ export function PlanCard({
       <div>
         <p
           className={`text-[13px] font-semibold ${
-            standing.state === "overdue" ? "text-(color:--m-bad-fg)" : standing.state === "due-soon" ? "text-(color:--m-warn-fg)" : "text-m-muted"
+            deal.status !== "approved"
+              ? "text-m-muted"
+              : standing.state === "overdue"
+                ? "text-(color:--m-bad-fg)"
+                : standing.state === "due-soon"
+                  ? "text-(color:--m-warn-fg)"
+                  : "text-m-muted"
           }`}
         >
-          {PLAN_STATE_LABEL[standing.state]}
+          {deal.status === "approved" ? PLAN_STATE_LABEL[standing.state] : "Starts once AV Homes approves it"}
         </p>
         <p className="mt-1 text-[15px] font-semibold text-m-text">
           {money(standing.verifiedMinor)} paid of {money(deal.amountMinor)}
         </p>
+        {deal.status !== "approved" && deal.plan.depositMinor > 0 && (
+          <p className="mt-1 text-[13px] text-m-muted">The {money(deal.plan.depositMinor)} deposit is checked with the deal.</p>
+        )}
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-m-raised ring-1 ring-m-line" aria-hidden>
           <div
             className="h-full rounded-full bg-(color:--m-good-fg)"

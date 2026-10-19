@@ -120,6 +120,7 @@ export default function BuyersPage() {
       render: (lead) => (
         <span className="inline-flex flex-wrap items-center gap-1.5 md:flex-nowrap">
           <Badge tone={LEAD_TONE[lead.state]}>{LEAD_STATE_LABEL[lead.state]}</Badge>
+          {lead.self && <Badge tone="wine">Partner purchase</Badge>}
           {lead.state === "won" && lead.dealId && <Badge tone="green">Deal</Badge>}
         </span>
       ),

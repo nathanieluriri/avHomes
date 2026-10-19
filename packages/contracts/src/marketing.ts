@@ -269,6 +269,9 @@ export interface MarketerBalance {
   paidMinor: number;
   /** Deals still being checked. Not money yet, and labelled as such. */
   pendingMinor: number;
+  /** Their share of payment plans still being paid, earned as each payment is verified. */
+  planToComeMinor?: number;
+  plansOpen?: number;
 }
 
 /* ═════════════════════════════════════════════════════════════════ PAY RUNS ══ */

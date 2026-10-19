@@ -37,6 +37,8 @@ export function joinedOn(at: number): string {
 
 export interface MarketingCounts {
   dealsWaiting: number;
+  /** Plan payments a partner logged, waiting to be verified. */
+  paymentsWaiting: number;
   issuesOpen: number;
   marketersActive: number;
   owedMinor: number;

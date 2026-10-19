@@ -118,6 +118,15 @@ function useSelfParam(): boolean {
   );
 }
 
+/** `?lead=<id>`: the registered interest this payment is for, so approving it closes that interest. */
+function useLeadParam(): string | null {
+  return useSyncExternalStore(
+    onPopState,
+    () => new URLSearchParams(window.location.search).get("lead"),
+    () => null,
+  );
+}
+
 /** Fills the buyer with the partner themselves once their profile has loaded. Must render inside AppShell. */
 function SelfBuyer({ onMe }: { onMe: (me: { displayName: string; phone: string; email: string }) => void }) {
   const { me } = useMarketer();
@@ -657,6 +666,7 @@ export default function NewDealPage() {
   const [note, setNote] = useState("");
   const [plan, setPlan] = useState<PlanDraft>(NO_PLAN);
   const self = useSelfParam();
+  const leadId = useLeadParam();
   const [selfFilled, setSelfFilled] = useState(false);
   const uploads = useProofUploads();
 
@@ -733,6 +743,7 @@ export default function NewDealPage() {
         closedOn: dateInputToEpoch(closedOn),
         plan: planFromDraft(plan),
         selfPurchase: self,
+        leadId: self ? leadId : null,
       });
       // Replace, not push: back from the deals must not land inside a form already sent.
       router.replace(self ? "/m/purchases" : result.alsoClaimed ? "/m/deals?new=claimed" : "/m/deals?new=1");

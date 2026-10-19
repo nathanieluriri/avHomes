@@ -34,6 +34,8 @@ export interface MeResponse {
   supportPhone: string;
   /** False when the bank name check is not configured on this site. */
   bankCheck: boolean;
+  /** Whether buying a home yourself earns commission. Off by default. */
+  selfPurchasePays?: boolean;
   isAdmin: boolean;
   /** Alerts that need the marketer to act. The bell's number. */
   alertCount: number;

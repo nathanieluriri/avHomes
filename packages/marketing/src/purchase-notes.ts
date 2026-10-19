@@ -1,5 +1,5 @@
 import type { Db } from "mongodb";
-import { formatMoney, type Deal, type PushMessage } from "@avhomes/contracts";
+import { formatMoney, type Deal, type DealShare, type PushMessage } from "@avhomes/contracts";
 import { findMarketerById, userIdsFor } from "./repo";
 import type { SendTemplate } from "./whatsapp";
 
@@ -66,6 +66,26 @@ export async function tellPurchase(
     } else {
       await deps.mail(db, marketer.email, "purchase-update", { name, property: input.property, headline: title, message: body, link }, ctx);
     }
+  }
+}
+
+/** Uplines earn on every verified plan payment, not only at approval, so each one is told. */
+export async function tellUplineShares(
+  deps: NoteDeps,
+  db: Db,
+  input: { deal: Deal; shares: readonly DealShare[] },
+): Promise<void> {
+  const { deal } = input;
+  const closer = firstOf(deal.closerName || deal.reporterName);
+  for (const share of input.shares) {
+    if (share.marketerId === deal.reporterId || share.amountMinor <= 0) continue;
+    await push(deps, db, share.marketerId, {
+      kind: "share-earned",
+      title: `You earned ${formatMoney(share.amountMinor, deal.currency)}`,
+      body: `Your level ${share.level} share of a payment on ${closer}'s deal on ${deal.listingTitle}.`,
+      url: `/m/deals/${deal.id}`,
+      tag: `deal-${deal.id}`,
+    });
   }
 }
 

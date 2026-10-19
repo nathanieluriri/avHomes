@@ -14,6 +14,8 @@ import {
   parseMajor,
   personRates,
   plainMajor,
+  planRefusal,
+  slicePayment,
   splitFor,
   type AwaitingClose,
   type Deal,
@@ -57,7 +59,7 @@ interface DealDetail {
   /** Settled shares once approved, a preview at today's rates before that. */
   shares: DealShare[];
   alsoClaimed: Deal[];
-  rates: MarketingSettings;
+  rates: Pick<MarketingSettings, "commission">;
 }
 
 export default function DealDetailPage() {
@@ -183,6 +185,14 @@ function DealScreen({ initial }: { initial: DealDetail }) {
         amountMinor: Math.floor((amountMinor * share.rate) / 100),
       }));
   const paidOut = lines.reduce((sum, line) => sum + line.amountMinor, 0);
+  const planToDecide = !settled && deal.plan ? deal.plan : null;
+  const planProblem = planToDecide ? planRefusal(amountMinor, planToDecide) : null;
+  const depositEarns = planToDecide
+    ? slicePayment(0, planToDecide.depositMinor, amountMinor, { people: lines, funds: [] }).people.reduce(
+        (sum, line) => sum + line.amountMinor,
+        0,
+      )
+    : 0;
 
   function announce() {
     // The rail's Deals badge is fed by a poll; this is what makes it follow a
@@ -308,7 +318,11 @@ function DealScreen({ initial }: { initial: DealDetail }) {
             <EmptyState
               bare
               title="Nobody earns on this one"
-              hint="The marketer is paused or banned, or every rate is zero. Approving it still records the sale."
+              hint={
+                deal.selfPurchase
+                  ? "A partner buying a home for themselves earns no commission unless the commission settings say so. The two funds still take their share."
+                  : "The marketer is paused or banned, or every rate is zero. Approving it still records the sale."
+              }
             />
           ) : (
             lines.map((line) => (
@@ -357,6 +371,23 @@ function DealScreen({ initial }: { initial: DealDetail }) {
       {canReview && decides && (
         <Card spotlight="deal-decide">
           <CardHead title="Decide" />
+          {planToDecide && (
+            <p
+              className={`mb-3 rounded-xl px-3 py-2 text-[12px] leading-relaxed ${
+                planProblem ? "bg-amber-50 text-amber-900" : "bg-wine-50 text-wine-700"
+              }`}
+            >
+              {planProblem
+                ? planProblem
+                : paidOut === 0
+                  ? planToDecide.depositMinor > 0
+                    ? `On a payment plan. Approving verifies the ${formatMoney(planToDecide.depositMinor, deal.currency)} deposit, and each later payment is logged and verified here as it arrives.`
+                    : "On a payment plan with no deposit. Each payment is logged and verified here as it arrives."
+                  : planToDecide.depositMinor > 0
+                    ? `On a payment plan. Approving verifies the ${formatMoney(planToDecide.depositMinor, deal.currency)} deposit, which earns ${formatMoney(depositEarns, deal.currency)} of the ${formatMoney(paidOut, deal.currency)} commission now. The rest is earned as each payment is verified.`
+                    : `On a payment plan with no deposit, so approving earns nothing yet. The ${formatMoney(paidOut, deal.currency)} commission is earned as each payment is verified.`}
+            </p>
+          )}
           <Field
             label="Reason"
             hint="One line, and the marketer reads it. Needed to ask for information or to refuse."
@@ -372,7 +403,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
           <div className="mt-3 flex flex-col gap-2">
             <Button
               size="lg"
-              disabled={busy || amountRefusal !== null}
+              disabled={busy || amountRefusal !== null || planProblem !== null}
               onClick={() => void review("approved")}
             >
               {busy ? "Working" : "Approve deal"}
@@ -489,7 +520,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
             )}
           </Card>
 
-          <PlanPayments deal={deal} onChange={setDeal} />
+          <PlanPayments deal={deal} onChange={setDeal} canDecide={decides} />
 
           <Card>
             <CardHead title="The deal" />

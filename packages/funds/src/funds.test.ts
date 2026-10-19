@@ -107,6 +107,22 @@ describe("the monthly fold", () => {
     );
     assert.deepEqual([oct!.paidMinor, oct!.payments, oct!.closingMinor], [0, 0, 11_000]);
   });
+
+  test("a payment plan paying the fund twice in a month, and again the next, is one deal each month and one in all", () => {
+    const now = new Date(2026, 9, 15).getTime();
+    const at = (m: number, d: number) => new Date(2026, m, d).getTime();
+    const share = (amountMinor: number, dealId: string, createdAt: number) => ({ amountMinor, currency: "NGN", dealId, kind: "accrual" as const, createdAt });
+    const out = foldMonths([share(3_000, "plan", at(8, 2)), share(2_000, "plan", at(8, 20)), share(1_000, "other", at(8, 21)), share(2_000, "plan", at(9, 3))], {
+      fund: "reward",
+      name: "Reward Pool",
+      months: 2,
+      now,
+    });
+    const [sep, oct] = out.months;
+    assert.deepEqual([sep!.inMinor, sep!.deals], [6_000, 2]);
+    assert.deepEqual([oct!.inMinor, oct!.deals], [2_000, 1]);
+    assert.equal(out.dealsInWindow, 2);
+  });
 });
 
 describe("the fund ledger", { skip: uri ? false : "set MONGODB_URI to run" }, () => {

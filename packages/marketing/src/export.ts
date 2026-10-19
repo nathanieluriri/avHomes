@@ -16,20 +16,8 @@ import { toCsv, xlsx, zip, type SheetCell, type SheetColumn } from "./spreadshee
 
 export type ExportRow = Record<MarketerExportField, SheetCell>;
 
-const WIDTHS: Partial<Record<MarketerExportField, number>> = {
-  code: 10,
-  name: 24,
-  email: 30,
-  phone: 16,
-  state: 14,
-  status: 11,
-  joined: 13,
-  uplineName: 24,
-  uplineCode: 14,
-  bankName: 22,
-  accountName: 26,
-  accountNumber: 16,
-};
+/* The console's wording, which says "Banned" where the partner's own screen says "Closed". */
+const STATUS_LABEL: Record<MarketerDoc["status"], string> = { active: "Active", paused: "Paused", banned: "Banned" };
 
 /** The last four digits, so a row can be matched to a bank statement without holding the account. */
 export function maskAccount(number: string): string {
@@ -105,7 +93,7 @@ export async function marketerExportRows(db: Db, options: { fullAccountNumbers: 
       email: doc.email,
       phone: doc.phone,
       state: doc.state,
-      status: doc.status,
+      status: STATUS_LABEL[doc.status] ?? doc.status,
       joined: doc.joinedAt ?? doc.createdAt,
       uplineName: parent?.displayName ?? "",
       uplineCode: parent?.code ?? "",
@@ -129,7 +117,6 @@ export function exportColumns(fields: readonly MarketerExportField[], currency: 
     return {
       label: info.kind === "money" ? `${info.label} (${currency})` : info.label,
       kind: info.kind,
-      width: WIDTHS[field] ?? (info.kind === "money" ? 20 : 15),
     };
   });
 }

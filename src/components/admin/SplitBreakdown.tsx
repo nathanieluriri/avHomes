@@ -25,6 +25,7 @@ export function SplitBreakdown({
   onToggle,
   heading = "Where this money goes",
   spotlight,
+  paidMinor,
 }: {
   amountMinor: number;
   currency: string;
@@ -38,17 +39,23 @@ export function SplitBreakdown({
   heading?: string;
   /** A tutorial anchor, rendered as `data-spotlight` on whichever state is drawn. */
   spotlight?: string;
+  /** A payment plan part paid: the split is of this much, not of the whole amount. */
+  paidMinor?: number;
 }) {
   const paidOut =
     people.reduce((sum, share) => sum + share.amountMinor, 0) +
     funds.reduce((sum, share) => sum + share.amountMinor, 0);
   const total = paidOut + keptMinor;
   const money = (minor: number) => formatMoney(minor, currency);
+  const partPaid = paidMinor !== undefined && paidMinor !== amountMinor;
+  const target = partPaid ? paidMinor : amountMinor;
 
   /* Collapsed, it is one line: the whole point of collapsing is that the summary is
      readable on its own. "Commission and shares" rather than "Details", because a
      label that does not say what is behind it makes people open everything. */
-  const summary = `${money(paidOut)} out, ${money(keptMinor)} kept`;
+  const summary = partPaid
+    ? `${money(paidOut)} out, ${money(keptMinor)} kept, of ${money(paidMinor)} paid so far`
+    : `${money(paidOut)} out, ${money(keptMinor)} kept`;
 
   if (!open) {
     return (
@@ -114,11 +121,11 @@ export function SplitBreakdown({
         */}
         <div className="flex items-baseline justify-between border-t border-mist-200 pt-1.5">
           <dt className="text-[11px] uppercase tracking-wide text-slate-600">
-            {total === amountMinor ? "Adds up to the sale" : "Does not add up"}
+            {total !== target ? "Does not add up" : partPaid ? "Adds up to what has been paid" : "Adds up to the sale"}
           </dt>
           <dd
             className={`c-num text-[12px] font-semibold ${
-              total === amountMinor ? "text-plum-950" : "text-red-600"
+              total === target ? "text-plum-950" : "text-red-600"
             }`}
           >
             {money(total)}

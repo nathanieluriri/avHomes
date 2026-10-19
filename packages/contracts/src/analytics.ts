@@ -188,6 +188,13 @@ export interface TransactionRow {
   fundShares: FundShare[];
   keptMinor: number;
   proof: string[];
+  /** On a payment plan the split is what has been earned so far, out of `paidMinor`. */
+  onPlan: boolean;
+  /** Verified money received. The whole amount on a deal paid in full. */
+  paidMinor: number;
+  /** The partner bought it themselves; `reporterName` is who. */
+  selfPurchase: boolean;
+  reporterName: string;
 }
 
 /** Kept structural so this file does not have to import a value to name a type. */

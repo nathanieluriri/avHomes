@@ -192,6 +192,7 @@ const RULES: readonly Rule[] = [
      deal is the accountant's; deciding one stays marketing's, hence `readOnly`. */
   { prefix: "/api/admin/marketing/counts", domain: "finance", readOnly: true },
   { prefix: "/api/admin/marketing/deals", domain: "finance", readOnly: true },
+  { prefix: "/api/admin/marketing/plans", domain: "finance", readOnly: true },
   { prefix: "/api/admin/marketing/pay-runs", domain: "finance" },
   { prefix: "/api/admin/marketing/issues", domain: "finance" },
   { prefix: "/api/admin/marketing/marketers/export", domain: "finance" },

@@ -7,6 +7,7 @@ import {
   PLAN_STATE_LABEL,
   formatMoney,
   parseMajor,
+  plainMajor,
   planStanding,
   type Deal,
 } from "@avhomes/contracts";
@@ -14,18 +15,22 @@ import { ApiError, api } from "@/lib/admin/client";
 import { fullDate, shortDate } from "@/lib/admin/format";
 import { toApiError } from "@/lib/admin/marketing";
 import ImagePicker from "./ImagePicker";
+import { MoneyInput } from "./listing/MoneyInput";
 import { Badge, Button, Card, CardHead, DRow, DefinitionList, ErrorNote, Field, inputClass, type Tone } from "./ui";
 
 const STATE_TONE = { paid: "green", "on-track": "neutral", "due-soon": "amber", overdue: "red" } as const satisfies Record<string, Tone>;
 const PAYMENT_TONE = { pending: "amber", verified: "green", rejected: "red" } as const satisfies Record<string, Tone>;
 
 /** A payment-plan deal: where it stands, every payment, and the controls to verify, reject or log one. */
-export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: Deal) => void }) {
+/** `canDecide` is the marketing domain: the accountant reads a plan but does not verify its payments. */
+export function PlanPayments({ deal, onChange, canDecide }: { deal: Deal; onChange: (deal: Deal) => void; canDecide: boolean }) {
   const [busy, setBusy] = useState(false);
   const [now] = useState(() => Date.now());
   const [error, setError] = useState<ApiError | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [correcting, setCorrecting] = useState<string | null>(null);
+  const [corrected, setCorrected] = useState("");
   const [logging, setLogging] = useState(false);
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState("");
@@ -37,6 +42,8 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
   const standing = planStanding(deal.amountMinor, plan, deal.payments, now);
   const approved = deal.status === "approved";
   const parsed = parseMajor(amount || "0", deal.currency);
+  const correctedParsed = parseMajor(corrected || "0", deal.currency);
+  const correctedMinor = correctedParsed.ok ? correctedParsed.minor : 0;
 
   async function act(run: () => Promise<{ deal: Deal }>) {
     setBusy(true);
@@ -44,6 +51,8 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
     try {
       const res = await run();
       onChange(res.deal);
+      // The rail's Deals badge counts payments waiting to be verified.
+      window.dispatchEvent(new Event("avhomes:deals-reviewed"));
       return true;
     } catch (err) {
       setError(toApiError(err));
@@ -58,7 +67,7 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
     const ok = await act(() =>
       api.post<{ deal: Deal }>(`/admin/marketing/deals/${deal.id}/payments`, {
         amountMinor: parsed.minor,
-        paidOn: paidOn ? new Date(paidOn).getTime() : 0,
+        paidOn: paidOn ? Date.parse(`${paidOn}T12:00:00`) : 0,
         proof,
       }),
     );
@@ -123,8 +132,32 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
                   ))}
                 </div>
               )}
-              {p.status === "pending" &&
-                (rejecting === p.id ? (
+              {canDecide && p.status === "pending" &&
+                (correcting === p.id ? (
+                  <div className="mt-2 space-y-2">
+                    <Field label="What actually arrived" hint="Commission is worked out on this amount, not the one logged.">
+                      <MoneyInput value={corrected} onChange={setCorrected} />
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={busy || correctedMinor < 1}
+                        onClick={() =>
+                          void act(() =>
+                            api.post(`/admin/marketing/deals/${deal.id}/payments/${p.id}/verify`, { amountMinor: correctedMinor }),
+                          ).then((ok) => {
+                            if (ok) setCorrecting(null);
+                          })
+                        }
+                      >
+                        {correctedMinor > 0 ? `Verify ${money(correctedMinor)}` : "Verify"}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setCorrecting(null)} disabled={busy}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : rejecting === p.id ? (
                   <div className="mt-2 space-y-2">
                     <input className={inputClass} value={reason} placeholder="Why it was not accepted" onChange={(e) => setReason(e.target.value)} />
                     <div className="flex gap-2">
@@ -148,7 +181,7 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       disabled={busy}
@@ -156,7 +189,27 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
                     >
                       Verify
                     </Button>
-                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => setRejecting(p.id)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setRejecting(null);
+                        setCorrecting(p.id);
+                        setCorrected(plainMajor(p.amountMinor, deal.currency));
+                      }}
+                    >
+                      A different amount arrived
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setCorrecting(null);
+                        setRejecting(p.id);
+                      }}
+                    >
                       Reject
                     </Button>
                   </div>
@@ -166,7 +219,7 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
         </ul>
       )}
 
-      {approved && standing.leftMinor - standing.pendingMinor > 0 && (
+      {canDecide && approved && standing.leftMinor - standing.pendingMinor > 0 && (
         <div className="mt-4 border-t border-mist-100 pt-3">
           {!logging ? (
             <Button variant="ghost" className="w-full" onClick={() => setLogging(true)}>
@@ -175,9 +228,9 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
           ) : (
             <div className="space-y-2">
               <Field label="Amount">
-                <input className={inputClass} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <MoneyInput value={amount} onChange={setAmount} />
               </Field>
-              <Field label="Paid on">
+              <Field label="Paid on" hint="Leave it empty for today.">
                 <input type="date" className={inputClass} value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
               </Field>
               <Field label="Proof" as="group">

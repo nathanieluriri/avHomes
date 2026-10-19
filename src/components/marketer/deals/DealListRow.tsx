@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { formatMoney } from "@avhomes/contracts";
 import { shortDate } from "@/lib/admin/format";
+import { maskMoney, useMoneyHidden } from "@/lib/marketer/prefs";
 import type { DealRowData } from "@/lib/marketer/api";
 import { useMarketer } from "../AppShell";
 import { IconDeals, IconListings } from "../icons3d";
@@ -23,13 +25,23 @@ export function DealListRow({ deal }: { deal: DealRowData }) {
   const when = shortDate(deal.closedOn > 0 ? deal.closedOn : deal.createdAt);
   // A level 2 or 3 share means somebody else closed it.
   const closer = deal.myShare && deal.myShare.level > 1 ? deal.reporterName : "";
-  const sub = closer
-    ? `${kindWord(deal.listingType)} on ${when} by ${closer}`
-    : `${kindWord(deal.listingType)} on ${when}`;
+  const sub = deal.selfPurchase
+    ? `Your own purchase, ${when}`
+    : closer
+      ? `${kindWord(deal.listingType)} on ${when} by ${closer}`
+      : `${kindWord(deal.listingType)} on ${when}`;
 
   const earned = deal.status === "approved" ? deal.myShare : null;
   const open = stillOpen(deal.status);
-  const estimate = open ? couldEarn(deal.amountMinor, deal.listingType, me?.rates) : null;
+  const estimate =
+    open && (!deal.selfPurchase || me?.selfPurchasePays) ? couldEarn(deal.amountMinor, deal.listingType, me?.rates) : null;
+  // On a plan still being paid, what is earned grows with each verified payment.
+  const myId = earned?.marketerId ?? me?.marketer.id ?? "";
+  const paying = deal.status === "approved" && deal.plan !== null && deal.paidMinor < deal.amountMinor;
+  const inFull = paying ? (deal.planShares ?? []).find((share) => share.marketerId === myId) : undefined;
+  const [hidden] = useMoneyHidden();
+  const toCome = inFull ? formatMoney(Math.max(0, inFull.amountMinor - (earned?.amountMinor ?? 0)), deal.currency) : "";
+  const paidPct = deal.amountMinor > 0 ? Math.floor((deal.paidMinor / deal.amountMinor) * 100) : 0;
 
   return (
     <Link
@@ -47,13 +59,25 @@ export function DealListRow({ deal }: { deal: DealRowData }) {
           <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-m-faint" aria-hidden />
         </span>
         <span className="mt-0.5 block truncate text-[13px] text-m-muted">{sub}</span>
+        {paying && (
+          <span className="mt-0.5 block truncate text-[13px] text-m-muted">
+            Plan: <span className="m-num">{paidPct}%</span> paid
+            {toCome && (
+              <>
+                , <span className="m-num">{hidden ? maskMoney(toCome) : toCome}</span> to come
+              </>
+            )}
+          </span>
+        )}
         <span className="mt-2 flex items-end justify-between gap-3">
           <DealStatusChip status={deal.status} />
-          {earned ? (
+          {paying && inFull ? (
+            <Figure caption="earned so far" minor={earned?.amountMinor ?? 0} currency={deal.currency} />
+          ) : earned ? (
             <Figure caption="you earned" minor={earned.amountMinor} currency={deal.currency} />
           ) : estimate ? (
             <Figure caption="you could earn" minor={estimate.minor} currency={deal.currency} />
-          ) : open ? (
+          ) : open && !deal.selfPurchase ? (
             <Skeleton className="h-8 w-20" />
           ) : null}
         </span>

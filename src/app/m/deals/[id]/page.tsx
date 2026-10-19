@@ -78,7 +78,9 @@ function plan(view: DealView, justSent: boolean): { key: SectionKey; label: stri
   if (asking) out.push({ key: "ask", label: "Do this" });
   if (deal.status === "rejected") out.push({ key: "why", label: "Why it was not approved" });
   if (deal.status === "cancelled") out.push({ key: "why", label: "Why it was cancelled" });
-  if (deal.status === "approved" || stillOpen(deal.status)) {
+  // Buying for yourself earns nothing unless AV Homes has said it does, and then the share says so.
+  const ownPurchase = deal.selfPurchase && !view.myShare;
+  if (!ownPurchase && (deal.status === "approved" || stillOpen(deal.status))) {
     out.push({ key: "money", label: "Your money" });
   }
   if (deal.plan) out.push({ key: "plan", label: "Payment plan" });
@@ -179,7 +181,7 @@ function DealHero({ deal, loading }: { deal: Deal | undefined; loading: boolean 
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <DealStatusChip status={deal.status} />
       <span className="m-glass inline-flex h-[26px] items-center rounded-full px-2.5 text-[12px] font-semibold">
-        {kindWord(deal.listingType)} on {shortDate(when)}
+        {deal.selfPurchase ? "Paid" : kindWord(deal.listingType)} on {shortDate(when)}
       </span>
     </div>
   );
@@ -434,11 +436,11 @@ function Facts({ view }: { view: DealView }) {
   const mine = isMine(view);
   return (
     <RowGroup>
-      <Fact label="What happened">{kindWord(deal.listingType)}</Fact>
-      <Fact label="What they paid">
+      <Fact label="What happened">{deal.selfPurchase ? "You are buying it" : kindWord(deal.listingType)}</Fact>
+      <Fact label={deal.selfPurchase ? "The price" : "What they paid"}>
         <Amount minor={deal.amountMinor} currency={deal.currency} size="md" />
       </Fact>
-      {deal.closedOn > 0 && <Fact label="Date it was done">{fullDate(deal.closedOn)}</Fact>}
+      {deal.closedOn > 0 && <Fact label={deal.selfPurchase ? "Paid on" : "Date it was done"}>{fullDate(deal.closedOn)}</Fact>}
       <Fact label="Reported">{fullDate(deal.createdAt)}</Fact>
       {!mine && (
         <Fact label="Closed by">
@@ -446,8 +448,8 @@ function Facts({ view }: { view: DealView }) {
           <span className="m-num ml-1.5 text-[13px] font-medium text-m-muted">{deal.reporterCode}</span>
         </Fact>
       )}
-      {mine && deal.buyerName !== "" && <Fact label="Buyer">{deal.buyerName}</Fact>}
-      {mine && deal.buyerPhone !== "" && (
+      {mine && !deal.selfPurchase && deal.buyerName !== "" && <Fact label="Buyer">{deal.buyerName}</Fact>}
+      {mine && !deal.selfPurchase && deal.buyerPhone !== "" && (
         <Fact label="Buyer phone">
           <a href={`tel:${deal.buyerPhone.replace(/\s/gu, "")}`} className="m-link m-num">
             {formatPhone(deal.buyerPhone)}

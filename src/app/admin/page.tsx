@@ -3,18 +3,23 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Banknote,
   Building2,
   Handshake,
   Images,
   Inbox,
+  Landmark,
   Newspaper,
+  PiggyBank,
   Users,
   type LucideIcon,
 } from "lucide-react";
 import {
   formatMoney,
   hasDomain,
+  type AccountsSummary,
   type Domain,
+  type Role,
   type SiteAlert,
   type SitePulse,
 } from "@avhomes/contracts";
@@ -22,6 +27,7 @@ import { api } from "@/lib/admin/client";
 import { useAsync, useIsNarrow, useSession } from "@/lib/admin/hooks";
 import { relative } from "@/lib/admin/format";
 import { Badge, Card, ErrorNote, Skeleton } from "@/components/admin/ui";
+import { StatRow, StatTile } from "@/components/admin/StatTile";
 import { AlertBanner } from "@/components/admin/Alerts";
 import { PulseStrip } from "@/components/admin/PulseStrip";
 import { StorefrontCard } from "@/components/admin/StorefrontCard";
@@ -59,6 +65,7 @@ interface Dashboard {
   /** Null for a role without the marketing domain: the server does not send it. */
   marketing: {
     dealsWaiting: number;
+    paymentsWaiting?: number;
     issuesOpen: number;
     owedMinor: number;
     marketersActive: number;
@@ -77,6 +84,12 @@ interface Destination {
   /** Takes two columns. Listings gets it because listings are the job, and
    *  because a uniform grid of five equal cards reads as a settings page. */
   wide?: boolean;
+  /** Drawn only for these roles. An owner reaches Pay day through Marketers already. */
+  onlyFor?: readonly Role[];
+}
+
+function visibleTo(role: Role) {
+  return (item: Destination) => hasDomain(role, item.domain) && (!item.onlyFor || item.onlyFor.includes(role));
 }
 
 const DESTINATIONS: readonly Destination[] = [
@@ -135,6 +148,35 @@ const DESTINATIONS: readonly Destination[] = [
     domain: "team",
     kicker: () => null,
   },
+  {
+    href: "/admin/accounts",
+    label: "Accounts",
+    title: "The balance sheet",
+    body: "Money in, where it went, and what is owed either way.",
+    icon: Landmark,
+    domain: "finance",
+    kicker: () => null,
+  },
+  {
+    href: "/admin/marketers/pay",
+    label: "Pay day",
+    title: "Send this month's pay",
+    body: "Each partner's transfer, with its receipt and reference.",
+    icon: Banknote,
+    domain: "finance",
+    onlyFor: ["accountant"],
+    kicker: () => null,
+  },
+  {
+    href: "/admin/analytics/wallets",
+    label: "The two funds",
+    title: "Record a fund payment",
+    body: "What each fund holds, and every payment made out of it.",
+    icon: PiggyBank,
+    domain: "finance",
+    onlyFor: ["accountant"],
+    kicker: () => null,
+  },
 ];
 
 /**
@@ -146,15 +188,21 @@ function marketingKicker(marketing: Dashboard["marketing"]): string | null {
   if (!marketing) return null;
   const parts: string[] = [];
   if (marketing.dealsWaiting > 0) parts.push(`${marketing.dealsWaiting} to check`);
+  const payments = marketing.paymentsWaiting ?? 0;
+  if (payments > 0) parts.push(`${payments} ${payments === 1 ? "payment" : "payments"} to verify`);
   if (marketing.owedMinor > 0) parts.push(`${formatMoney(marketing.owedMinor)} owed`);
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
 export default function DashboardPage() {
   const { session } = useSession();
-  const { data, error, loading, reload } = useAsync<Dashboard>(
-    (signal) => api.get<Dashboard>("/admin/dashboard", signal),
-    [],
+  const user = session.status === "signed-in" ? session.user : null;
+  /* The briefing is analytics. A role without it, such as an editor or the
+     accountant, gets the launcher alone rather than a refused read. */
+  const briefed = user ? hasDomain(user.role, "analytics") : false;
+  const { data, error, loading, reload } = useAsync<Dashboard | null>(
+    (signal) => (briefed ? api.get<Dashboard>("/admin/dashboard", signal) : Promise.resolve(null)),
+    [briefed],
   );
 
   /*
@@ -175,7 +223,6 @@ export default function DashboardPage() {
   // Where the tutorials nudge can sit without pushing anything: beside the pulse from lg, under the destinations below it.
   const narrow = useIsNarrow();
 
-  const user = session.status === "signed-in" ? session.user : null;
   const firstName = user?.displayName.trim().split(/\s+/)[0] ?? "";
 
   return (
@@ -215,7 +262,7 @@ export default function DashboardPage() {
           <ErrorNote error={error} onRetry={reload} />
           {user && (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {DESTINATIONS.filter((item) => hasDomain(user.role, item.domain)).map((item) => (
+              {DESTINATIONS.filter(visibleTo(user.role)).map((item) => (
                 <DestinationCard key={item.href} item={item} data={null} />
               ))}
             </div>
@@ -230,6 +277,8 @@ export default function DashboardPage() {
         no content, a blank frame for as long as /auth/me took.
       */}
       {(loading || !user) && !error && <DashboardSkeleton />}
+
+      {user && !briefed && !loading && <LauncherOnly role={user.role} firstName={firstName} />}
 
       {data && user && (
         <>
@@ -263,7 +312,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {DESTINATIONS.filter((item) => hasDomain(user.role, item.domain)).map((item) => (
+              {DESTINATIONS.filter(visibleTo(user.role)).map((item) => (
                 <DestinationCard key={item.href} item={item} data={data} />
               ))}
             </div>
@@ -341,6 +390,46 @@ export default function DashboardPage() {
  * the screen twice. The kicker carries live state, so the card becomes a
  * notification without any extra chrome.
  */
+/**
+ * Home for a role the briefing is not for. The accountant also gets today's
+ * money at a glance, from the same read as the balance sheet.
+ */
+function LauncherOnly({ role, firstName }: { role: Role; firstName: string }) {
+  const money = hasDomain(role, "finance");
+  const accounts = useAsync<AccountsSummary | null>(
+    (signal) => (money ? api.get<AccountsSummary>("/admin/accounts", signal) : Promise.resolve(null)),
+    [money],
+  );
+  const pos = accounts.data?.position;
+  const naira = (minor: number) => formatMoney(minor, accounts.data?.currency ?? "NGN");
+  return (
+    <section className="space-y-5">
+      <div className="text-center">
+        <h1 className="text-xl font-bold tracking-tight text-plum-950 sm:text-2xl">
+          {firstName ? `${firstName}, what` : "What"} do you want to work on next?
+        </h1>
+      </div>
+      {money && (
+        <StatRow>
+          <StatTile label="Owed to partners" value={pos ? naira(pos.owedMinor) : "-"} scope="credited, not yet sent" />
+          <StatTile label="Due from buyers" value={pos ? naira(pos.dueMinor) : "-"} scope="on payment plans" />
+          <StatTile
+            label="Plan payments to verify"
+            value={pos ? String(pos.paymentsWaiting) : "-"}
+            scope={pos ? naira(pos.paymentsWaitingMinor) : ""}
+          />
+          <StatTile label="Overdue on plans" value={pos ? naira(pos.overdueMinor) : "-"} scope="today" tone="quiet" />
+        </StatRow>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {DESTINATIONS.filter(visibleTo(role)).map((item) => (
+          <DestinationCard key={item.href} item={item} data={null} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function DestinationCard({ item, data }: { item: Destination; data: Dashboard | null }) {
   // Null on the error branch: the destination still works, it just has no live
   // state to advertise, and an invented kicker would be worse than none.
