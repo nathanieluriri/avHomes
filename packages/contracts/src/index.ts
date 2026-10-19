@@ -21,6 +21,7 @@ export * from "./phone";
 export * from "./email";
 export * from "./funds";
 export * from "./marketing";
+export * from "./plans";
 export * from "./analytics";
 export * from "./mail";
 export * from "./signature";

@@ -7,8 +7,11 @@
  * only place in the app that decides what somebody is owed.
  */
 
+import { planSchedule } from "@avhomes/contracts";
 import type {
   CloserKind,
+  DealPayment,
+  DealPlan,
   CommissionSplit,
   Deal,
   DealKind,
@@ -103,6 +106,14 @@ export interface DealDoc {
   reviewedAt: number | null;
   closedOn: number;
   shares: DealShare[];
+  plan?: DealPlan | null;
+  payments?: DealPayment[];
+  paidMinor?: number;
+  planShares?: DealShare[];
+  planFundShares?: FundShare[];
+  selfPurchase?: boolean;
+  /** Reminder keys already sent, such as `2:soon`. See reminderKey. */
+  reminders?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -194,6 +205,7 @@ export interface LeadDoc {
   state: LeadState;
   events: LeadEvent[];
   dealId: string | null;
+  self?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -297,6 +309,13 @@ export function toDeal(doc: DealDoc): Deal {
     reviewedAt: doc.reviewedAt ?? null,
     closedOn: doc.closedOn ?? doc.createdAt,
     shares: doc.shares ?? [],
+    plan: doc.plan ?? null,
+    schedule: doc.plan ? planSchedule(doc.amountMinor, doc.plan) : [],
+    payments: doc.payments ?? [],
+    paidMinor: doc.paidMinor ?? (doc.status === "approved" && !doc.plan ? doc.amountMinor : 0),
+    planShares: doc.planShares ?? [],
+    planFundShares: doc.planFundShares ?? [],
+    selfPurchase: doc.selfPurchase ?? false,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
@@ -392,6 +411,7 @@ export function toLead(doc: LeadDoc): Lead {
     state: doc.state,
     events: doc.events ?? [],
     dealId: doc.dealId ?? null,
+    self: doc.self ?? false,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };

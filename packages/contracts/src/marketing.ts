@@ -18,6 +18,7 @@
 
 import { DEFAULT_FUND_NAMES, type FundKind } from "./funds";
 import { DEFAULT_CURRENCY, minorUnitsFor } from "./money";
+import type { DealPayment, DealPlan, PlanDue } from "./plans";
 import { OWNERSHIPS, OWNERSHIP_LABEL, type Ownership } from "./types";
 
 /* ═══════════════════════════════════════════════════════════════ MARKETERS ══ */
@@ -201,7 +202,20 @@ export interface Deal {
   reviewedByName: string;
   reviewedAt: number | null;
   closedOn: number;
+  /** What has been earned so far. On a payment plan, only from verified payments. */
   shares: DealShare[];
+  /** Null when paid in full. */
+  plan: DealPlan | null;
+  /** The plan's expected payments, worked out on read. Empty when paid in full. */
+  schedule: PlanDue[];
+  payments: DealPayment[];
+  /** Verified money received. The whole price on an approved outright deal. */
+  paidMinor: number;
+  /** On a plan: what everyone earns once the full price is paid. Empty otherwise. */
+  planShares: DealShare[];
+  planFundShares: FundShare[];
+  /** A partner buying for themselves rather than introducing a buyer. */
+  selfPurchase: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -652,6 +666,12 @@ export interface MarketingSettings {
   joinOpen: boolean;
   /** Refuse a deal whose buyer phone belongs to the reporter or their upline. */
   blockSelfDeals: boolean;
+  /**
+   * A partner buying for themselves earns commission, and their upline their
+   * shares, as on any deal. Off by default: the funds still take their share,
+   * and nobody is paid for their own purchase.
+   */
+  selfPurchaseCommission: boolean;
   /** A pay run skips anyone under this. 0 pays every balance. */
   minPayoutMinor: number;
   currency: string;
@@ -679,6 +699,7 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   requireApproval: false,
   joinOpen: true,
   blockSelfDeals: true,
+  selfPurchaseCommission: false,
   minPayoutMinor: 0,
   currency: DEFAULT_CURRENCY,
   supportPhone: "+2348143345307",
@@ -1315,6 +1336,8 @@ export interface Lead {
   events: LeadEvent[];
   /** The deal a win minted, or null. Survives a reversal so the thread is readable. */
   dealId: string | null;
+  /** The partner who logged it wants to buy it themselves. */
+  self: boolean;
   createdAt: number;
   updatedAt: number;
 }

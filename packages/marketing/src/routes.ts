@@ -751,6 +751,7 @@ const SettingsBody = z
     requireApproval: z.boolean().optional(),
     joinOpen: z.boolean().optional(),
     blockSelfDeals: z.boolean().optional(),
+    selfPurchaseCommission: z.boolean().optional(),
     minPayoutMinor: z.number().int().min(0).optional(),
     supportPhone: str().max(40).optional(),
     accountProvider: z.enum(ACCOUNT_PROVIDERS).optional(),

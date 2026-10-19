@@ -122,8 +122,9 @@ function toAward(doc: AwardDoc): RewardAward {
  * halves are already `[A-Za-z0-9_-]`, so the joined string carries no dot or
  * dollar and stays a key every query in this file can address.
  */
-function accrualId(dealId: string, fund: FundKind): string {
-  return `facc_${fund}_${dealId}`;
+function accrualId(dealId: string, fund: FundKind, key?: string): string {
+  // A payment plan accrues once per payment, so the payment's id joins the key.
+  return key ? `facc_${fund}_${dealId}_${key}` : `facc_${fund}_${dealId}`;
 }
 
 /* ════════════════════════════════════════════════════════════════ BALANCES ══ */
@@ -226,6 +227,7 @@ export interface FundAccrualPort {
     db: Db,
     input: {
       dealId: string;
+      key?: string;
       currency: string;
       shares: readonly FundShare[];
       byName: string;
@@ -245,6 +247,7 @@ export async function accrueForDeal(
   db: Db,
   input: {
     dealId: string;
+    key?: string;
     currency: string;
     shares: readonly FundShare[];
     byName: string;
@@ -255,7 +258,7 @@ export async function accrueForDeal(
   const docs: FundDoc[] = input.shares
     .filter((share) => share.amountMinor > 0)
     .map((share) => ({
-      _id: accrualId(input.dealId, share.fund),
+      _id: accrualId(input.dealId, share.fund, input.key),
       fund: share.fund,
       kind: "accrual" as const,
       amountMinor: share.amountMinor,
