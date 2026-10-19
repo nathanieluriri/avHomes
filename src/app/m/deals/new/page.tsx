@@ -360,6 +360,8 @@ interface FactsProps {
   closedOn: string;
   setClosedOn: (next: string) => void;
   showErrors: boolean;
+  /** The partner is the buyer: no buyer to name and, by default, nothing to earn. */
+  self?: boolean;
 }
 
 /** What the amount typed so far would pay, worked out as it is typed from the rates the app was given. */
@@ -406,7 +408,7 @@ function DealFacts(props: FactsProps & { currency: string }) {
 
   return (
     <div className="space-y-5">
-      <Field label="What happened" as="group">
+      <Field label={props.self ? "Buying or renting" : "What happened"} as="group">
         <Segmented
           value={props.kind}
           options={KINDS}
@@ -417,8 +419,8 @@ function DealFacts(props: FactsProps & { currency: string }) {
 
       <div className="space-y-2.5">
         <Field
-          label="What they paid in the end"
-          hint="The final figure, not the asking price."
+          label={props.self ? "The full price you agreed" : "What they paid in the end"}
+          hint={props.self ? "The whole price, even if you are paying over time." : "The final figure, not the asking price."}
           error={noAmount ? "Put in the amount they paid." : undefined}
           as="group"
         >
@@ -429,9 +431,13 @@ function DealFacts(props: FactsProps & { currency: string }) {
             label="What they paid in the end, in naira"
           />
         </Field>
-        <LiveEarn amountMinor={props.amountMinor} kind={props.kind} currency={props.currency} />
+        {!props.self && <LiveEarn amountMinor={props.amountMinor} kind={props.kind} currency={props.currency} />}
       </div>
 
+      {props.self ? (
+        <Note>You are buying this yourself, so you are the buyer. AV Homes will keep you posted at every step.</Note>
+      ) : (
+        <>
       <Field label="Buyer name" error={noName ? "We need a name to check the deal." : undefined}>
         <input
           type="text"
@@ -470,6 +476,9 @@ function DealFacts(props: FactsProps & { currency: string }) {
           className={`${inputCls} ${badEmail ? "m-bad" : ""}`}
         />
       </Field>
+
+        </>
+      )}
 
       <Field
         label="Date it was done"
@@ -555,6 +564,7 @@ function ProofStep({
   kind,
   currency,
   showErrors,
+  self = false,
 }: {
   uploads: ProofUploads;
   note: string;
@@ -563,10 +573,11 @@ function ProofStep({
   kind: DealKind;
   currency: string;
   showErrors: boolean;
+  self?: boolean;
 }) {
   return (
     <div className="space-y-5">
-      <CouldEarn amountMinor={amountMinor} kind={kind} currency={currency} />
+      {!self && <CouldEarn amountMinor={amountMinor} kind={kind} currency={currency} />}
 
       <ProofPicker
         uploads={uploads}
@@ -858,6 +869,7 @@ export default function NewDealPage() {
                 closedOn={closedOn}
                 setClosedOn={setClosedOn}
                 showErrors={showErrors}
+                self={self}
               />
             )}
 
@@ -874,6 +886,7 @@ export default function NewDealPage() {
                 kind={kind}
                 currency={currency}
                 showErrors={showErrors}
+                self={self}
               />
             )}
 

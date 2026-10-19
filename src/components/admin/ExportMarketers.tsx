@@ -12,6 +12,13 @@ import { ApiError, api } from "@/lib/admin/client";
 import { BottomSheet } from "./BottomSheet";
 import { Button, ErrorNote, Switch } from "./ui";
 
+export const EXPORT_GROUPS: { title: string; fields: MarketerExportField[] }[] = [
+  { title: "The partner", fields: ["code", "name", "email", "phone", "state", "status", "joined"] },
+  { title: "Their team", fields: ["uplineName", "uplineCode", "teamSize", "directInvites"] },
+  { title: "Sales and commission", fields: ["dealsApproved", "salesValue", "commissionEarned", "commissionPaid", "commissionOwed"] },
+  { title: "Bank", fields: ["bankName", "accountName", "accountNumber"] },
+];
+
 /** Every partner as a zip of a styled workbook and a CSV, in the columns the admin ticks. */
 export function ExportMarketers() {
   const [open, setOpen] = useState(false);
@@ -111,7 +118,7 @@ export function ExportMarketers() {
         ) : allowed.length === 0 ? (
           <p className="text-[12px] text-slate-600">No fields may be exported. Turn some on under Commission settings.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex gap-3 text-[12px] font-semibold text-wine-700">
               <button type="button" onClick={() => setPicked(new Set(allowed))}>
                 Select all
@@ -120,14 +127,28 @@ export function ExportMarketers() {
                 Clear
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {allowed.map((field) => (
-                <label key={field} className="flex items-center gap-2 text-[13px] text-plum-950">
-                  <input type="checkbox" checked={picked.has(field)} onChange={() => toggle(field)} />
-                  {MARKETER_EXPORT_FIELD_INFO[field].label}
-                </label>
-              ))}
-            </div>
+            {EXPORT_GROUPS.map((group) => {
+              const fields = group.fields.filter((f) => allowed.includes(f));
+              if (fields.length === 0) return null;
+              return (
+                <fieldset key={group.title}>
+                  <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">{group.title}</legend>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+                    {fields.map((field) => (
+                      <label key={field} className="flex min-w-0 items-center gap-2 text-[13px] text-plum-950">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 accent-wine-700"
+                          checked={picked.has(field)}
+                          onChange={() => toggle(field)}
+                        />
+                        <span className="truncate">{MARKETER_EXPORT_FIELD_INFO[field].label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              );
+            })}
             {picked.has("accountNumber") && (
               <Switch
                 checked={fullNumbers}

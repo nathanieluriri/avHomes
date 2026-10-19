@@ -40,6 +40,7 @@ import { useAsync } from "@/lib/admin/hooks";
 import { toApiError } from "@/lib/admin/marketing";
 import { SaveBar } from "@/components/admin/SaveBar";
 import { LeaderboardSettingsCard } from "@/components/admin/LeaderboardSettingsCard";
+import { EXPORT_GROUPS } from "@/components/admin/ExportMarketers";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import {
   Card,
@@ -568,25 +569,31 @@ function CommissionEditor({
             <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
               The fields anyone may download from the Marketers page.
             </p>
-            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {MARKETER_EXPORT_FIELDS.map((field) => (
-                <label key={field} className="flex items-center gap-2 text-[13px] text-plum-950">
-                  <input
-                    type="checkbox"
-                    checked={draft.exportableFields.includes(field)}
-                    onChange={() =>
-                      set(
-                        "exportableFields",
-                        draft.exportableFields.includes(field)
-                          ? draft.exportableFields.filter((f) => f !== field)
-                          : MARKETER_EXPORT_FIELDS.filter((f) => f === field || draft.exportableFields.includes(f)),
-                      )
-                    }
-                  />
-                  {MARKETER_EXPORT_FIELD_INFO[field].label}
-                </label>
-              ))}
-            </div>
+            {EXPORT_GROUPS.map((group) => (
+              <fieldset key={group.title}>
+                <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">{group.title}</legend>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+                  {group.fields.map((field) => (
+                    <label key={field} className="flex min-w-0 items-center gap-2 text-[13px] text-plum-950">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 shrink-0 accent-wine-700"
+                        checked={draft.exportableFields.includes(field)}
+                        onChange={() =>
+                          set(
+                            "exportableFields",
+                            draft.exportableFields.includes(field)
+                              ? draft.exportableFields.filter((f) => f !== field)
+                              : MARKETER_EXPORT_FIELDS.filter((f) => f === field || draft.exportableFields.includes(f)),
+                          )
+                        }
+                      />
+                      <span className="truncate">{MARKETER_EXPORT_FIELD_INFO[field].label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
           </Card>
 
           <Card className="space-y-4">

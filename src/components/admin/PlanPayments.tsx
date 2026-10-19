@@ -73,6 +73,14 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
   return (
     <Card>
       <CardHead title="Payment plan" action={<Badge tone={STATE_TONE[standing.state]}>{PLAN_STATE_LABEL[standing.state]}</Badge>} />
+      <div className="mb-3">
+        <div className="h-2 overflow-hidden rounded-full bg-mist-100" aria-hidden="true">
+          <div className="h-full bg-emerald-600" style={{ width: `${Math.min(100, (standing.verifiedMinor / deal.amountMinor) * 100)}%` }} />
+        </div>
+        <p className="mt-1 text-[12px] text-slate-600">
+          {Math.floor((standing.verifiedMinor / deal.amountMinor) * 100)}% paid and verified
+        </p>
+      </div>
       <DefinitionList>
         <DRow label="Price">{money(deal.amountMinor)}</DRow>
         <DRow label="Deposit">{money(plan.depositMinor)}</DRow>

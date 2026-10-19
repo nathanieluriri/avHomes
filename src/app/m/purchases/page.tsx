@@ -39,7 +39,7 @@ function useWanted(): { id: string; title: string } | null {
 
 export default function PurchasesPage() {
   return (
-    <AppShell title="My purchases" hint="Property you are buying from AV Homes yourself." back="/m">
+    <AppShell title="My purchases" hint="Property you are buying from AV Homes yourself." back="/m" tab="Your purchases">
       <Purchases />
     </AppShell>
   );
@@ -130,7 +130,7 @@ function Purchases() {
 
         {data && data.deals.length > 0 && (
           <section>
-            <SectionLabel>Payments</SectionLabel>
+            <SectionLabel>Buying or bought</SectionLabel>
             <ul className="space-y-2">
               {data.deals.map((deal) => {
                 const owned = deal.status === "approved" && deal.paidMinor >= deal.amountMinor;

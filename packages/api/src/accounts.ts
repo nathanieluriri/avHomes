@@ -3,7 +3,10 @@ import { z } from "zod";
 import { COLLECTIONS, collection, type Db } from "@avhomes/db";
 import { BadRequestError, currentDb, readQuery, type AppEnv } from "@avhomes/core";
 import {
+  PAYOUT_FLAG_LABELS,
+  fundMonthLabel,
   fundMonthOf,
+  minorUnitsFor,
   type AccountsMonth,
   type AccountsReport,
   type FundKind,
@@ -13,7 +16,7 @@ import {
 } from "@avhomes/contracts";
 import { requireAuth } from "@avhomes/identity";
 import { fundBalances } from "@avhomes/funds";
-import { readMarketingSettings, reconcile } from "@avhomes/marketing";
+import { readMarketingSettings, reconcile, sheetCsv, workbook, type Sheet, type SheetCell } from "@avhomes/marketing";
 
 interface DealRow {
   amountMinor: number;
@@ -218,23 +221,156 @@ export async function accountsReport(
   };
 }
 
+const MONTH_COLUMNS: { key: Exclude<keyof AccountsMonth, "month">; label: string }[] = [
+  { key: "deals", label: "Deals" },
+  { key: "salesMinor", label: "Sales" },
+  { key: "commissionMinor", label: "Commission owed" },
+  { key: "paidOutMinor", label: "Commission paid" },
+  { key: "clawbackMinor", label: "Clawed back" },
+  { key: "fundsMinor", label: "Share to the funds" },
+  { key: "fundInMinor", label: "Fund inflows" },
+  { key: "fundOutMinor", label: "Fund payments" },
+  { key: "keptMinor", label: "AV Homes kept" },
+];
+
+export function accountsSheets(report: AccountsReport): Sheet[] {
+  const units = minorUnitsFor(report.currency);
+  const major = (minor: number) => minor / units;
+  const cur = report.currency;
+  const t = report.totals;
+
+  const summaryRows: SheetCell[][] = [
+    ["Period", `${fundMonthLabel(report.from)} to ${fundMonthLabel(report.to)}`, null],
+    ["Money in", `Deals closed: ${t.deals}`, null],
+    ["Money in", "Sales and rentals", major(t.salesMinor)],
+    ["Commission", "Owed on deals closed", major(t.commissionMinor)],
+    ["Commission", "Paid out", major(t.paidOutMinor)],
+    ["Commission", "Clawed back", major(t.clawbackMinor)],
+    ["Funds", "Share of deals", major(t.fundsMinor)],
+    ["Funds", "Inflows", major(t.fundInMinor)],
+    ["Funds", "Payments out", major(t.fundOutMinor)],
+    ["AV Homes", "Kept", major(t.keptMinor)],
+    ["Today", "Commission owed", major(report.position.commissionOwedMinor)],
+    ["Today", "Of which on a pay run", major(report.position.commissionScheduledMinor)],
+    ...report.position.funds.map((f): SheetCell[] => ["Today", `${f.name} balance`, major(f.balanceMinor)]),
+    ["Today", "Deals still being checked", major(report.position.pendingDealsMinor)],
+    ["Ledger check", report.check.ok ? "Balanced" : report.check.problems.join(" "), null],
+  ];
+
+  return [
+    {
+      name: "Summary",
+      columns: [
+        { label: "Section", kind: "text", width: 16 },
+        { label: "Item", kind: "text", width: 40 },
+        { label: `Amount (${cur})`, kind: "money", width: 22 },
+      ],
+      rows: summaryRows,
+    },
+    {
+      name: "By month",
+      columns: [
+        { label: "Month", kind: "text", width: 16 },
+        ...MONTH_COLUMNS.map((col) => ({
+          label: col.key === "deals" ? col.label : `${col.label} (${cur})`,
+          kind: col.key === "deals" ? ("count" as const) : ("money" as const),
+          width: col.key === "deals" ? 9 : 20,
+        })),
+      ],
+      rows: report.months.map((m) => [
+        fundMonthLabel(m.month),
+        ...MONTH_COLUMNS.map((col) => (col.key === "deals" ? m.deals : major(m[col.key]))),
+      ]),
+      total: ["Total", ...MONTH_COLUMNS.map((col) => (col.key === "deals" ? t.deals : major(t[col.key])))],
+    },
+    {
+      name: "Payouts",
+      columns: [
+        { label: "Pay month", kind: "text", width: 16 },
+        { label: "Partner", kind: "text", width: 26 },
+        { label: "Code", kind: "text", width: 12 },
+        { label: `Amount (${cur})`, kind: "money", width: 18 },
+        { label: "Status", kind: "text", width: 10 },
+        { label: "Bank", kind: "text", width: 22 },
+        { label: "Account name", kind: "text", width: 26 },
+        { label: "Account", kind: "text", width: 12 },
+        { label: "Reference", kind: "text", width: 20 },
+        { label: "Marked paid", kind: "date", width: 14 },
+        { label: "Marked paid by", kind: "text", width: 20 },
+        { label: "Receipts", kind: "count", width: 10 },
+        { label: "Flags", kind: "text", width: 40 },
+        { label: "Receipt links", kind: "text", width: 60 },
+      ],
+      rows: report.payouts.map((p) => [
+        fundMonthLabel(p.month),
+        p.displayName,
+        p.code,
+        major(p.totalMinor),
+        p.status === "paid" ? "Paid" : p.status === "held" ? "Held" : "Pending",
+        p.bankName,
+        p.accountName,
+        p.accountMasked,
+        p.reference,
+        p.paidAt,
+        p.paidByName,
+        p.proof.length,
+        p.flags.map((f) => PAYOUT_FLAG_LABELS[f]).join(", "),
+        p.proof.join(" "),
+      ]),
+      total: ["Total", null, null, major(report.payouts.reduce((sum, p) => sum + p.totalMinor, 0))],
+    },
+  ];
+}
+
 export function accountsRoutes(deps: { names: (db: Db) => Promise<Record<FundKind, string>> }): Hono<AppEnv> {
   const routes = new Hono<AppEnv>();
 
-  routes.get("/admin/accounts", requireAuth(), async (c) => {
-    const db = await currentDb(c);
+  function period(c: Parameters<typeof readQuery>[0]): { from: string; to: string; format: "xlsx" | "csv" } {
     const q = readQuery(
       c,
-      z.object({ from: z.string().regex(MONTH).optional(), to: z.string().regex(MONTH).optional() }).strict(),
+      z
+        .object({
+          from: z.string().regex(MONTH).optional(),
+          to: z.string().regex(MONTH).optional(),
+          format: z.enum(["xlsx", "csv"]).default("xlsx"),
+        })
+        .strict(),
     );
-    const now = Date.now();
-    const to = q.to ?? fundMonthOf(now);
-    const from = q.from ?? fundMonthOf(new Date(new Date(now).getFullYear(), new Date(now).getMonth() - 11, 1).getTime());
+    const now = new Date();
+    const to = q.to ?? fundMonthOf(now.getTime());
+    const from = q.from ?? fundMonthOf(new Date(now.getFullYear(), now.getMonth() - 11, 1).getTime());
     if (from > to) throw new BadRequestError("from", [{ path: "from", message: "The start month is after the end month." }]);
     if (monthsBetween(from, to).length >= 60) {
       throw new BadRequestError("from", [{ path: "from", message: "Choose five years or less." }]);
     }
+    return { from, to, format: q.format };
+  }
+
+  routes.get("/admin/accounts", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const { from, to } = period(c);
     return c.json(await accountsReport(db, { from, to, names: await deps.names(db) }));
+  });
+
+  /** The balance sheet as a styled workbook (summary, by month, payouts), or the monthly sheet as CSV. */
+  routes.get("/admin/accounts/export", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const { from, to, format } = period(c);
+    const report = await accountsReport(db, { from, to, names: await deps.names(db) });
+    const name = `av-balance-sheet-${from}-to-${to}`;
+    const sheets = accountsSheets(report);
+    const body =
+      format === "csv"
+        ? Buffer.from(sheetCsv(sheets[1]!.columns, [...sheets[1]!.rows, [...(sheets[1]!.total ?? [])]]), "utf8")
+        : workbook(sheets);
+    return new Response(new Uint8Array(body), {
+      headers: {
+        "content-type":
+          format === "csv" ? "text/csv; charset=utf-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-disposition": `attachment; filename="${name}.${format}"`,
+        "cache-control": "no-store",
+      },
+    });
   });
 
   return routes;

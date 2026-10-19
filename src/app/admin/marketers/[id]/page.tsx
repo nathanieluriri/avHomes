@@ -280,13 +280,6 @@ function MarketerScreen({ initial }: { initial: MarketerDetail }) {
           </p>
         )}
       </Card>
-
-      <EmailPartner
-        marketerId={marketer.id}
-        name={marketer.displayName.split(/\s+/u)[0] ?? ""}
-        email={marketer.email}
-        initial={messages}
-      />
     </aside>
   );
 
@@ -323,6 +316,13 @@ function MarketerScreen({ initial }: { initial: MarketerDetail }) {
               <DRow label="Console account">{marketer.isAdmin ? "Yes" : "No"}</DRow>
             </DefinitionList>
           </Card>
+
+          <EmailPartner
+            marketerId={marketer.id}
+            name={marketer.displayName.split(/\s+/u)[0] ?? ""}
+            email={marketer.email}
+            initial={messages}
+          />
 
           <Card>
             <CardHead title="Who is above them" />

@@ -308,11 +308,15 @@ function Earnings({ view }: { view: DealView }) {
     return (
       <MoneyCard
         icon={<IconCheckBadge size={56} />}
-        caption="You earned"
+        caption={deal.plan ? "Earned so far" : "You earned"}
         figure={
           <Amount minor={myShare.amountMinor} currency={deal.currency} size="lg" className="text-[30px]" />
         }
-        line={mask(`${myShare.rate}% of ${total}. ${shareSource(myShare)}.`)}
+        line={mask(
+          deal.plan
+            ? `Earned so far on ${formatMoney(deal.paidMinor, deal.currency)} paid. ${myShare.rate}% of ${total} in all, as the rest is paid.`
+            : `${myShare.rate}% of ${total}. ${shareSource(myShare)}.`,
+        )}
         foot={<SectionLink href="/m/money">See when it is paid</SectionLink>}
       />
     );
