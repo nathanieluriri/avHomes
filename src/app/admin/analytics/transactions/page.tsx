@@ -170,11 +170,18 @@ export default function TransactionsPage() {
               </div>
               <p className="mt-0.5 text-[12px] text-slate-600">
                 {shortDate(row.closedOn)} · {row.kind === "sale" ? "Sold" : "Let"} ·{" "}
-                {row.closerKind === "direct"
-                  ? "Walk-in, nobody paid"
-                  : `${row.closerName || "Somebody"} (${CLOSER_KIND_LABEL[row.closerKind]})`}
+                {row.selfPurchase
+                  ? `Bought by ${row.reporterName || "a partner"} for themselves`
+                  : row.closerKind === "direct"
+                    ? "Walk-in, nobody paid"
+                    : `${row.closerName || "Somebody"} (${CLOSER_KIND_LABEL[row.closerKind]})`}
                 {" · "}
                 <span className="text-slate-550">{DEAL_SOURCE_LABEL[row.source]}</span>
+                {row.onPlan && (
+                  <span className="text-slate-550">
+                    {" · "}Payment plan, {formatMoney(row.paidMinor, row.currency)} of {formatMoney(row.amountMinor, row.currency)} paid
+                  </span>
+                )}
               </p>
 
               <div className="mt-2">
@@ -184,6 +191,7 @@ export default function TransactionsPage() {
                   people={row.shares}
                   funds={row.fundShares}
                   keptMinor={row.keptMinor}
+                  paidMinor={row.onPlan ? row.paidMinor : undefined}
                   /* From the response, not from a constant here: the labels are
                      renameable and a screen holding its own copy keeps saying the
                      old name. */

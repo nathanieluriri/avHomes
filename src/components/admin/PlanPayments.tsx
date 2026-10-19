@@ -20,7 +20,8 @@ const STATE_TONE = { paid: "green", "on-track": "neutral", "due-soon": "amber", 
 const PAYMENT_TONE = { pending: "amber", verified: "green", rejected: "red" } as const satisfies Record<string, Tone>;
 
 /** A payment-plan deal: where it stands, every payment, and the controls to verify, reject or log one. */
-export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: Deal) => void }) {
+/** `canDecide` is the marketing domain: the accountant reads a plan but does not verify its payments. */
+export function PlanPayments({ deal, onChange, canDecide }: { deal: Deal; onChange: (deal: Deal) => void; canDecide: boolean }) {
   const [busy, setBusy] = useState(false);
   const [now] = useState(() => Date.now());
   const [error, setError] = useState<ApiError | null>(null);
@@ -123,7 +124,7 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
                   ))}
                 </div>
               )}
-              {p.status === "pending" &&
+              {canDecide && p.status === "pending" &&
                 (rejecting === p.id ? (
                   <div className="mt-2 space-y-2">
                     <input className={inputClass} value={reason} placeholder="Why it was not accepted" onChange={(e) => setReason(e.target.value)} />
@@ -166,7 +167,7 @@ export function PlanPayments({ deal, onChange }: { deal: Deal; onChange: (deal: 
         </ul>
       )}
 
-      {approved && standing.leftMinor - standing.pendingMinor > 0 && (
+      {canDecide && approved && standing.leftMinor - standing.pendingMinor > 0 && (
         <div className="mt-4 border-t border-mist-100 pt-3">
           {!logging ? (
             <Button variant="ghost" className="w-full" onClick={() => setLogging(true)}>

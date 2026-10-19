@@ -8,6 +8,7 @@ import {
   currentUser,
   pathParam,
   readJson,
+  deploymentOrigin,
   requestOrigin,
   str,
   type AppEnv,
@@ -24,7 +25,7 @@ import {
   type Verified,
 } from "./plans";
 import { findMarketerById } from "./repo";
-import { tellPaymentVerified, tellPurchase } from "./purchase-notes";
+import { tellPaymentVerified, tellPurchase, tellUplineShares } from "./purchase-notes";
 import { assertActive, currentMarketer, dealView, noAccrual, type MarketingDeps } from "./routes";
 
 const PaymentBody = z
@@ -40,7 +41,10 @@ function firstOf(name: string): string {
   return name.trim().split(/\s+/u)[0] || name;
 }
 
-/** Everyone a verified payment earned something tells, and a partner's own purchase moves a step. */
+/**
+ * One message per person per verified payment. A partner buying for themselves
+ * hears about their purchase; anyone else on the deal hears what it earned them.
+ */
 async function afterVerified(
   deps: MarketingDeps,
   db: Db,
@@ -48,8 +52,6 @@ async function afterVerified(
   ctx: { origin: string; requestId: string },
 ): Promise<void> {
   const { deal, payment } = verified;
-  const earned = payment.shares.find((s) => s.marketerId === deal.reporterId)?.amountMinor ?? 0;
-  await tellPaymentVerified(deps, db, { deal, amountMinor: payment.amountMinor, earnedMinor: earned, ...ctx });
   if (deal.selfPurchase) {
     await tellPurchase(deps, db, {
       marketerId: deal.reporterId,
@@ -57,7 +59,11 @@ async function afterVerified(
       step: verified.complete ? "owner" : "instalment-verified",
       ...ctx,
     });
+  } else {
+    const earned = payment.shares.find((s) => s.marketerId === deal.reporterId)?.amountMinor ?? 0;
+    await tellPaymentVerified(deps, db, { deal, amountMinor: payment.amountMinor, earnedMinor: earned, ...ctx });
   }
+  await tellUplineShares(deps, db, { deal, shares: payment.shares });
 }
 
 export function planAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
@@ -193,14 +199,18 @@ export function planCronRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const db = await currentDb(c);
     const now = Date.now();
     const due = await claimDueReminders(db, now);
-    const origin = requestOrigin(c.req);
+    // A scheduled call has no visitor to follow: links go to the production host, which /admin links must anyway.
+    const origin = deploymentOrigin(c.req);
     const ctx = { requestId: c.get("requestId"), route: "plan reminders" };
     const office = deps.officeEmail ? await deps.officeEmail(db) : "";
 
     for (const { deal, standing, late } of due) {
       const next = standing.next;
       const amount = formatMoney(standing.nextLeftMinor, deal.currency);
-      const dueDate = next && next.dueOn > 0 ? new Date(next.dueOn).toDateString() : "";
+      const dueDate =
+        next && next.dueOn > 0
+          ? new Date(next.dueOn).toLocaleDateString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "long", year: "numeric" })
+          : "";
       const message = reminderLine(deal, late);
       const marketer = await findMarketerById(db, deal.reporterId);
       const text = {

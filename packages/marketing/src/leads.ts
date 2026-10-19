@@ -166,6 +166,34 @@ export async function getLeadFor(db: Db, id: string, reporterId: string): Promis
   return doc ? toLead(doc) : null;
 }
 
+/** A partner's own interest they may send payment proof against: theirs, for themselves, and still open. */
+export async function openSelfLead(db: Db, id: string, reporterId: string): Promise<Lead | null> {
+  const doc = await leads(db).findOne({ _id: id, reporterId, self: true, state: { $nin: ["won", "lost"] } });
+  return doc ? toLead(doc) : null;
+}
+
+/**
+ * A partner's own purchase was approved, so the interest it grew out of is
+ * bought. Without this it sat open in Buyers and could be converted a second
+ * time. A lead already closed either way is left as it is.
+ */
+export async function closeSelfLead(
+  db: Db,
+  input: { leadId: string; dealId: string; onPlan: boolean },
+  actor: LeadActor,
+): Promise<void> {
+  const doc = await leads(db).findOne({ _id: input.leadId, self: true });
+  if (!doc || doc.state === "won" || doc.state === "lost") return;
+  await append(
+    db,
+    doc,
+    "won",
+    { reason: input.onPlan ? "Deposit taken" : "Paid in full", note: "Their payment was verified on the deal." },
+    actor,
+    { dealId: input.dealId },
+  );
+}
+
 /** Leads counted by state, for the console's filter row. */
 export async function leadCounts(db: Db): Promise<Record<string, number>> {
   const rows = await leads(db)

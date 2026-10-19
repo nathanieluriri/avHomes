@@ -61,7 +61,8 @@ export function settleNumbers(
   cell: CommissionSplit,
   chain: readonly (ChainMember | null)[],
   plan: DealPlan | null,
-  deposit: { at: number; byName: string; proof: string[] },
+  /** `paidOn` is the day the deposit was paid, which is the day the deal closed, not the day it was approved. */
+  deposit: { at: number; paidOn?: number; byName: string; proof: string[] },
 ): Settled {
   const full = splitDeal(amountMinor, cell, chain);
   const fullShares: DealShare[] = full.people.map((line) => ({
@@ -99,7 +100,7 @@ export function settleNumbers(
       {
         id: newId("dpay", deposit.at),
         amountMinor: paid,
-        paidOn: deposit.at,
+        paidOn: deposit.paidOn || deposit.at,
         proof: deposit.proof,
         note: "Deposit",
         status: "verified",

@@ -600,7 +600,6 @@ export async function recordSale(
 ): Promise<Deal> {
   const refusal = recordSaleRefusal(input);
   if (refusal) throw new BadRequestError("sale", [{ path: "sale", message: refusal }]);
-  assertPlan(input.amountMinor, input.plan);
 
   const now = Date.now();
 
@@ -642,14 +641,17 @@ export async function recordSale(
   }
 
   const cell = splitFor(settings.commission, listing.ownership, input.kind);
-  const plan = input.plan ?? null;
-  /* A reported deal settled here keeps who it was for. A partner's own purchase
-     pays nobody unless the settings say it does. */
+  /* A reported deal settled here keeps who it was for, and its payment plan
+     unless the sheet sends one. A partner's own purchase pays nobody unless the
+     settings say it does. */
   const reported = input.dealId ? await deals(db).findOne({ _id: input.dealId }) : null;
+  const plan = input.plan !== undefined ? input.plan : (reported?.plan ?? null);
+  assertPlan(input.amountMinor, plan);
   const selfPurchase = reported?.selfPurchase ?? false;
   if (selfPurchase && !settings.selfPurchaseCommission) chain = [];
   const numbers = settleNumbers(input.amountMinor, cell, chain, plan, {
     at: now,
+    paidOn: input.closedOn || now,
     byName: input.actorName,
     proof: input.proof,
   });
@@ -1018,6 +1020,7 @@ export async function reviewDeal(
   assertPlan(amountMinor, plan);
   const numbers = settleNumbers(amountMinor, cell, chain, plan, {
     at: now,
+    paidOn: doc.closedOn,
     byName: input.actorName,
     proof: doc.proof ?? [],
   });
@@ -2215,6 +2218,12 @@ export async function creditAdjustment(
     updatedAt: now,
   });
   return id;
+}
+
+/** A deal still in play that grew out of this lead, which a second conversion would duplicate. */
+export async function openDealForLead(db: Db, leadId: string): Promise<Deal | null> {
+  const doc = await deals(db).findOne({ leadId, status: { $in: ["pending", "info", "approved"] } });
+  return doc ? toDeal(doc) : null;
 }
 
 /** Every approved deal's id, for the funds' own reconciliation. */

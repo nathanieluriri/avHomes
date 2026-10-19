@@ -106,6 +106,7 @@ import {
 } from "@avhomes/identity";
 import { listBanks, providerState, resolveAccount } from "./bank";
 import {
+  closeSelfLead,
   createLead,
   getLead,
   getLeadFor,
@@ -113,6 +114,7 @@ import {
   listLeads,
   moveLead,
   noteOnLead,
+  openSelfLead,
   winLead,
   withShares,
 } from "./leads";
@@ -142,6 +144,7 @@ import {
   deleteUpdate,
   findMarketerByCode,
   findMarketerById,
+  openDealForLead,
   findMarketerByUser,
   getDeal,
   getDealFor,
@@ -582,6 +585,8 @@ const DealBody = z
       .nullable()
       .default(null),
     selfPurchase: z.boolean().default(false),
+    /** The partner's own registered interest this payment is for. */
+    leadId: str().max(64).nullable().default(null),
   })
   .strict();
 
@@ -1380,6 +1385,14 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     assertActive(marketer);
     const body = await readJson(c, DealBody);
     const settings = await readMarketingSettings(db);
+    if (body.leadId) {
+      const lead = body.selfPurchase ? await openSelfLead(db, body.leadId, marketer.id) : null;
+      if (!lead) {
+        throw new BadRequestError("leadId", [
+          { path: "leadId", message: "That interest is not open any more. Register your interest again from the listing." },
+        ]);
+      }
+    }
 
     const claim = await claimOn(db, body.listingId, body.unitKey);
     /*
@@ -2226,6 +2239,13 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     await tellMarketers(deps, db, decisionNotes(deal));
     await greetBuyer(deps, db, deal, requestOrigin(c.req), c.get("requestId"));
     if (deal.selfPurchase && deal.status === "approved") {
+      if (deal.leadId) {
+        await closeSelfLead(db, { leadId: deal.leadId, dealId: deal.id, onPlan: Boolean(deal.plan) }, {
+          id: user.id,
+          name: user.displayName,
+          side: "admin",
+        });
+      }
       const step = { marketerId: deal.reporterId, property: deal.listingTitle, origin: requestOrigin(c.req), requestId: c.get("requestId") };
       await tellPurchase(deps, db, { ...step, step: "payment-verified" });
       if (deal.paidMinor >= deal.amountMinor) await tellPurchase(deps, db, { ...step, step: "owner" });
@@ -2326,6 +2346,12 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
 
     const reporter = await findMarketerById(db, before.reporterId);
     if (!reporter) throw new NotFoundError(`marketer ${before.reporterId}`);
+    const already = await openDealForLead(db, id);
+    if (already) {
+      throw new PreconditionFailedError("lead_has_deal", {
+        detail: `${firstName(reporter.displayName)} already sent payment proof for this. Check that deal instead of marking it bought again.`,
+      });
+    }
 
     const body = await readJson(c, WinBody);
     const settings = await readMarketingSettings(db);
@@ -2349,6 +2375,11 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const won = dealId ? await getDeal(db, dealId) : null;
     if (won) await settleDeal(deps, db, won, { id: user.id, name: user.displayName });
     await greetBuyer(deps, db, won, requestOrigin(c.req), c.get("requestId"));
+    if (won?.selfPurchase) {
+      const step = { marketerId: won.reporterId, property: won.listingTitle, origin: requestOrigin(c.req), requestId: c.get("requestId") };
+      await tellPurchase(deps, db, { ...step, step: "payment-verified" });
+      if (won.paidMinor >= won.amountMinor) await tellPurchase(deps, db, { ...step, step: "owner" });
+    }
     auditEntityId(c, lead.id);
     return c.json({ lead, dealId });
   });

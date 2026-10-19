@@ -117,8 +117,12 @@ function Purchases() {
                 <li key={lead.id} className="m-card space-y-2 p-4">
                   <p className="text-[15px] font-semibold text-m-text">{lead.listingTitle || "A property"}</p>
                   <p className="text-[13px] text-m-muted">{LEAD_STATE_LABEL[lead.state]}</p>
-                  {lead.listingId && !data.deals.some((d) => d.listingId === lead.listingId) && (
-                    <ButtonLink href={`/m/deals/new?listing=${encodeURIComponent(lead.listingId)}&self=1`} variant="secondary" full>
+                  {lead.listingId && !data.deals.some((d) => d.leadId === lead.id || d.listingId === lead.listingId) && (
+                    <ButtonLink
+                      href={`/m/deals/new?listing=${encodeURIComponent(lead.listingId)}&self=1&lead=${encodeURIComponent(lead.id)}`}
+                      variant="secondary"
+                      full
+                    >
                       I have paid: send the proof
                     </ButtonLink>
                   )}

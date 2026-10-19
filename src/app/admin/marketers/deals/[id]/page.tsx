@@ -489,7 +489,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
             )}
           </Card>
 
-          <PlanPayments deal={deal} onChange={setDeal} />
+          <PlanPayments deal={deal} onChange={setDeal} canDecide={decides} />
 
           <Card>
             <CardHead title="The deal" />

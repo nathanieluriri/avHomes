@@ -174,6 +174,10 @@ interface DealRow {
   fundShares?: { fund: "reward" | "foundation"; rate: number; amountMinor: number }[];
   keptMinor?: number;
   proof?: string[];
+  plan?: unknown;
+  paidMinor?: number;
+  selfPurchase?: boolean;
+  reporterName?: string;
 }
 
 function deals(db: Db) {
@@ -818,6 +822,10 @@ function toTransactionRow(row: DealRow): TransactionRow {
     fundShares: row.fundShares ?? [],
     keptMinor: row.keptMinor ?? 0,
     proof: row.proof ?? [],
+    onPlan: Boolean(row.plan),
+    paidMinor: row.plan ? (row.paidMinor ?? 0) : row.amountMinor,
+    selfPurchase: row.selfPurchase ?? false,
+    reporterName: row.reporterName ?? "",
   };
 }
 

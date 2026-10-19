@@ -23,7 +23,7 @@ import {
   type MarketingSettings,
 } from "@avhomes/contracts";
 import { createDeal, reconcile, reviewDeal, type FundAccrual } from "./repo";
-import { claimDueReminders, logPayment, rejectPayment, verifyPayment } from "./plans";
+import { claimDueReminders, logPayment, rejectPayment, settleNumbers, verifyPayment } from "./plans";
 import { writeMarketingSettings, readMarketingSettings } from "./settings";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -84,6 +84,18 @@ describe("payment plan maths", () => {
       for (const share of full.funds) assert.equal(funds.get(share.fund) ?? 0, share.amountMinor, `total ${total}`);
       assert.equal(kept, full.kept);
     }
+  });
+
+  test("the deposit is dated the day it was paid, not the day the deal was approved", () => {
+    const cell = splitFor(DEFAULT_MARKETING_SETTINGS.commission, "av", "sale");
+    const plan: DealPlan = { depositMinor: 2_000_000, instalments: 4, frequency: "monthly", firstDueOn: Date.UTC(2026, 5, 1) };
+    const closedOn = Date.UTC(2026, 3, 3);
+    const approvedAt = Date.UTC(2026, 3, 20);
+    const settled = settleNumbers(10_000_000, cell, [], plan, { at: approvedAt, paidOn: closedOn, byName: "Arc", proof: [] });
+    assert.equal(settled.payments[0]?.paidOn, closedOn);
+    assert.equal(settled.payments[0]?.reviewedAt, approvedAt);
+    const legacy = settleNumbers(10_000_000, cell, [], plan, { at: approvedAt, byName: "Arc", proof: [] });
+    assert.equal(legacy.payments[0]?.paidOn, approvedAt, "a caller that does not say falls back to the approval time");
   });
 
   test("a payment past the price earns nothing beyond it", () => {
