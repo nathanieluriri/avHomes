@@ -34,7 +34,6 @@ import {
   type CloserKind,
   type Deal,
   type DealKind,
-  type DealShare,
   type DealSplit,
   type DealStatus,
   type FundShare,
