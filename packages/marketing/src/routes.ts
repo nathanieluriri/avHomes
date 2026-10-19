@@ -374,7 +374,7 @@ function assertUnit(facts: ListingFacts, unitKey: string): void {
   }
 }
 
-async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
+export async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
   const tell = deps.tell;
   if (!tell || notes.length === 0) return;
   try {
@@ -390,7 +390,7 @@ async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promis
   }
 }
 
-function firstName(name: string): string {
+export function firstName(name: string): string {
   return name.trim().split(/\s+/u)[0] || name;
 }
 
@@ -758,6 +758,7 @@ const SettingsBody = z
     requireApproval: z.boolean().optional(),
     joinOpen: z.boolean().optional(),
     blockSelfDeals: z.boolean().optional(),
+    selfPurchaseCommission: z.boolean().optional(),
     minPayoutMinor: z.number().int().min(0).optional(),
     supportPhone: str().max(40).optional(),
     accountProvider: z.enum(ACCOUNT_PROVIDERS).optional(),
@@ -1030,7 +1031,7 @@ export async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[
   });
 }
 
-function assertActive(marketer: Marketer): void {
+export function assertActive(marketer: Marketer): void {
   if (marketer.status === "active") return;
   throw new ForbiddenError(
     marketer.status === "paused"
@@ -1080,7 +1081,7 @@ function listingCard(listing: RecentListing): MarketingUpdate {
  * misconfigured deployment into a half-settled deal, which is the worst of the
  * available outcomes. A missing accrual is what `reconcile` exists to report.
  */
-const noAccrual: FundAccrual = async () => {};
+export const noAccrual: FundAccrual = async () => {};
 const noReversal: FundReversal = async () => 0;
 
 /** How long a newsletter stays in Alerts after it went out. */

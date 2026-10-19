@@ -39,6 +39,7 @@ import {
   type DealStatus,
   type FundShare,
   type Ownership,
+  type DealPlan,
   type LedgerLine,
   type LedgerStatus,
   type Marketer,
@@ -73,6 +74,7 @@ import {
   type PayRunItemDoc,
   type UpdateDoc,
 } from "./schema";
+import { assertPlan, settleNumbers } from "./plans";
 
 function marketers(db: Db) {
   return collection<MarketerDoc>(db, COLLECTIONS.marketers);
@@ -455,6 +457,9 @@ export interface DealInput {
   ownership: Ownership;
   /** Set when a won lead minted this deal. */
   leadId?: string | null;
+  plan?: DealPlan | null;
+  /** The reporter is the buyer. */
+  selfPurchase?: boolean;
 }
 
 /** Somebody else already has this listing settled or waiting. */
@@ -475,7 +480,8 @@ export async function createDeal(
 ): Promise<Deal> {
   const now = Date.now();
 
-  if (settings.blockSelfDeals && input.buyerPhone.trim() !== "") {
+  assertPlan(input.amountMinor, input.plan);
+  if (!input.selfPurchase && settings.blockSelfDeals && input.buyerPhone.trim() !== "") {
     const digits = input.buyerPhone.replace(/[^0-9]/gu, "").slice(-10);
     if (digits !== "" && reporter.phone.replace(/[^0-9]/gu, "").endsWith(digits)) {
       throw new PreconditionFailedError("self_deal", {
@@ -523,6 +529,12 @@ export async function createDeal(
     reviewedAt: null,
     closedOn: input.closedOn || now,
     shares: [],
+    plan: input.plan ?? null,
+    payments: [],
+    paidMinor: 0,
+    planShares: [],
+    planFundShares: [],
+    selfPurchase: input.selfPurchase ?? false,
     createdAt: now,
     updatedAt: now,
   };
@@ -554,6 +566,7 @@ export interface RecordSaleInput {
   closer: CloserInput;
   /** The reported deal an admin is settling through this door, when there is one. */
   dealId: string | null;
+  plan?: DealPlan | null;
   actorId: string;
   actorName: string;
 }
@@ -588,6 +601,7 @@ export async function recordSale(
 ): Promise<Deal> {
   const refusal = recordSaleRefusal(input);
   if (refusal) throw new BadRequestError("sale", [{ path: "sale", message: refusal }]);
+  assertPlan(input.amountMinor, input.plan);
 
   const now = Date.now();
 
@@ -629,8 +643,18 @@ export async function recordSale(
   }
 
   const cell = splitFor(settings.commission, listing.ownership, input.kind);
-  const split = splitDeal(input.amountMinor, cell, chain);
-  const shares = toShares(split);
+  const plan = input.plan ?? null;
+  /* A reported deal settled here keeps who it was for. A partner's own purchase
+     pays nobody unless the settings say it does. */
+  const reported = input.dealId ? await deals(db).findOne({ _id: input.dealId }) : null;
+  const selfPurchase = reported?.selfPurchase ?? false;
+  if (selfPurchase && !settings.selfPurchaseCommission) chain = [];
+  const numbers = settleNumbers(input.amountMinor, cell, chain, plan, {
+    at: now,
+    byName: input.actorName,
+    proof: input.proof,
+  });
+  const shares = numbers.shares;
 
   const dealId = input.dealId ?? newId("deal", now);
   const doc: DealDoc = {
@@ -663,9 +687,9 @@ export async function recordSale(
     closerName,
     ownership: listing.ownership,
     split: cell,
-    fundShares: split.funds,
-    keptMinor: split.keptMinor,
-    source: "console",
+    fundShares: numbers.fundShares,
+    keptMinor: numbers.keptMinor,
+    source: reported?.source ?? "console",
     leadId: null,
     // Recorded by an admin IS the approval. There is nobody left to review it.
     status: "approved",
@@ -675,6 +699,12 @@ export async function recordSale(
     reviewedAt: now,
     closedOn: input.closedOn || now,
     shares,
+    plan,
+    payments: numbers.payments,
+    paidMinor: numbers.paidMinor,
+    planShares: numbers.planShares,
+    planFundShares: numbers.planFundShares,
+    selfPurchase,
     createdAt: now,
     updatedAt: now,
   };
@@ -724,7 +754,7 @@ export async function recordSale(
       status: "earned" as const,
       payRunId: null,
       reversesId: null,
-      note: "",
+      note: plan ? "Deposit" : "",
       dealTitle: listing.title,
       createdAt: now,
       updatedAt: now,
@@ -734,8 +764,9 @@ export async function recordSale(
 
   await accrue(db, {
     dealId,
+    ...(numbers.payments[0] ? { key: numbers.payments[0].id } : {}),
     currency: input.currency,
-    shares: split.funds,
+    shares: numbers.fundShares,
     byName: input.actorName,
   });
 
@@ -926,6 +957,8 @@ export interface FundAccrual {
     db: Db,
     input: {
       dealId: string;
+      /** One payment on a plan. Each payment accrues once, however many times this runs. */
+      key?: string;
       currency: string;
       shares: readonly FundShare[];
       byName: string;
@@ -992,9 +1025,16 @@ export async function reviewDeal(
      prices it by the property it was actually about. */
   const ownership: Ownership = doc.ownership ?? "av";
   const cell = splitFor(settings.commission, ownership, doc.listingType);
-  const chain = await chainFor(db, doc.reporterId);
-  const split = splitDeal(amountMinor, cell, chain);
-  const shares = toShares(split);
+  const unpaidSelf = (doc.selfPurchase ?? false) && !settings.selfPurchaseCommission;
+  const chain = unpaidSelf ? [] : await chainFor(db, doc.reporterId);
+  const plan = doc.plan ?? null;
+  assertPlan(amountMinor, plan);
+  const numbers = settleNumbers(amountMinor, cell, chain, plan, {
+    at: now,
+    byName: input.actorName,
+    proof: doc.proof ?? [],
+  });
+  const shares = numbers.shares;
 
   try {
     await deals(db).updateOne(
@@ -1010,8 +1050,15 @@ export async function reviewDeal(
              lets a transaction row explain its own numbers a year later. */
           ownership,
           split: cell,
-          fundShares: split.funds,
-          keptMinor: split.keptMinor,
+          fundShares: numbers.fundShares,
+          keptMinor: numbers.keptMinor,
+          payments: numbers.payments,
+          paidMinor: numbers.paidMinor,
+          planShares: numbers.planShares,
+          planFundShares: numbers.planFundShares,
+          /* Nobody closed it for commission, so it counts as a direct sale and
+             earns nobody a place on the leaderboard either. */
+          ...(unpaidSelf ? { closerKind: "direct" as const, closerId: "" } : {}),
           reviewedBy: input.actorId,
           reviewedByName: input.actorName,
           reviewedAt: now,
@@ -1042,7 +1089,7 @@ export async function reviewDeal(
       status: "earned" as const,
       payRunId: null,
       reversesId: null,
-      note: "",
+      note: plan ? "Deposit" : "",
       dealTitle: doc.listingTitle,
       createdAt: now,
       updatedAt: now,
@@ -1061,8 +1108,9 @@ export async function reviewDeal(
    */
   await accrue(db, {
     dealId: id,
+    ...(numbers.payments[0] ? { key: numbers.payments[0].id } : {}),
     currency: doc.currency,
-    shares: split.funds,
+    shares: numbers.fundShares,
     byName: input.actorName,
   });
 
@@ -2121,10 +2169,12 @@ export async function reconcile(db: Db): Promise<{ ok: boolean; problems: string
   const settled = await deals(db)
     .find(
       { status: "approved" },
-      { projection: { _id: 1, amountMinor: 1, shares: 1, fundShares: 1, keptMinor: 1 } },
+      { projection: { _id: 1, amountMinor: 1, shares: 1, fundShares: 1, keptMinor: 1, plan: 1, paidMinor: 1 } },
     )
     .toArray();
   for (const deal of settled) {
+    // A plan is accounted for up to what has been paid on it.
+    const expected = deal.plan ? (deal.paidMinor ?? 0) : deal.amountMinor;
     const out =
       (deal.shares ?? []).reduce((total, share) => total + share.amountMinor, 0) +
       (deal.fundShares ?? []).reduce((total, share) => total + share.amountMinor, 0) +
@@ -2133,9 +2183,9 @@ export async function reconcile(db: Db): Promise<{ ok: boolean; problems: string
        0, so its parts legitimately fall short of the total. Only a deal that
        claims a kept amount is claiming to be fully accounted for. */
     if ((deal.keptMinor ?? 0) === 0) continue;
-    if (out !== deal.amountMinor) {
+    if (out !== expected) {
       problems.push(
-        `deal ${deal._id}: the shares, funds and kept amount total ${out}, the deal is ${deal.amountMinor}.`,
+        `deal ${deal._id}: the shares, funds and kept amount total ${out}, ${deal.plan ? "paid so far is" : "the deal is"} ${expected}.`,
       );
     }
   }
@@ -2183,7 +2233,11 @@ export async function creditAdjustment(
 /** Every approved deal's id, for the funds' own reconciliation. */
 export async function approvedDealIds(db: Db): Promise<string[]> {
   const rows = await deals(db)
-    .find({ status: "approved" }, { projection: { _id: 1 } })
+    .find(
+      // A plan with nothing paid yet has nothing in the funds, correctly.
+      { status: "approved", $or: [{ plan: null }, { plan: { $exists: false } }, { paidMinor: { $gt: 0 } }] },
+      { projection: { _id: 1 } },
+    )
     .toArray();
   return rows.map((row) => row._id);
 }

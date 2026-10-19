@@ -146,8 +146,10 @@ function toAward(doc: AwardDoc): RewardAward {
  * round is read from the ledger, so a retry of the same approval still lands on
  * the same id.
  */
-function accrualId(dealId: string, fund: FundKind, round = 0): string {
-  return round === 0 ? `facc_${fund}_${dealId}` : `facc_${fund}_${dealId}_${round}`;
+function accrualId(dealId: string, fund: FundKind, round = 0, key?: string): string {
+  const base = round === 0 ? `facc_${fund}_${dealId}` : `facc_${fund}_${dealId}_${round}`;
+  // A payment plan accrues once per payment, so the payment's id joins the key.
+  return key ? `${base}_${key}` : base;
 }
 
 /* ════════════════════════════════════════════════════════════════ BALANCES ══ */
@@ -252,6 +254,7 @@ export interface FundAccrualPort {
     db: Db,
     input: {
       dealId: string;
+      key?: string;
       currency: string;
       shares: readonly FundShare[];
       byName: string;
@@ -271,6 +274,7 @@ export async function accrueForDeal(
   db: Db,
   input: {
     dealId: string;
+    key?: string;
     currency: string;
     shares: readonly FundShare[];
     byName: string;
@@ -285,7 +289,7 @@ export async function accrueForDeal(
   const docs: FundDoc[] = input.shares
     .filter((share) => share.amountMinor > 0)
     .map((share) => ({
-      _id: accrualId(input.dealId, share.fund, round(share.fund)),
+      _id: accrualId(input.dealId, share.fund, round(share.fund), input.key),
       fund: share.fund,
       kind: "accrual" as const,
       amountMinor: share.amountMinor,

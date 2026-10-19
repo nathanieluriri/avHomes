@@ -53,6 +53,8 @@ export interface LeadInput {
   wantArea: string;
   wantBudgetMinor: number;
   brief: string;
+  /** The partner is the buyer: they want it for themselves. */
+  self?: boolean;
 }
 
 /** Who is moving it, and under which set of rules. */
@@ -73,7 +75,7 @@ export async function createLead(
   /* The same guard deals keep, for the same reason: a marketer introducing
      themselves is not an introduction. Checked on the last ten digits because
      the two numbers may be written with different prefixes and spacing. */
-  if (settings.blockSelfDeals && input.buyerPhone.trim() !== "") {
+  if (!input.self && settings.blockSelfDeals && input.buyerPhone.trim() !== "") {
     const digits = input.buyerPhone.replace(/[^0-9]/gu, "").slice(-10);
     if (digits !== "" && reporter.phone.replace(/[^0-9]/gu, "").endsWith(digits)) {
       throw new PreconditionFailedError("self_lead", {
@@ -107,11 +109,12 @@ export async function createLead(
         to: "new",
         bySide: "marketer",
         byName: reporter.displayName,
-        reason: "Logged by marketer",
-        note: input.brief.trim() || "Logged a potential buyer.",
+        reason: input.self ? "Wants to buy it themselves" : "Logged by marketer",
+        note: input.brief.trim() || (input.self ? "Interested in buying this." : "Logged a potential buyer."),
       },
     ],
     dealId: null,
+    self: input.self ?? false,
     createdAt: now,
     updatedAt: now,
   };
@@ -320,10 +323,14 @@ export async function winLead(
       buyerPhone: doc.buyerPhone,
       buyerEmail: doc.buyerEmail ?? "",
       proof: [],
-      note: `From a buyer ${reporter.displayName} logged. ${input.note}`.trim(),
+      note: (doc.self
+        ? `${reporter.displayName} bought it for themselves. ${input.note}`
+        : `From a buyer ${reporter.displayName} logged. ${input.note}`
+      ).trim(),
       closedOn: input.closedOn,
       ownership: input.ownership,
       leadId: id,
+      selfPurchase: doc.self ?? false,
     },
     settings,
   );
