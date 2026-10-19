@@ -13,6 +13,7 @@ import {
   type LedgerLine,
   type Marketer,
   type MarketerBalance,
+  type MarketerMessage,
   type MarketerStatus,
   type TeamMember,
 } from "@avhomes/contracts";
@@ -48,6 +49,7 @@ import {
   inputClass,
   type Tone,
 } from "@/components/admin/ui";
+import { EmailPartner } from "@/components/admin/EmailPartner";
 
 /**
  * One marketer: who they are, who is above them, who is under them, and every
@@ -70,6 +72,7 @@ interface MarketerDetail {
   deals: Deal[];
   lines: LedgerLine[];
   payments: PayHistoryRow[];
+  messages: MarketerMessage[];
 }
 
 export default function MarketerDetailPage() {
@@ -140,7 +143,7 @@ function MarketerScreen({ initial }: { initial: MarketerDetail }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
-  const { balance, levels, members, upline, deals, lines, payments } = initial;
+  const { balance, levels, members, upline, deals, lines, payments, messages } = initial;
 
   async function move(status: MarketerStatus) {
     setBusy(true);
@@ -277,6 +280,13 @@ function MarketerScreen({ initial }: { initial: MarketerDetail }) {
           </p>
         )}
       </Card>
+
+      <EmailPartner
+        marketerId={marketer.id}
+        name={marketer.displayName.split(/\s+/u)[0] ?? ""}
+        email={marketer.email}
+        initial={messages}
+      />
     </aside>
   );
 
