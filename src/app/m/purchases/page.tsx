@@ -38,6 +38,14 @@ function useWanted(): { id: string; title: string } | null {
 }
 
 export default function PurchasesPage() {
+  return (
+    <AppShell title="My purchases" hint="Property you are buying from AV Homes yourself." back="/m">
+      <Purchases />
+    </AppShell>
+  );
+}
+
+function Purchases() {
   const { me } = useMarketer();
   const wanted = useWanted();
   const read = useAsync((signal) => api.get<Purchases>("/marketing/purchases", signal), []);
@@ -73,7 +81,6 @@ export default function PurchasesPage() {
   const empty = data && data.interests.length === 0 && data.deals.length === 0;
 
   return (
-    <AppShell title="My purchases" hint="Property you are buying from AV Homes yourself." back="/m">
       <div className="space-y-6 px-4 pb-24">
         {wanted && !already && (
           <div className="m-card space-y-3 p-4">
@@ -145,6 +152,5 @@ export default function PurchasesPage() {
           </section>
         )}
       </div>
-    </AppShell>
   );
 }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { Check, ChevronRight, Search } from "lucide-react";
 import {
   formatMoney,
@@ -116,6 +116,15 @@ function useSelfParam(): boolean {
     () => new URLSearchParams(window.location.search).get("self") === "1",
     () => false,
   );
+}
+
+/** Fills the buyer with the partner themselves once their profile has loaded. Must render inside AppShell. */
+function SelfBuyer({ onMe }: { onMe: (me: { displayName: string; phone: string; email: string }) => void }) {
+  const { me } = useMarketer();
+  useEffect(() => {
+    if (me) onMe(me.marketer);
+  }, [me, onMe]);
+  return null;
 }
 
 /** The public API reads listings by slug only, so a listing named by id is found by paging. */
@@ -637,14 +646,7 @@ export default function NewDealPage() {
   const [note, setNote] = useState("");
   const [plan, setPlan] = useState<PlanDraft>(NO_PLAN);
   const self = useSelfParam();
-  const { me } = useMarketer();
   const [selfFilled, setSelfFilled] = useState(false);
-  if (self && !selfFilled && me) {
-    setSelfFilled(true);
-    setBuyerName(me.marketer.displayName);
-    setBuyerPhone(me.marketer.phone);
-    setBuyerEmail(me.marketer.email);
-  }
   const uploads = useProofUploads();
 
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
@@ -780,6 +782,16 @@ export default function NewDealPage() {
         <ReportGate>
           <div className="space-y-5 pb-32">
             <Stepper step={step} labels={NEXT} />
+            {self && !selfFilled && (
+              <SelfBuyer
+                onMe={(me) => {
+                  setSelfFilled(true);
+                  setBuyerName(me.displayName);
+                  setBuyerPhone(me.phone);
+                  setBuyerEmail(me.email);
+                }}
+              />
+            )}
 
             {step > 1 && picked && (
               <PickedHome
