@@ -21,11 +21,15 @@ import {
   DEFAULT_CURRENCY,
   FUND_KINDS,
   disbursementRefusal,
+  fundMonthOf,
+  voidRefusal,
   emptyFundBalance,
   quarterFinished,
   type FundBalance,
   type FundEntry,
   type FundKind,
+  type FundMonth,
+  type FundMonthly,
   type FundShare,
   type RewardAward,
   type RewardStanding,
@@ -43,6 +47,13 @@ interface FundDoc {
   note: string;
   proof: string[];
   byName: string;
+  paidAt?: number | null;
+  recipient?: string;
+  reference?: string;
+  voidedAt?: number | null;
+  voidReason?: string;
+  voidedByName?: string;
+  voidsId?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -88,6 +99,13 @@ function toEntry(doc: FundDoc): FundEntry {
     note: doc.note ?? "",
     proof: doc.proof ?? [],
     byName: doc.byName ?? "",
+    paidAt: doc.paidAt ?? (doc.kind === "payout" ? doc.createdAt : null),
+    recipient: doc.recipient ?? "",
+    reference: doc.reference ?? "",
+    voidedAt: doc.voidedAt ?? null,
+    voidReason: doc.voidReason ?? "",
+    voidedByName: doc.voidedByName ?? "",
+    voidsId: doc.voidsId ?? null,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt ?? doc.createdAt,
   };
@@ -121,9 +139,15 @@ function toAward(doc: AwardDoc): RewardAward {
  * Derived rather than minted, and that is the whole idempotence story. Both
  * halves are already `[A-Za-z0-9_-]`, so the joined string carries no dot or
  * dollar and stays a key every query in this file can address.
+ *
+ * `round` counts the times this deal's share was already handed back. A deal
+ * that is cancelled and then approved again needs a second accrual, and the bare
+ * id would hit the first one's duplicate key and credit the fund nothing. The
+ * round is read from the ledger, so a retry of the same approval still lands on
+ * the same id.
  */
-function accrualId(dealId: string, fund: FundKind): string {
-  return `facc_${fund}_${dealId}`;
+function accrualId(dealId: string, fund: FundKind, round = 0): string {
+  return round === 0 ? `facc_${fund}_${dealId}` : `facc_${fund}_${dealId}_${round}`;
 }
 
 /* ════════════════════════════════════════════════════════════════ BALANCES ══ */
@@ -151,11 +175,13 @@ export async function fundBalances(
       {
         $group: {
           _id: "$fund",
-          /* Split by SIGN, not by `kind`, so an `adjustment` lands on whichever
-             side it actually moved the fund. Grouping by kind would leave a
-             correction uncounted in both. */
-          accrued: { $sum: { $cond: [{ $gt: ["$amountMinor", 0] }, "$amountMinor", 0] } },
-          paid: { $sum: { $cond: [{ $lt: ["$amountMinor", 0] }, "$amountMinor", 0] } },
+          /* Split by WHERE THE MONEY CAME FROM, not by sign. A cancelled deal's
+             reversal is negative but it is not a payment, and a voided payment's
+             give-back is positive but it is not income. Splitting by sign called
+             the first "paid out" and the second "from sales". Every deal row is
+             income, net; every other row is spending, net. */
+          accrued: { $sum: { $cond: [{ $ne: [{ $ifNull: ["$dealId", null] }, null] }, "$amountMinor", 0] } },
+          paid: { $sum: { $cond: [{ $eq: [{ $ifNull: ["$dealId", null] }, null] }, "$amountMinor", 0] } },
           entries: { $sum: 1 },
           lastAt: { $max: "$createdAt" },
           currency: { $last: "$currency" },
@@ -252,10 +278,14 @@ export async function accrueForDeal(
 ): Promise<void> {
   if (input.shares.length === 0) return;
   const now = Date.now();
+  const reversals = await entries(db)
+    .find({ dealId: input.dealId, kind: "adjustment", amountMinor: { $lt: 0 } }, { projection: { fund: 1 } })
+    .toArray();
+  const round = (fund: FundKind) => reversals.filter((row) => row.fund === fund).length;
   const docs: FundDoc[] = input.shares
     .filter((share) => share.amountMinor > 0)
     .map((share) => ({
-      _id: accrualId(input.dealId, share.fund),
+      _id: accrualId(input.dealId, share.fund, round(share.fund)),
       fund: share.fund,
       kind: "accrual" as const,
       amountMinor: share.amountMinor,
@@ -276,9 +306,10 @@ export async function accrueForDeal(
   } catch (err) {
     const code = (err as { code?: number }).code;
     const writeErrors = (err as { writeErrors?: { code?: number }[] }).writeErrors ?? [];
+    // Any other write error in the batch is real, even when the first one was a duplicate.
     const onlyDuplicates =
       code === 11000 && writeErrors.every((entry) => entry.code === undefined || entry.code === 11000);
-    if (!onlyDuplicates && code !== 11000) throw err;
+    if (!onlyDuplicates) throw err;
   }
 }
 
@@ -341,11 +372,16 @@ export interface FundReversalPort {
 /* ═════════════════════════════════════════════════════════════════ SPENDING ══ */
 
 /**
- * Money leaving a fund, with a receipt.
+ * Money leaving a fund, recorded with who got it, when and why.
  *
  * Refused past the balance rather than allowed to go negative. A fund's balance
  * is the sum of its history, so a negative one is the fund claiming it gave away
  * money it never had, which is not a thing to record: it is a thing to stop.
+ *
+ * The check and the write are two steps, so two payments recorded at the same
+ * moment could each pass against the same balance. The balance is read again
+ * after the write, and a payment that took the fund below zero takes itself back
+ * out. Both racers may lose that way, which is a retry; neither can overdraw.
  */
 export async function disburse(
   db: Db,
@@ -353,7 +389,10 @@ export async function disburse(
     fund: FundKind;
     amountMinor: number;
     currency: string;
+    recipient: string;
     note: string;
+    reference: string;
+    paidAt: number;
     proof: string[];
     byName: string;
     names: Record<FundKind, string>;
@@ -363,8 +402,9 @@ export async function disburse(
   const refusal = disbursementRefusal({
     amountMinor: input.amountMinor,
     balanceMinor: balance.balanceMinor,
+    recipient: input.recipient,
     note: input.note,
-    proof: input.proof,
+    paidAt: input.paidAt,
   });
   if (refusal) {
     throw new PreconditionFailedError("fund_disbursement_refused", { detail: refusal });
@@ -384,11 +424,206 @@ export async function disburse(
     note: input.note.trim(),
     proof: input.proof,
     byName: input.byName,
+    paidAt: input.paidAt,
+    recipient: input.recipient.trim(),
+    reference: input.reference.trim(),
+    voidedAt: null,
+    voidReason: "",
+    voidedByName: "",
+    voidsId: null,
     createdAt: now,
     updatedAt: now,
   };
   await entries(db).insertOne(doc);
+
+  const after = await fundBalance(db, input.fund, input.names);
+  if (after.balanceMinor < 0) {
+    await entries(db).deleteOne({ _id: doc._id });
+    throw new PreconditionFailedError("fund_disbursement_refused", {
+      detail: "Another payment was recorded at the same moment. Check the balance and try again.",
+    });
+  }
   return toEntry(doc);
+}
+
+/**
+ * A payment recorded by mistake. Its row stays, marked void, and a new entry
+ * gives the money back, so the history shows both the mistake and the fix.
+ *
+ * The give-back's id is derived from the payment, so a retry after a crash
+ * between the two writes finishes the job instead of refunding twice.
+ */
+export async function voidPayment(
+  db: Db,
+  input: { fund: FundKind; id: string; reason: string; byName: string },
+): Promise<FundEntry> {
+  const doc = await entries(db).findOne({ _id: input.id, fund: input.fund });
+  if (!doc) throw new NotFoundError(`payment ${input.id}`);
+  const current = toEntry(doc);
+  const refusal = voidRefusal(current, input.reason);
+  /* Already voided is the retry case: fall through and make sure the give-back
+     exists, rather than refusing a call that is finishing its own work. */
+  if (refusal && current.voidedAt === null) {
+    throw new PreconditionFailedError("fund_void_refused", { detail: refusal });
+  }
+
+  const now = Date.now();
+  const marked =
+    (await entries(db).findOneAndUpdate(
+      { _id: input.id, kind: "payout", voidedAt: null },
+      {
+        $set: {
+          voidedAt: now,
+          voidReason: input.reason.trim(),
+          voidedByName: input.byName,
+          updatedAt: now,
+        },
+      },
+      { returnDocument: "after" },
+    )) ?? (await entries(db).findOne({ _id: input.id }));
+  if (!marked) throw new NotFoundError(`payment ${input.id}`);
+
+  try {
+    await entries(db).insertOne({
+      _id: `fvoid_${marked._id}`,
+      fund: marked.fund,
+      kind: "adjustment",
+      amountMinor: Math.abs(marked.amountMinor),
+      currency: marked.currency,
+      dealId: null,
+      rate: 0,
+      awardId: null,
+      note: `Voided: ${marked.voidReason || input.reason.trim()}`,
+      proof: [],
+      byName: input.byName,
+      paidAt: null,
+      recipient: "",
+      reference: "",
+      voidedAt: null,
+      voidReason: "",
+      voidedByName: "",
+      voidsId: marked._id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (err) {
+    if ((err as { code?: number }).code !== 11000) throw err;
+  }
+  return toEntry(marked);
+}
+
+/** A fund's payments, newest paid first, voided ones included and marked. */
+export async function listPayments(
+  db: Db,
+  input: { fund: FundKind; limit: number },
+): Promise<FundEntry[]> {
+  const rows = await entries(db)
+    .find({ fund: input.fund, kind: "payout" }, { sort: { createdAt: -1, _id: -1 }, limit: input.limit })
+    .toArray();
+  return rows
+    .map(toEntry)
+    .sort((a, b) => (b.paidAt ?? b.createdAt) - (a.paidAt ?? a.createdAt) || b.createdAt - a.createdAt);
+}
+
+/* ═══════════════════════════════════════════════════════════════ MONTHLY ══ */
+
+/**
+ * A fund month by month: what came in and from how many deals, what went back
+ * when a deal fell through, what was paid out, and where the balance closed.
+ *
+ * Read from the whole ledger, which grows by a few rows per deal and stays small
+ * enough to fold in memory. A voided payment and its give-back are both left out,
+ * since together they moved nothing, so a month is never shown paying out money
+ * that was in fact never paid.
+ */
+export async function fundMonthly(
+  db: Db,
+  input: { fund: FundKind; months: number; names: Record<FundKind, string>; now?: number },
+): Promise<FundMonthly> {
+  const rows = await entries(db)
+    .find(
+      { fund: input.fund },
+      { projection: { amountMinor: 1, currency: 1, dealId: 1, kind: 1, paidAt: 1, voidedAt: 1, voidsId: 1, createdAt: 1 } },
+    )
+    .toArray();
+  return foldMonths(rows, {
+    fund: input.fund,
+    name: input.names[input.fund],
+    months: input.months,
+    now: input.now ?? Date.now(),
+  });
+}
+
+type MonthRow = Pick<FundDoc, "amountMinor" | "currency" | "dealId" | "kind" | "paidAt" | "voidedAt" | "voidsId" | "createdAt">;
+
+/** The pure half of `fundMonthly`, exported for the tests. */
+export function foldMonths(
+  rows: readonly MonthRow[],
+  input: { fund: FundKind; name: string; months: number; now: number },
+): FundMonthly {
+  const count = Math.max(1, Math.min(60, Math.floor(input.months)));
+  const end = new Date(input.now);
+  const keys: string[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    keys.push(fundMonthOf(new Date(end.getFullYear(), end.getMonth() - i, 1).getTime()));
+  }
+  const first = keys[0] ?? fundMonthOf(input.now);
+
+  const blank = (month: string): FundMonth => ({
+    month,
+    inMinor: 0,
+    deals: 0,
+    reversedMinor: 0,
+    reversals: 0,
+    paidMinor: 0,
+    payments: 0,
+    netMinor: 0,
+    closingMinor: 0,
+  });
+  const byMonth = new Map(keys.map((key) => [key, blank(key)]));
+
+  let opening = 0;
+  let currency = DEFAULT_CURRENCY;
+  for (const row of rows) {
+    if (row.currency) currency = row.currency;
+    if (row.voidsId || (row.kind === "payout" && row.voidedAt)) continue;
+    const at = row.kind === "payout" ? (row.paidAt ?? row.createdAt) : row.createdAt;
+    const month = fundMonthOf(at);
+    if (month < first) {
+      opening += row.amountMinor;
+      continue;
+    }
+    const bucket = byMonth.get(month);
+    // Past the current month: a payment dated ahead. Counted in the last month.
+    const target = bucket ?? byMonth.get(keys[keys.length - 1] ?? month);
+    if (!target) continue;
+    if (row.dealId) {
+      if (row.amountMinor >= 0) {
+        target.inMinor += row.amountMinor;
+        target.deals += 1;
+      } else {
+        target.reversedMinor += -row.amountMinor;
+        target.reversals += 1;
+      }
+    } else if (row.amountMinor < 0) {
+      target.paidMinor += -row.amountMinor;
+      target.payments += 1;
+    } else {
+      // A positive row with no deal and no payment behind it: a correction in.
+      target.inMinor += row.amountMinor;
+    }
+  }
+
+  let running = opening;
+  const months = keys.map((key) => {
+    const month = byMonth.get(key) ?? blank(key);
+    month.netMinor = month.inMinor - month.reversedMinor - month.paidMinor;
+    running += month.netMinor;
+    month.closingMinor = running;
+    return month;
+  });
+
+  return { fund: input.fund, name: input.name, currency, openingMinor: opening, months };
 }
 
 /* ═══════════════════════════════════════════════════════════════════ AWARDS ══ */
@@ -624,8 +859,9 @@ export async function reconcileFunds(
   return { ok: problems.length === 0, problems };
 }
 
-// TODO(test): accrueForDeal called twice writes one pair of entries.
-// TODO(test): reverseForDeal called twice leaves the fund at the same balance.
-// TODO(test): disburse past the balance is refused and writes nothing.
 // TODO(test): settleAward on an already-awarded quarter refuses without paying.
-// TODO(test): fundBalances counts a negative adjustment as paid, not accrued.
+
+export async function getFundEntry(db: Db, fund: FundKind, id: string): Promise<FundEntry | null> {
+  const doc = await entries(db).findOne({ _id: id, fund });
+  return doc ? toEntry(doc) : null;
+}

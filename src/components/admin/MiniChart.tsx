@@ -38,6 +38,7 @@ export function MiniChart({
   mode,
   height = 56,
   label,
+  unit = "day",
 }: {
   /**
    * ZERO FILLED BY THE SERVER. A chart drawn from only the days that saw
@@ -49,6 +50,8 @@ export function MiniChart({
   height?: number;
   /** The accessible description. The shape itself says nothing aloud. */
   label: string;
+  /** What one point is, for the hint under the chart. */
+  unit?: string;
 }) {
   const titleId = useId();
   const [active, setActive] = useState<number | null>(null);
@@ -196,7 +199,7 @@ export function MiniChart({
           </>
         ) : (
           <span className="text-slate-550">
-            {points.length} points. Hover or tap for a day.
+            {points.length} points. Hover or tap for a {unit}.
           </span>
         )}
       </p>

@@ -5,6 +5,8 @@ import {
   clampLimit,
   currentDb,
   currentUser,
+  auditBefore,
+  auditEntityId,
   pathParam,
   readJson,
   readQuery,
@@ -15,6 +17,10 @@ import { requireAdmin, requireAuth } from "@avhomes/identity";
 import { FUND_KINDS, type FundKind } from "@avhomes/contracts";
 import {
   disburse,
+  fundMonthly,
+  getFundEntry,
+  listPayments,
+  voidPayment,
   fundBalances,
   getAward,
   listAwards,
@@ -48,13 +54,22 @@ function fundParam(value: string): FundKind {
   return value as FundKind;
 }
 
-const DisburseBody = z
+const PaymentBody = z
   .object({
     amountMinor: z.number().int().positive(),
+    recipient: str().min(2).max(200),
     /** What it paid for. The only description this row will ever carry. */
     note: str().min(4).max(400),
-    proof: z.array(str().max(500)).min(1).max(10),
+    reference: str().max(120).default(""),
+    paidAt: z.number().int().positive(),
+    proof: z.array(str().max(500)).max(10).default([]),
   })
+  .strict();
+
+const VoidBody = z.object({ reason: str().min(4).max(400) }).strict();
+
+const MonthlyQuery = z
+  .object({ months: z.coerce.number().int().min(1).max(60).default(12) })
   .strict();
 
 const EntriesQuery = z
@@ -87,29 +102,63 @@ export function fundsRoutes(deps: { names: FundNamesPort }): Hono<AppEnv> {
     return c.json(page);
   });
 
-  /*
-   * Spending. Only the Foundation is meant to be spent from here: the reward
-   * pool leaves through an award, which has a winner and a quarter attached. The
-   * route still accepts either, because a fund that cannot be corrected is a
-   * fund whose first mistake is permanent, and an adjustment with a receipt and
-   * a name on it is the correction.
-   */
-  routes.post("/admin/funds/:fund/disburse", requireAuth(), requireAdmin(), async (c) => {
+  routes.get("/admin/funds/:fund/payments", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const fund = fundParam(pathParam(c, "fund"));
-    const body = await readJson(c, DisburseBody);
+    const query = readQuery(c, EntriesQuery);
+    return c.json({ payments: await listPayments(db, { fund, limit: clampLimit(query.limit) }) });
+  });
+
+  routes.get("/admin/funds/:fund/monthly", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const fund = fundParam(pathParam(c, "fund"));
+    const query = readQuery(c, MonthlyQuery);
+    const names = await deps.names(db);
+    return c.json(await fundMonthly(db, { fund, months: query.months, names }));
+  });
+
+  /*
+   * Recording money that left a fund. Either fund: the reward pool's prize
+   * normally leaves through an award, but a prize paid in kind, or a cost the
+   * pool covers, still needs a line with a name and a date on it.
+   */
+  routes.post("/admin/funds/:fund/payments", requireAuth(), requireAdmin(), async (c) => {
+    const db = await currentDb(c);
+    const fund = fundParam(pathParam(c, "fund"));
+    const body = await readJson(c, PaymentBody);
     const names = await deps.names(db);
     const user = currentUser(c);
     const entry = await disburse(db, {
       fund,
       amountMinor: body.amountMinor,
       currency: (await fundBalances(db, names)).find((f) => f.fund === fund)?.currency ?? "NGN",
+      recipient: body.recipient,
       note: body.note,
+      reference: body.reference,
+      paidAt: body.paidAt,
       proof: body.proof,
       byName: user.displayName,
       names,
     });
+    auditEntityId(c, entry.id);
     return c.json({ entry }, 201);
+  });
+
+  routes.post("/admin/funds/:fund/payments/:id/void", requireAuth(), requireAdmin(), async (c) => {
+    const db = await currentDb(c);
+    const fund = fundParam(pathParam(c, "fund"));
+    const id = pathParam(c, "id");
+    const body = await readJson(c, VoidBody);
+    const before = await getFundEntry(db, fund, id);
+    if (before) auditBefore(c, before as unknown as Record<string, unknown>);
+    auditEntityId(c, id);
+    const entry = await voidPayment(db, {
+      fund,
+      id,
+      reason: body.reason,
+      byName: currentUser(c).displayName,
+    });
+    return c.json({ entry });
   });
 
   routes.get("/admin/awards", requireAuth(), async (c) => {

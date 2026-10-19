@@ -56,9 +56,21 @@ export interface FundEntry {
   awardId: string | null;
   /** What a disbursement was for. The only description the row will ever have. */
   note: string;
-  /** Receipts. Required on a payout, because money leaving needs evidence. */
+  /** Receipts. Optional on a recorded payment, kept on an award's payout. */
   proof: string[];
   byName: string;
+  /** A payout: the day the money actually left, which can be before it was recorded. */
+  paidAt: number | null;
+  /** A payout: who received the money. */
+  recipient: string;
+  /** A payout: the bank or transfer reference. */
+  reference: string;
+  /** A voided payout keeps its row; these say when, why and who. */
+  voidedAt: number | null;
+  voidReason: string;
+  voidedByName: string;
+  /** The entry that gives a voided payout's money back points at that payout. */
+  voidsId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -74,8 +86,9 @@ export interface FundBalance {
   /** The renameable label, resolved from settings by the caller. */
   name: string;
   currency: string;
+  /** What deals put in, net of deals that were cancelled afterwards. */
   accruedMinor: number;
-  /** Positive, though the entries behind it are negative. */
+  /** What was paid out, net of voided payments. Positive, though stored negative. */
   paidMinor: number;
   balanceMinor: number;
   entries: number;
@@ -244,7 +257,7 @@ export function emptyFundBalance(fund: FundKind, name: string): FundBalance {
 }
 
 /**
- * Everything a disbursement is refused for, checked the same way on both sides.
+ * Everything a recorded payment is refused for, checked the same way on both sides.
  *
  * Spending a fund past its balance is not a thing to record, it is a thing to
  * stop: the balance is the sum of the history, so a negative one would be a fund
@@ -253,20 +266,89 @@ export function emptyFundBalance(fund: FundKind, name: string): FundBalance {
 export function disbursementRefusal(input: {
   amountMinor: number;
   balanceMinor: number;
+  recipient: string;
   note: string;
-  proof: readonly string[];
+  paidAt: number;
+  now?: number;
 }): string | null {
   if (!Number.isFinite(input.amountMinor) || input.amountMinor <= 0) {
-    return "Enter how much is being paid out.";
+    return "Enter how much was paid.";
   }
   if (input.amountMinor > input.balanceMinor) {
     return "That is more than this fund holds.";
   }
+  if (input.recipient.trim().length < 2) {
+    return "Say who was paid.";
+  }
   if (input.note.trim().length < 4) {
     return "Say what this paid for.";
   }
-  if (input.proof.length === 0) {
-    return "Attach a receipt.";
+  if (!Number.isFinite(input.paidAt) || input.paidAt <= 0) {
+    return "Pick the day it was paid.";
+  }
+  // A day of slack, so "today" picked in a zone ahead of the server still passes.
+  if (input.paidAt > (input.now ?? Date.now()) + 86_400_000) {
+    return "The payment date cannot be in the future.";
   }
   return null;
+}
+
+/** Why a payment cannot be voided, or null when it can. */
+export function voidRefusal(
+  entry: Pick<FundEntry, "kind" | "awardId" | "voidedAt">,
+  reason: string,
+): string | null {
+  if (entry.kind !== "payout") return "Only a payment can be voided.";
+  if (entry.voidedAt !== null) return "This payment was already voided.";
+  if (entry.awardId !== null) {
+    return "A prize payment is settled through its award and cannot be voided here.";
+  }
+  if (reason.trim().length < 4) return "Say why this payment is being voided.";
+  return null;
+}
+
+/** One month of a fund, in the server's own zone like every other pay period. */
+export interface FundMonth {
+  /** `2026-10`. */
+  month: string;
+  /** Deal shares that came in this month. */
+  inMinor: number;
+  /** How many deals those shares came from. */
+  deals: number;
+  /** Shares handed back because a deal was cancelled this month. Positive. */
+  reversedMinor: number;
+  reversals: number;
+  /** Payments out, by the day they were paid. Voided payments are left out. */
+  paidMinor: number;
+  payments: number;
+  /** In, less reversed, less paid. */
+  netMinor: number;
+  /** The fund's balance at the end of the month. */
+  closingMinor: number;
+}
+
+export interface FundMonthly {
+  fund: FundKind;
+  name: string;
+  currency: string;
+  /** The balance before the first month shown. */
+  openingMinor: number;
+  /** Oldest first, zero filled, ending with the current month. */
+  months: FundMonth[];
+}
+
+/** `2026-10` for a timestamp, local like `quarterOf`. */
+export function fundMonthOf(at: number): string {
+  const d = new Date(at);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "October 2026", or "Oct 26" short, from `2026-10`. */
+export function fundMonthLabel(month: string, style: "long" | "short" = "long"): string {
+  const [year, mon] = month.split("-").map(Number);
+  if (!year || !mon) return month;
+  return new Date(year, mon - 1, 1).toLocaleDateString("en-GB", {
+    month: style,
+    year: style === "long" ? "numeric" : "2-digit",
+  });
 }
