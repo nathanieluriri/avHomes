@@ -17,6 +17,9 @@ export {
 
 export { whatsappRedirectRoutes } from "./whatsapp";
 
+export { currentMarketer } from "./routes";
+export { readTools, toolsAdminRoutes, toolsAppRoutes } from "./tools";
+
 export {
   paystackKeySaved,
   readMarketingSettings,

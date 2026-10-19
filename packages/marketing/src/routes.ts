@@ -975,7 +975,7 @@ export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscr
  * the founder, because the owner asked that every admin be a marketer without
  * having to sign up for it.
  */
-async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Marketer> {
+export async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Marketer> {
   const user = currentUser(c);
   /*
    * A PARTNER LISTER IS NOT A MARKETER, and is refused before any profile is read.
