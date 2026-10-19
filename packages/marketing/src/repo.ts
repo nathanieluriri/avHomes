@@ -446,6 +446,7 @@ export interface DealInput {
   currency: string;
   buyerName: string;
   buyerPhone: string;
+  buyerEmail?: string;
   proof: string[];
   note: string;
   closedOn: number;
@@ -494,6 +495,7 @@ export async function createDeal(
     currency: input.currency,
     buyerName: input.buyerName,
     buyerPhone: input.buyerPhone,
+    buyerEmail: (input.buyerEmail ?? "").trim().toLowerCase(),
     proof: input.proof,
     note: input.note,
     reporterId: reporter.id,
@@ -543,6 +545,7 @@ export interface RecordSaleInput {
   currency: string;
   buyerName: string;
   buyerPhone: string;
+  buyerEmail?: string;
   closedOn: number;
   /** At least one. The refusal is shared with the sheet; see recordSaleRefusal. */
   proof: string[];
@@ -641,6 +644,7 @@ export async function recordSale(
     currency: input.currency,
     buyerName: input.buyerName,
     buyerPhone: input.buyerPhone,
+    buyerEmail: (input.buyerEmail ?? "").trim().toLowerCase(),
     proof: input.proof,
     note: input.note,
     /*

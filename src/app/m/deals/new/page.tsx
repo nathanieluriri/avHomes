@@ -336,6 +336,8 @@ interface FactsProps {
   setBuyerName: (next: string) => void;
   buyerPhone: string;
   setBuyerPhone: (next: string) => void;
+  buyerEmail: string;
+  setBuyerEmail: (next: string) => void;
   closedOn: string;
   setClosedOn: (next: string) => void;
   showErrors: boolean;
@@ -374,10 +376,13 @@ function LiveEarn({
   );
 }
 
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+
 function DealFacts(props: FactsProps & { currency: string }) {
   const noAmount = props.showErrors && props.amountMinor <= 0;
   const noName = props.showErrors && props.buyerName.trim().length < 2;
   const noDate = props.showErrors && props.closedOn === "";
+  const badEmail = props.buyerEmail.trim() !== "" && !EMAIL_SHAPE.test(props.buyerEmail.trim());
   const picked = dateWords(props.closedOn);
 
   return (
@@ -430,6 +435,20 @@ function DealFacts(props: FactsProps & { currency: string }) {
           onChange={props.setBuyerPhone}
           autoComplete="off"
           aria-label="Buyer phone"
+        />
+      </Field>
+
+      <Field label="Buyer email" hint="Optional. We send them a thank you once the sale is approved." error={badEmail ? "That email does not look right." : undefined}>
+        <input
+          type="email"
+          inputMode="email"
+          value={props.buyerEmail}
+          onChange={(event) => props.setBuyerEmail(event.target.value)}
+          placeholder="chidinma@example.com"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          className={`${inputCls} ${badEmail ? "m-bad" : ""}`}
         />
       </Field>
 
@@ -603,6 +622,7 @@ export default function NewDealPage() {
   const [amountMinor, setAmountMinor] = useState(0);
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
+  const [buyerEmail, setBuyerEmail] = useState("");
   const [closedOn, setClosedOn] = useState(todayInput);
   const [note, setNote] = useState("");
   const uploads = useProofUploads();
@@ -674,6 +694,7 @@ export default function NewDealPage() {
         amountMinor,
         buyerName: buyerName.trim(),
         buyerPhone: buyerPhone.trim(),
+        buyerEmail: buyerEmail.trim(),
         proof: uploads.urls,
         note: note.trim(),
         closedOn: dateInputToEpoch(closedOn),
@@ -798,6 +819,8 @@ export default function NewDealPage() {
                 setBuyerName={setBuyerName}
                 buyerPhone={buyerPhone}
                 setBuyerPhone={setBuyerPhone}
+                buyerEmail={buyerEmail}
+                setBuyerEmail={setBuyerEmail}
                 closedOn={closedOn}
                 setClosedOn={setClosedOn}
                 showErrors={showErrors}

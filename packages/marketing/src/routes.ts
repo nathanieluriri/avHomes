@@ -218,6 +218,12 @@ export interface MarketingDeps {
    * in the audience package. Never undoes an earlier unsubscribe.
    */
   subscribe?: (db: Db, email: string, ctx: { origin: string; requestId: string; route: string }) => Promise<void>;
+  /** Congratulates a buyer and adds them to the mailing list, once per address. Injected from the audience package. Never throws. */
+  welcomeBuyer?: (
+    db: Db,
+    input: { email: string; name: string; property: string; origin: string },
+    ctx: { requestId: string; route: string },
+  ) => Promise<boolean>;
   /** Sends one of the editable email templates. Injected, because templates live in the settings package. Never throws. */
   mail?: SendTemplate;
   /**
@@ -332,6 +338,16 @@ async function settleDeal(
 }
 
 /** A sale that fell through: its unit is offered again, or the listing it closed reopens. */
+/** An approved sale with a buyer email: welcome them to the list. */
+async function greetBuyer(deps: MarketingDeps, db: Db, deal: Deal | null, origin: string, requestId: string) {
+  if (!deal || deal.status !== "approved" || !deal.buyerEmail || !deps.welcomeBuyer) return;
+  await deps.welcomeBuyer(
+    db,
+    { email: deal.buyerEmail, name: deal.buyerName, property: deal.listingTitle, origin },
+    { requestId, route: "deal approved" },
+  );
+}
+
 async function unsettleDeal(deps: MarketingDeps, db: Db, deal: Deal): Promise<void> {
   if (!deps.reopenListing) return;
   try {
@@ -528,6 +544,7 @@ const DealBody = z
     amountMinor: z.number().int().min(1),
     buyerName: str().max(160).default(""),
     buyerPhone: str().max(40).default(""),
+    buyerEmail: z.union([z.literal(""), emailString()]).default(""),
     proof: z.array(str().max(600)).min(1).max(5),
     note: str().max(600).default(""),
     closedOn: z.number().int().min(0).default(0),
@@ -702,6 +719,7 @@ const RecordSaleBody = z
     amountMinor: z.number().int().positive(),
     buyerName: str().max(120),
     buyerPhone: str().max(40).default(""),
+    buyerEmail: z.union([z.literal(""), emailString()]).default(""),
     closedOn: z.number().int().min(0).default(0),
     /* At least one. `recordSaleRefusal` says the same thing in words the sheet
        renders, and this is the shape check behind it. */
@@ -1006,7 +1024,7 @@ function dealView(deal: Deal, marketerId: string) {
   const mine = deal.reporterId === marketerId;
   return {
     // Somebody else's buyer is not this marketer's business.
-    deal: mine ? deal : { ...deal, buyerName: "", buyerPhone: "" },
+    deal: mine ? deal : { ...deal, buyerName: "", buyerPhone: "", buyerEmail: "" },
     myShare: deal.shares.find((share) => share.marketerId === marketerId) ?? null,
   };
 }
@@ -1250,6 +1268,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       // Somebody else's buyer is not this marketer's business.
       buyerName: deal.reporterId === marketer.id ? deal.buyerName : "",
       buyerPhone: deal.reporterId === marketer.id ? deal.buyerPhone : "",
+      buyerEmail: deal.reporterId === marketer.id ? deal.buyerEmail : "",
     }));
     return c.json({ items, total: page.total });
   });
@@ -1917,6 +1936,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         currency: settings.currency,
         buyerName: body.buyerName,
         buyerPhone: body.buyerPhone,
+        buyerEmail: body.buyerEmail,
         closedOn: body.closedOn || Date.now(),
         proof: body.proof,
         note: body.note,
@@ -1947,6 +1967,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     }
     // Settling a deal a marketer reported reads as an approval; a sale typed in here, as one recorded for them.
     await tellMarketers(deps, db, decisionNotes(deal, !body.dealId));
+    await greetBuyer(deps, db, deal, requestOrigin(c.req), c.get("requestId"));
 
     return c.json({ deal }, 201);
   });
@@ -2028,6 +2049,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     );
     await settleDeal(deps, db, deal, { id: user.id, name: user.displayName });
     await tellMarketers(deps, db, decisionNotes(deal));
+    await greetBuyer(deps, db, deal, requestOrigin(c.req), c.get("requestId"));
     return c.json({ deal });
   });
 
@@ -2146,6 +2168,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     );
     const won = dealId ? await getDeal(db, dealId) : null;
     if (won) await settleDeal(deps, db, won, { id: user.id, name: user.displayName });
+    await greetBuyer(deps, db, won, requestOrigin(c.req), c.get("requestId"));
     auditEntityId(c, lead.id);
     return c.json({ lead, dealId });
   });

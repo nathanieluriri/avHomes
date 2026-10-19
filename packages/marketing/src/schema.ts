@@ -73,6 +73,7 @@ export interface DealDoc {
   currency: string;
   buyerName: string;
   buyerPhone: string;
+  buyerEmail?: string;
   proof: string[];
   note: string;
   reporterId: string;
@@ -272,6 +273,7 @@ export function toDeal(doc: DealDoc): Deal {
     currency: doc.currency,
     buyerName: doc.buyerName ?? "",
     buyerPhone: doc.buyerPhone ?? "",
+    buyerEmail: doc.buyerEmail ?? "",
     proof: doc.proof ?? [],
     note: doc.note ?? "",
     reporterId: doc.reporterId,

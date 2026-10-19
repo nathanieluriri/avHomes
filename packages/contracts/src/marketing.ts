@@ -163,6 +163,8 @@ export interface Deal {
   currency: string;
   buyerName: string;
   buyerPhone: string;
+  /** Optional. A buyer with an email joins the mailing list once the sale is approved. */
+  buyerEmail: string;
   /** Uploaded receipts, alerts or agreements. At least one is required. */
   proof: string[];
   note: string;

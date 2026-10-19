@@ -87,6 +87,7 @@ import {
   subscribeAddress,
   unsubscribePublicRoutes,
   unsubscribedAmong,
+  welcomeBuyer,
 } from "@avhomes/audience";
 import {
   activeMarketerContacts,
@@ -633,6 +634,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
     marketingAdminRoutes({
       notify,
       tell,
+      welcomeBuyer: (db, input, ctx) => welcomeBuyer(db, mailer, input, ctx),
       mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
       ...marketingPorts,
     }),

@@ -20,6 +20,7 @@ export const EMAIL_TEMPLATE_KEYS = [
   "team-invite",
   "property-partner-welcome",
   "property-partner-whatsapp",
+  "buyer-welcome",
 ] as const;
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
 
@@ -251,6 +252,28 @@ export const EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateInfo> = {
       "Sign in here: {{signInLink}}",
       "",
       "Sign in with this same email address and you’ll be sent a 6-digit code to confirm it. The invite expires in seven days.",
+    ].join("\n"),
+  },
+  "buyer-welcome": {
+    label: "Congratulations to a buyer",
+    group: "Buyers",
+    when: "Sent once when a sale with the buyer's email is approved. It adds them to the mailing list and introduces AV Constructions.",
+    variables: [
+      { name: "name", description: "The buyer's first name" },
+      { name: "property", description: "The property they bought" },
+      { name: "constructionLink", description: "AV Constructions' website" },
+      { name: "unsubscribeLink", description: "Leave the mailing list" },
+    ],
+    defaultSubject: "Congratulations on {{property}}",
+    defaultBody: [
+      "Congratulations, {{name}}.",
+      "",
+      "Thank you for buying {{property}} through AV Homes. We are glad to have been part of it.",
+      "",
+      "If you are planning to build, finish, renovate or furnish, our sister company AV Constructions builds with the same care we put into every listing, from design to handover:",
+      "[Visit AV Constructions]({{constructionLink}})",
+      "",
+      "You are now on the AV Homes mailing list for new listings and market news. [Unsubscribe]({{unsubscribeLink}})",
     ].join("\n"),
   },
   "property-partner-welcome": {

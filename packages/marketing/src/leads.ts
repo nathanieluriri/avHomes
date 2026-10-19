@@ -318,6 +318,7 @@ export async function winLead(
       currency: settings.currency,
       buyerName: doc.buyerName,
       buyerPhone: doc.buyerPhone,
+      buyerEmail: doc.buyerEmail ?? "",
       proof: [],
       note: `From a buyer ${reporter.displayName} logged. ${input.note}`.trim(),
       closedOn: input.closedOn,
