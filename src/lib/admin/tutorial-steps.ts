@@ -150,13 +150,13 @@ export const TUTORIAL_STEPS: Partial<Record<TutorialId, readonly TutorialStep[]>
   "spend-the-fund": [
     { at: 3.8, until: 8.4, title: "The two funds", line: "A share of every recorded deal goes into each, whoever closed it and whether or not anybody earned commission." },
     { at: 8.9, until: 14.4, title: "What the Foundation holds", line: "Held now, all time. A balance is the sum of its history, never a stored number." },
-    { at: 15, until: 19.5, title: "Record a payment out", line: "This is the only way money leaves it. The prize pool is different: that leaves through an award." },
+    { at: 15, until: 19.5, title: "Record a payment", line: "Each fund has its own button. Use it whenever money leaves a fund, the prize pool included when a prize is not paid through an award." },
     { at: 20, until: 22.8, title: "How much", line: "It will not take more than the fund holds. A negative balance would be the fund claiming it gave away money it never had." },
-    { at: 23.3, until: 28.9, title: "What it paid for", line: "Write what a reader needs a year from now. Not \"project\"." },
-    { at: 29.3, until: 34.2, title: "The receipt", line: "At least one. Money leaving needs evidence, the same rule a recorded sale follows." },
+    { at: 23.3, until: 28.9, title: "Who was paid, and for what", line: "Name the person, school or supplier, and write what a reader needs a year from now. Not \"project\"." },
+    { at: 29.3, until: 34.2, title: "The receipt", line: "Optional, but a photo of the receipt or transfer slip saves questions later. Add the bank reference too if there is one." },
     { at: 35.5, until: 40.7, title: "Record it", line: "The balance drops by exactly that amount." },
-    { at: 41.2, until: 48.4, title: "And the history says why", line: "The payment sits at the top, carrying what it paid for and who recorded it. Nothing here is ever edited." },
-    { at: 48.2, until: 53.2, title: "Nothing here is ever edited", line: "Both funds are append only, so a balance is always the sum of its own history. A correction is a new line, not a change to an old one, which is what keeps the record worth reading a year from now." },
+    { at: 41.2, until: 48.4, title: "And the history says why", line: "The payment sits at the top of the fund's payments, carrying who was paid, what for and who recorded it." },
+    { at: 48.2, until: 53.2, title: "Mistakes are voided, not edited", line: "A wrong payment is voided with a reason. The money goes back into the fund and the record stays, marked void, so the history is always the whole story." },
   ],
   "report-a-deal": [
     { at: 3.5, until: 7.6, title: "Tap the round + button", line: "It sits in the middle of the bar at the bottom." },
