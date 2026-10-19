@@ -47,7 +47,7 @@ interface MenuEntry {
   count?: boolean;
 }
 
-/* Four rows of three, each with a raised middle tile. */
+/* Four rows of three, each with a raised middle tile, then My purchases. */
 const MENU: readonly MenuEntry[] = [
   { href: "/m/deals", label: "Deals", Icon: IconDeals, column: "1 / span 2", row: 1 },
   { href: "/m/team", label: "Network", Icon: IconTeam, column: "3 / span 2", row: 1, up: true },
@@ -61,6 +61,7 @@ const MENU: readonly MenuEntry[] = [
   { href: "/m/alerts", label: "Alerts", Icon: IconAlerts, column: "1 / span 2", row: 4, count: true },
   { href: "/m/help", label: "Help", Icon: IconHelp, column: "3 / span 2", row: 4, up: true },
   { href: "/m/profile", label: "Account", Icon: IconAccount, column: "5 / span 2", row: 4 },
+  { href: "/m/purchases", label: "My purchases", Icon: IconListings, column: "3 / span 2", row: 5 },
 ];
 
 const LAST_ROW = Math.max(...MENU.map((entry) => entry.row));

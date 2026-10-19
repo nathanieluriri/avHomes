@@ -214,6 +214,13 @@ export const NAV: readonly NavItem[] = [
     domain: "finance",
     children: [
       {
+        href: "/admin/accounts",
+        label: "Balance sheet",
+        hint: "Money in, owed and paid, both funds, and payout proof",
+        icon: Landmark,
+        domain: "finance",
+      },
+      {
         href: "/admin/analytics/transactions",
         label: "Transactions",
         hint: "Every deal, with its split and its proof",

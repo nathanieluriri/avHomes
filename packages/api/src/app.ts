@@ -95,6 +95,9 @@ import {
   currentMarketer,
   marketingAdminRoutes,
   marketingAppRoutes,
+  planAdminRoutes,
+  planAppRoutes,
+  planCronRoutes,
   marketingPublicRoutes,
   toolsAdminRoutes,
   toolsAppRoutes,
@@ -106,6 +109,7 @@ import {
 import { accrueForDeal, fundsRoutes, reverseForDeal } from "@avhomes/funds";
 import { dashboardRoutes } from "./dashboard";
 import { analyticsConsoleRoutes } from "./analytics";
+import { accountsRoutes } from "./accounts";
 import { healthRoutes } from "./health";
 import { awaitingCloseRoutes } from "./awaiting-close";
 import { tutorialsRoutes } from "./tutorials";
@@ -427,6 +431,16 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * sealed copy before anything is read.
    */
   app.route(API_PREFIX, mailHookRoutes({ onNewMail: announceMail }));
+  /* The daily plan reminders. Its authority is the platform's CRON_SECRET bearer; it reads no cookie. */
+  app.route(
+    API_PREFIX,
+    planCronRoutes({
+      notify,
+      tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
+      officeEmail: async (db) => (await readPublicSettings(db)).contactEmail,
+    }),
+  );
 
   /* ═════════════════ 6. public reads, ABOVE sessionMiddleware ═════════ */
 
@@ -630,7 +644,17 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       recentListings,
       recentNews: recentNewsFor,
       newsletterFor: (db, input) => newsletterArticle(db, input.origin, input.id, input.email),
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
       officeEmail: async (db) => (await readPublicSettings(db)).contactEmail,
+      ...marketingPorts,
+    }),
+  );
+  app.route(
+    API_PREFIX,
+    planAppRoutes({
+      notify,
+      tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
       ...marketingPorts,
     }),
   );
@@ -661,6 +685,15 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       ...marketingPorts,
     }),
   );
+  app.route(
+    API_PREFIX,
+    planAdminRoutes({
+      notify,
+      tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
+      ...marketingPorts,
+    }),
+  );
   /* After the session, so a partner opening their own link is told apart from a forward. Requires nothing. */
   app.route(API_PREFIX, whatsappRedirectRoutes());
   /* The funds sit beside marketing because that is what feeds them, and they take
@@ -668,6 +701,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
      import: a renameable label is not a reason for one feature package to know
      another. */
   app.route(API_PREFIX, fundsRoutes({ names: fundNames }));
+  app.route(API_PREFIX, accountsRoutes({ names: fundNames }));
   app.route(API_PREFIX, feedbackRoutes({ notify }));
   app.route(API_PREFIX, tutorialsRoutes());
   app.route(API_PREFIX, notificationsRoutes());

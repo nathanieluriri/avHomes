@@ -191,6 +191,14 @@ export function ListingCard({
               Report a deal
             </ButtonLink>
           )}
+          {canReport && (
+            <ButtonLink
+              href={`/m/purchases?listing=${encodeURIComponent(property.id)}&title=${encodeURIComponent(property.title)}`}
+              variant="quiet"
+            >
+              Buy it myself
+            </ButtonLink>
+          )}
         </div>
       </div>
     </article>

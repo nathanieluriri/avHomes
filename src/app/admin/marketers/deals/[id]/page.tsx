@@ -25,6 +25,7 @@ import { useAsync, useHoldsDomain } from "@/lib/admin/hooks";
 import { dateTime, fullDate } from "@/lib/admin/format";
 import { DEAL_TONE, toApiError } from "@/lib/admin/marketing";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
+import { PlanPayments } from "@/components/admin/PlanPayments";
 import {
   Badge,
   Button,
@@ -474,6 +475,8 @@ function DealScreen({ initial }: { initial: DealDetail }) {
             )}
           </Card>
 
+          <PlanPayments deal={deal} onChange={setDeal} />
+
           <Card>
             <CardHead title="The deal" />
             <DefinitionList>
@@ -488,7 +491,10 @@ function DealScreen({ initial }: { initial: DealDetail }) {
               {deal.unitKey && <DRow label="Unit">{deal.unitKey}</DRow>}
               {deal.listingEstate && <DRow label="Estate">{deal.listingEstate}</DRow>}
               {deal.listingLocation && <DRow label="Location">{deal.listingLocation}</DRow>}
-              <DRow label="Kind">{deal.listingType === "rent" ? "Rental" : "Sale"}</DRow>
+              <DRow label="Kind">
+                {deal.listingType === "rent" ? "Rental" : "Sale"}
+                {deal.selfPurchase ? " · Partner purchase" : ""}
+              </DRow>
               <DRow label="Buyer">{deal.buyerName || "Not given"}</DRow>
               <DRow label="Buyer phone">{formatPhone(deal.buyerPhone) || "Not given"}</DRow>
               <DRow label="Marketer">

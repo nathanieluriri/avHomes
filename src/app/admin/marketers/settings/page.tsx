@@ -5,6 +5,9 @@ import { Percent } from "lucide-react";
 import {
   ACCOUNT_PROVIDERS,
   ACCOUNT_PROVIDER_LABEL,
+  MARKETER_EXPORT_FIELDS,
+  MARKETER_EXPORT_FIELD_INFO,
+  type MarketerExportField,
   DEAL_KINDS,
   OWNERSHIPS,
   OWNERSHIP_LABEL,
@@ -90,6 +93,8 @@ interface Draft {
   requireApproval: boolean;
   joinOpen: boolean;
   blockSelfDeals: boolean;
+  selfPurchaseCommission: boolean;
+  exportableFields: MarketerExportField[];
   /** Major units, because that is what the field asks for. */
   minPayout: string;
   supportPhone: string;
@@ -155,6 +160,8 @@ function toDraft(settings: MarketingSettings): Draft {
     requireApproval: settings.requireApproval,
     joinOpen: settings.joinOpen,
     blockSelfDeals: settings.blockSelfDeals,
+    selfPurchaseCommission: settings.selfPurchaseCommission,
+    exportableFields: settings.exportableFields,
     minPayout: plainMajor(settings.minPayoutMinor, settings.currency),
     supportPhone: settings.supportPhone,
     accountProvider: settings.accountProvider,
@@ -324,6 +331,8 @@ function CommissionEditor({
           requireApproval: draft.requireApproval,
           joinOpen: draft.joinOpen,
           blockSelfDeals: draft.blockSelfDeals,
+          selfPurchaseCommission: draft.selfPurchaseCommission,
+          exportableFields: draft.exportableFields,
           minPayoutMinor: payout.minor,
           supportPhone: draft.supportPhone,
           leaderboard: draft.leaderboard,
@@ -543,6 +552,42 @@ function CommissionEditor({
           </Card>
 
           <LeaderboardSettingsCard value={draft.leaderboard} onChange={(next) => set("leaderboard", next)} />
+
+          <Card className="space-y-4">
+            <CardHead title="Partner purchases" />
+            <Switch
+              checked={draft.selfPurchaseCommission}
+              onChange={(next) => set("selfPurchaseCommission", next)}
+              label="Pay commission when a partner buys for themselves"
+              description="Off, a partner's own purchase earns no commission."
+            />
+          </Card>
+
+          <Card className="space-y-3">
+            <CardHead title="Partner export" />
+            <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
+              The fields anyone may download from the Marketers page.
+            </p>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {MARKETER_EXPORT_FIELDS.map((field) => (
+                <label key={field} className="flex items-center gap-2 text-[13px] text-plum-950">
+                  <input
+                    type="checkbox"
+                    checked={draft.exportableFields.includes(field)}
+                    onChange={() =>
+                      set(
+                        "exportableFields",
+                        draft.exportableFields.includes(field)
+                          ? draft.exportableFields.filter((f) => f !== field)
+                          : MARKETER_EXPORT_FIELDS.filter((f) => f === field || draft.exportableFields.includes(f)),
+                      )
+                    }
+                  />
+                  {MARKETER_EXPORT_FIELD_INFO[field].label}
+                </label>
+              ))}
+            </div>
+          </Card>
 
           <Card className="space-y-4">
             <CardHead title="Rent" />

@@ -164,6 +164,8 @@ export default function DealsPage() {
         return (
           <span className="inline-flex flex-wrap items-center gap-1.5 md:flex-nowrap">
             <Badge tone={DEAL_TONE[deal.status]}>{DEAL_STATUS_LABEL[deal.status]}</Badge>
+            {deal.selfPurchase && <Badge tone="wine">Partner purchase</Badge>}
+            {deal.plan && <Badge tone="neutral">Payment plan</Badge>}
             {/* Louder than the status beside it, on purpose. Two people claiming
                 one sale is the failure this queue exists to catch, and it is the
                 one thing on the row that has to be read before the row is

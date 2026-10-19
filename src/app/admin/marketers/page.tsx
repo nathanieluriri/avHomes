@@ -14,6 +14,7 @@ import {
   toApiError,
   type MarketingCounts,
 } from "@/lib/admin/marketing";
+import { ExportMarketers } from "@/components/admin/ExportMarketers";
 import { Badge, Button, ButtonLink, EmptyState, ErrorNote, PageHeader } from "@/components/admin/ui";
 import { DataTable, IdCell, TableToolbar, type Column } from "@/components/admin/DataTable";
 
@@ -257,10 +258,13 @@ export default function MarketersPage() {
             : "Everyone selling, and the people they brought in."
         }
         actions={
-          <ButtonLink href="/admin/marketers/settings" variant="ghost" spotlight="commission-link">
-            <Percent className="mr-1.5 h-4 w-4" aria-hidden="true" />
-            Commission
-          </ButtonLink>
+          <>
+            <ExportMarketers />
+            <ButtonLink href="/admin/marketers/settings" variant="ghost" spotlight="commission-link">
+              <Percent className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Commission
+            </ButtonLink>
+          </>
         }
       />
 

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { Check, ChevronRight, Search } from "lucide-react";
 import {
   formatMoney,
@@ -23,6 +23,7 @@ import {
 } from "@/components/marketer/AppShell";
 import { couldEarn } from "@/components/marketer/deals/DealStatus";
 import { NairaInput } from "@/components/marketer/deals/NairaInput";
+import { NO_PLAN, PlanFields, planDraftRefusal, planFromDraft, type PlanDraft } from "@/components/marketer/deals/PlanFields";
 import {
   ProofPicker,
   toApiError,
@@ -106,6 +107,24 @@ function useListingParam(): string | null {
     () => new URLSearchParams(window.location.search).get("listing"),
     () => null,
   );
+}
+
+/** `?self=1`: the partner is buying it themselves. */
+function useSelfParam(): boolean {
+  return useSyncExternalStore(
+    onPopState,
+    () => new URLSearchParams(window.location.search).get("self") === "1",
+    () => false,
+  );
+}
+
+/** Fills the buyer with the partner themselves once their profile has loaded. Must render inside AppShell. */
+function SelfBuyer({ onMe }: { onMe: (me: { displayName: string; phone: string; email: string }) => void }) {
+  const { me } = useMarketer();
+  useEffect(() => {
+    if (me) onMe(me.marketer);
+  }, [me, onMe]);
+  return null;
 }
 
 /** The public API reads listings by slug only, so a listing named by id is found by paging. */
@@ -625,6 +644,9 @@ export default function NewDealPage() {
   const [buyerEmail, setBuyerEmail] = useState("");
   const [closedOn, setClosedOn] = useState(todayInput);
   const [note, setNote] = useState("");
+  const [plan, setPlan] = useState<PlanDraft>(NO_PLAN);
+  const self = useSelfParam();
+  const [selfFilled, setSelfFilled] = useState(false);
   const uploads = useProofUploads();
 
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
@@ -673,7 +695,7 @@ export default function NewDealPage() {
     step === 1
       ? picked !== null
       : step === 2
-        ? unitOk && amountMinor > 0 && buyerName.trim().length >= 2 && closedOn !== ""
+        ? unitOk && amountMinor > 0 && buyerName.trim().length >= 2 && closedOn !== "" && planDraftRefusal(amountMinor, plan) === null
         : uploads.items.length > 0;
 
   async function submit() {
@@ -698,9 +720,11 @@ export default function NewDealPage() {
         proof: uploads.urls,
         note: note.trim(),
         closedOn: dateInputToEpoch(closedOn),
+        plan: planFromDraft(plan),
+        selfPurchase: self,
       });
       // Replace, not push: back from the deals must not land inside a form already sent.
-      router.replace(result.alsoClaimed ? "/m/deals?new=claimed" : "/m/deals?new=1");
+      router.replace(self ? "/m/purchases" : result.alsoClaimed ? "/m/deals?new=claimed" : "/m/deals?new=1");
     } catch (err) {
       setSubmitError(toApiError(err));
       setBusy(false);
@@ -730,7 +754,7 @@ export default function NewDealPage() {
 
   return (
     <AppShell
-      title="Report a deal"
+      title={self ? "Buy it myself" : "Report a deal"}
       hero={<FlowHint step={step} />}
       onBack={back}
       nav={null}
@@ -758,6 +782,16 @@ export default function NewDealPage() {
         <ReportGate>
           <div className="space-y-5 pb-32">
             <Stepper step={step} labels={NEXT} />
+            {self && !selfFilled && (
+              <SelfBuyer
+                onMe={(me) => {
+                  setSelfFilled(true);
+                  setBuyerName(me.displayName);
+                  setBuyerPhone(me.phone);
+                  setBuyerEmail(me.email);
+                }}
+              />
+            )}
 
             {step > 1 && picked && (
               <PickedHome
@@ -825,6 +859,10 @@ export default function NewDealPage() {
                 setClosedOn={setClosedOn}
                 showErrors={showErrors}
               />
+            )}
+
+            {step === 2 && (
+              <PlanFields totalMinor={amountMinor} currency={currency} value={plan} onChange={setPlan} showErrors={showErrors} />
             )}
 
             {step === 3 && (
