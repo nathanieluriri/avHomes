@@ -367,7 +367,7 @@ function assertUnit(facts: ListingFacts, unitKey: string): void {
   }
 }
 
-async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
+export async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
   const tell = deps.tell;
   if (!tell || notes.length === 0) return;
   try {
@@ -383,7 +383,7 @@ async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promis
   }
 }
 
-function firstName(name: string): string {
+export function firstName(name: string): string {
   return name.trim().split(/\s+/u)[0] || name;
 }
 
@@ -976,7 +976,7 @@ export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscr
  * the founder, because the owner asked that every admin be a marketer without
  * having to sign up for it.
  */
-async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Marketer> {
+export async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Marketer> {
   const user = currentUser(c);
   /*
    * A PARTNER LISTER IS NOT A MARKETER, and is refused before any profile is read.
@@ -1011,7 +1011,7 @@ async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Pr
   });
 }
 
-function assertActive(marketer: Marketer): void {
+export function assertActive(marketer: Marketer): void {
   if (marketer.status === "active") return;
   throw new ForbiddenError(
     marketer.status === "paused"
@@ -1061,7 +1061,7 @@ function listingCard(listing: RecentListing): MarketingUpdate {
  * misconfigured deployment into a half-settled deal, which is the worst of the
  * available outcomes. A missing accrual is what `reconcile` exists to report.
  */
-const noAccrual: FundAccrual = async () => {};
+export const noAccrual: FundAccrual = async () => {};
 const noReversal: FundReversal = async () => 0;
 
 /** How long a newsletter stays in Alerts after it went out. */
