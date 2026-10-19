@@ -89,6 +89,8 @@ import {
   type PayRun,
   type PropertyStatus,
   type PushMessage,
+  PLAN_FREQUENCIES,
+  PLAN_INSTALMENTS_MAX,
 } from "@avhomes/contracts";
 import {
   burnPasswordTime,
@@ -121,6 +123,7 @@ import {
   writePaystackKey,
 } from "./settings";
 import { toMarketingUpdate } from "./schema";
+import { tellPurchase } from "./purchase-notes";
 import { insightsFor, leaderboardFor, uplineFor } from "./insights";
 import { exportZip, marketerExportRows } from "./export";
 import { listMessages, recordMessage } from "./messages";
@@ -316,7 +319,7 @@ export interface ListingFacts {
  * and each opens the same screen the alert's action does.
  */
 
-interface Note {
+export interface Note {
   marketerId: string;
   message: PushMessage;
   urgent?: boolean;
@@ -568,6 +571,17 @@ const DealBody = z
     proof: z.array(str().max(600)).min(1).max(5),
     note: str().max(600).default(""),
     closedOn: z.number().int().min(0).default(0),
+    plan: z
+      .object({
+        depositMinor: z.number().int().min(0),
+        instalments: z.number().int().min(1).max(PLAN_INSTALMENTS_MAX),
+        frequency: z.enum(PLAN_FREQUENCIES),
+        firstDueOn: z.number().int().min(1),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+    selfPurchase: z.boolean().default(false),
   })
   .strict();
 
@@ -663,6 +677,7 @@ const LeadBody = z
     wantArea: str().trim().max(160).default(""),
     wantBudgetMinor: z.number().int().min(0).default(0),
     brief: str().trim().max(600).default(""),
+    self: z.boolean().default(false),
   })
   .strict();
 
@@ -1056,7 +1071,7 @@ export function assertActive(marketer: Marketer): void {
 }
 
 /** A deal as one marketer reads it: their own share, and a buyer only if the buyer is theirs. */
-function dealView(deal: Deal, marketerId: string) {
+export function dealView(deal: Deal, marketerId: string) {
   const mine = deal.reporterId === marketerId;
   return {
     // Somebody else's buyer is not this marketer's business.
@@ -1393,11 +1408,22 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     if (deps.notify) {
       await deps.notify(db, {
         kind: "marketing-deal",
-        title: `${marketer.displayName} reported a deal`,
+        title: body.selfPurchase
+          ? `${marketer.displayName} paid for a property themselves`
+          : `${marketer.displayName} reported a deal`,
         body: `${body.listingTitle}. Check the proof and approve it.`,
         href: "/admin/marketers/deals",
         actorId: marketer.userId,
         actorName: marketer.displayName,
+      });
+    }
+    if (body.selfPurchase) {
+      await tellPurchase(deps, db, {
+        marketerId: marketer.id,
+        property: body.listingTitle,
+        step: "payment-received",
+        origin: requestOrigin(c.req),
+        requestId: c.get("requestId"),
       });
     }
     return c.json(
@@ -1475,11 +1501,22 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     if (deps.notify) {
       await deps.notify(db, {
         kind: "marketing-deal",
-        title: `${marketer.displayName} logged a buyer`,
-        body: `${lead.buyerName}. Reach them and move it along.`,
+        title: body.self ? `${marketer.displayName} wants to buy a property` : `${marketer.displayName} logged a buyer`,
+        body: body.self
+          ? `${body.listingTitle || "A property"}, for themselves. Reach them and move it along.`
+          : `${lead.buyerName}. Reach them and move it along.`,
         href: `/admin/marketers/buyers/${lead.id}`,
         actorId: marketer.userId,
         actorName: marketer.displayName,
+      });
+    }
+    if (body.self) {
+      await tellPurchase(deps, db, {
+        marketerId: marketer.id,
+        property: body.listingTitle || "your property",
+        step: "interest",
+        origin: requestOrigin(c.req),
+        requestId: c.get("requestId"),
       });
     }
     return c.json(await one(db, lead, marketer.id), 201);
@@ -2188,6 +2225,11 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     await settleDeal(deps, db, deal, { id: user.id, name: user.displayName });
     await tellMarketers(deps, db, decisionNotes(deal));
     await greetBuyer(deps, db, deal, requestOrigin(c.req), c.get("requestId"));
+    if (deal.selfPurchase && deal.status === "approved") {
+      const step = { marketerId: deal.reporterId, property: deal.listingTitle, origin: requestOrigin(c.req), requestId: c.get("requestId") };
+      await tellPurchase(deps, db, { ...step, step: "payment-verified" });
+      if (deal.paidMinor >= deal.amountMinor) await tellPurchase(deps, db, { ...step, step: "owner" });
+    }
     return c.json({ deal });
   });
 

@@ -18,6 +18,7 @@ export {
 export { whatsappRedirectRoutes } from "./whatsapp";
 
 export { currentMarketer } from "./routes";
+export { planAdminRoutes, planAppRoutes, planCronRoutes } from "./plan-routes";
 export { readTools, toolsAdminRoutes, toolsAppRoutes } from "./tools";
 
 export {

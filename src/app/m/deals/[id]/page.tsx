@@ -13,6 +13,7 @@ import {
   stillOpen,
 } from "@/components/marketer/deals/DealStatus";
 import { PhotoGallery } from "@/components/marketer/deals/PhotoGallery";
+import { PlanCard } from "@/components/marketer/deals/PlanCard";
 import {
   ProofPicker,
   toApiError,
@@ -59,7 +60,7 @@ interface DealView {
   myShare: DealShare | null;
 }
 
-type SectionKey = "sent" | "ask" | "why" | "money" | "facts" | "proof" | "note";
+type SectionKey = "sent" | "ask" | "why" | "money" | "plan" | "facts" | "proof" | "note";
 
 /** A level 2 or 3 share means somebody else reported it. No share at all means it is yours. */
 function isMine(view: DealView): boolean {
@@ -80,6 +81,7 @@ function plan(view: DealView, justSent: boolean): { key: SectionKey; label: stri
   if (deal.status === "approved" || stillOpen(deal.status)) {
     out.push({ key: "money", label: "Your money" });
   }
+  if (deal.plan) out.push({ key: "plan", label: "Payment plan" });
   out.push({ key: "facts", label: "The deal" });
   // A deal being answered shows its photos inside the form, where they can be changed.
   if (!asking && deal.proof.length > 0) {
@@ -222,11 +224,13 @@ function DealBody({
   onAnswered: (next: DealView) => void;
   onStale: () => void;
 }) {
+  const { me } = useMarketer();
   const nodes: Record<SectionKey, () => ReactNode> = {
     sent: () => <SentCard />,
     ask: () => <NeedsMore deal={view.deal} onAnswered={onAnswered} onStale={onStale} />,
     why: () => <WhyCard deal={view.deal} />,
     money: () => <Earnings view={view} />,
+    plan: () => <PlanCard deal={view.deal} myShare={view.myShare} canLog={view.deal.reporterId === me?.marketer.id} onLogged={onStale} />,
     facts: () => <Facts view={view} />,
     proof: () => (
       <PhotoGallery urls={view.deal.proof} name={isMine(view) ? "Proof you sent" : "Proof photo"} />

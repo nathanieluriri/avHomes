@@ -23,6 +23,7 @@ import {
 } from "@/components/marketer/AppShell";
 import { couldEarn } from "@/components/marketer/deals/DealStatus";
 import { NairaInput } from "@/components/marketer/deals/NairaInput";
+import { NO_PLAN, PlanFields, planDraftRefusal, planFromDraft, type PlanDraft } from "@/components/marketer/deals/PlanFields";
 import {
   ProofPicker,
   toApiError,
@@ -105,6 +106,15 @@ function useListingParam(): string | null {
     onPopState,
     () => new URLSearchParams(window.location.search).get("listing"),
     () => null,
+  );
+}
+
+/** `?self=1`: the partner is buying it themselves. */
+function useSelfParam(): boolean {
+  return useSyncExternalStore(
+    onPopState,
+    () => new URLSearchParams(window.location.search).get("self") === "1",
+    () => false,
   );
 }
 
@@ -625,6 +635,16 @@ export default function NewDealPage() {
   const [buyerEmail, setBuyerEmail] = useState("");
   const [closedOn, setClosedOn] = useState(todayInput);
   const [note, setNote] = useState("");
+  const [plan, setPlan] = useState<PlanDraft>(NO_PLAN);
+  const self = useSelfParam();
+  const { me } = useMarketer();
+  const [selfFilled, setSelfFilled] = useState(false);
+  if (self && !selfFilled && me) {
+    setSelfFilled(true);
+    setBuyerName(me.marketer.displayName);
+    setBuyerPhone(me.marketer.phone);
+    setBuyerEmail(me.marketer.email);
+  }
   const uploads = useProofUploads();
 
   const [submitError, setSubmitError] = useState<ApiError | null>(null);
@@ -673,7 +693,7 @@ export default function NewDealPage() {
     step === 1
       ? picked !== null
       : step === 2
-        ? unitOk && amountMinor > 0 && buyerName.trim().length >= 2 && closedOn !== ""
+        ? unitOk && amountMinor > 0 && buyerName.trim().length >= 2 && closedOn !== "" && planDraftRefusal(amountMinor, plan) === null
         : uploads.items.length > 0;
 
   async function submit() {
@@ -698,9 +718,11 @@ export default function NewDealPage() {
         proof: uploads.urls,
         note: note.trim(),
         closedOn: dateInputToEpoch(closedOn),
+        plan: planFromDraft(plan),
+        selfPurchase: self,
       });
       // Replace, not push: back from the deals must not land inside a form already sent.
-      router.replace(result.alsoClaimed ? "/m/deals?new=claimed" : "/m/deals?new=1");
+      router.replace(self ? "/m/purchases" : result.alsoClaimed ? "/m/deals?new=claimed" : "/m/deals?new=1");
     } catch (err) {
       setSubmitError(toApiError(err));
       setBusy(false);
@@ -730,7 +752,7 @@ export default function NewDealPage() {
 
   return (
     <AppShell
-      title="Report a deal"
+      title={self ? "Buy it myself" : "Report a deal"}
       hero={<FlowHint step={step} />}
       onBack={back}
       nav={null}
@@ -825,6 +847,10 @@ export default function NewDealPage() {
                 setClosedOn={setClosedOn}
                 showErrors={showErrors}
               />
+            )}
+
+            {step === 2 && (
+              <PlanFields totalMinor={amountMinor} currency={currency} value={plan} onChange={setPlan} showErrors={showErrors} />
             )}
 
             {step === 3 && (

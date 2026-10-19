@@ -28,6 +28,9 @@ export const PUSH_KINDS = [
   "update",
   "newsletter",
   "whatsapp-invite",
+  "plan-payment",
+  "plan-reminder",
+  "purchase-update",
   // The console.
   "mail-received",
   "mail-failed",

@@ -95,6 +95,9 @@ import {
   currentMarketer,
   marketingAdminRoutes,
   marketingAppRoutes,
+  planAdminRoutes,
+  planAppRoutes,
+  planCronRoutes,
   marketingPublicRoutes,
   toolsAdminRoutes,
   toolsAppRoutes,
@@ -428,6 +431,16 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
    * sealed copy before anything is read.
    */
   app.route(API_PREFIX, mailHookRoutes({ onNewMail: announceMail }));
+  /* The daily plan reminders. Its authority is the platform's CRON_SECRET bearer; it reads no cookie. */
+  app.route(
+    API_PREFIX,
+    planCronRoutes({
+      notify,
+      tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
+      officeEmail: async (db) => (await readPublicSettings(db)).contactEmail,
+    }),
+  );
 
   /* ═════════════════ 6. public reads, ABOVE sessionMiddleware ═════════ */
 
@@ -631,7 +644,17 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       recentListings,
       recentNews: recentNewsFor,
       newsletterFor: (db, input) => newsletterArticle(db, input.origin, input.id, input.email),
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
       officeEmail: async (db) => (await readPublicSettings(db)).contactEmail,
+      ...marketingPorts,
+    }),
+  );
+  app.route(
+    API_PREFIX,
+    planAppRoutes({
+      notify,
+      tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
       ...marketingPorts,
     }),
   );
@@ -659,6 +682,15 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
           return "failed";
         }
       },
+      ...marketingPorts,
+    }),
+  );
+  app.route(
+    API_PREFIX,
+    planAdminRoutes({
+      notify,
+      tell,
+      mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
       ...marketingPorts,
     }),
   );
