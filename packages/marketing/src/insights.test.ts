@@ -218,7 +218,7 @@ describe("leaderboard, insights and upline", { skip: uri ? false : "set MONGODB_
     assert.equal(up?.email, ada.email);
     assert.equal(up?.phone, ada.phone);
 
-    await db.collection("marketers").updateOne({ _id: ada.id }, { $set: { showPhoneToTeam: false } });
+    await db.collection<MarketerDoc>("marketers").updateOne({ _id: ada.id }, { $set: { showPhoneToTeam: false } });
     assert.equal((await uplineFor(db, kid, office))?.phone, "");
     await db.dropDatabase();
   });

@@ -1234,6 +1234,71 @@ export function IconHandshake(props: IconProps) {
   );
 }
 
+const CUP = "M17 10H47V20C47 30 40.5 37 32 37C23.5 37 17 30 17 20Z";
+const CUP_STEM = rrect(28.5, 36, 7, 8, 1.5);
+const CUP_BASE = rrect(18, 44, 28, 9, 2.5);
+const CUP_STAR = "M32 15.5L34 20L38.8 20.4L35.2 23.6L36.3 28.3L32 25.8L27.7 28.3L28.8 23.6L25.2 20.4L30 20Z";
+
+/** A gold cup on a wine plinth: the leaderboard. */
+export function IconTrophy(props: IconProps) {
+  const k = useKit();
+  return (
+    <Svg k={k} box={[4, 4, 56]} {...props}>
+      <Defs k={k} tones={["gold", "wine"]}>
+        <clipPath id={k.id("cup")}>
+          <path d={CUP} />
+        </clipPath>
+      </Defs>
+      <Ground k={k} cx={33} cy={54.5} rx={19} ry={3} />
+      <g fill="none" strokeWidth="3.4" strokeLinecap="round">
+        <path d="M17.5 14H12.5C11 23 14 28 21 30" stroke={GOLD.shade} />
+        <path d="M46.5 14H51.5C53 23 50 28 43 30" stroke={GOLD.deep} />
+      </g>
+      <Sweep d={CUP_BASE} dx={2.4} dy={-1.6} fill={k.url("wine-box")} />
+      <path d={CUP_BASE} fill={k.url("wine-face")} />
+      <path d={CUP_STEM} fill={k.url("gold-cyl")} />
+      <path d={CUP} fill={k.url("gold-ball")} />
+      <Rim k={k} name="cup" d={CUP} tone="gold" width={1.2} />
+      <ellipse cx="32" cy="10" rx="15" ry="2.4" fill={k.url("gold-top")} />
+      <path d={CUP_STAR} transform="translate(0.4 0.7)" fill={GOLD.hi} opacity="0.7" />
+      <path d={CUP_STAR} fill={GOLD.deep} opacity="0.8" />
+      <rect x="23" y="47" width="18" height="3" rx="1.5" fill={WINE.deep} opacity="0.55" />
+      <Glint k={k} clip="cup">
+        <ellipse cx="22.5" cy="20" rx="2" ry="7" transform="rotate(-8 22.5 20)" opacity="0.7" />
+      </Glint>
+    </Svg>
+  );
+}
+
+const BAR_A = rrect(10, 34, 11, 19, 2);
+const BAR_B = rrect(25, 24, 11, 29, 2);
+const BAR_C = rrect(40, 12, 11, 41, 2);
+
+/** Three rising bars, rose to gold: the analytics page. */
+export function IconChart(props: IconProps) {
+  const k = useKit();
+  return (
+    <Svg k={k} box={[4, 4, 56]} {...props}>
+      <Defs k={k} tones={["rose", "wine", "gold"]}>
+        <clipPath id={k.id("c")}>
+          <path d={BAR_C} />
+        </clipPath>
+      </Defs>
+      <Ground k={k} cx={32} cy={55} rx={24} ry={3} />
+      <Sweep d={BAR_A} dx={3} dy={-2} fill={k.url("rose-box")} />
+      <path d={BAR_A} fill={k.url("rose-face")} />
+      <Sweep d={BAR_B} dx={3} dy={-2} fill={k.url("wine-box")} />
+      <path d={BAR_B} fill={k.url("wine-face")} />
+      <Sweep d={BAR_C} dx={3} dy={-2} fill={k.url("gold-box")} />
+      <path d={BAR_C} fill={k.url("gold-face")} />
+      <Rim k={k} name="c" d={BAR_C} tone="gold" />
+      <Glint k={k} clip="c">
+        <ellipse cx="43" cy="22" rx="1.2" ry="7" opacity="0.65" />
+      </Glint>
+    </Svg>
+  );
+}
+
 /* ═══ BAR ══════════════════════════════════════════════════════════════════ */
 
 function Glyph({ size = 24, className, title, children }: IconProps & { children: ReactNode }) {
