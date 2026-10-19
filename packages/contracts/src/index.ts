@@ -22,6 +22,7 @@ export * from "./email";
 export * from "./funds";
 export * from "./marketing";
 export * from "./analytics";
+export * from "./partner-insights";
 export * from "./mail";
 export * from "./signature";
 export * from "./push";

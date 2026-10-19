@@ -417,10 +417,11 @@ export async function updateMarketerBank(
 export async function updateMarketerProfile(
   db: Db,
   id: string,
-  patch: { displayName?: string; phone?: string; state?: string },
+  patch: { displayName?: string; phone?: string; state?: string; showPhoneToTeam?: boolean },
 ): Promise<Marketer> {
   const now = Date.now();
   const set: Record<string, unknown> = { updatedAt: now };
+  if (patch.showPhoneToTeam !== undefined) set.showPhoneToTeam = patch.showPhoneToTeam;
   if (patch.displayName !== undefined) set.displayName = patch.displayName;
   if (patch.phone !== undefined) set.phone = patch.phone;
   if (patch.state !== undefined) set.state = patch.state;

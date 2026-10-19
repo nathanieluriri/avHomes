@@ -21,6 +21,7 @@ import type {
   PayIssue,
   TeamMember,
   Transaction,
+  UplineContact,
 } from "@avhomes/contracts";
 
 /** `GET /api/marketing/me`. The whole app's opening read. */
@@ -110,6 +111,8 @@ export interface StatementResponse {
 export interface TeamResponse {
   levels: [number, number, number];
   members: TeamMember[];
+  /** Who this partner can reach above them. Null for the founder's own account. */
+  upline: UplineContact | null;
 }
 
 export interface IssuesResponse {

@@ -30,11 +30,13 @@ import {
   type Ownership,
   type RatingWeights,
   type RentBasis,
+  type LeaderboardSettings,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { toApiError } from "@/lib/admin/marketing";
 import { SaveBar } from "@/components/admin/SaveBar";
+import { LeaderboardSettingsCard } from "@/components/admin/LeaderboardSettingsCard";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
 import {
   Card,
@@ -94,6 +96,7 @@ interface Draft {
   accountProvider: AccountProvider;
   /** Always blank on load: the saved key is never sent to the browser. */
   paystackKey: string;
+  leaderboard: LeaderboardSettings;
 }
 
 function toSplitDraft(split: CommissionSplit): SplitDraft {
@@ -156,6 +159,7 @@ function toDraft(settings: MarketingSettings): Draft {
     supportPhone: settings.supportPhone,
     accountProvider: settings.accountProvider,
     paystackKey: "",
+    leaderboard: settings.leaderboard,
   };
 }
 
@@ -322,6 +326,7 @@ function CommissionEditor({
           blockSelfDeals: draft.blockSelfDeals,
           minPayoutMinor: payout.minor,
           supportPhone: draft.supportPhone,
+          leaderboard: draft.leaderboard,
         },
       );
       setSaved(res.settings);
@@ -537,6 +542,8 @@ function CommissionEditor({
             </p>
           </Card>
 
+          <LeaderboardSettingsCard value={draft.leaderboard} onChange={(next) => set("leaderboard", next)} />
+
           <Card className="space-y-4">
             <CardHead title="Rent" />
             <p className="-mt-1 text-[12px] leading-relaxed text-slate-600">
@@ -698,7 +705,7 @@ function CommissionEditor({
             <CardHead title="Help" />
             <Field
               label="Support phone"
-              hint="Printed on the sign up page and in the app's help sheet. Leave it empty and neither shows a number."
+              hint="Printed on the sign up page and in the app's help sheet, and shown as the office number to partners who joined without a link. Leave it empty and none of them shows a number."
               as="group"
             >
               <PhoneField value={draft.supportPhone} onChange={(next) => set("supportPhone", next)} />
