@@ -85,6 +85,8 @@ const ENTITY_BY_SEGMENT: Record<string, AuditEntity> = {
   settings: "settings",
   marketing: "marketer",
   applications: "application",
+  funds: "fund",
+  awards: "award",
 };
 
 /**
