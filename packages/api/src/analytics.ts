@@ -19,7 +19,7 @@ import {
   FUNNEL_SORTS,
   OWNERSHIPS,
   PERIOD_KEYS,
-  hasDomain,
+  seesMoney,
   isPeriodKey,
   partnerScopeOf,
   quarterFinished,
@@ -109,7 +109,7 @@ interface Scope {
 async function scopeFor(db: Db, user: ReturnType<typeof currentUser>): Promise<Scope> {
   const scope = partnerScopeOf(user);
   if (scope === null) {
-    return { listingIds: null, money: hasDomain(user.role, "marketing"), partner: false };
+    return { listingIds: null, money: seesMoney(user.role), partner: false };
   }
   const rows = await collection<{ _id: string }>(db, COLLECTIONS.properties)
     .find({ partnerId: scope }, { projection: { _id: 1 } })

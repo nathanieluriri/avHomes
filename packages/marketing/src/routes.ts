@@ -20,6 +20,7 @@ import {
   NotFoundError,
   PreconditionFailedError,
   UnauthenticatedError,
+  UpstreamError,
   auditBefore,
   auditEntityId,
   clientIp,
@@ -37,6 +38,7 @@ import {
 } from "@avhomes/core";
 import {
   ACCOUNT_PROVIDERS,
+  MARKETER_EXPORT_FIELDS,
   WHATSAPP_CHANGE_REASONS,
   WHATSAPP_NOTE_MAX,
   isWhatsappGroupUrl,
@@ -115,6 +117,8 @@ import {
   writePaystackKey,
 } from "./settings";
 import { toMarketingUpdate } from "./schema";
+import { exportZip, marketerExportRows } from "./export";
+import { listMessages, recordMessage } from "./messages";
 import { inviteUninvited, listLinkChanges, recordLinkChange, remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
 import {
   alertsFor,
@@ -226,6 +230,15 @@ export interface MarketingDeps {
   ) => Promise<boolean>;
   /** Sends one of the editable email templates. Injected, because templates live in the settings package. Never throws. */
   mail?: SendTemplate;
+  /**
+   * A template sent with a Reply-To, answering whether the deployment has mail at
+   * all apart from whether this one send failed, which `mail` cannot. Never throws.
+   */
+  directMail?: (
+    db: Db,
+    input: { to: string; replyTo: string; text: Record<string, string> },
+    ctx: { requestId: string; route: string },
+  ) => Promise<"sent" | "unconfigured" | "failed">;
   /**
    * Live listings published since `sinceMs`, newest first, at most `limit`.
    * Injected, because this package may not read the listings package's collection.
@@ -754,6 +767,8 @@ const SettingsBody = z
     minPayoutMinor: z.number().int().min(0).optional(),
     supportPhone: str().max(40).optional(),
     accountProvider: z.enum(ACCOUNT_PROVIDERS).optional(),
+    exportableFields: z.array(z.enum(MARKETER_EXPORT_FIELDS)).max(MARKETER_EXPORT_FIELDS.length).optional(),
+    exportFields: z.array(z.enum(MARKETER_EXPORT_FIELDS)).max(MARKETER_EXPORT_FIELDS.length).optional(),
     /* The key is write-only. Absent leaves what is saved alone, because the
        form posts every field on every save and can never prefill this one.
        null is how an admin clears it deliberately. */
@@ -1686,13 +1701,14 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const marketer = await findMarketerById(db, id);
     if (!marketer) throw new NotFoundError(`marketer ${id}`);
     const settings = await readMarketingSettings(db);
-    const [balance, team, chain, deals, lines, payments] = await Promise.all([
+    const [balance, team, chain, deals, lines, payments, messages] = await Promise.all([
       balanceFor(db, id, settings.currency),
       teamFor(db, id),
       chainFor(db, id),
       listDeals(db, { reporterId: id, limit: 25 }),
       listLedger(db, id, 25),
       payHistoryFor(db, id, 12),
+      listMessages(db, id, 20),
     ]);
     return c.json({
       marketer,
@@ -1703,6 +1719,82 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       deals: deals.items,
       lines,
       payments,
+      messages,
+    });
+  });
+
+  /** A private email to one partner, from their page, answered straight back to the admin who wrote it. */
+  routes.post("/admin/marketing/marketers/:id/message", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const body = await readJson(
+      c,
+      z.object({ subject: str().trim().min(1).max(200), message: str().trim().min(1).max(5000) }).strict(),
+    );
+    const marketer = await findMarketerById(db, id);
+    if (!marketer) throw new NotFoundError(`marketer ${id}`);
+    if (marketer.email.trim() === "") throw new BadRequestError("This partner has no email address on their profile.");
+
+    const outcome = deps.directMail
+      ? await deps.directMail(
+          db,
+          {
+            to: marketer.email,
+            replyTo: user.email,
+            text: {
+              name: marketer.displayName.split(/\s+/u)[0] ?? marketer.displayName,
+              subject: body.subject,
+              message: body.message,
+              senderName: user.displayName,
+            },
+          },
+          { requestId: c.get("requestId"), route: "partner message" },
+        )
+      : "unconfigured";
+    if (outcome === "unconfigured") {
+      throw new BadRequestError("Email is not set up yet, so nothing was sent. Connect a mailbox in the console's mail settings first.");
+    }
+    const message = await recordMessage(db, {
+      marketerId: id,
+      subject: body.subject,
+      body: body.message,
+      sentById: user.id,
+      sentByName: user.displayName,
+      delivered: outcome === "sent",
+    });
+    auditEntityId(c, id);
+    if (outcome === "failed") throw new UpstreamError("mail", "The mail provider refused the message. Try again in a minute.");
+    return c.json({ message }, 201);
+  });
+
+  /** Every partner as a zip of a styled workbook and a CSV, in the columns the admin ticked. */
+  routes.post("/admin/marketing/marketers/export", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const body = await readJson(
+      c,
+      z
+        .object({
+          fields: z.array(z.enum(MARKETER_EXPORT_FIELDS)).min(1).max(MARKETER_EXPORT_FIELDS.length),
+          fullAccountNumbers: z.boolean().default(false),
+        })
+        .strict(),
+    );
+    const settings = await readMarketingSettings(db);
+    const fields = MARKETER_EXPORT_FIELDS.filter(
+      (field) => body.fields.includes(field) && settings.exportableFields.includes(field),
+    );
+    if (fields.length === 0) throw new BadRequestError("None of the ticked fields may be exported. Change that under Commission settings.");
+    await writeMarketingSettings(db, { exportFields: fields });
+    const rows = await marketerExportRows(db, { fullAccountNumbers: body.fullAccountNumbers });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const file = exportZip(fields, rows, settings.currency, stamp);
+    return new Response(new Uint8Array(file), {
+      headers: {
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename="av-partners-${stamp}.zip"`,
+        "cache-control": "no-store",
+      },
     });
   });
 

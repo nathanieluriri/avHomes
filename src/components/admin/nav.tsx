@@ -12,6 +12,7 @@ import {
   History,
   Images,
   Inbox,
+  Landmark,
   LibraryBig,
   Mail,
   Mails,
@@ -33,7 +34,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { hasDomain, isScopedRole, type Domain, type Role } from "@avhomes/contracts";
+import { hasDomain, isScopedRole, seesMoney, type Domain, type Role } from "@avhomes/contracts";
 
 /**
  * The rail's contents, in one place because three surfaces read them: the rail
@@ -93,7 +94,7 @@ export type NavPage = NavItem & { href: string };
 export function canSeeNavItem(role: Role, item: NavItem): boolean {
   if (item.roles && !item.roles.includes(role)) return false;
   if (item.unscoped && isScopedRole(role)) return false;
-  if (item.money && !hasDomain(role, "marketing") && !isScopedRole(role)) return false;
+  if (item.money && !seesMoney(role) && !isScopedRole(role)) return false;
   return item.domain === null || hasDomain(role, item.domain);
 }
 
@@ -198,6 +199,58 @@ export const NAV: readonly NavItem[] = [
         hint: "Visitors, and the listings they read",
         icon: Activity,
         domain: "analytics",
+      },
+    ],
+  },
+  {
+    /* The accountant's whole console. Owner and developer reach these screens
+       through Analytics and Marketers already, so the children are drawn for the
+       accountant only, rather than listing every money screen twice. */
+    href: "/admin/accounts",
+    label: "Accounts",
+    hint: "The balance sheet and whether every payout has its proof",
+    icon: Landmark,
+    domain: "finance",
+    children: [
+      {
+        href: "/admin/analytics/transactions",
+        label: "Transactions",
+        hint: "Every deal, with its split and its proof",
+        icon: Receipt,
+        domain: "finance",
+        roles: ["accountant"],
+      },
+      {
+        href: "/admin/marketers/deals",
+        label: "Deals",
+        hint: "Every sale reported, and the receipts behind it",
+        icon: Handshake,
+        domain: "finance",
+        roles: ["accountant"],
+      },
+      {
+        href: "/admin/marketers/pay",
+        label: "Pay day",
+        hint: "This month's transfers, and who is still owed",
+        icon: Banknote,
+        domain: "finance",
+        roles: ["accountant"],
+      },
+      {
+        href: "/admin/marketers/problems",
+        label: "Problems",
+        hint: "Marketers who say a payment never arrived",
+        icon: MessageCircleWarning,
+        domain: "finance",
+        roles: ["accountant"],
+      },
+      {
+        href: "/admin/analytics/wallets",
+        label: "The two funds",
+        hint: "The prize pool and the community fund",
+        icon: Wallet,
+        domain: "finance",
+        roles: ["accountant"],
       },
     ],
   },
@@ -506,6 +559,7 @@ export function locate(rows: readonly NavItem[], pathname: string): RailPosition
  * the matrix does. Better a wrong screen than a link with no href.
  */
 export function homeFor(role: Role): string {
+  if (role === "accountant") return "/admin/accounts";
   // A partner's front door is their own listings, not Alerts, which is the first row left once the dashboard is gone.
   if (isScopedRole(role)) return "/admin/properties";
   return NAV_ITEMS.find((item) => canSeeNavItem(role, item))?.href ?? "/admin";

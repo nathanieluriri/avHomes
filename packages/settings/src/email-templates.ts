@@ -386,6 +386,7 @@ function sampleVars(origin: string): EmailVars {
       appLink: `${origin}/m`,
       whatsappLink: `${origin}/wa/AV-0001`,
       constructionLink: "https://www.avconstructionsltd.com/",
+      senderName: "Tolu Ade",
     },
     html: {
       conversation: conversationHtml(lines),

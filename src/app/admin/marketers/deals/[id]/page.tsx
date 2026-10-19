@@ -21,7 +21,7 @@ import {
   type MarketingSettings,
 } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
-import { useAsync } from "@/lib/admin/hooks";
+import { useAsync, useHoldsDomain } from "@/lib/admin/hooks";
 import { dateTime, fullDate } from "@/lib/admin/format";
 import { DEAL_TONE, toApiError } from "@/lib/admin/marketing";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
@@ -129,6 +129,8 @@ function DealScreen({ initial }: { initial: DealDetail }) {
   const [actionError, setActionError] = useState<ApiError | null>(null);
 
   const settled = deal.status === "approved";
+  /* An accountant reads the deal and its receipts; deciding it stays with marketing. */
+  const decides = useHoldsDomain("marketing");
 
   /*
    * The final amount, and what it does to the split.
@@ -226,13 +228,13 @@ function DealScreen({ initial }: { initial: DealDetail }) {
    */
   const awaiting = useAsync<{ items: AwaitingClose[] }>(
     (signal) =>
-      settled
+      settled && decides
         ? api.get<{ items: AwaitingClose[] }>(
             `/admin/marketing/awaiting-close?dealId=${encodeURIComponent(deal.id)}`,
             signal,
           )
         : Promise.resolve({ items: [] }),
-    [settled, deal.id, deal.updatedAt],
+    [settled, decides, deal.id, deal.updatedAt],
   );
   const stillListed = awaiting.data?.items[0] ?? null;
 
@@ -337,7 +339,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
         </p>
       </Card>
 
-      {canReview && (
+      {canReview && decides && (
         <Card spotlight="deal-decide">
           <CardHead title="Decide" />
           <Field
@@ -378,7 +380,7 @@ function DealScreen({ initial }: { initial: DealDetail }) {
         </Card>
       )}
 
-      {settled && (
+      {settled && decides && (
         <Card>
           <CardHead title="If it fell through" />
           <p className="mb-3 text-[12px] leading-relaxed text-slate-600">
