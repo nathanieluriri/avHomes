@@ -18,7 +18,9 @@
 
 import { DEFAULT_FUND_NAMES, type FundKind } from "./funds";
 import { DEFAULT_CURRENCY, minorUnitsFor } from "./money";
+import type { DealPayment, DealPlan, PlanDue } from "./plans";
 import { OWNERSHIPS, OWNERSHIP_LABEL, type Ownership } from "./types";
+import { DEFAULT_LEADERBOARD_SETTINGS, type LeaderboardSettings } from "./partner-insights";
 
 /* ═══════════════════════════════════════════════════════════════ MARKETERS ══ */
 
@@ -66,6 +68,8 @@ export interface Marketer {
    */
   upline: string[];
   bank: MarketerBank | null;
+  /** False hides their phone from the people they invited. Their email always shows. */
+  showPhoneToTeam: boolean;
   /** True for a marketer who also holds an admin role. */
   isAdmin: boolean;
   joinedAt: number;
@@ -163,6 +167,8 @@ export interface Deal {
   currency: string;
   buyerName: string;
   buyerPhone: string;
+  /** Optional. A buyer with an email joins the mailing list once the sale is approved. */
+  buyerEmail: string;
   /** Uploaded receipts, alerts or agreements. At least one is required. */
   proof: string[];
   note: string;
@@ -199,7 +205,20 @@ export interface Deal {
   reviewedByName: string;
   reviewedAt: number | null;
   closedOn: number;
+  /** What has been earned so far. On a payment plan, only from verified payments. */
   shares: DealShare[];
+  /** Null when paid in full. */
+  plan: DealPlan | null;
+  /** The plan's expected payments, worked out on read. Empty when paid in full. */
+  schedule: PlanDue[];
+  payments: DealPayment[];
+  /** Verified money received. The whole price on an approved outright deal. */
+  paidMinor: number;
+  /** On a plan: what everyone earns once the full price is paid. Empty otherwise. */
+  planShares: DealShare[];
+  planFundShares: FundShare[];
+  /** A partner buying for themselves rather than introducing a buyer. */
+  selfPurchase: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -621,6 +640,67 @@ export const DEFAULT_RATING_WEIGHTS: RatingWeights = {
   speed: 10,
 };
 
+/* ═══════════════════════════════════════════════════════════════════ EXPORT ══ */
+
+export const MARKETER_EXPORT_FIELDS = [
+  "code",
+  "name",
+  "email",
+  "phone",
+  "state",
+  "status",
+  "joined",
+  "uplineName",
+  "uplineCode",
+  "teamSize",
+  "directInvites",
+  "dealsApproved",
+  "salesValue",
+  "commissionEarned",
+  "commissionPaid",
+  "commissionOwed",
+  "bankName",
+  "accountName",
+  "accountNumber",
+] as const;
+export type MarketerExportField = (typeof MARKETER_EXPORT_FIELDS)[number];
+
+export type ExportCellKind = "text" | "date" | "money" | "count";
+
+export const MARKETER_EXPORT_FIELD_INFO: Record<MarketerExportField, { label: string; kind: ExportCellKind }> = {
+  code: { label: "Code", kind: "text" },
+  name: { label: "Name", kind: "text" },
+  email: { label: "Email", kind: "text" },
+  phone: { label: "Phone", kind: "text" },
+  state: { label: "State", kind: "text" },
+  status: { label: "Status", kind: "text" },
+  joined: { label: "Joined", kind: "date" },
+  uplineName: { label: "Invited by", kind: "text" },
+  uplineCode: { label: "Inviter's code", kind: "text" },
+  teamSize: { label: "Team size", kind: "count" },
+  directInvites: { label: "Direct invites", kind: "count" },
+  dealsApproved: { label: "Deals approved", kind: "count" },
+  salesValue: { label: "Sales value", kind: "money" },
+  commissionEarned: { label: "Commission earned", kind: "money" },
+  commissionPaid: { label: "Commission paid", kind: "money" },
+  commissionOwed: { label: "Commission owed", kind: "money" },
+  bankName: { label: "Bank", kind: "text" },
+  accountName: { label: "Account name", kind: "text" },
+  accountNumber: { label: "Account number", kind: "text" },
+};
+
+/** One private email an admin sent a partner from their page. */
+export interface MarketerMessage {
+  id: string;
+  marketerId: string;
+  subject: string;
+  body: string;
+  sentByName: string;
+  /** False when the mail provider refused it. Kept anyway, so the attempt is on record. */
+  delivered: boolean;
+  createdAt: number;
+}
+
 export interface MarketingSettings {
   /**
    * The four rate cells. See splitFor.
@@ -650,6 +730,12 @@ export interface MarketingSettings {
   joinOpen: boolean;
   /** Refuse a deal whose buyer phone belongs to the reporter or their upline. */
   blockSelfDeals: boolean;
+  /**
+   * A partner buying for themselves earns commission, and their upline their
+   * shares, as on any deal. Off by default: the funds still take their share,
+   * and nobody is paid for their own purchase.
+   */
+  selfPurchaseCommission: boolean;
   /** A pay run skips anyone under this. 0 pays every balance. */
   minPayoutMinor: number;
   currency: string;
@@ -663,6 +749,12 @@ export interface MarketingSettings {
   accountProvider: AccountProvider;
   /** The partners' WhatsApp group invite. Partners only ever see their own /wa/<code> link to it. */
   whatsappGroupUrl: string;
+  /** What partners may see and filter on the app's leaderboard. */
+  leaderboard: LeaderboardSettings;
+  /** Which partner fields the Export button may offer at all. */
+  exportableFields: MarketerExportField[];
+  /** The fields last ticked on the Export sheet, offered first next time. */
+  exportFields: MarketerExportField[];
   updatedAt: number;
 }
 
@@ -677,11 +769,15 @@ export const DEFAULT_MARKETING_SETTINGS: MarketingSettings = {
   requireApproval: false,
   joinOpen: true,
   blockSelfDeals: true,
+  selfPurchaseCommission: false,
   minPayoutMinor: 0,
   currency: DEFAULT_CURRENCY,
   supportPhone: "+2348143345307",
   accountProvider: "kora",
   whatsappGroupUrl: "",
+  leaderboard: DEFAULT_LEADERBOARD_SETTINGS,
+  exportableFields: [...MARKETER_EXPORT_FIELDS],
+  exportFields: [...MARKETER_EXPORT_FIELDS],
   updatedAt: 0,
 };
 
@@ -1313,6 +1409,8 @@ export interface Lead {
   events: LeadEvent[];
   /** The deal a win minted, or null. Survives a reversal so the thread is readable. */
   dealId: string | null;
+  /** The partner who logged it wants to buy it themselves. */
+  self: boolean;
   createdAt: number;
   updatedAt: number;
 }

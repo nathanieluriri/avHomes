@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Trophy } from "lucide-react";
+import { Crown, Trophy } from "lucide-react";
 import {
   RATING_WEIGHT_LABEL,
   formatMoney,
@@ -106,9 +106,26 @@ export default function PeopleLeaguePage() {
         />
       ) : (
         <div className="space-y-2">
-          {rows.map((row) => (
+          <Podium
+            rows={rows.slice(0, 3)}
+            currency={currency}
+            open={openRow}
+            onPick={(id) => setOpenRow((was) => (was === id ? null : id))}
+          />
+          {rows.slice(0, 3).some((row) => row.personId === openRow) && data && (
+            <PersonCard
+              row={rows.find((row) => row.personId === openRow)!}
+              rank={rows.findIndex((row) => row.personId === openRow) + 1}
+              currency={currency}
+              weights={data.weights}
+              open
+              onToggle={() => setOpenRow(null)}
+            />
+          )}
+          {rows.slice(3).map((row, index) => (
             <PersonCard
               key={`${row.kind}-${row.personId}`}
+              rank={index + 4}
               row={row}
               currency={currency}
               weights={data?.weights}
@@ -136,14 +153,87 @@ export default function PeopleLeaguePage() {
   );
 }
 
+const MEDAL = [
+  { ring: "ring-amber-300", chip: "bg-amber-300 text-amber-950", bar: "h-24 bg-wine-700" },
+  { ring: "ring-slate-300", chip: "bg-slate-300 text-slate-900", bar: "h-16 bg-wine-100" },
+  { ring: "ring-orange-300", chip: "bg-orange-300 text-orange-950", bar: "h-12 bg-mist-100" },
+] as const;
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/u).filter(Boolean);
+  return `${parts[0]?.[0] ?? "?"}${parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : ""}`.toUpperCase();
+}
+
+/** The top three, second first third, the order a podium is read in. Tap one for their score. */
+function Podium({
+  rows,
+  currency,
+  open,
+  onPick,
+}: {
+  rows: PersonRow[];
+  currency: string;
+  open: string | null;
+  onPick: (id: string) => void;
+}) {
+  const order = [rows[1], rows[0], rows[2]];
+  return (
+    <Card className="pb-0">
+      <ol className="mx-auto grid max-w-xl grid-cols-3 items-end gap-3 pt-4">
+        {order.map((row, slot) => {
+          if (!row) return <li key={`gap-${slot}`} />;
+          const rank = slot === 1 ? 1 : slot === 0 ? 2 : 3;
+          const medal = MEDAL[rank - 1]!;
+          return (
+            <li key={row.personId} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => onPick(row.personId)}
+                aria-expanded={open === row.personId}
+                className="flex w-full flex-col items-center text-center"
+              >
+                <span className="relative">
+                  {rank === 1 && (
+                    <Crown className="absolute -top-5 left-1/2 h-5 w-5 -translate-x-1/2 fill-amber-300 text-amber-400" aria-hidden />
+                  )}
+                  <span
+                    className={`grid place-items-center rounded-full bg-mist-100 font-semibold text-plum-950 ring-[3px] ${medal.ring} ${
+                      rank === 1 ? "h-16 w-16 text-[18px]" : "h-13 w-13 text-[15px]"
+                    }`}
+                  >
+                    {initialsOf(row.name)}
+                  </span>
+                  <span
+                    className={`c-num absolute -bottom-1.5 left-1/2 grid h-5 min-w-5 -translate-x-1/2 place-items-center rounded-full px-1 text-[11px] font-bold ${medal.chip}`}
+                  >
+                    {rank}
+                  </span>
+                </span>
+                <span className="mt-3 w-full truncate text-[13px] font-semibold text-plum-950">{row.name}</span>
+                <span className="c-num text-[13px] font-semibold text-wine-700">{formatMoney(row.valueMinor, currency)}</span>
+                <span className="text-[11.5px] text-slate-600">
+                  {row.deals} {row.deals === 1 ? "deal" : "deals"}
+                </span>
+                <span className={`mt-2 w-full rounded-t-xl ${medal.bar}`} aria-hidden />
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
+
 function PersonCard({
   row,
+  rank,
   currency,
   weights,
   open,
   onToggle,
 }: {
   row: PersonRow;
+  rank: number;
   currency: string;
   weights: RatingWeights | undefined;
   open: boolean;
@@ -151,9 +241,13 @@ function PersonCard({
 }) {
   return (
     <Card>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="c-num text-[13px] font-semibold text-slate-550">
-          {String(row.rating.score)}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <span className="c-num w-6 text-center text-[14px] font-semibold text-slate-550">{rank}</span>
+        <span
+          aria-hidden
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-mist-100 text-[11px] font-semibold text-plum-950"
+        >
+          {initialsOf(row.name)}
         </span>
         <h3 className="min-w-0 text-[13px] font-semibold text-plum-950">{row.name}</h3>
         {/* The word, not just a colour: a chip whose meaning is its hue is a chip
@@ -166,8 +260,8 @@ function PersonCard({
         </span>
       </div>
 
-      <p className="mt-0.5 text-[12px] text-slate-600">
-        {row.deals} {row.deals === 1 ? "deal" : "deals"}
+      <p className="mt-0.5 pl-[4.375rem] text-[12px] text-slate-600">
+        Score {row.rating.score} · {row.deals} {row.deals === 1 ? "deal" : "deals"}
         {row.kind === "marketer" && (
           <> · earned {formatMoney(row.earnedMinor, currency)}</>
         )}
@@ -183,7 +277,7 @@ function PersonCard({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="c-tap mt-2 text-[12px] font-medium text-wine-700 hover:underline"
+        className="c-tap mt-2 pl-[4.375rem] text-[12px] font-medium text-wine-700 hover:underline"
       >
         {open ? "Hide the score" : "How this score is made up"}
       </button>

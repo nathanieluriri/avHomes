@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { MARKETER_STATUS_LABEL, type TeamMember } from "@avhomes/contracts";
+import { Mail, MessageCircle, Phone } from "lucide-react";
+import { MARKETER_STATUS_LABEL, type TeamMember, type UplineContact } from "@avhomes/contracts";
 import { AppShell, useMarketer } from "@/components/marketer/AppShell";
-import { IconInvite, IconTeam } from "@/components/marketer/icons3d";
+import { IconHelp, IconInvite, IconTeam } from "@/components/marketer/icons3d";
 import { pct, sameRates } from "@/components/marketer/team/bits";
 import {
   ButtonLink,
@@ -177,9 +178,79 @@ function TeamBody({ team }: { team: TeamRead }) {
 
   return (
     <div className="space-y-7 px-4">
+      {team.data?.upline && <UplineCard upline={team.data.upline} />}
       <section aria-label="Your partners">{people}</section>
       <HowItPays me={me} />
     </div>
+  );
+}
+
+/** Who is above you, with one tap to reach them. The office stands in for people who joined on no link. */
+function UplineCard({ upline }: { upline: UplineContact }) {
+  const office = upline.kind === "office";
+  const digits = upline.phone.replace(/[^\d]/gu, "");
+  const actions = [
+    upline.email && { href: `mailto:${upline.email}`, label: "Email", Icon: Mail },
+    digits && { href: `tel:${upline.phone.replace(/\s/gu, "")}`, label: "Call", Icon: Phone },
+    digits && { href: `https://wa.me/${digits}`, label: "WhatsApp", Icon: MessageCircle, variant: "whatsapp" as const },
+  ].filter(Boolean) as { href: string; label: string; Icon: typeof Mail; variant?: "whatsapp" }[];
+
+  return (
+    <section aria-labelledby="upline">
+      <Card className="m-card--lg">
+        <p id="upline" className="text-[12px] font-semibold uppercase tracking-wide text-m-muted">
+          {office ? "Your support team" : "Your upline"}
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          {office ? (
+            <span aria-hidden className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-m-raised">
+              <IconHelp size={40} />
+            </span>
+          ) : (
+            <span
+              aria-hidden
+              className={`grid h-12 w-12 shrink-0 place-items-center rounded-full text-[15px] font-bold tracking-wide ${tintFor(upline.code)}`}
+            >
+              {initials(upline.name, upline.code)}
+            </span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[16px] font-semibold text-m-text">{upline.name}</span>
+            <span className="mt-0.5 block text-[13px] leading-snug text-m-muted">
+              {office
+                ? "You joined without a partner's link, so the AV Homes office looks after you."
+                : `${upline.code} invited you. Ask them anything about selling.`}
+            </span>
+          </span>
+        </div>
+        {(upline.email || upline.phone) && (
+          <dl className="mt-4 space-y-1 text-[13px]">
+            {upline.email && (
+              <div className="flex gap-2">
+                <dt className="w-12 shrink-0 text-m-muted">Email</dt>
+                <dd className="min-w-0 truncate text-m-text">{upline.email}</dd>
+              </div>
+            )}
+            {upline.phone && (
+              <div className="flex gap-2">
+                <dt className="w-12 shrink-0 text-m-muted">Phone</dt>
+                <dd className="m-num text-m-text">{upline.phone}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+        {actions.length > 0 && (
+          <div className={`mt-4 grid gap-2 ${actions.length === 3 ? "grid-cols-3" : actions.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+            {actions.map(({ href, label, Icon, variant }) => (
+              <ButtonLink key={label} href={href} external variant={variant ?? "secondary"} size="md" full className="px-2">
+                <Icon className="h-4 w-4" aria-hidden />
+                {label}
+              </ButtonLink>
+            ))}
+          </div>
+        )}
+      </Card>
+    </section>
   );
 }
 

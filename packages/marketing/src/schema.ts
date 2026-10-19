@@ -7,8 +7,11 @@
  * only place in the app that decides what somebody is owed.
  */
 
+import { planSchedule } from "@avhomes/contracts";
 import type {
   CloserKind,
+  DealPayment,
+  DealPlan,
   CommissionSplit,
   Deal,
   DealKind,
@@ -55,6 +58,7 @@ export interface MarketerDoc {
   /** Nearest referrer first, at most two. */
   upline: string[];
   bank: MarketerBank | null;
+  showPhoneToTeam?: boolean;
   isAdmin: boolean;
   joinedAt: number;
   createdAt: number;
@@ -73,6 +77,7 @@ export interface DealDoc {
   currency: string;
   buyerName: string;
   buyerPhone: string;
+  buyerEmail?: string;
   proof: string[];
   note: string;
   reporterId: string;
@@ -102,6 +107,14 @@ export interface DealDoc {
   reviewedAt: number | null;
   closedOn: number;
   shares: DealShare[];
+  plan?: DealPlan | null;
+  payments?: DealPayment[];
+  paidMinor?: number;
+  planShares?: DealShare[];
+  planFundShares?: FundShare[];
+  selfPurchase?: boolean;
+  /** Reminder keys already sent, such as `2:soon`. See reminderKey. */
+  reminders?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -193,6 +206,7 @@ export interface LeadDoc {
   state: LeadState;
   events: LeadEvent[];
   dealId: string | null;
+  self?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -232,6 +246,7 @@ export function toMarketer(doc: MarketerDoc): Marketer {
     parentId: doc.parentId ?? null,
     upline: doc.upline ?? [],
     bank: doc.bank ?? null,
+    showPhoneToTeam: doc.showPhoneToTeam ?? true,
     isAdmin: doc.isAdmin ?? false,
     joinedAt: doc.joinedAt ?? doc.createdAt,
     createdAt: doc.createdAt,
@@ -272,6 +287,7 @@ export function toDeal(doc: DealDoc): Deal {
     currency: doc.currency,
     buyerName: doc.buyerName ?? "",
     buyerPhone: doc.buyerPhone ?? "",
+    buyerEmail: doc.buyerEmail ?? "",
     proof: doc.proof ?? [],
     note: doc.note ?? "",
     reporterId: doc.reporterId,
@@ -295,6 +311,13 @@ export function toDeal(doc: DealDoc): Deal {
     reviewedAt: doc.reviewedAt ?? null,
     closedOn: doc.closedOn ?? doc.createdAt,
     shares: doc.shares ?? [],
+    plan: doc.plan ?? null,
+    schedule: doc.plan ? planSchedule(doc.amountMinor, doc.plan) : [],
+    payments: doc.payments ?? [],
+    paidMinor: doc.paidMinor ?? (doc.status === "approved" && !doc.plan ? doc.amountMinor : 0),
+    planShares: doc.planShares ?? [],
+    planFundShares: doc.planFundShares ?? [],
+    selfPurchase: doc.selfPurchase ?? false,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
@@ -390,6 +413,7 @@ export function toLead(doc: LeadDoc): Lead {
     state: doc.state,
     events: doc.events ?? [],
     dealId: doc.dealId ?? null,
+    self: doc.self ?? false,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };

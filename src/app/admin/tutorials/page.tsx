@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, GraduationCap, Monitor, Play, RotateCcw } from "lucide-react";
-import { isRole, type Role, type TutorialProgress, type TutorialProgressList } from "@avhomes/contracts";
+import { ArrowRight, Check, Download, GraduationCap, Monitor, Play, RotateCcw } from "lucide-react";
+import { hasDomain, isRole, type Role, type TutorialProgress, type TutorialProgressList } from "@avhomes/contracts";
 import { ApiError, api } from "@/lib/admin/client";
 import { useIsNarrow, useIsTouch, useSession } from "@/lib/admin/hooks";
 import { TUTORIALS, clock, putWithRetry, spokenDuration, tryHrefOf, tutorialsFor, type Tutorial } from "@/lib/admin/tutorials";
@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from "@/components/admin/ui";
 import { TutorialPlayer } from "./TutorialPlayer";
+import { VideoDownloads, tutorialDownload } from "./VideoDownloads";
 
 /**
  * One card per job the reader's role can do: a short silent video, then "Try
@@ -328,6 +329,8 @@ export default function TutorialsPage() {
         </ul>
       )}
 
+      {role && (hasDomain(role, "content") || hasDomain(role, "marketing")) && <VideoDownloads />}
+
       <TutorialPlayer
         tutorial={playing}
         screenLabel={playing ? screenLabel(playing) : ""}
@@ -499,6 +502,8 @@ function TutorialCard({
     );
   }
 
+  const download = tutorialDownload(tutorial.video, tutorial.title);
+
   return (
     <Card padded={false} className={CARD_GRID}>
       <button
@@ -573,6 +578,16 @@ function TutorialCard({
         className="col-span-2 flex items-center gap-2 [&>*]:flex-1 sm:col-span-1 sm:col-start-2 sm:[&>*]:flex-none lg:col-start-3 lg:justify-end"
       >
         {actions}
+        {download && (
+          <a
+            href={download.href}
+            download={download.filename}
+            className="c-tap inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-slate-600 transition-colors hover:bg-mist-100 hover:text-plum-950 sm:h-8 sm:px-2.5"
+          >
+            <Download className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden="true" />
+            {named("Download")}
+          </a>
+        )}
       </div>
     </Card>
   );

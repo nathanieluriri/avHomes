@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Maximize2, Pause, Play, RotateCcw } from "lucide-react";
 import { useMediaQuery } from "@/lib/admin/hooks";
 import { clock, stepAt, type HelpStep, type HelpTopic } from "@/lib/marketer/help";
+import { DownloadButton } from "./DownloadButton";
 import { Sheet } from "./Sheet";
 import { Button } from "./ui";
 
@@ -305,6 +306,8 @@ export function VideoSheet({
             ))}
           </ol>
         </div>
+
+        {topic.video && <DownloadButton url={topic.video} name={`AV Homes - ${topic.title}`} size="lg" full label="Download the video" />}
 
         <Button variant="secondary" size="lg" full onClick={onClose}>
           Done

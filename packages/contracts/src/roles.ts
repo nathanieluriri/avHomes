@@ -13,6 +13,7 @@ export type Role =
   | "agent"
   | "editor"
   | "support"
+  | "accountant"
   | "marketer"
   | "partner";
 
@@ -28,6 +29,7 @@ export type Domain =
   | "analytics" // dashboard reads
   | "team" // users and invites
   | "marketing" // marketers, the deals they report, pay runs and commission rates
+  | "finance" // reading the money, paying out and recording fund payments; never rates or people
   | "danger"; // destroy, export, migrations
 
 export interface RoleInfo {
@@ -81,6 +83,13 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
     description: "Answers enquiries and reads the dashboard. Changes nothing on the public site.",
     grants: ["enquiries", "analytics"],
   },
+  accountant: {
+    label: "Accountant",
+    tagline: "The books, the payouts and the proof",
+    description:
+      "Reads every sale, commission and fund movement, keeps the balance sheet, sends pay day transfers with their receipts and records fund payments. Cannot approve deals, change commission rates or touch listings, content or the team.",
+    grants: ["finance"],
+  },
   marketer: {
     label: "Marketer",
     tagline: "Sells property, earns commission",
@@ -109,7 +118,7 @@ export const ROLE_INFO: Record<Role, RoleInfo> = {
  * and by an admin approving a partner application, and handing either to a
  * console account would take that person's console away.
  */
-export const ASSIGNABLE_ROLES = ["developer", "agent", "editor", "support"] as const;
+export const ASSIGNABLE_ROLES = ["developer", "agent", "editor", "support", "accountant"] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
 export const ALL_ROLES = ["owner", ...ASSIGNABLE_ROLES, "marketer", "partner"] as const;
@@ -143,6 +152,11 @@ export function isConsoleRole(role: Role): boolean {
  */
 export function isScopedRole(role: Role): boolean {
   return ROLE_INFO[role]?.scoped === true;
+}
+
+/** Money is the marketing domain's, and the accountant's through finance. */
+export function seesMoney(role: Role): boolean {
+  return hasDomain(role, "marketing") || hasDomain(role, "finance");
 }
 
 /** The full-access tier requireAdmin() reads. "Owner or developer", once. */

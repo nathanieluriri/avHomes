@@ -17,6 +17,9 @@ export {
 
 export { whatsappRedirectRoutes } from "./whatsapp";
 
+export { currentMarketer } from "./routes";
+export { readTools, toolsAdminRoutes, toolsAppRoutes } from "./tools";
+
 export {
   paystackKeySaved,
   readMarketingSettings,
@@ -99,3 +102,16 @@ export {
   type PayRunDoc,
   type UpdateDoc,
 } from "./schema";
+
+export {
+  claimDueReminders,
+  logPayment,
+  plansNeedingAttention,
+  purchasesFor,
+  rejectPayment,
+  settleNumbers,
+  verifyPayment,
+  type DueReminder,
+  type PaymentInput,
+  type Verified,
+} from "./plans";

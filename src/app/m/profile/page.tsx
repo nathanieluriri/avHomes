@@ -250,14 +250,18 @@ function DetailsForm({
   const [displayName, setDisplayName] = useState(marketer.displayName);
   const [phone, setPhone] = useState(marketer.phone);
   const [state, setState] = useState(marketer.state);
+  const [showPhone, setShowPhone] = useState(marketer.showPhoneToTeam);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   // What the last save sent, so the fields count as saved before the fresh read remounts this form.
   const [sent, setSent] = useState<string | null>(null);
 
-  const typed = [displayName.trim(), phone.trim(), state.trim()];
+  const typed = [displayName.trim(), phone.trim(), state.trim(), String(showPhone)];
   const changed =
-    typed[0] !== marketer.displayName || typed[1] !== marketer.phone || typed[2] !== marketer.state;
+    typed[0] !== marketer.displayName ||
+    typed[1] !== marketer.phone ||
+    typed[2] !== marketer.state ||
+    showPhone !== marketer.showPhoneToTeam;
   const badName = displayName.trim().length < 2;
   const done = saved && (!changed || sent === typed.join("\n"));
 
@@ -269,6 +273,7 @@ function DetailsForm({
         displayName: typed[0],
         phone: typed[1],
         state: typed[2],
+        showPhoneToTeam: showPhone,
       });
       setSent(typed.join("\n"));
       onSaved();
@@ -293,6 +298,18 @@ function DetailsForm({
 
         <Field label="Phone" as="group">
           <PhoneField value={phone} onChange={setPhone} aria-label="Phone" />
+          <label className="mt-3 flex items-start gap-3 text-[13px] leading-snug text-m-muted">
+            <input
+              type="checkbox"
+              checked={showPhone}
+              onChange={(event) => setShowPhone(event.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[#ff8fa3]"
+            />
+            <span>
+              <span className="block font-semibold text-m-text">Show my phone to people I invite</span>
+              They always see your name and email, so they can reach you.
+            </span>
+          </label>
         </Field>
 
         <Field label="State" hint="Where you mostly work.">

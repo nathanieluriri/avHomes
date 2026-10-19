@@ -9,11 +9,8 @@ import { useEffect, useRef, useState } from "react";
  * typeface reads as a list we typed, which is the one thing a proof strip must
  * not look like. A real mark is the evidence.
  *
- * Grey at rest and colour under the pointer, and the strip stops while it is
- * hovered. Five marks in five different brand palettes, all lit at once and all
- * sliding past, is the loudest band on the page competing with the thing it is
- * supposed to support. Desaturated they read as one texture; colour then means
- * "this is the one you are looking at" rather than being the default state.
+ * Full colour on white cards, with the name under each. A handful sit centred
+ * and still; past that they scroll, and the scroll pauses under the pointer.
  *
  * `logo` names a file that MAY NOT BE THERE YET, and that is deliberate: a
  * missing file falls back to the wordmark this component used to render, so the
@@ -36,47 +33,65 @@ interface Client {
  * five companies the site could not show. Now an empty list renders NOTHING:
  * a missing section is invisible, and an empty one is an admission.
  */
+/* Up to this many sit still, centred. A scroller showing four logos is mostly empty track. */
+const STILL_MAX = 6;
+
 export default function LogoMarquee({ clients }: { clients: readonly Client[] }) {
   if (clients.length === 0) return null;
+  const still = clients.length <= STILL_MAX;
+  /* Each half of the track must be wider than the screen, or the loop shows a gap. */
+  const half = still ? [] : Array.from({ length: Math.ceil(12 / clients.length) }, () => clients).flat();
 
   return (
-    <section className="border-y border-mist-200 bg-mist-50 py-8 lg:py-10">
+    <section className="border-y border-mist-200 bg-mist-50 py-12 lg:py-16">
       <div className="mx-auto max-w-7xl px-6 lg:px-10">
-        <p className="text-center text-xs uppercase tracking-[0.18em] text-slate-500">
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.22em] text-wine-600">Our clients</p>
+        <h2 className="mt-2 text-center text-2xl font-bold tracking-tight text-plum-950 sm:text-3xl">
           Trusted by leading brands and visionary homeowners
-        </p>
+        </h2>
 
-        <div
-          className="relative mt-6 overflow-hidden"
-          style={{
-            maskImage:
-              "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
-            WebkitMaskImage:
-              "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
-          }}
-        >
-          <div className="marquee-track animate-marquee items-center">
-            {[0, 1].map((rep) => (
-              <div
-                key={rep}
-                aria-hidden={rep === 1 ? "true" : undefined}
-                className="flex shrink-0 items-center gap-10 pl-10"
-              >
-                {clients.map((client) => (
-                  <span key={client.name} className="flex shrink-0 items-center gap-10">
-                    <ClientLogo client={client} />
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-wine-600"
-                      aria-hidden="true"
-                    />
-                  </span>
-                ))}
-              </div>
+        {still ? (
+          <ul className="mt-10 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-center sm:gap-6">
+            {clients.map((client) => (
+              <li key={client.name}>
+                <ClientCard client={client} />
+              </li>
             ))}
+          </ul>
+        ) : (
+          <div
+            className="group relative mt-10 overflow-hidden"
+            style={{
+              maskImage: "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+              WebkitMaskImage: "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+            }}
+          >
+            <div className="marquee-track animate-marquee group-hover:[animation-play-state:paused]">
+              {[0, 1].map((rep) => (
+                <ul key={rep} aria-hidden={rep === 1 ? "true" : undefined} className="flex shrink-0 gap-6 pr-6">
+                  {half.map((client, i) => (
+                    <li key={`${client.name}-${i}`}>
+                      <ClientCard client={client} />
+                    </li>
+                  ))}
+                </ul>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
+  );
+}
+
+function ClientCard({ client }: { client: Client }) {
+  return (
+    <figure className="flex h-36 w-full min-w-40 flex-col items-center justify-center gap-3 rounded-2xl border border-mist-200 bg-white px-5 py-4 shadow-sm transition-shadow hover:shadow-md sm:h-40 sm:w-52 sm:min-w-0">
+      <div className="flex h-20 w-full items-center justify-center">
+        <ClientLogo client={client} />
+      </div>
+      <figcaption className="line-clamp-1 text-center text-[13px] font-semibold text-plum-950">{client.name}</figcaption>
+    </figure>
   );
 }
 
@@ -107,8 +122,12 @@ function ClientLogo({ client }: { client: Client }) {
 
   if (missing) {
     return (
-      <span className="whitespace-nowrap text-lg font-semibold text-slate-500 transition-colors duration-300 hover:text-plum-950">
-        {client.name}
+      <span className="grid h-16 w-16 place-items-center rounded-full bg-wine-50 text-xl font-bold text-wine-700">
+        {client.name
+          .split(/\s+/u)
+          .slice(0, 2)
+          .map((word) => word[0]?.toUpperCase() ?? "")
+          .join("")}
       </span>
     );
   }
@@ -129,7 +148,7 @@ function ClientLogo({ client }: { client: Client }) {
       /* Grey and recessive at rest, full colour under the pointer.
          `pointer-coarse` is the touch answer: a phone has no hover to give, so
          holding every mark grey there would be a state with no way out of it. */
-      className="h-8 w-auto max-w-40 shrink-0 object-contain opacity-70 grayscale transition duration-300 hover:opacity-100 hover:grayscale-0 pointer-coarse:opacity-100 pointer-coarse:grayscale-0"
+      className="max-h-20 w-auto max-w-full object-contain"
       onError={() => setMissing(true)}
     />
   );

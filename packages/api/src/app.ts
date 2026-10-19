@@ -72,6 +72,7 @@ import {
   mailWatchRoutes,
   mailboxRoutes,
   mailStateRoutes,
+  readPublicSettings,
   settingsPublicRoutes,
   settingsRoutes,
   type MailFailureHook,
@@ -87,12 +88,16 @@ import {
   subscribeAddress,
   unsubscribePublicRoutes,
   unsubscribedAmong,
+  welcomeBuyer,
 } from "@avhomes/audience";
 import {
   activeMarketerContacts,
+  currentMarketer,
   marketingAdminRoutes,
   marketingAppRoutes,
   marketingPublicRoutes,
+  toolsAdminRoutes,
+  toolsAppRoutes,
   whatsappRedirectRoutes,
   readMarketingSettings,
   type MarketingDeps,
@@ -625,15 +630,34 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
       recentListings,
       recentNews: recentNewsFor,
       newsletterFor: (db, input) => newsletterArticle(db, input.origin, input.id, input.email),
+      officeEmail: async (db) => (await readPublicSettings(db)).contactEmail,
       ...marketingPorts,
     }),
   );
+  app.route(API_PREFIX, toolsAppRoutes(currentMarketer));
+  app.route(API_PREFIX, toolsAdminRoutes({ tell }));
   app.route(
     API_PREFIX,
     marketingAdminRoutes({
       notify,
       tell,
+      welcomeBuyer: (db, input, ctx) => welcomeBuyer(db, mailer, input, ctx),
       mail: (db, to, key, text, ctx) => sendTemplate(templateMail, db, to, key, text, ctx),
+      directMail: async (db, input, ctx) => {
+        try {
+          await mailer.assertConfigured();
+        } catch {
+          return "unconfigured";
+        }
+        try {
+          const email = await templateMail.render(db, "property-partner-message", input.text);
+          await mailer.send({ to: input.to, replyTo: input.replyTo, subject: email.subject, text: email.text, html: email.html });
+          return "sent";
+        } catch (err) {
+          console.error("[mail]", JSON.stringify({ ...ctx, message: err instanceof Error ? err.message : String(err) }));
+          return "failed";
+        }
+      },
       ...marketingPorts,
     }),
   );

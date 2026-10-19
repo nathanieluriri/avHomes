@@ -96,6 +96,7 @@ function RecordSaleForm({
     amountMinor: number;
     buyerName: string;
     buyerPhone: string;
+    buyerEmail?: string;
     proof: string[];
     closerKind: CloserKind;
     closerId: string;
@@ -120,6 +121,7 @@ function RecordSaleForm({
   const unit = units.find((u) => u.key === unitKey) ?? null;
   const [buyerName, setBuyerName] = useState(fromDeal?.buyerName ?? "");
   const [buyerPhone, setBuyerPhone] = useState(fromDeal?.buyerPhone ?? "");
+  const [buyerEmail, setBuyerEmail] = useState(fromDeal?.buyerEmail ?? "");
   const [closedOn, setClosedOn] = useState(today());
   const [proof, setProof] = useState<string[]>(fromDeal?.proof ?? []);
   const [note, setNote] = useState("");
@@ -269,6 +271,7 @@ function RecordSaleForm({
         amountMinor,
         buyerName: buyerName.trim(),
         buyerPhone: buyerPhone.trim(),
+        buyerEmail: buyerEmail.trim(),
         closedOn: Date.parse(`${closedOn}T12:00:00`),
         proof,
         note: note.trim(),
@@ -450,6 +453,17 @@ function RecordSaleForm({
             value={buyerPhone}
             onChange={(event) => setBuyerPhone(event.target.value)}
             inputMode="tel"
+          />
+        </Field>
+
+        <Field label="Their email" hint="Optional. They are congratulated, introduced to AV Constructions and added to the mailing list.">
+          <input
+            className={inputClass}
+            type="email"
+            value={buyerEmail}
+            onChange={(event) => setBuyerEmail(event.target.value)}
+            inputMode="email"
+            autoComplete="off"
           />
         </Field>
 

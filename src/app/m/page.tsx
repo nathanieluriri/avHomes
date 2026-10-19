@@ -26,6 +26,8 @@ import {
   IconListings,
   IconMoney,
   IconTeam,
+  IconTrophy,
+  IconChart,
 } from "@/components/marketer/icons3d";
 import {
   Button,
@@ -484,13 +486,16 @@ function HomeBody({ alerts }: { alerts: AlertsRead }) {
         {device.guide}
       </section>
 
-      {/* Three places not already on the first screen. Report a deal is the orb's alone. */}
+      {/* Places not already on the first screen. Report a deal is the orb's alone. */}
       <section className="mt-5 px-4">
         <SectionLabel>Quick access</SectionLabel>
         <div className="grid grid-cols-3 gap-3">
           <IconTile href="/m/deals" icon={<IconDeals size={46} />} label="My deals" />
           <IconTile href="/m/listings" icon={<IconListings size={46} />} label="Listings" />
           <IconTile href="/m/team" icon={<IconTeam size={46} />} label="My Network" />
+          <IconTile href="/m/leaderboard" icon={<IconTrophy size={46} />} label="Leaderboard" />
+          <IconTile href="/m/analytics" icon={<IconChart size={46} />} label="My numbers" />
+          <IconTile href="/m/invite" icon={<IconInvite size={46} />} label="Invite" />
         </div>
       </section>
     </>

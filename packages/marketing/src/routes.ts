@@ -20,6 +20,7 @@ import {
   NotFoundError,
   PreconditionFailedError,
   UnauthenticatedError,
+  UpstreamError,
   auditBefore,
   auditEntityId,
   clientIp,
@@ -37,6 +38,11 @@ import {
 } from "@avhomes/core";
 import {
   ACCOUNT_PROVIDERS,
+  BOARD_METRICS,
+  BOARD_PERIODS,
+  BOARD_SCOPES,
+  normalizeLeaderboardSettings,
+  MARKETER_EXPORT_FIELDS,
   WHATSAPP_CHANGE_REASONS,
   WHATSAPP_NOTE_MAX,
   isWhatsappGroupUrl,
@@ -115,6 +121,9 @@ import {
   writePaystackKey,
 } from "./settings";
 import { toMarketingUpdate } from "./schema";
+import { insightsFor, leaderboardFor, uplineFor } from "./insights";
+import { exportZip, marketerExportRows } from "./export";
+import { listMessages, recordMessage } from "./messages";
 import { inviteUninvited, listLinkChanges, recordLinkChange, remindPartners, welcomePartner, whatsappCard, whatsappReport, hasJoinedWhatsapp, type SendTemplate } from "./whatsapp";
 import {
   alertsFor,
@@ -218,8 +227,23 @@ export interface MarketingDeps {
    * in the audience package. Never undoes an earlier unsubscribe.
    */
   subscribe?: (db: Db, email: string, ctx: { origin: string; requestId: string; route: string }) => Promise<void>;
+  /** Congratulates a buyer and adds them to the mailing list, once per address. Injected from the audience package. Never throws. */
+  welcomeBuyer?: (
+    db: Db,
+    input: { email: string; name: string; property: string; origin: string },
+    ctx: { requestId: string; route: string },
+  ) => Promise<boolean>;
   /** Sends one of the editable email templates. Injected, because templates live in the settings package. Never throws. */
   mail?: SendTemplate;
+  /**
+   * A template sent with a Reply-To, answering whether the deployment has mail at
+   * all apart from whether this one send failed, which `mail` cannot. Never throws.
+   */
+  directMail?: (
+    db: Db,
+    input: { to: string; replyTo: string; text: Record<string, string> },
+    ctx: { requestId: string; route: string },
+  ) => Promise<"sent" | "unconfigured" | "failed">;
   /**
    * Live listings published since `sinceMs`, newest first, at most `limit`.
    * Injected, because this package may not read the listings package's collection.
@@ -265,6 +289,8 @@ export interface MarketingDeps {
   ) => Promise<void>;
   /** The reverse, for a cancelled sale: the unit is offered again, or the listing reopens. */
   reopenListing?: (db: Db, input: { listingId: string; unitKey: string; dealId: string }) => Promise<void>;
+  /** The office's work email, for partners who joined without somebody's link. Owned by the settings package. */
+  officeEmail?: (db: Db) => Promise<string>;
 }
 
 /** The listing facts marketing needs and may not read for itself. */
@@ -332,6 +358,16 @@ async function settleDeal(
 }
 
 /** A sale that fell through: its unit is offered again, or the listing it closed reopens. */
+/** An approved sale with a buyer email: welcome them to the list. */
+async function greetBuyer(deps: MarketingDeps, db: Db, deal: Deal | null, origin: string, requestId: string) {
+  if (!deal || deal.status !== "approved" || !deal.buyerEmail || !deps.welcomeBuyer) return;
+  await deps.welcomeBuyer(
+    db,
+    { email: deal.buyerEmail, name: deal.buyerName, property: deal.listingTitle, origin },
+    { requestId, route: "deal approved" },
+  );
+}
+
 async function unsettleDeal(deps: MarketingDeps, db: Db, deal: Deal): Promise<void> {
   if (!deps.reopenListing) return;
   try {
@@ -351,7 +387,7 @@ function assertUnit(facts: ListingFacts, unitKey: string): void {
   }
 }
 
-async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
+export async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promise<void> {
   const tell = deps.tell;
   if (!tell || notes.length === 0) return;
   try {
@@ -367,7 +403,7 @@ async function tellMarketers(deps: MarketingDeps, db: Db, notes: Note[]): Promis
   }
 }
 
-function firstName(name: string): string {
+export function firstName(name: string): string {
   return name.trim().split(/\s+/u)[0] || name;
 }
 
@@ -528,6 +564,7 @@ const DealBody = z
     amountMinor: z.number().int().min(1),
     buyerName: str().max(160).default(""),
     buyerPhone: str().max(40).default(""),
+    buyerEmail: z.union([z.literal(""), emailString()]).default(""),
     proof: z.array(str().max(600)).min(1).max(5),
     note: str().max(600).default(""),
     closedOn: z.number().int().min(0).default(0),
@@ -702,6 +739,7 @@ const RecordSaleBody = z
     amountMinor: z.number().int().positive(),
     buyerName: str().max(120),
     buyerPhone: str().max(40).default(""),
+    buyerEmail: z.union([z.literal(""), emailString()]).default(""),
     closedOn: z.number().int().min(0).default(0),
     /* At least one. `recordSaleRefusal` says the same thing in words the sheet
        renders, and this is the shape check behind it. */
@@ -733,13 +771,29 @@ const SettingsBody = z
     requireApproval: z.boolean().optional(),
     joinOpen: z.boolean().optional(),
     blockSelfDeals: z.boolean().optional(),
+    selfPurchaseCommission: z.boolean().optional(),
     minPayoutMinor: z.number().int().min(0).optional(),
     supportPhone: str().max(40).optional(),
     accountProvider: z.enum(ACCOUNT_PROVIDERS).optional(),
+    exportableFields: z.array(z.enum(MARKETER_EXPORT_FIELDS)).max(MARKETER_EXPORT_FIELDS.length).optional(),
+    exportFields: z.array(z.enum(MARKETER_EXPORT_FIELDS)).max(MARKETER_EXPORT_FIELDS.length).optional(),
     /* The key is write-only. Absent leaves what is saved alone, because the
        form posts every field on every save and can never prefill this one.
        null is how an admin clears it deliberately. */
     paystackKey: str().max(200).nullable().optional(),
+    leaderboard: z
+      .object({
+        enabled: z.boolean(),
+        periods: z.array(z.enum(BOARD_PERIODS)).min(1),
+        metrics: z.array(z.enum(BOARD_METRICS)).min(1),
+        scopes: z.array(z.enum(BOARD_SCOPES)).min(1),
+        stateFilter: z.boolean(),
+        defaultPeriod: z.enum(BOARD_PERIODS),
+        defaultMetric: z.enum(BOARD_METRICS),
+      })
+      .strict()
+      .transform(normalizeLeaderboardSettings)
+      .optional(),
   })
   .strict();
 
@@ -957,7 +1011,7 @@ export function marketingPublicRoutes(deps: Pick<MarketingDeps, "tell" | "subscr
  * the founder, because the owner asked that every admin be a marketer without
  * having to sign up for it.
  */
-async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Marketer> {
+export async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Promise<Marketer> {
   const user = currentUser(c);
   /*
    * A PARTNER LISTER IS NOT A MARKETER, and is refused before any profile is read.
@@ -992,7 +1046,7 @@ async function currentMarketer(db: Db, c: Parameters<typeof currentUser>[0]): Pr
   });
 }
 
-function assertActive(marketer: Marketer): void {
+export function assertActive(marketer: Marketer): void {
   if (marketer.status === "active") return;
   throw new ForbiddenError(
     marketer.status === "paused"
@@ -1006,7 +1060,7 @@ function dealView(deal: Deal, marketerId: string) {
   const mine = deal.reporterId === marketerId;
   return {
     // Somebody else's buyer is not this marketer's business.
-    deal: mine ? deal : { ...deal, buyerName: "", buyerPhone: "" },
+    deal: mine ? deal : { ...deal, buyerName: "", buyerPhone: "", buyerEmail: "" },
     myShare: deal.shares.find((share) => share.marketerId === marketerId) ?? null,
   };
 }
@@ -1042,7 +1096,7 @@ function listingCard(listing: RecentListing): MarketingUpdate {
  * misconfigured deployment into a half-settled deal, which is the worst of the
  * available outcomes. A missing accrual is what `reconcile` exists to report.
  */
-const noAccrual: FundAccrual = async () => {};
+export const noAccrual: FundAccrual = async () => {};
 const noReversal: FundReversal = async () => 0;
 
 /** How long a newsletter stays in Alerts after it went out. */
@@ -1166,6 +1220,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
           displayName: str().min(2).max(120).optional(),
           phone: str().max(30).optional(),
           state: str().max(80).optional(),
+          showPhoneToTeam: z.boolean().optional(),
         })
         .strict(),
     );
@@ -1231,8 +1286,32 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
   routes.get("/marketing/team", requireAuth(), async (c) => {
     const db = await currentDb(c);
     const marketer = await currentMarketer(db, c);
-    const team = await teamFor(db, marketer.id);
-    return c.json({ levels: team.levels, members: team.members });
+    const settings = await readMarketingSettings(db);
+    const [team, officeEmail] = await Promise.all([
+      teamFor(db, marketer.id),
+      deps.officeEmail ? deps.officeEmail(db) : Promise.resolve(""),
+    ]);
+    const upline = await uplineFor(db, marketer, { email: officeEmail, phone: settings.supportPhone });
+    return c.json({ levels: team.levels, members: team.members, upline });
+  });
+
+  routes.get("/marketing/leaderboard", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    return c.json(
+      await leaderboardFor(db, marketer, {
+        period: c.req.query("period"),
+        metric: c.req.query("metric"),
+        scope: c.req.query("scope"),
+        state: c.req.query("state"),
+      }),
+    );
+  });
+
+  routes.get("/marketing/insights", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const marketer = await currentMarketer(db, c);
+    return c.json(await insightsFor(db, marketer, c.req.query("period")));
   });
 
   routes.get("/marketing/deals", requireAuth(), async (c) => {
@@ -1250,6 +1329,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       // Somebody else's buyer is not this marketer's business.
       buyerName: deal.reporterId === marketer.id ? deal.buyerName : "",
       buyerPhone: deal.reporterId === marketer.id ? deal.buyerPhone : "",
+      buyerEmail: deal.reporterId === marketer.id ? deal.buyerEmail : "",
     }));
     return c.json({ items, total: page.total });
   });
@@ -1667,13 +1747,14 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const marketer = await findMarketerById(db, id);
     if (!marketer) throw new NotFoundError(`marketer ${id}`);
     const settings = await readMarketingSettings(db);
-    const [balance, team, chain, deals, lines, payments] = await Promise.all([
+    const [balance, team, chain, deals, lines, payments, messages] = await Promise.all([
       balanceFor(db, id, settings.currency),
       teamFor(db, id),
       chainFor(db, id),
       listDeals(db, { reporterId: id, limit: 25 }),
       listLedger(db, id, 25),
       payHistoryFor(db, id, 12),
+      listMessages(db, id, 20),
     ]);
     return c.json({
       marketer,
@@ -1684,6 +1765,82 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       deals: deals.items,
       lines,
       payments,
+      messages,
+    });
+  });
+
+  /** A private email to one partner, from their page, answered straight back to the admin who wrote it. */
+  routes.post("/admin/marketing/marketers/:id/message", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const user = currentUser(c);
+    const id = pathParam(c, "id");
+    const body = await readJson(
+      c,
+      z.object({ subject: str().trim().min(1).max(200), message: str().trim().min(1).max(5000) }).strict(),
+    );
+    const marketer = await findMarketerById(db, id);
+    if (!marketer) throw new NotFoundError(`marketer ${id}`);
+    if (marketer.email.trim() === "") throw new BadRequestError("This partner has no email address on their profile.");
+
+    const outcome = deps.directMail
+      ? await deps.directMail(
+          db,
+          {
+            to: marketer.email,
+            replyTo: user.email,
+            text: {
+              name: marketer.displayName.split(/\s+/u)[0] ?? marketer.displayName,
+              subject: body.subject,
+              message: body.message,
+              senderName: user.displayName,
+            },
+          },
+          { requestId: c.get("requestId"), route: "partner message" },
+        )
+      : "unconfigured";
+    if (outcome === "unconfigured") {
+      throw new BadRequestError("Email is not set up yet, so nothing was sent. Connect a mailbox in the console's mail settings first.");
+    }
+    const message = await recordMessage(db, {
+      marketerId: id,
+      subject: body.subject,
+      body: body.message,
+      sentById: user.id,
+      sentByName: user.displayName,
+      delivered: outcome === "sent",
+    });
+    auditEntityId(c, id);
+    if (outcome === "failed") throw new UpstreamError("mail", "The mail provider refused the message. Try again in a minute.");
+    return c.json({ message }, 201);
+  });
+
+  /** Every partner as a zip of a styled workbook and a CSV, in the columns the admin ticked. */
+  routes.post("/admin/marketing/marketers/export", requireAuth(), async (c) => {
+    const db = await currentDb(c);
+    const body = await readJson(
+      c,
+      z
+        .object({
+          fields: z.array(z.enum(MARKETER_EXPORT_FIELDS)).min(1).max(MARKETER_EXPORT_FIELDS.length),
+          fullAccountNumbers: z.boolean().default(false),
+        })
+        .strict(),
+    );
+    const settings = await readMarketingSettings(db);
+    const fields = MARKETER_EXPORT_FIELDS.filter(
+      (field) => body.fields.includes(field) && settings.exportableFields.includes(field),
+    );
+    if (fields.length === 0) throw new BadRequestError("None of the ticked fields may be exported. Change that under Commission settings.");
+    await writeMarketingSettings(db, { exportFields: fields });
+    const rows = await marketerExportRows(db, { fullAccountNumbers: body.fullAccountNumbers });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const file = exportZip(fields, rows, settings.currency, stamp);
+    return new Response(new Uint8Array(file), {
+      headers: {
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename="av-partners-${stamp}.zip"`,
+        "cache-control": "no-store",
+      },
     });
   });
 
@@ -1917,6 +2074,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         currency: settings.currency,
         buyerName: body.buyerName,
         buyerPhone: body.buyerPhone,
+        buyerEmail: body.buyerEmail,
         closedOn: body.closedOn || Date.now(),
         proof: body.proof,
         note: body.note,
@@ -1947,6 +2105,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     }
     // Settling a deal a marketer reported reads as an approval; a sale typed in here, as one recorded for them.
     await tellMarketers(deps, db, decisionNotes(deal, !body.dealId));
+    await greetBuyer(deps, db, deal, requestOrigin(c.req), c.get("requestId"));
 
     return c.json({ deal }, 201);
   });
@@ -2028,6 +2187,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     );
     await settleDeal(deps, db, deal, { id: user.id, name: user.displayName });
     await tellMarketers(deps, db, decisionNotes(deal));
+    await greetBuyer(deps, db, deal, requestOrigin(c.req), c.get("requestId"));
     return c.json({ deal });
   });
 
@@ -2146,6 +2306,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     );
     const won = dealId ? await getDeal(db, dealId) : null;
     if (won) await settleDeal(deps, db, won, { id: user.id, name: user.displayName });
+    await greetBuyer(deps, db, won, requestOrigin(c.req), c.get("requestId"));
     auditEntityId(c, lead.id);
     return c.json({ lead, dealId });
   });

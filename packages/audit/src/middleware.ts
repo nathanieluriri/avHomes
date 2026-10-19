@@ -85,6 +85,8 @@ const ENTITY_BY_SEGMENT: Record<string, AuditEntity> = {
   settings: "settings",
   marketing: "marketer",
   applications: "application",
+  funds: "fund",
+  awards: "award",
 };
 
 /**
@@ -213,6 +215,8 @@ function deriveRecord(entity: AuditEntity, rest: string[], method: string): Deri
 
   if (rest.length === 1) {
     const id = rest[0] ?? null;
+    // `POST /admin/marketing/marketers/export` reads every record and changes none.
+    if (id === "export" && method === "POST") return { entity, entityId: null, action: "op:export" };
     if (method === "PUT") {
       return id === NEW_SENTINEL
         ? { entity, entityId: null, action: "create" }

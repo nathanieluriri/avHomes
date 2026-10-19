@@ -124,7 +124,11 @@ interface Rule {
    * added there later, so each one must gate itself.
    */
   readonly subtree?: true;
+  /** Applies to reads only. A write to the same path falls through to the next rule. */
+  readonly readOnly?: true;
 }
+
+const READ_METHODS = new Set(["GET", "HEAD"]);
 
 /**
  * First match wins, specific before general, and the admin catch-all is
@@ -183,7 +187,18 @@ const RULES: readonly Rule[] = [
   { prefix: "/api/admin/mail-status", domain: null },
   /* SELF-GATING: reads and writes only the caller's own email signature. */
   { prefix: "/api/admin/signature", domain: null },
+  /* The money, which an accountant holds through `finance`. Owner and developer hold
+     every domain, and nobody else holds `marketing`, so these narrow nobody. Reading a
+     deal is the accountant's; deciding one stays marketing's, hence `readOnly`. */
+  { prefix: "/api/admin/marketing/counts", domain: "finance", readOnly: true },
+  { prefix: "/api/admin/marketing/deals", domain: "finance", readOnly: true },
+  { prefix: "/api/admin/marketing/pay-runs", domain: "finance" },
+  { prefix: "/api/admin/marketing/issues", domain: "finance" },
+  { prefix: "/api/admin/marketing/marketers/export", domain: "finance" },
   { prefix: "/api/admin/marketing", domain: "marketing", subtree: true },
+  { prefix: "/api/admin/accounts", domain: "finance" },
+  { prefix: "/api/admin/analytics/transactions", domain: "finance", readOnly: true },
+  { prefix: "/api/admin/analytics/overview", domain: "finance", readOnly: true },
   { prefix: "/api/admin/users", domain: "team" },
   { prefix: "/api/admin/invites", domain: "team" },
   /* Somebody outside AV Homes asking to list property. `team`, because approving
@@ -207,12 +222,13 @@ const RULES: readonly Rule[] = [
   { prefix: "/api/admin/analytics", domain: "analytics" },
   /* What is in a community fund and who won a prize are money figures, so they
      sit with the rest of the money rather than with the counters. */
-  { prefix: "/api/admin/funds", domain: "marketing" },
+  { prefix: "/api/admin/funds", domain: "finance" },
+  { prefix: "/api/admin/awards", domain: "finance", readOnly: true },
   { prefix: "/api/admin/awards", domain: "marketing" },
   { prefix: "/api/admin/", domain: "danger" },
 ];
 
-export function domainFor(path: string): Domain | null {
+export function domainFor(path: string, method = "GET"): Domain | null {
   for (const rule of RULES) {
     /*
      * A DOMAIN rule is a prefix, which is what lets one entry cover a whole
@@ -239,6 +255,7 @@ export function domainFor(path: string): Domain | null {
       rule.domain === null
         ? path === rule.prefix || (rule.subtree === true && path.startsWith(`${rule.prefix}/`))
         : path.startsWith(rule.prefix);
+    if (matched && rule.readOnly && !READ_METHODS.has(method)) continue;
     if (matched) return rule.domain;
   }
   return null;
@@ -256,7 +273,7 @@ export function rolePermissions(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const user = c.get("user");
     if (user) {
-      const domain = domainFor(c.req.path);
+      const domain = domainFor(c.req.path, c.req.method);
       if (domain && !hasDomain(user.role, domain)) {
         throw new ForbiddenError(`role ${user.role} does not hold the ${domain} domain`);
       }
@@ -297,6 +314,17 @@ export function requireAdmin(): MiddlewareHandler<AppEnv> {
     const user = currentUser(c);
     if (!isAdminRole(user.role)) {
       throw new ForbiddenError(`role ${user.role} is not owner or developer`);
+    }
+    await next();
+  };
+}
+
+/** Money leaving: owner, developer, or the accountant whose job it is. */
+export function requireTreasurer(): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    const user = currentUser(c);
+    if (!isAdminRole(user.role) && user.role !== "accountant") {
+      throw new ForbiddenError(`role ${user.role} may not move money`);
     }
     await next();
   };

@@ -10,6 +10,7 @@ import {
   GlyphMenu,
   IconAccount,
   IconAlerts,
+  IconChart,
   IconDeals,
   IconHandshake,
   IconHelp,
@@ -17,6 +18,8 @@ import {
   IconListings,
   IconMoney,
   IconTeam,
+  IconTrophy,
+  IconUpdates,
   OrbMark,
   type IconProps,
 } from "./icons3d";
@@ -44,8 +47,7 @@ interface MenuEntry {
   count?: boolean;
 }
 
-/* Three rows of three. Buyers filled the gap in row 2, which is why the middle
-   row no longer sits inset: every row now has a raised middle tile. */
+/* Four rows of three, each with a raised middle tile. */
 const MENU: readonly MenuEntry[] = [
   { href: "/m/deals", label: "Deals", Icon: IconDeals, column: "1 / span 2", row: 1 },
   { href: "/m/team", label: "Network", Icon: IconTeam, column: "3 / span 2", row: 1, up: true },
@@ -53,10 +55,15 @@ const MENU: readonly MenuEntry[] = [
   { href: "/m/buyers", label: "Buyers", Icon: IconHandshake, column: "1 / span 2", row: 2 },
   { href: "/m/invite", label: "Invite", Icon: IconInvite, column: "3 / span 2", row: 2, up: true },
   { href: "/m/listings", label: "Listings", Icon: IconListings, column: "5 / span 2", row: 2 },
-  { href: "/m/alerts", label: "Alerts", Icon: IconAlerts, column: "1 / span 2", row: 3, count: true },
-  { href: "/m/help", label: "Help", Icon: IconHelp, column: "3 / span 2", row: 3, up: true },
-  { href: "/m/profile", label: "Account", Icon: IconAccount, column: "5 / span 2", row: 3 },
+  { href: "/m/leaderboard", label: "Leaderboard", Icon: IconTrophy, column: "1 / span 2", row: 3 },
+  { href: "/m/analytics", label: "My numbers", Icon: IconChart, column: "3 / span 2", row: 3, up: true },
+  { href: "/m/tools", label: "Tools", Icon: IconUpdates, column: "5 / span 2", row: 3 },
+  { href: "/m/alerts", label: "Alerts", Icon: IconAlerts, column: "1 / span 2", row: 4, count: true },
+  { href: "/m/help", label: "Help", Icon: IconHelp, column: "3 / span 2", row: 4, up: true },
+  { href: "/m/profile", label: "Account", Icon: IconAccount, column: "5 / span 2", row: 4 },
 ];
+
+const LAST_ROW = Math.max(...MENU.map((entry) => entry.row));
 
 function countText(count: number): string {
   return count > 9 ? "9+" : String(count);
@@ -216,7 +223,7 @@ function MenuSheet({
                 <li
                   key={entry.href}
                   className={`m-menu__cell ${entry.up ? "m-menu__cell--up" : ""} ${
-                    entry.row === 3 ? "m-menu__cell--last" : ""
+                    entry.row === LAST_ROW ? "m-menu__cell--last" : ""
                   }`}
                   style={{ gridColumn: entry.column, gridRow: entry.row }}
                 >
