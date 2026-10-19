@@ -17,6 +17,7 @@ import {
   IconListings,
   IconMoney,
   IconTeam,
+  IconUpdates,
   OrbMark,
   type IconProps,
 } from "./icons3d";
@@ -44,8 +45,8 @@ interface MenuEntry {
   count?: boolean;
 }
 
-/* Three rows of three. Buyers filled the gap in row 2, which is why the middle
-   row no longer sits inset: every row now has a raised middle tile. */
+/* Three rows of three, and Tools alone in the middle of a fourth. Buyers filled
+   the gap in row 2, which is why every full row has a raised middle tile. */
 const MENU: readonly MenuEntry[] = [
   { href: "/m/deals", label: "Deals", Icon: IconDeals, column: "1 / span 2", row: 1 },
   { href: "/m/team", label: "Network", Icon: IconTeam, column: "3 / span 2", row: 1, up: true },
@@ -56,7 +57,10 @@ const MENU: readonly MenuEntry[] = [
   { href: "/m/alerts", label: "Alerts", Icon: IconAlerts, column: "1 / span 2", row: 3, count: true },
   { href: "/m/help", label: "Help", Icon: IconHelp, column: "3 / span 2", row: 3, up: true },
   { href: "/m/profile", label: "Account", Icon: IconAccount, column: "5 / span 2", row: 3 },
+  { href: "/m/tools", label: "Tools", Icon: IconUpdates, column: "3 / span 2", row: 4 },
 ];
+
+const LAST_ROW = Math.max(...MENU.map((entry) => entry.row));
 
 function countText(count: number): string {
   return count > 9 ? "9+" : String(count);
@@ -216,7 +220,7 @@ function MenuSheet({
                 <li
                   key={entry.href}
                   className={`m-menu__cell ${entry.up ? "m-menu__cell--up" : ""} ${
-                    entry.row === 3 ? "m-menu__cell--last" : ""
+                    entry.row === LAST_ROW ? "m-menu__cell--last" : ""
                   }`}
                   style={{ gridColumn: entry.column, gridRow: entry.row }}
                 >

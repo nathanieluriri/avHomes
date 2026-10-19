@@ -308,7 +308,7 @@ const BTN_SIZE = {
 
 export type ButtonSize = keyof typeof BTN_SIZE;
 
-function buttonClass(variant: ButtonVariant, size: ButtonSize, full: boolean, extra: string) {
+export function buttonClass(variant: ButtonVariant, size: ButtonSize, full: boolean, extra: string) {
   return `m-btn ${VARIANT[variant]} ${BTN_SIZE[size]} ${full ? "w-full" : ""} ${extra}`;
 }
 
