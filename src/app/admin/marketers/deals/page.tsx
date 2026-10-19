@@ -9,7 +9,7 @@ import {
   type DealStatus,
 } from "@avhomes/contracts";
 import { api } from "@/lib/admin/client";
-import { useAsync, useDebounced } from "@/lib/admin/hooks";
+import { useAsync, useDebounced, useHoldsDomain } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
 import { DEAL_TONE, type MarketingCounts } from "@/lib/admin/marketing";
 import { Badge, ButtonLink, EmptyState, ErrorNote, PageHeader } from "@/components/admin/ui";
@@ -43,6 +43,7 @@ interface DealPage {
 }
 
 export default function DealsPage() {
+  const decides = useHoldsDomain("marketing");
   const [tab, setTab] = useState<DealStatus>("pending");
   const [searchInput, setSearchInput] = useState("");
   const query = useDebounced(searchInput).trim();
@@ -181,16 +182,18 @@ export default function DealsPage() {
         title="Deals to check"
         subtitle="Sales and rentals a marketer says they closed. Nothing is owed until one is approved."
         actions={
-          <ButtonLink href="/admin/marketers/settings" variant="ghost">
-            <Percent className="mr-1.5 h-4 w-4" aria-hidden="true" />
-            Commission
-          </ButtonLink>
+          decides && (
+            <ButtonLink href="/admin/marketers/settings" variant="ghost">
+              <Percent className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Commission
+            </ButtonLink>
+          )
         }
       />
 
       {/* Above the queue: an approved deal whose house is still advertised is the
           one thing here costing a buyer a wasted call today. */}
-      <SoldStillListed />
+      {decides && <SoldStillListed />}
 
       {error && (
         <div className="mb-4">

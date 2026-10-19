@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { AuthUser } from "@avhomes/contracts";
+import { hasDomain, type AuthUser, type Domain } from "@avhomes/contracts";
 import { ApiError, api, readCache } from "./client";
 
 /* ═════════════════════════════════════════════════════════════ VIEWPORT ═══ */
@@ -228,6 +228,12 @@ export function useSession(): { session: SessionState; refresh: () => void } {
   }, [nonce]);
 
   return { session, refresh: useCallback(() => setNonce((n) => n + 1), []) };
+}
+
+/** Whether the signed-in member holds a domain. False until the session is known, so a write control never flashes in. */
+export function useHoldsDomain(domain: Domain): boolean {
+  const { session } = useSession();
+  return session.status === "signed-in" && hasDomain(session.user.role, domain);
 }
 
 /** Debounces a value, for a search box that would otherwise fetch per keystroke. */

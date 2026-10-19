@@ -15,11 +15,13 @@ import {
   DEFAULT_COMMISSION_MATRIX,
   DEFAULT_MARKETING_SETTINGS,
   DEFAULT_RATING_WEIGHTS,
+  MARKETER_EXPORT_FIELDS,
   OWNERSHIPS,
   normalizeLeaderboardSettings,
   type AccountProvider,
   type CommissionMatrix,
   type CommissionSplit,
+  type MarketerExportField,
   type MarketingSettings,
   type RatingWeights,
 } from "@avhomes/contracts";
@@ -155,8 +157,16 @@ export async function readMarketingSettings(db: Db): Promise<MarketingSettings> 
     accountProvider: provider(doc.accountProvider, d.accountProvider),
     whatsappGroupUrl: doc.whatsappGroupUrl?.trim() ?? d.whatsappGroupUrl,
     leaderboard: normalizeLeaderboardSettings(doc.leaderboard),
+    exportableFields: fields(doc.exportableFields, d.exportableFields),
+    exportFields: fields(doc.exportFields, d.exportFields),
     updatedAt: doc.updatedAt ?? 0,
   };
+}
+
+/** Known fields only, in the canonical column order, whatever order they were saved in. */
+function fields(value: unknown, fallback: MarketerExportField[]): MarketerExportField[] {
+  if (!Array.isArray(value)) return fallback;
+  return MARKETER_EXPORT_FIELDS.filter((field) => value.includes(field));
 }
 
 function provider(value: unknown, fallback: AccountProvider): AccountProvider {
@@ -215,6 +225,8 @@ const WRITABLE = [
   "accountProvider",
   "whatsappGroupUrl",
   "leaderboard",
+  "exportableFields",
+  "exportFields",
 ] as const;
 
 export async function writeMarketingSettings(

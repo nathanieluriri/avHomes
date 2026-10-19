@@ -31,6 +31,7 @@ export {
   rolePermissions,
   requireAuth,
   requireAdmin,
+  requireTreasurer,
   requireOwner,
   domainFor,
   sessionCookieName,

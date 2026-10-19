@@ -63,6 +63,7 @@ export const ID_PREFIXES = {
   whatsappClick: "wac",
   whatsappLinkChange: "wal",
   merchRequest: "mreq",
+  marketerMessage: "mmsg",
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

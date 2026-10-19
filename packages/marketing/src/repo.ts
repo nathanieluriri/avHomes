@@ -923,18 +923,6 @@ export async function previewSplit(
   );
 }
 
-/** The share list as a deal stores it, from a computed split. */
-function toShares(split: DealSplit): DealShare[] {
-  return split.people.map((line) => ({
-    marketerId: line.marketerId,
-    marketerName: line.marketerName,
-    code: line.code,
-    level: line.level,
-    rate: line.rate,
-    amountMinor: line.amountMinor,
-  }));
-}
-
 export interface ReviewInput {
   status: Extract<DealStatus, "approved" | "rejected" | "info">;
   reason: string;

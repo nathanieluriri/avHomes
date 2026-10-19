@@ -13,7 +13,7 @@ import {
   str,
   type AppEnv,
 } from "@avhomes/core";
-import { requireAdmin, requireAuth } from "@avhomes/identity";
+import { requireAuth, requireTreasurer } from "@avhomes/identity";
 import { FUND_KINDS, type FundKind } from "@avhomes/contracts";
 import {
   disburse,
@@ -30,10 +30,10 @@ import {
 /**
  * The two funds' console routes.
  *
- * Reads are `marketing` domain, because what is in a community fund is a money
+ * Reads are `finance` domain, because what is in a community fund is a money
  * figure and the domain gate already decides who reads those. Writes are
- * `requireAdmin` on top of that: spending a fund and deciding a prize are owner
- * or developer decisions however the domain matrix later evolves.
+ * `requireTreasurer` on top of that: spending a fund is an owner, developer or
+ * accountant job however the domain matrix later evolves.
  *
  * Proposing and settling an award are NOT here. They need the league table,
  * which spans marketing and listings, so they live in `packages/api` beside the
@@ -122,7 +122,7 @@ export function fundsRoutes(deps: { names: FundNamesPort }): Hono<AppEnv> {
    * normally leaves through an award, but a prize paid in kind, or a cost the
    * pool covers, still needs a line with a name and a date on it.
    */
-  routes.post("/admin/funds/:fund/payments", requireAuth(), requireAdmin(), async (c) => {
+  routes.post("/admin/funds/:fund/payments", requireAuth(), requireTreasurer(), async (c) => {
     const db = await currentDb(c);
     const fund = fundParam(pathParam(c, "fund"));
     const body = await readJson(c, PaymentBody);
@@ -144,7 +144,7 @@ export function fundsRoutes(deps: { names: FundNamesPort }): Hono<AppEnv> {
     return c.json({ entry }, 201);
   });
 
-  routes.post("/admin/funds/:fund/payments/:id/void", requireAuth(), requireAdmin(), async (c) => {
+  routes.post("/admin/funds/:fund/payments/:id/void", requireAuth(), requireTreasurer(), async (c) => {
     const db = await currentDb(c);
     const fund = fundParam(pathParam(c, "fund"));
     const id = pathParam(c, "id");

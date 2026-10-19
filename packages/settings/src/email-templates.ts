@@ -395,6 +395,7 @@ function sampleVars(origin: string): EmailVars {
       dealLink: `${origin}/m/deals/sample`,
       headline: "Your payment was verified",
       link: `${origin}/m/purchases`,
+      senderName: "Tolu Ade",
     },
     html: {
       conversation: conversationHtml(lines),

@@ -25,6 +25,7 @@ export const EMAIL_TEMPLATE_KEYS = [
   "plan-payment-verified",
   "purchase-update",
   "purchase-owner",
+  "property-partner-message",
 ] as const;
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
 
@@ -403,6 +404,28 @@ export const EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateInfo> = {
       "Thank you for buying with AV Homes. The team will be in touch about the documents and handover.",
       "",
       "Your purchase: {{link}}",
+    ].join("\n"),
+  },
+  "property-partner-message": {
+    label: "A private message to a partner",
+    group: "Property partners",
+    when: "Sent when an admin writes to one partner from that partner's page.",
+    variables: [
+      { name: "name", description: "The partner's first name" },
+      { name: "subject", description: "The subject the admin wrote" },
+      { name: "message", description: "What the admin wrote" },
+      { name: "senderName", description: "The admin who wrote it" },
+    ],
+    defaultSubject: "{{subject}}",
+    defaultBody: [
+      "Hello {{name}},",
+      "",
+      "{{message}}",
+      "",
+      "{{senderName}}",
+      "AV Homes",
+      "",
+      "Reply to this email if you have any questions.",
     ].join("\n"),
   },
 };
