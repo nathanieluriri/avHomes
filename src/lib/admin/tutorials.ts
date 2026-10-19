@@ -49,10 +49,11 @@ function entry(
   requires: readonly Domain[],
   desktopOnly: boolean,
 ): Tutorial {
-  const rail = NAV_ITEMS.find((row) => row.href === tryHref);
-  if (!rail) throw new Error(`tutorials: no rail row for ${tryHref}`);
-  if (rail.domain !== null && !requires.includes(rail.domain)) {
-    throw new Error(`tutorials: ${id} must require ${rail.domain}, the domain of ${tryHref}`);
+  // The accountant's Accounts section repeats some money rows under its own domain.
+  const rails = NAV_ITEMS.filter((row) => row.href === tryHref);
+  if (rails.length === 0) throw new Error(`tutorials: no rail row for ${tryHref}`);
+  if (!rails.some((rail) => rail.domain === null || requires.includes(rail.domain))) {
+    throw new Error(`tutorials: ${id} must require ${rails[0]!.domain}, the domain of ${tryHref}`);
   }
   // Both tables are partial: an id may be in the allowlist before its video is rendered.
   const media = TUTORIAL_MEDIA[id];

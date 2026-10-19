@@ -207,7 +207,7 @@ export const NAV: readonly NavItem[] = [
     /* The accountant's whole console. Owner and developer reach these screens
        through Analytics and Marketers already, so the children are drawn for the
        accountant only, rather than listing every money screen twice. */
-    href: "/admin/accounts",
+    href: null,
     label: "Accounts",
     hint: "The balance sheet and whether every payout has its proof",
     icon: Landmark,
@@ -567,7 +567,7 @@ export function locate(rows: readonly NavItem[], pathname: string): RailPosition
  * the matrix does. Better a wrong screen than a link with no href.
  */
 export function homeFor(role: Role): string {
-  if (role === "accountant") return "/admin/accounts";
+  if (role === "accountant") return "/admin/analytics/transactions";
   // A partner's front door is their own listings, not Alerts, which is the first row left once the dashboard is gone.
   if (isScopedRole(role)) return "/admin/properties";
   return NAV_ITEMS.find((item) => canSeeNavItem(role, item))?.href ?? "/admin";
