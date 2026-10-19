@@ -37,6 +37,7 @@ const ENTITY_NOUN: Record<AuditEntity, string> = {
   award: "prize",
   application: "partner application",
   partner: "partner company",
+  accounts: "balance sheet",
   unknown: "record",
 };
 
@@ -64,6 +65,7 @@ export const ENTITY_FILTER_LABEL: Record<AuditEntity, string> = {
   award: "Prizes",
   application: "Partner applications",
   partner: "Partner companies",
+  accounts: "Balance sheet",
   unknown: "Other",
 };
 
@@ -90,6 +92,10 @@ const OP_PREDICATES: Record<string, (target: string) => string> = {
   role: (t) => `changed ${t}'s role`,
   "transfer-ownership": (t) => `made ${t} the owner`,
   reply: (t) => `replied to ${t}`,
+  message: (t) => `emailed ${t}`,
+  payments: (t) => `logged a payment on ${t}`,
+  verify: (t) => `verified a payment on ${t}`,
+  reject: (t) => `refused a payment on ${t}`,
 };
 
 /** Splits `someOp` into `some op`, for an operation this file has no name for. */
@@ -144,6 +150,10 @@ function predicateFor(entity: AuditEntity, action: string, entityId: string | nu
     if (entity === "property" || entity === "post") return `moved ${target} to the trash`;
     if (entity === "invite") return `revoked ${target}`;
     return `deleted ${target}`;
+  }
+  if (action === "op:export") {
+    if (entity === "marketer") return "exported the partners list";
+    if (entity === "accounts") return "downloaded the balance sheet";
   }
   if (action.startsWith("op:")) {
     const op = action.slice(3);

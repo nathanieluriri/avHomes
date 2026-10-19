@@ -116,4 +116,14 @@ export {
   type PaymentInput,
   type Verified,
 } from "./plans";
-export { toCsv as sheetCsv, workbook, type Sheet, type SheetCell, type SheetColumn } from "./spreadsheet";
+export {
+  toCsv as sheetCsv,
+  workbook,
+  type Sheet,
+  type SheetCell,
+  type SheetColumn,
+  type SheetLink,
+  type StatementLine,
+  type StatementSheet,
+  type TableSheet,
+} from "./spreadsheet";
