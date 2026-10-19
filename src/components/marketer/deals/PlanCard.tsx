@@ -12,7 +12,7 @@ import {
 } from "@avhomes/contracts";
 import { NairaInput } from "./NairaInput";
 import { ProofPicker, useProofUploads } from "./ProofPicker";
-import { Field, Note, PrimaryButton, ErrorNote, inputCls } from "@/components/marketer/ui";
+import { Button, Field, Note, PrimaryButton, ErrorNote, inputCls } from "@/components/marketer/ui";
 import { ApiError, api } from "@/lib/admin/client";
 import { shortDate, fullDate } from "@/lib/admin/format";
 import { maskMoney, useMoneyHidden } from "@/lib/marketer/prefs";
@@ -37,6 +37,7 @@ export function PlanCard({
   const [busy, setBusy] = useState(false);
   const [tried, setTried] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [logging, setLogging] = useState(false);
 
   if (!deal.plan) return null;
   const money = (minor: number) => {
@@ -70,10 +71,22 @@ export function PlanCard({
   return (
     <div className="m-card space-y-4 p-4">
       <div>
-        <p className="text-[13px] font-semibold text-m-muted">{PLAN_STATE_LABEL[standing.state]}</p>
+        <p
+          className={`text-[13px] font-semibold ${
+            standing.state === "overdue" ? "text-(color:--m-bad-fg)" : standing.state === "due-soon" ? "text-(color:--m-warn-fg)" : "text-m-muted"
+          }`}
+        >
+          {PLAN_STATE_LABEL[standing.state]}
+        </p>
         <p className="mt-1 text-[15px] font-semibold text-m-text">
           {money(standing.verifiedMinor)} paid of {money(deal.amountMinor)}
         </p>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-m-raised ring-1 ring-m-line" aria-hidden>
+          <div
+            className="h-full rounded-full bg-(color:--m-good-fg)"
+            style={{ width: `${Math.min(100, (standing.verifiedMinor / deal.amountMinor) * 100)}%` }}
+          />
+        </div>
         {standing.next && standing.next.dueOn > 0 && (
           <p className="mt-1 text-[13px] text-m-muted">
             Next: {money(standing.nextLeftMinor)} due {fullDate(standing.next.dueOn)}
@@ -101,13 +114,30 @@ export function PlanCard({
               <span className="text-m-text">
                 {money(p.amountMinor)} <span className="text-m-muted">· {shortDate(p.paidOn)}</span>
               </span>
-              <span className="text-m-muted">{PAYMENT_STATUS_LABEL[p.status]}</span>
+              <span
+                className={
+                  p.status === "verified"
+                    ? "text-(color:--m-good-fg)"
+                    : p.status === "rejected"
+                      ? "text-(color:--m-bad-fg)"
+                      : "text-(color:--m-warn-fg)"
+                }
+              >
+                {PAYMENT_STATUS_LABEL[p.status]}
+              </span>
             </li>
           ))}
         </ul>
       )}
 
-      {canLog && deal.status === "approved" && room > 0 && (
+      {canLog && deal.status === "approved" && room > 0 && !logging && (
+        <PrimaryButton onClick={() => setLogging(true)}>
+          <Send className="h-5 w-5" aria-hidden />
+          Log a payment
+        </PrimaryButton>
+      )}
+
+      {canLog && deal.status === "approved" && room > 0 && logging && (
         <div className="space-y-4 border-t border-m-line pt-4">
           <p className="text-[14px] font-semibold text-m-text">Log a payment</p>
           <Field label="Amount paid" as="group" error={tried && amountMinor < 1 ? "Put in the amount paid." : undefined}>
@@ -128,6 +158,9 @@ export function PlanCard({
             {!busy && <Send className="h-5 w-5" aria-hidden />}
             {busy ? "Sending" : "Send payment"}
           </PrimaryButton>
+          <Button variant="secondary" size="lg" full onClick={() => setLogging(false)} disabled={busy}>
+            Cancel
+          </Button>
         </div>
       )}
     </div>

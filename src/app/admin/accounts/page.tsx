@@ -1,61 +1,90 @@
 "use client";
 
-import { useState } from "react";
-import { Download, Landmark } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Download, FileSpreadsheet, Landmark } from "lucide-react";
 import {
   PAYOUT_FLAG_LABELS,
   formatMoney,
   fundMonthLabel,
   fundMonthOf,
-  plainMajor,
   type AccountsMonth,
   type AccountsReport,
+  type PayoutRecord,
 } from "@avhomes/contracts";
-import { api } from "@/lib/admin/client";
+import { ApiError, api } from "@/lib/admin/client";
 import { useAsync } from "@/lib/admin/hooks";
 import { shortDate } from "@/lib/admin/format";
-import { downloadCsv, toCsv } from "@/lib/admin/marketing";
 import { StatRow, StatTile } from "@/components/admin/StatTile";
 import {
   Badge,
   Button,
   Card,
   CardHead,
-  DRow,
-  DefinitionList,
   EmptyState,
   ErrorNote,
-  Field,
+  PageColumns,
   PageHeader,
   Skeleton,
   inputClass,
 } from "@/components/admin/ui";
 
-const COLUMNS: { key: Exclude<keyof AccountsMonth, "month">; label: string; money: boolean }[] = [
-  { key: "deals", label: "Deals", money: false },
-  { key: "salesMinor", label: "Sales", money: true },
-  { key: "commissionMinor", label: "Commission owed", money: true },
-  { key: "paidOutMinor", label: "Commission paid", money: true },
-  { key: "clawbackMinor", label: "Clawed back", money: true },
-  { key: "fundsMinor", label: "To the funds", money: true },
-  { key: "fundInMinor", label: "Fund inflows", money: true },
-  { key: "fundOutMinor", label: "Fund payments", money: true },
-  { key: "keptMinor", label: "AV Homes kept", money: true },
+type Preset = "12m" | "year" | "quarter" | "custom";
+
+function monthsBack(n: number): string {
+  const now = new Date();
+  return fundMonthOf(new Date(now.getFullYear(), now.getMonth() - n, 1).getTime());
+}
+
+function presetRange(preset: Exclude<Preset, "custom">): { from: string; to: string } {
+  const to = fundMonthOf(Date.now());
+  if (preset === "year") return { from: `${new Date().getFullYear()}-01`, to };
+  if (preset === "quarter") return { from: monthsBack(2), to };
+  return { from: monthsBack(11), to };
+}
+
+const PRESETS: { value: Exclude<Preset, "custom">; label: string }[] = [
+  { value: "12m", label: "Last 12 months" },
+  { value: "year", label: "This year" },
+  { value: "quarter", label: "Last 3 months" },
 ];
 
-function defaultFrom(): string {
-  const now = new Date();
-  return fundMonthOf(new Date(now.getFullYear(), now.getMonth() - 11, 1).getTime());
+function hasActivity(m: AccountsMonth): boolean {
+  return (
+    m.deals > 0 ||
+    m.paidOutMinor > 0 ||
+    m.clawbackMinor > 0 ||
+    m.fundInMinor > 0 ||
+    m.fundOutMinor > 0
+  );
+}
+
+async function download(path: string): Promise<void> {
+  const res = await fetch(`/api${path}`, { credentials: "same-origin" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: "upstream_failed" }));
+    throw new ApiError(res.status, body);
+  }
+  const name = /filename="([^"]+)"/u.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "balance-sheet";
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export default function AccountsPage() {
-  const [from, setFrom] = useState(defaultFrom);
-  const [to, setTo] = useState(() => fundMonthOf(Date.now()));
+  const [preset, setPreset] = useState<Preset>("12m");
+  const [range, setRange] = useState(() => presetRange("12m"));
+  const [showEmpty, setShowEmpty] = useState(false);
   const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const [exporting, setExporting] = useState<null | "xlsx" | "csv">(null);
+  const [exportError, setExportError] = useState<ApiError | null>(null);
 
+  const query = `from=${range.from}&to=${range.to}`;
   const state = useAsync(
-    (signal) => api.get<AccountsReport>(`/admin/accounts?from=${from}&to=${to}`, signal),
-    [from, to],
+    (signal) => api.get<AccountsReport>(`/admin/accounts?${query}`, signal),
+    [query],
     { keepPrevious: true },
   );
   const data = state.data;
@@ -63,47 +92,97 @@ export default function AccountsPage() {
   const money = (minor: number) => formatMoney(minor, currency);
   const scope = data ? `${fundMonthLabel(data.from, "short")} to ${fundMonthLabel(data.to, "short")}` : "";
 
-  function exportCsv() {
-    if (!data) return;
-    const plain = (minor: number) => plainMajor(minor, currency);
-    const head = ["Month", ...COLUMNS.map((c) => c.label)];
-    const rows = data.months.map((m) => [m.month, ...COLUMNS.map((c) => (c.money ? plain(m[c.key]) : String(m[c.key])))]);
-    const total = ["Total", ...COLUMNS.map((c) => (c.money ? plain(data.totals[c.key]) : String(data.totals[c.key])))];
-    const position = [
-      [],
-      ["Position today"],
-      ["Commission owed", plain(data.position.commissionOwedMinor)],
-      ["Of which on a pay run", plain(data.position.commissionScheduledMinor)],
-      ...data.position.funds.map((f) => [`${f.name} balance`, plain(f.balanceMinor)]),
-      ["Deals still being checked", plain(data.position.pendingDealsMinor)],
-    ];
-    downloadCsv(`av-balance-sheet-${data.from}-to-${data.to}.csv`, toCsv([head, ...rows, total, ...position]));
+  async function exportAs(format: "xlsx" | "csv") {
+    setExporting(format);
+    setExportError(null);
+    try {
+      await download(`/admin/accounts/export?${query}&format=${format}`);
+    } catch (err) {
+      setExportError(err instanceof ApiError ? err : new ApiError(0, { error: "upstream_failed", detail: String(err) }));
+    } finally {
+      setExporting(null);
+    }
   }
 
+  const months = data ? data.months.filter((m) => showEmpty || hasActivity(m)).reverse() : [];
+  const hidden = data ? data.months.length - data.months.filter(hasActivity).length : 0;
   const payouts = (data?.payouts ?? []).filter((p) => !flaggedOnly || p.flags.length > 0);
+  const flagged = (data?.payouts ?? []).filter((p) => p.flags.length > 0).length;
 
   return (
     <>
       <PageHeader
         icon={Landmark}
-        title="Accounts"
+        title="Balance sheet"
         subtitle="Money in, what is owed and paid, both funds, and whether every payout has its proof."
         actions={
-          <Button variant="ghost" onClick={exportCsv} disabled={!data}>
-            <Download className="mr-1.5 h-4 w-4" aria-hidden="true" />
-            Export CSV
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => void exportAs("xlsx")} disabled={!data || exporting !== null}>
+              <FileSpreadsheet className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              {exporting === "xlsx" ? "Preparing" : "Excel"}
+            </Button>
+            <Button variant="ghost" onClick={() => void exportAs("csv")} disabled={!data || exporting !== null}>
+              <Download className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              {exporting === "csv" ? "Preparing" : "CSV"}
+            </Button>
+          </div>
         }
       />
 
+      {exportError && (
+        <div className="mb-4">
+          <ErrorNote error={exportError} />
+        </div>
+      )}
+
       <Card className="mb-4">
-        <div className="flex flex-wrap gap-3">
-          <Field label="From">
-            <input type="month" className={inputClass} value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} />
-          </Field>
-          <Field label="To">
-            <input type="month" className={inputClass} value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} />
-          </Field>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Period">
+            {PRESETS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => {
+                  setPreset(p.value);
+                  setRange(presetRange(p.value));
+                }}
+                className={`rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                  preset === p.value
+                    ? "border-wine-700 bg-wine-700 text-white"
+                    : "border-mist-200 text-plum-950 hover:bg-mist-50"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+            <input
+              type="month"
+              aria-label="From"
+              className={`${inputClass} min-w-0 flex-1 sm:w-40 sm:flex-none`}
+              value={range.from}
+              max={range.to}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setPreset("custom");
+                setRange((r) => ({ ...r, from: e.target.value }));
+              }}
+            />
+            <span className="text-[12px] text-slate-600">to</span>
+            <input
+              type="month"
+              aria-label="To"
+              className={`${inputClass} min-w-0 flex-1 sm:w-40 sm:flex-none`}
+              value={range.to}
+              min={range.from}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setPreset("custom");
+                setRange((r) => ({ ...r, to: e.target.value }));
+              }}
+            />
+          </div>
         </div>
       </Card>
 
@@ -126,127 +205,260 @@ export default function AccountsPage() {
         <StatTile label="AV Homes kept" value={data ? money(data.totals.keptMinor) : "-"} scope={scope} tone="quiet" />
       </StatRow>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-        <Card>
-          <CardHead title="By month" />
-          {!data ? (
-            <Skeleton className="h-48" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[56rem] text-[12.5px]">
-                <thead>
-                  <tr className="border-b border-mist-200 text-left text-slate-600">
-                    <th className="py-2 pr-3 font-semibold">Month</th>
-                    {COLUMNS.map((c) => (
-                      <th key={c.key} className="py-2 pr-3 text-right font-semibold">
-                        {c.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.months.map((m) => (
-                    <tr key={m.month} className="border-b border-mist-100">
-                      <td className="py-1.5 pr-3 text-plum-950">{fundMonthLabel(m.month, "short")}</td>
-                      {COLUMNS.map((c) => (
-                        <td key={c.key} className="c-num py-1.5 pr-3 text-right">
-                          {c.money ? money(m[c.key]) : m[c.key]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr className="font-semibold text-plum-950">
-                    <td className="py-2 pr-3">Total</td>
-                    {COLUMNS.map((c) => (
-                      <td key={c.key} className="c-num py-2 pr-3 text-right">
-                        {c.money ? money(data.totals[c.key]) : data.totals[c.key]}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+      <PageColumns
+        aside={
+          <Card>
+            <CardHead title="Where things stand today" />
+            {!data ? (
+              <Skeleton className="h-40" />
+            ) : (
+              <dl className="divide-y divide-mist-100">
+                <Line label="Commission owed" value={money(data.position.commissionOwedMinor)} strong />
+                <Line label="Of which on a pay run" value={money(data.position.commissionScheduledMinor)} />
+                {data.position.funds.map((f) => (
+                  <Line key={f.fund} label={f.name} value={money(f.balanceMinor)} />
+                ))}
+                <Line label="Deals still being checked" value={money(data.position.pendingDealsMinor)} />
+                <Line
+                  label="Ledger check"
+                  value={
+                    data.check.ok ? <Badge tone="green">Balanced</Badge> : <Badge tone="red">Problems</Badge>
+                  }
+                />
+              </dl>
+            )}
+          </Card>
+        }
+      >
+        <div className="space-y-4">
+          <Card>
+            <CardHead title="Statement" />
+            {!data ? (
+              <Skeleton className="h-64" />
+            ) : (
+              <div className="space-y-4">
+                <Section title="Money in">
+                  <Line label={`Sales and rentals (${data.totals.deals} ${data.totals.deals === 1 ? "deal" : "deals"})`} value={money(data.totals.salesMinor)} />
+                </Section>
+                <Section title="Commission">
+                  <Line label="Owed on deals closed" value={money(data.totals.commissionMinor)} />
+                  <Line label="Paid out" value={money(data.totals.paidOutMinor)} />
+                  <Line label="Clawed back" value={money(data.totals.clawbackMinor)} />
+                </Section>
+                <Section title="The two funds">
+                  <Line label="Share of deals" value={money(data.totals.fundsMinor)} />
+                  <Line label="Inflows" value={money(data.totals.fundInMinor)} />
+                  <Line label="Payments out" value={money(data.totals.fundOutMinor)} />
+                </Section>
+                <div className="flex items-baseline justify-between gap-3 border-t-2 border-plum-950 pt-3">
+                  <span className="text-[13px] font-semibold text-plum-950">AV Homes kept</span>
+                  <span className="c-num text-[16px] font-semibold text-plum-950">{money(data.totals.keptMinor)}</span>
+                </div>
+              </div>
+            )}
+          </Card>
 
-        <Card>
-          <CardHead title="Where things stand today" />
-          {!data ? (
-            <Skeleton className="h-40" />
-          ) : (
-            <DefinitionList>
-              <DRow label="Commission owed">{money(data.position.commissionOwedMinor)}</DRow>
-              <DRow label="Of which on a pay run">{money(data.position.commissionScheduledMinor)}</DRow>
-              {data.position.funds.map((f) => (
-                <DRow key={f.fund} label={f.name}>
-                  {money(f.balanceMinor)}
-                </DRow>
-              ))}
-              <DRow label="Deals still being checked">{money(data.position.pendingDealsMinor)}</DRow>
-            </DefinitionList>
-          )}
-        </Card>
-      </div>
+        </div>
+      </PageColumns>
+
+    <Card className="mt-4">
+      <CardHead
+        title="By month"
+        action={
+          hidden > 0 ? (
+            <label className="flex items-center gap-2 text-[12px] text-slate-700">
+              <input type="checkbox" className="h-4 w-4 accent-wine-700" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} />
+              Show quiet months
+            </label>
+          ) : undefined
+        }
+      />
+      {!data ? (
+        <Skeleton className="h-48" />
+      ) : months.length === 0 ? (
+        <EmptyState bare title="Nothing moved in this period" hint="No deals, payouts or fund movements." />
+      ) : (
+        <>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:hidden">
+            {months.map((m) => (
+              <li key={m.month} className="rounded-xl border border-mist-200 p-3">
+                <div className="mb-2 flex items-baseline justify-between">
+                  <span className="text-[13px] font-semibold text-plum-950">{fundMonthLabel(m.month)}</span>
+                  <span className="text-[12px] text-slate-600">
+                    {m.deals} {m.deals === 1 ? "deal" : "deals"}
+                  </span>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
+                  <Mini label="Sales" value={money(m.salesMinor)} />
+                  <Mini label="Kept" value={money(m.keptMinor)} />
+                  <Mini label="Commission owed" value={money(m.commissionMinor)} />
+                  <Mini label="Commission paid" value={money(m.paidOutMinor)} />
+                  <Mini label="Fund inflows" value={money(m.fundInMinor)} />
+                  <Mini label="Fund payments" value={money(m.fundOutMinor)} />
+                  {m.clawbackMinor > 0 && <Mini label="Clawed back" value={money(m.clawbackMinor)} />}
+                </dl>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden lg:block">
+            <table className="w-full text-[13px]">
+              <colgroup>
+                <col className="w-[16%]" />
+                <col className="w-[8%]" />
+                <col />
+                <col />
+                <col />
+                <col />
+                <col />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-mist-200 text-[11.5px] uppercase tracking-wide text-slate-600">
+                  <th className="py-2 pr-2 text-left font-semibold">Month</th>
+                  <th className="py-2 pr-2 text-right font-semibold">Deals</th>
+                  <th className="py-2 pr-2 text-right font-semibold">Sales</th>
+                  <th className="py-2 pr-2 text-right font-semibold">Comm. owed</th>
+                  <th className="py-2 pr-2 text-right font-semibold">Comm. paid</th>
+                  <th className="py-2 pr-2 text-right font-semibold">Funds in / out</th>
+                  <th className="py-2 text-right font-semibold">Kept</th>
+                </tr>
+              </thead>
+              <tbody>
+                {months.map((m) => (
+                  <tr key={m.month} className="border-b border-mist-100">
+                    <td className="whitespace-nowrap py-2 pr-2 text-plum-950">{fundMonthLabel(m.month, "short")}</td>
+                    <td className="c-num py-2 pr-2 text-right">{m.deals}</td>
+                    <td className="c-num whitespace-nowrap py-2 pr-2 text-right">{money(m.salesMinor)}</td>
+                    <td className="c-num whitespace-nowrap py-2 pr-2 text-right">{money(m.commissionMinor)}</td>
+                    <td className="c-num whitespace-nowrap py-2 pr-2 text-right">{money(m.paidOutMinor)}</td>
+                    <td className="c-num py-2 pr-2 text-right">
+                      <span className="block whitespace-nowrap">{money(m.fundInMinor)}</span>
+                      {m.fundOutMinor > 0 && (
+                        <span className="block whitespace-nowrap text-slate-600">-{money(m.fundOutMinor)}</span>
+                      )}
+                    </td>
+                    <td className="c-num whitespace-nowrap py-2 text-right font-semibold text-plum-950">{money(m.keptMinor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-plum-950 font-semibold text-plum-950">
+                  <td className="py-2 pr-2">Total</td>
+                  <td className="c-num py-2 pr-2 text-right">{data.totals.deals}</td>
+                  <td className="c-num whitespace-nowrap py-2 pr-2 text-right">{money(data.totals.salesMinor)}</td>
+                  <td className="c-num whitespace-nowrap py-2 pr-2 text-right">{money(data.totals.commissionMinor)}</td>
+                  <td className="c-num whitespace-nowrap py-2 pr-2 text-right">{money(data.totals.paidOutMinor)}</td>
+                  <td className="c-num whitespace-nowrap py-2 pr-2 text-right">{money(data.totals.fundInMinor)}</td>
+                  <td className="c-num whitespace-nowrap py-2 text-right">{money(data.totals.keptMinor)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <p className="mt-3 text-[11.5px] text-slate-600">
+            Every column, clawbacks included, is in the Excel download.
+          </p>
+        </>
+      )}
+    </Card>
 
       <Card className="mt-4">
         <CardHead
-          title="Payouts"
+          title={`Payouts${data ? ` (${data.payouts.length})` : ""}`}
           action={
-            <label className="flex items-center gap-2 text-[12px] text-slate-700">
-              <input type="checkbox" checked={flaggedOnly} onChange={(e) => setFlaggedOnly(e.target.checked)} />
-              Only flagged
-            </label>
+            flagged > 0 ? (
+              <label className="flex items-center gap-2 text-[12px] text-slate-700">
+                <input type="checkbox" className="h-4 w-4 accent-wine-700" checked={flaggedOnly} onChange={(e) => setFlaggedOnly(e.target.checked)} />
+                Only flagged ({flagged})
+              </label>
+            ) : undefined
           }
         />
         {!data ? (
           <Skeleton className="h-32" />
         ) : payouts.length === 0 ? (
-          <EmptyState bare title="Nothing to show" hint="No pay run lines in this period match." />
+          <EmptyState bare title="No payouts in this period" hint="Pay run lines for these months show here." />
         ) : (
-          <ul className="space-y-2">
+          <ul className="divide-y divide-mist-100">
             {payouts.map((p) => (
-              <li key={`${p.runId}-${p.marketerId}`} className="rounded-xl border border-mist-200 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-plum-950">
-                    {p.displayName} <span className="font-normal text-slate-500">{p.code}</span>
-                  </span>
-                  <span className="c-num text-[13px] font-semibold">{money(p.totalMinor)}</span>
-                  <Badge tone={p.status === "paid" ? "green" : p.status === "held" ? "amber" : "neutral"}>
-                    {p.status === "paid" ? "Paid" : p.status === "held" ? "Held" : "Pending"}
-                  </Badge>
-                </div>
-                <p className="mt-1 text-[12px] text-slate-600">
-                  {fundMonthLabel(p.month)}
-                  {p.bankName ? ` · ${p.bankName} ${p.accountMasked}` : ""}
-                  {p.accountName ? ` · ${p.accountName}` : ""}
-                  {p.reference ? ` · Ref ${p.reference}` : ""}
-                  {p.paidAt !== null ? ` · Marked paid ${shortDate(p.paidAt)}${p.paidByName ? ` by ${p.paidByName}` : ""}` : ""}
-                </p>
-                {(p.proof.length > 0 || p.flags.length > 0) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {p.proof.map((url, i) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[12px] font-semibold text-wine-700 underline underline-offset-2"
-                      >
-                        Proof {i + 1}
-                      </a>
-                    ))}
-                    {p.flags.map((flag) => (
-                      <Badge key={flag} tone={flag === "disputed" || flag === "no-proof" ? "red" : "amber"}>
-                        {PAYOUT_FLAG_LABELS[flag]}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </li>
+              <PayoutRow key={`${p.runId}-${p.marketerId}`} payout={p} money={money} />
             ))}
           </ul>
         )}
       </Card>
     </>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">{title}</p>
+      <dl className="divide-y divide-mist-100">{children}</dl>
+    </section>
+  );
+}
+
+function Line({ label, value, strong = false }: { label: string; value: ReactNode; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-2">
+      <dt className="min-w-0 text-[13px] text-slate-700">{label}</dt>
+      <dd className={`c-num shrink-0 text-right text-[13px] ${strong ? "font-semibold text-plum-950" : "text-plum-950"}`}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-slate-600">{label}</dt>
+      <dd className="c-num truncate font-semibold text-plum-950">{value}</dd>
+    </div>
+  );
+}
+
+function PayoutRow({ payout: p, money }: { payout: PayoutRecord; money: (minor: number) => string }) {
+  return (
+    <li className="py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="min-w-0 flex-1 text-[13px] font-semibold text-plum-950">
+          <span className="block truncate">
+            {p.displayName} <span className="font-normal text-slate-500">{p.code}</span>
+          </span>
+        </span>
+        <span className="c-num text-[13px] font-semibold text-plum-950">{money(p.totalMinor)}</span>
+        <Badge tone={p.status === "paid" ? "green" : p.status === "held" ? "amber" : "neutral"}>
+          {p.status === "paid" ? "Paid" : p.status === "held" ? "Held" : "Pending"}
+        </Badge>
+      </div>
+      <p className="mt-1 text-[12px] leading-relaxed text-slate-600 [overflow-wrap:anywhere]">
+        {fundMonthLabel(p.month)}
+        {p.bankName ? ` · ${p.bankName} ${p.accountMasked}` : ""}
+        {p.accountName ? ` · ${p.accountName}` : ""}
+        {p.reference ? ` · Ref ${p.reference}` : ""}
+        {p.paidAt !== null ? ` · Marked paid ${shortDate(p.paidAt)}${p.paidByName ? ` by ${p.paidByName}` : ""}` : ""}
+      </p>
+      {(p.proof.length > 0 || p.flags.length > 0) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {p.proof.map((url, i) => (
+            <a
+              key={url}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[12px] font-semibold text-wine-700 underline underline-offset-2"
+            >
+              Receipt {i + 1}
+            </a>
+          ))}
+          {p.flags.map((flag) => (
+            <Badge key={flag} tone={flag === "disputed" || flag === "no-proof" ? "red" : "amber"}>
+              {PAYOUT_FLAG_LABELS[flag]}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </li>
   );
 }

@@ -158,36 +158,60 @@ function excelDate(ms: number): number {
 }
 
 /* Style indexes into cellXfs below. */
-const STYLE = { body: 0, header: 1, date: 2, money: 3, count: 4 } as const;
+const STYLE = { body: 0, header: 1, date: 2, money: 3, count: 4, totalText: 5, totalMoney: 6, totalCount: 7 } as const;
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="2"><numFmt numFmtId="164" formatCode="d mmm yyyy"/><numFmt numFmtId="165" formatCode="#,##0.00"/></numFmts>
-<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>
-<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF7A1F3D"/><bgColor indexed="64"/></patternFill></fill></fills>
-<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFD9D2DC"/></bottom><diagonal/></border></borders>
+<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF7A1F3D"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF4EEF2"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFD9D2DC"/></bottom><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF7A1F3D"/></top><bottom style="double"><color rgb="FF7A1F3D"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="5">
+<cellXfs count="8">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment vertical="center"/></xf>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment vertical="center"/></xf>
 <xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment horizontal="left" vertical="center"/></xf>
 <xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment vertical="center"/></xf>
 <xf numFmtId="1" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="2" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>
+<xf numFmtId="165" fontId="2" fillId="3" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>
+<xf numFmtId="1" fontId="2" fillId="3" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
 
-function cell(ref: string, value: SheetCell, kind: ExportCellKind): string {
-  if (value === null || value === "") return `<c r="${ref}" s="${STYLE.body}"/>`;
+function cell(ref: string, value: SheetCell, kind: ExportCellKind, total = false): string {
+  if (value === null || value === "") return `<c r="${ref}" s="${total ? STYLE.totalText : STYLE.body}"/>`;
   if (typeof value === "number") {
-    const style = kind === "date" ? STYLE.date : kind === "money" ? STYLE.money : kind === "count" ? STYLE.count : STYLE.body;
+    const style = total
+      ? kind === "money"
+        ? STYLE.totalMoney
+        : kind === "count"
+          ? STYLE.totalCount
+          : STYLE.totalText
+      : kind === "date"
+        ? STYLE.date
+        : kind === "money"
+          ? STYLE.money
+          : kind === "count"
+            ? STYLE.count
+            : STYLE.body;
     const number = kind === "date" ? excelDate(value) : value;
     return `<c r="${ref}" s="${style}"><v>${number}</v></c>`;
   }
-  return `<c r="${ref}" s="${STYLE.body}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
+  return `<c r="${ref}" s="${total ? STYLE.totalText : STYLE.body}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
 }
 
-export function xlsx(sheetName: string, columns: readonly SheetColumn[], rows: readonly SheetCell[][]): Buffer {
+export interface Sheet {
+  name: string;
+  columns: readonly SheetColumn[];
+  rows: readonly SheetCell[][];
+  /** A bold closing row, such as the totals under a statement. Left out of the filter. */
+  total?: readonly SheetCell[];
+}
+
+function sheetXml(sheet: Sheet): string {
+  const { columns, rows, total } = sheet;
   const last = columnName(Math.max(columns.length - 1, 0));
   const header = `<row r="1" ht="22" customHeight="1">${columns
     .map((col, i) => `<c r="${columnName(i)}1" s="${STYLE.header}" t="inlineStr"><is><t>${xml(col.label)}</t></is></c>`)
@@ -195,23 +219,39 @@ export function xlsx(sheetName: string, columns: readonly SheetColumn[], rows: r
   const body = rows
     .map((row, r) => `<row r="${r + 2}">${columns.map((col, i) => cell(`${columnName(i)}${r + 2}`, row[i] ?? null, col.kind)).join("")}</row>`)
     .join("");
-
-  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  const end = rows.length + 2;
+  const closing = total
+    ? `<row r="${end}" ht="20" customHeight="1">${columns.map((col, i) => cell(`${columnName(i)}${end}`, total[i] ?? null, col.kind, true)).join("")}</row>`
+    : "";
+  const lastRow = rows.length + (total ? 2 : 1);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<dimension ref="A1:${last}${rows.length + 1}"/>
+<dimension ref="A1:${last}${lastRow}"/>
 <sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>
 <sheetFormatPr defaultRowHeight="18"/>
 <cols>${columns.map((col, i) => `<col min="${i + 1}" max="${i + 1}" width="${col.width}" customWidth="1"/>`).join("")}</cols>
-<sheetData>${header}${body}</sheetData>
-<autoFilter ref="A1:${last}${rows.length + 1}"/>
+<sheetData>${header}${body}${closing}</sheetData>
+${rows.length > 0 ? `<autoFilter ref="A1:${last}${rows.length + 1}"/>` : ""}
 </worksheet>`;
+}
 
-  const name = xml(sheetName.slice(0, 31));
+/** A workbook of one or more styled sheets: coloured frozen header, column widths, number formats, autofilter. */
+export function workbook(sheets: readonly Sheet[]): Buffer {
+  const names = sheets.map((sheet) => xml(sheet.name.replace(/[\\/?*[\]:]/gu, " ").slice(0, 31)));
+  const filters = sheets
+    .map((sheet, i) =>
+      sheet.rows.length > 0
+        ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${names[i]!.replace(/'/gu, "''")}'!$A$1:$${columnName(Math.max(sheet.columns.length - 1, 0))}$${sheet.rows.length + 1}</definedName>`
+        : "",
+    )
+    .join("");
   return zip([
     {
       name: "[Content_Types].xml",
       data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets
+        .map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)
+        .join("")}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
     },
     {
       name: "_rels/.rels",
@@ -221,14 +261,22 @@ export function xlsx(sheetName: string, columns: readonly SheetColumn[], rows: r
     {
       name: "xl/workbook.xml",
       data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${name}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${name.replace(/'/gu, "''")}'!$A$1:$${last}$${rows.length + 1}</definedName></definedNames></workbook>`,
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets
+        .map((_, i) => `<sheet name="${names[i]}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+        .join("")}</sheets>${filters ? `<definedNames>${filters}</definedNames>` : ""}</workbook>`,
     },
     {
       name: "xl/_rels/workbook.xml.rels",
       data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets
+        .map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`)
+        .join("")}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     },
     { name: "xl/styles.xml", data: STYLES },
-    { name: "xl/worksheets/sheet1.xml", data: sheet },
+    ...sheets.map((sheet, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(sheet) })),
   ]);
+}
+
+export function xlsx(sheetName: string, columns: readonly SheetColumn[], rows: readonly SheetCell[][]): Buffer {
+  return workbook([{ name: sheetName, columns, rows }]);
 }

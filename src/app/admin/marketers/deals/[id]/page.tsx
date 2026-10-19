@@ -170,7 +170,13 @@ function DealScreen({ initial }: { initial: DealDetail }) {
    * rescaling those lines to a new amount lands on exactly the numbers the
    * approval will write. It is not a second opinion about who earns.
    */
-  const lines = settled
+  // On a plan the full-price shares are what goes out; `shares` is only what has been earned so far.
+  const onPlan = settled && deal.plan !== null && deal.planShares.length > 0;
+  const earnedSoFar = new Map(deal.shares.map((share) => [`${share.marketerId}:${share.level}`, share.amountMinor]));
+  const earnedTotal = deal.shares.reduce((sum, share) => sum + share.amountMinor, 0);
+  const lines = onPlan
+    ? deal.planShares
+    : settled
     ? shares
     : shares.map((share) => ({
         ...share,
@@ -317,6 +323,11 @@ function DealScreen({ initial }: { initial: DealDetail }) {
                   <span className="block truncate text-[12px] text-slate-600">
                     Level {line.level} · {line.rate}% · {line.code}
                   </span>
+                  {onPlan && (
+                    <span className="block truncate text-[12px] text-slate-600">
+                      {formatMoney(earnedSoFar.get(`${line.marketerId}:${line.level}`) ?? 0, deal.currency)} earned so far
+                    </span>
+                  )}
                 </span>
                 <span className="c-num shrink-0 text-[13px] font-semibold text-plum-950">
                   {formatMoney(line.amountMinor, deal.currency)}
@@ -331,7 +342,10 @@ function DealScreen({ initial }: { initial: DealDetail }) {
             <>
               {formatMoney(paidOut, deal.currency)} of{" "}
               {formatMoney(settled ? deal.amountMinor : amountMinor, deal.currency)} goes out in
-              commission.{" "}
+              commission
+              {onPlan
+                ? `, paid as each payment is verified. ${formatMoney(earnedTotal, deal.currency)} earned so far. `
+                : ". "}
             </>
           )}
           {settled

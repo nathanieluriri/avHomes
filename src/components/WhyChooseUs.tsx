@@ -20,11 +20,12 @@ export default function WhyChooseUs({ stats }: { stats: SiteStat[] }) {
         <Reveal delay={100}>
           <div className="relative mt-12 overflow-hidden rounded-2xl">
             <Image
-              src="/images/library/team-01.jpg"
-              alt="The AVHomes advisory team"
-              width={1600}
-              height={800}
-              className="h-[280px] w-full object-cover sm:h-[380px] lg:h-[440px]"
+              src="/images/library/av-team-01.jpg"
+              alt="The AVHomes team reviewing listings together in a meeting"
+              width={2000}
+              height={1500}
+              sizes="(min-width: 1280px) 1200px, 100vw"
+              className="h-[280px] w-full object-cover object-[50%_40%] sm:h-[380px] lg:h-[440px]"
             />
           </div>
         </Reveal>
