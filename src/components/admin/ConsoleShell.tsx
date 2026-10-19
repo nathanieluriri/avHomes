@@ -820,7 +820,7 @@ function useDealsWaiting(enabled: boolean, pathname: string): number {
     const load = () =>
       api
         .get<{ counts: MarketingCounts }>("/admin/marketing/counts", controller.signal)
-        .then((res) => setCount(res.counts.dealsWaiting))
+        .then((res) => setCount(res.counts.dealsWaiting + (res.counts.paymentsWaiting ?? 0)))
         .catch(() => {});
     void load();
     const timer = window.setInterval(() => void load(), 60_000);

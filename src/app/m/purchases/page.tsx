@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import {
   DEAL_STATUS_LABEL,
   LEAD_STATE_LABEL,
@@ -141,13 +142,22 @@ function Purchases() {
                 const standing = deal.plan ? planStanding(deal.amountMinor, deal.plan, deal.payments, now) : null;
                 return (
                   <li key={deal.id}>
-                    <Link href={`/m/deals/${deal.id}`} className="m-card block space-y-1 p-4">
-                      <p className="text-[15px] font-semibold text-m-text">{deal.listingTitle}</p>
-                      <p className="text-[13px] text-m-muted">
-                        {formatMoney(deal.paidMinor, deal.currency)} paid of {formatMoney(deal.amountMinor, deal.currency)} ·{" "}
-                        {deal.status === "approved" && standing ? PLAN_STATE_LABEL[standing.state] : DEAL_STATUS_LABEL[deal.status]}
-                      </p>
-                      {owned && <Note tone="good">Congratulations, you are now the proud owner of {deal.listingTitle}.</Note>}
+                    <Link href={`/m/deals/${deal.id}`} className="m-card m-press m-press-light block p-4">
+                      <span className="flex items-start gap-2">
+                        <span className="min-w-0 flex-1 space-y-1">
+                          <span className="block text-[15px] font-semibold text-m-text">{deal.listingTitle}</span>
+                          <span className="block text-[13px] text-m-muted">
+                            {formatMoney(deal.paidMinor, deal.currency)} paid of {formatMoney(deal.amountMinor, deal.currency)} ·{" "}
+                            {deal.status === "approved" && standing ? PLAN_STATE_LABEL[standing.state] : DEAL_STATUS_LABEL[deal.status]}
+                          </span>
+                        </span>
+                        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-m-faint" aria-hidden />
+                      </span>
+                      {owned && (
+                        <div className="mt-2">
+                          <Note tone="good">Congratulations, you are now the proud owner of {deal.listingTitle}.</Note>
+                        </div>
+                      )}
                     </Link>
                   </li>
                 );

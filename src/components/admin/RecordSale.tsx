@@ -9,9 +9,11 @@ import {
   parseMajor,
   moneyRefusalMessage,
   recordSaleRefusal,
+  slicePayment,
   type ChainMember,
   type CloserKind,
   type DealKind,
+  type DealPlan,
   type DealSplit,
   type FundKind,
   type Ownership,
@@ -23,6 +25,7 @@ import ImagePicker from "./ImagePicker";
 import { MoneyInput } from "./listing/MoneyInput";
 import { Segmented } from "./listing/Segmented";
 import { OwnershipBadge } from "./OwnershipBadge";
+import { SalePlanFields, dateInput, readSalePlan, salePlanDraft } from "./SalePlanFields";
 import { SplitBreakdown } from "./SplitBreakdown";
 import { signalSpotlight } from "./spotlight/signal";
 import { Button, ErrorNote, Field, inputClass } from "./ui";
@@ -101,6 +104,7 @@ function RecordSaleForm({
     closerKind: CloserKind;
     closerId: string;
     closerName: string;
+    plan?: DealPlan | null;
   };
   onDone: () => void;
 }) {
@@ -141,6 +145,7 @@ function RecordSaleForm({
     foundation: "AV Foundation",
   });
   const [splitOpen, setSplitOpen] = useState(false);
+  const [planDraft, setPlanDraft] = useState(() => salePlanDraft(fromDeal?.plan));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -149,6 +154,9 @@ function RecordSaleForm({
 
   const parsed = parseMajor(amount || "0", listing.currency);
   const amountMinor = parsed.ok ? parsed.minor : 0;
+  const money = (minor: number) => formatMoney(minor, listing.currency);
+
+  const { plan, problem: planProblem } = readSalePlan(planDraft, amountMinor, listing.currency);
 
   const closer =
     closerKind === "marketer"
@@ -170,7 +178,8 @@ function RecordSaleForm({
           closedOn: Date.parse(`${closedOn}T12:00:00`),
         }) ??
         (units.length > 0 && !unit ? "Pick which unit was sold or let." : null) ??
-        (closerKind === "marketer" && !marketer ? "Pick which marketer closed it." : null));
+        (closerKind === "marketer" && !marketer ? "Pick which marketer closed it." : null) ??
+        planProblem);
 
   /* The live breakdown. Re-read whenever the amount or the closer changes, because
      those are the two things that change the answer, and the number somebody
@@ -258,6 +267,11 @@ function RecordSaleForm({
    */
   const shownSplit = amountMinor > 0 && closer ? split : null;
   const shownFound = closerKind === "marketer" && search.trim().length >= 2 ? found : [];
+  const partnersInFull = shownSplit ? shownSplit.people.reduce((sum, share) => sum + share.amountMinor, 0) : 0;
+  const partnersNow =
+    shownSplit && plan && !planProblem
+      ? slicePayment(0, plan.depositMinor, amountMinor, shownSplit).people.reduce((sum, share) => sum + share.amountMinor, 0)
+      : 0;
 
   async function confirm() {
     if (refusal || !closer) return;
@@ -276,6 +290,7 @@ function RecordSaleForm({
         proof,
         note: note.trim(),
         closer,
+        plan,
         ...(fromDeal ? { dealId: fromDeal.dealId } : {}),
       });
       onDone();
@@ -477,12 +492,18 @@ function RecordSaleForm({
           />
         </Field>
 
+        <SalePlanFields value={planDraft} onChange={setPlanDraft} totalMinor={amountMinor} currency={listing.currency} />
+
         {/* The field, not the picker's own `image-library` button: that anchor
             also sits on the listing's photos behind this sheet, and the engine
             takes the first one in the document. */}
         <Field
           label="The proof"
-          hint="At least one: a receipt, a bank alert, or the signed agreement."
+          hint={
+            planDraft.on
+              ? "At least one: the deposit's receipt or bank alert, or the signed agreement."
+              : "At least one: a receipt, a bank alert, or the signed agreement."
+          }
           spotlight="sale-proof"
         >
           <ImagePicker value={proof} onChange={setProof} max={8} />
@@ -511,8 +532,16 @@ function RecordSaleForm({
             names={fundNames}
             open={splitOpen}
             onToggle={() => setSplitOpen((was) => !was)}
-            heading="What this pays out"
+            heading={plan ? "What this pays out once it is all paid" : "What this pays out"}
           />
+        )}
+
+        {shownSplit && plan && !planProblem && (
+          <p className="text-[12px] leading-relaxed text-slate-600">
+            {partnersInFull > 0
+              ? `On a plan this is paid out as the buyer pays. The deposit earns partners ${money(partnersNow)} now, and the other ${money(partnersInFull - partnersNow)} follows as each payment is verified.`
+              : "On a plan, the funds' shares and what AV Homes keeps follow each payment as it is verified."}
+          </p>
         )}
 
         {refusal && (
@@ -523,7 +552,8 @@ function RecordSaleForm({
 
         {!refusal && shownSplit && (
           <p className="text-[12px] leading-relaxed text-slate-600">
-            This records {formatMoney(amountMinor, listing.currency)} against{" "}
+            This records {money(amountMinor)}
+            {plan ? ` on a payment plan, ${money(plan.depositMinor)} of it paid so far,` : ""} against{" "}
             {unit ? `${unit.name} at ${listing.title}` : listing.title} and{" "}
             {unit ? "marks that unit taken, so it cannot be sold again" : "takes it off the market"}. It can
             be reversed by cancelling the deal.
@@ -536,8 +566,5 @@ function RecordSaleForm({
 
 /** Today as `YYYY-MM-DD`, for the date input's value and its ceiling. */
 function today(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+  return dateInput(Date.now());
 }

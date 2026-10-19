@@ -159,7 +159,7 @@ function HeroReady({ me }: { me: MeResponse }) {
   const block = reportBlockedReason(me);
   const payDay = payDayLabel();
   // The per deal read waits until this figure is on screen or in the picker.
-  const ifApproved = useIfApproved(balance, rates, figure === "checking" || picking);
+  const ifApproved = useIfApproved(balance, rates, figure === "checking" || picking, me.selfPurchasePays ?? false);
 
   const amounts: Record<Figure, number | null> = {
     // Money already in this month's pay run is still waiting as far as the marketer can tell.

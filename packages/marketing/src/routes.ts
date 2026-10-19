@@ -427,7 +427,7 @@ function decisionNotes(deal: Deal, recorded = false): Note[] {
           body: own
             ? recorded
               ? `AV Homes recorded your sale of ${deal.listingTitle}.`
-              : `${deal.listingTitle} was approved.`
+              : `${deal.listingTitle} was approved.${deal.plan ? " The rest comes as the buyer pays." : ""}`
             : `Your level ${share.level} share of ${firstName(deal.closerName || deal.reporterName)}'s deal on ${deal.listingTitle}.`,
           url,
           tag: `deal-${deal.id}`,
@@ -559,6 +559,15 @@ const JoinBody = z
 
 const SignInBody = z.object({ email: emailString(), password: str().min(1).max(200) }).strict();
 
+const PlanBody = z
+  .object({
+    depositMinor: z.number().int().min(0),
+    instalments: z.number().int().min(1).max(PLAN_INSTALMENTS_MAX),
+    frequency: z.enum(PLAN_FREQUENCIES),
+    firstDueOn: z.number().int().min(1),
+  })
+  .strict();
+
 const DealBody = z
   .object({
     listingId: str().max(64),
@@ -574,16 +583,7 @@ const DealBody = z
     proof: z.array(str().max(600)).min(1).max(5),
     note: str().max(600).default(""),
     closedOn: z.number().int().min(0).default(0),
-    plan: z
-      .object({
-        depositMinor: z.number().int().min(0),
-        instalments: z.number().int().min(1).max(PLAN_INSTALMENTS_MAX),
-        frequency: z.enum(PLAN_FREQUENCIES),
-        firstDueOn: z.number().int().min(1),
-      })
-      .strict()
-      .nullable()
-      .default(null),
+    plan: PlanBody.nullable().default(null),
     selfPurchase: z.boolean().default(false),
     /** The partner's own registered interest this payment is for. */
     leadId: str().max(64).nullable().default(null),
@@ -698,6 +698,7 @@ const WinBody = z
     closedOn: z.number().int().min(0).default(0),
     reason: str().trim().max(120),
     note: str().trim().min(LEAD_NOTE_MIN).max(LEAD_NOTE_MAX),
+    plan: PlanBody.nullable().default(null),
   })
   .strict();
 
@@ -768,6 +769,8 @@ const RecordSaleBody = z
     closer: CloserBody,
     /** Settling a deal that was already reported, rather than recording a new one. */
     dealId: str().max(40).nullable().optional(),
+    /** Left out when settling a reported deal keeps the plan it was reported with. */
+    plan: PlanBody.nullable().optional(),
   })
   .strict();
 
@@ -1148,7 +1151,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const bankCheck = (await providerState(db)).ready;
     const news = await newsFor(deps, db, marketer.email);
     const [balance, team, alerts] = await Promise.all([
-      balanceFor(db, marketer.id, settings.currency),
+      balanceFor(db, marketer.id, settings.currency, settings.selfPurchaseCommission),
       teamFor(db, marketer.id),
       alertsFor(db, marketer, settings, { bankCheck, news }),
     ]);
@@ -1166,6 +1169,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
       },
       supportPhone: settings.supportPhone,
       bankCheck,
+      selfPurchasePays: settings.selfPurchaseCommission,
       // AV Homes staff, not merely "not a marketer": a partner is neither, and is refused above anyway.
       isAdmin: isConsoleRole(currentUser(c).role) && !isScopedRole(currentUser(c).role),
       // The bell's number: only what they must act on.
@@ -1607,7 +1611,7 @@ export function marketingAppRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     const marketer = await currentMarketer(db, c);
     const settings = await readMarketingSettings(db);
     const [balance, lines, payments] = await Promise.all([
-      balanceFor(db, marketer.id, settings.currency),
+      balanceFor(db, marketer.id, settings.currency, settings.selfPurchaseCommission),
       listLedger(db, marketer.id, 60),
       payHistoryFor(db, marketer.id, 24),
     ]);
@@ -1798,7 +1802,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     if (!marketer) throw new NotFoundError(`marketer ${id}`);
     const settings = await readMarketingSettings(db);
     const [balance, team, chain, deals, lines, payments, messages] = await Promise.all([
-      balanceFor(db, id, settings.currency),
+      balanceFor(db, id, settings.currency, settings.selfPurchaseCommission),
       teamFor(db, id),
       chainFor(db, id),
       listDeals(db, { reporterId: id, limit: 25 }),
@@ -2015,7 +2019,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         : previewSplit(
             db,
             {
-              closerKind: deal.closerKind,
+              closerKind: deal.selfPurchase && !settings.selfPurchaseCommission ? "direct" : deal.closerKind,
               closerId: deal.closerId,
               ownership: deal.ownership,
               kind: deal.listingType,
@@ -2040,7 +2044,8 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
          deploy where the page has not shipped yet. */
       shares: split.people,
       alsoClaimed: other,
-      rates: settings,
+      // The page reads today's commission only; the rest of the settings are marketing's.
+      rates: { commission: settings.commission },
       fundNames: { reward: settings.rewardPoolName, foundation: settings.foundationName },
     });
   });
@@ -2130,6 +2135,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         note: body.note,
         closer: body.closer,
         dealId: body.dealId ?? null,
+        plan: body.plan,
         actorId: user.id,
         actorName: user.displayName,
       },
@@ -2247,7 +2253,7 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
         });
       }
       const step = { marketerId: deal.reporterId, property: deal.listingTitle, origin: requestOrigin(c.req), requestId: c.get("requestId") };
-      await tellPurchase(deps, db, { ...step, step: "payment-verified" });
+      if (deal.paidMinor > 0) await tellPurchase(deps, db, { ...step, step: "payment-verified" });
       if (deal.paidMinor >= deal.amountMinor) await tellPurchase(deps, db, { ...step, step: "owner" });
     }
     return c.json({ deal });
@@ -2377,7 +2383,8 @@ export function marketingAdminRoutes(deps: MarketingDeps = {}): Hono<AppEnv> {
     await greetBuyer(deps, db, won, requestOrigin(c.req), c.get("requestId"));
     if (won?.selfPurchase) {
       const step = { marketerId: won.reporterId, property: won.listingTitle, origin: requestOrigin(c.req), requestId: c.get("requestId") };
-      await tellPurchase(deps, db, { ...step, step: "payment-verified" });
+      // A plan with no deposit has nothing verified yet.
+      if (won.paidMinor > 0) await tellPurchase(deps, db, { ...step, step: "payment-verified" });
       if (won.paidMinor >= won.amountMinor) await tellPurchase(deps, db, { ...step, step: "owner" });
     }
     auditEntityId(c, lead.id);

@@ -71,7 +71,7 @@ export function EmailPartner({
   return (
     <Card>
       <CardHead
-        title="Messages"
+        title="Messages sent"
         action={
           <Button size="sm" onClick={() => setOpen(true)} disabled={noEmail}>
             <Send className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
@@ -90,7 +90,7 @@ export function EmailPartner({
       )}
 
       {sent.length === 0 ? (
-        <EmptyState bare title="No messages yet" hint="Emails you send to this partner are kept here." />
+        <EmptyState bare title="No messages sent yet" hint="Emails you send to this partner are kept here." />
       ) : (
         <ul className="divide-y divide-mist-100">
           {sent.map((m) => {

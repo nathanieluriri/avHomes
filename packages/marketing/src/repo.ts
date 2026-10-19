@@ -34,6 +34,7 @@ import {
   type CloserKind,
   type Deal,
   type DealKind,
+  type DealShare,
   type DealSplit,
   type DealStatus,
   type FundShare,
@@ -73,7 +74,7 @@ import {
   type PayRunItemDoc,
   type UpdateDoc,
 } from "./schema";
-import { assertPlan, settleNumbers } from "./plans";
+import { assertPlan, planAlertsFor, settleNumbers } from "./plans";
 
 function marketers(db: Db) {
   return collection<MarketerDoc>(db, COLLECTIONS.marketers);
@@ -654,6 +655,10 @@ export async function recordSale(
     paidOn: input.closedOn || now,
     byName: input.actorName,
     proof: input.proof,
+    reportedBy:
+      reported?.source === "app"
+        ? { side: "marketer", name: reported.reporterName }
+        : { side: "admin", name: input.actorName },
   });
   const shares = numbers.shares;
 
@@ -1023,6 +1028,11 @@ export async function reviewDeal(
     paidOn: doc.closedOn,
     byName: input.actorName,
     proof: doc.proof ?? [],
+    // A buyer marked bought in the console was logged there, not by the partner.
+    reportedBy:
+      doc.source === "app" && (doc.proof ?? []).length > 0
+        ? { side: "marketer", name: doc.reporterName }
+        : { side: "admin", name: input.actorName },
   });
   const shares = numbers.shares;
 
@@ -1218,8 +1228,10 @@ export async function balanceFor(
   db: Db,
   marketerId: string,
   currency: string,
+  /** Whether a partner's own purchase earns commission. Off, it is not money they are waiting on. */
+  selfPays = false,
 ): Promise<MarketerBalance> {
-  const [sums, pending] = await Promise.all([
+  const [sums, pending, plans] = await Promise.all([
     ledger(db)
       .aggregate<{ _id: string; total: number }>([
         { $match: { marketerId, status: { $ne: "void" } } },
@@ -1228,11 +1240,28 @@ export async function balanceFor(
       .toArray(),
     deals(db)
       .aggregate<{ _id: null; total: number }>([
-        { $match: { reporterId: marketerId, status: "pending" } },
+        { $match: { reporterId: marketerId, status: "pending", ...(selfPays ? {} : { selfPurchase: { $ne: true } }) } },
         { $group: { _id: null, total: { $sum: "$amountMinor" } } },
       ])
       .toArray(),
+    deals(db)
+      .find(
+        { status: "approved", "planShares.marketerId": marketerId, $expr: { $lt: ["$paidMinor", "$amountMinor"] } },
+        { projection: { planShares: 1, shares: 1 } },
+      )
+      .toArray(),
   ]);
+
+  let planToComeMinor = 0;
+  let plansOpen = 0;
+  const mine = (list: readonly DealShare[] | undefined) =>
+    (list ?? []).filter((share) => share.marketerId === marketerId).reduce((sum, share) => sum + share.amountMinor, 0);
+  for (const doc of plans) {
+    const left = mine(doc.planShares) - mine(doc.shares);
+    if (left <= 0) continue;
+    planToComeMinor += left;
+    plansOpen += 1;
+  }
 
   const by = new Map(sums.map((row) => [row._id, row.total]));
   // A deal being checked is not money yet. What it WOULD pay is worked out on
@@ -1243,6 +1272,8 @@ export async function balanceFor(
     scheduledMinor: by.get("scheduled") ?? 0,
     paidMinor: by.get("paid") ?? 0,
     pendingMinor: pending[0]?.total ?? 0,
+    planToComeMinor,
+    plansOpen,
   };
 }
 
@@ -1897,8 +1928,27 @@ export async function alertsFor(
 
   for (const doc of decided) {
     const at = doc.reviewedAt ?? doc.updatedAt;
+    // A partner's own purchase has its own alerts, in planAlertsFor.
+    if (doc.selfPurchase && doc.reporterId === marketer.id) continue;
     if (doc.status === "approved") {
-      const share = (doc.shares ?? []).find((row) => row.marketerId === marketer.id);
+      /* On a plan `shares` grows with every verified payment, each of which has
+         its own alert, so the approval is news about the deposit's share only. */
+      const deposit = doc.plan ? (doc.payments ?? [])[0] : undefined;
+      const atApproval = doc.plan ? (deposit?.note === "Deposit" ? deposit.shares : []) : (doc.shares ?? []);
+      const share = atApproval.find((row) => row.marketerId === marketer.id);
+      if (!share && doc.plan && doc.reporterId === marketer.id) {
+        out.push({
+          id: `deal-approved:${doc._id}`,
+          tone: "good",
+          icon: "check",
+          title: `${doc.listingTitle} was approved`,
+          body: "You earn your share as the buyer pays.",
+          detail: "",
+          action: { label: "See the deal", href: `/m/deals/${doc._id}` },
+          at,
+        });
+        continue;
+      }
       // Approved without a share for them is not news about their money.
       if (!share) continue;
       const first = doc.reporterName.trim().split(/\s+/u)[0] || doc.reporterName;
@@ -1909,7 +1959,7 @@ export async function alertsFor(
         title: `You earned ${formatMoney(share.amountMinor, doc.currency)}`,
         body:
           doc.reporterId === marketer.id
-            ? `${doc.listingTitle} was approved.`
+            ? `${doc.listingTitle} was approved.${doc.plan ? " The rest comes as the buyer pays." : ""}`
             : `Your level ${share.level} share of ${first}'s deal.`,
         detail: "",
         action: { label: "See the deal", href: `/m/deals/${doc._id}` },
@@ -1969,6 +2019,8 @@ export async function alertsFor(
       at: pot.last,
     });
   }
+
+  out.push(...(await planAlertsFor(db, marketer.id, now)));
 
   return out.sort((a, b) => TONE_RANK[a.tone] - TONE_RANK[b.tone] || b.at - a.at);
 }
@@ -2081,6 +2133,8 @@ export async function deleteUpdate(db: Db, id: string): Promise<boolean> {
 
 export interface MarketingCounts {
   dealsWaiting: number;
+  /** Payments on plans logged by a partner and waiting to be verified. */
+  paymentsWaiting: number;
   issuesOpen: number;
   marketersActive: number;
   /** Money approved and not yet in a pay run. */
@@ -2091,8 +2145,16 @@ export interface MarketingCounts {
 
 export async function marketingCounts(db: Db): Promise<MarketingCounts> {
   const month = payMonth(Date.now());
-  const [dealsWaiting, issuesOpen, marketersActive, owed, run] = await Promise.all([
+  const [dealsWaiting, logged, issuesOpen, marketersActive, owed, run] = await Promise.all([
     deals(db).countDocuments({ status: "pending" }),
+    deals(db)
+      .aggregate<{ n: number }>([
+        { $match: { status: "approved", "payments.status": "pending" } },
+        { $unwind: "$payments" },
+        { $match: { "payments.status": "pending" } },
+        { $count: "n" },
+      ])
+      .toArray(),
     issues(db).countDocuments({ status: "open" }),
     marketers(db).countDocuments({ status: "active" }),
     ledger(db)
@@ -2106,6 +2168,7 @@ export async function marketingCounts(db: Db): Promise<MarketingCounts> {
   const owedMinor = owed[0]?.total ?? 0;
   return {
     dealsWaiting,
+    paymentsWaiting: logged[0]?.n ?? 0,
     issuesOpen,
     marketersActive,
     owedMinor,

@@ -65,6 +65,7 @@ interface Dashboard {
   /** Null for a role without the marketing domain: the server does not send it. */
   marketing: {
     dealsWaiting: number;
+    paymentsWaiting?: number;
     issuesOpen: number;
     owedMinor: number;
     marketersActive: number;
@@ -187,6 +188,8 @@ function marketingKicker(marketing: Dashboard["marketing"]): string | null {
   if (!marketing) return null;
   const parts: string[] = [];
   if (marketing.dealsWaiting > 0) parts.push(`${marketing.dealsWaiting} to check`);
+  const payments = marketing.paymentsWaiting ?? 0;
+  if (payments > 0) parts.push(`${payments} ${payments === 1 ? "payment" : "payments"} to verify`);
   if (marketing.owedMinor > 0) parts.push(`${formatMoney(marketing.owedMinor)} owed`);
   return parts.length > 0 ? parts.join(", ") : null;
 }

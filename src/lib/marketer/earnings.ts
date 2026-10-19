@@ -20,6 +20,7 @@ export function useIfApproved(
   balance: MarketerBalance | null,
   rates: MeResponse["rates"] | null,
   load = true,
+  selfPays = false,
 ): number | null {
   const perDeal =
     balance !== null && rates !== null && rates.sale[0] !== rates.rent[0] && balance.pendingMinor > 0;
@@ -35,7 +36,7 @@ export function useIfApproved(
   if (!perDeal) return earningAtRate(balance.pendingMinor, rates.sale[0]);
   if (deals.data) {
     return deals.data.items
-      .filter((deal) => deal.status === "pending")
+      .filter((deal) => deal.status === "pending" && (selfPays || !deal.selfPurchase))
       .reduce((sum, deal) => sum + earningAtRate(deal.amountMinor, rates[deal.listingType][0]), 0);
   }
   // After a failed deals read, the nearest honest figure, as on the Money screen.

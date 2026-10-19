@@ -588,6 +588,8 @@ export function foldMonths(
 
   let opening = 0;
   let currency = DEFAULT_CURRENCY;
+  const dealsBy = new Map<string, Set<string>>();
+  const dealsInWindow = new Set<string>();
   for (const row of rows) {
     if (row.currency) currency = row.currency;
     if (row.voidsId || (row.kind === "payout" && row.voidedAt)) continue;
@@ -604,7 +606,11 @@ export function foldMonths(
     if (row.dealId) {
       if (row.amountMinor >= 0) {
         target.inMinor += row.amountMinor;
-        target.deals += 1;
+        const seen = dealsBy.get(target.month) ?? new Set<string>();
+        seen.add(row.dealId);
+        dealsBy.set(target.month, seen);
+        target.deals = seen.size;
+        dealsInWindow.add(row.dealId);
       } else {
         target.reversedMinor += -row.amountMinor;
         target.reversals += 1;
@@ -627,7 +633,7 @@ export function foldMonths(
     return month;
   });
 
-  return { fund: input.fund, name: input.name, currency, openingMinor: opening, months };
+  return { fund: input.fund, name: input.name, currency, openingMinor: opening, months, dealsInWindow: dealsInWindow.size };
 }
 
 /* ═══════════════════════════════════════════════════════════════════ AWARDS ══ */

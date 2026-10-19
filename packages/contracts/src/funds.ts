@@ -313,7 +313,7 @@ export interface FundMonth {
   month: string;
   /** Deal shares that came in this month. */
   inMinor: number;
-  /** How many deals those shares came from. */
+  /** How many deals those shares came from. A plan paid twice in a month is one deal. */
   deals: number;
   /** Shares handed back because a deal was cancelled this month. Positive. */
   reversedMinor: number;
@@ -335,6 +335,8 @@ export interface FundMonthly {
   openingMinor: number;
   /** Oldest first, zero filled, ending with the current month. */
   months: FundMonth[];
+  /** Deals that put money in across the months shown, each counted once however many payments it made. */
+  dealsInWindow?: number;
 }
 
 /** `2026-10` for a timestamp, local like `quarterOf`. */

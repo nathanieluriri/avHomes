@@ -20,6 +20,7 @@ import {
   leadMoveRefusal,
   marketerMayMove,
   type DealKind,
+  type DealPlan,
   type Lead,
   type LeadEvent,
   type LeadRow,
@@ -282,6 +283,7 @@ export interface WinInput {
   note: string;
   /** Whose property it is, which decides the rate. Read off the listing by the route. */
   ownership: Ownership;
+  plan?: DealPlan | null;
 }
 
 /**
@@ -359,6 +361,7 @@ export async function winLead(
       ownership: input.ownership,
       leadId: id,
       selfPurchase: doc.self ?? false,
+      plan: input.plan ?? null,
     },
     settings,
   );

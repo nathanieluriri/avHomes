@@ -26,6 +26,7 @@ import { useAsync } from "@/lib/admin/hooks";
 import { dateTime } from "@/lib/admin/format";
 import { LEAD_TONE, toApiError } from "@/lib/admin/marketing";
 import { MoneyInput } from "@/components/admin/listing/MoneyInput";
+import { SalePlanFields, readSalePlan, salePlanDraft } from "@/components/admin/SalePlanFields";
 import {
   Badge,
   Button,
@@ -85,8 +86,21 @@ export default function BuyerDetailPage() {
         title={data.buyerName}
         subtitle={leadWantLine(data)}
         backTo="/admin/marketers/buyers"
-        badge={<Badge tone={LEAD_TONE[data.state]}>{LEAD_STATE_LABEL[data.state]}</Badge>}
+        badge={
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <Badge tone={LEAD_TONE[data.state]}>{LEAD_STATE_LABEL[data.state]}</Badge>
+            {data.self && <Badge tone="wine">Partner purchase</Badge>}
+          </span>
+        }
       />
+
+      {data.self && (
+        <p className="mb-4 rounded-xl border border-wine-100 bg-white px-3 py-2 text-[12.5px] leading-relaxed text-wine-700">
+          {data.state === "won"
+            ? `${data.reporterName} bought this for themselves. Their payments are on the deal.`
+            : `${data.reporterName} wants to buy this for themselves. When they pay, they send the proof from their app and it arrives as a deal to check, linked to this interest.`}
+        </p>
+      )}
 
       <PageColumns asideWidth="22rem" asideFirstOnMobile aside={<Controls lead={data} onDone={reload} />}>
         <Card spotlight="buyer-timeline">
@@ -161,6 +175,7 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
      only one, since then there is nothing to decide. */
   const units = lead.wantUnits ?? [];
   const [unitKey, setUnitKey] = useState(units.length === 1 ? units[0]!.key : "");
+  const [planDraft, setPlanDraft] = useState(() => salePlanDraft(null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -169,12 +184,14 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
   const parsed = winning && amount.trim() !== "" ? parseMajor(amount, lead.currency) : null;
   const amountMinor = parsed?.ok ? parsed.minor : 0;
   const moneyBad = parsed && !parsed.ok ? moneyRefusalMessage(parsed.reason, lead.currency) : null;
+  const { plan, problem: planProblem } = readSalePlan(planDraft, amountMinor, lead.currency);
   const ready: boolean =
     picked &&
     reason !== "" &&
     note.trim().length >= LEAD_NOTE_MIN &&
     (!winning ||
       (amountMinor > 0 &&
+        planProblem === null &&
         lead.listingId !== null &&
         // An estate deal must name the house, or the uniqueness rule that stops
         // two marketers being paid for one sale has nothing to key on.
@@ -194,6 +211,7 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
           amountMinor,
           reason,
           note: note.trim(),
+          plan,
         });
       } else {
         await api.post(`/admin/marketing/leads/${lead.id}/state`, { to, reason, note: note.trim() });
@@ -349,6 +367,10 @@ function Controls({ lead, onDone }: { lead: Lead; onDone: () => void }) {
                     the end on the keystroke that added a comma. */}
                 <MoneyInput value={amount} onChange={setAmount} placeholder="80,000,000" />
               </Field>
+              <SalePlanFields value={planDraft} onChange={setPlanDraft} totalMinor={amountMinor} currency={lead.currency} />
+              {planProblem && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">{planProblem}</p>
+              )}
               {lead.listingId === null && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
                   This buyer has no property attached, so there is nothing to sell them yet. Report

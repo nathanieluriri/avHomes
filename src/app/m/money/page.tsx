@@ -71,9 +71,11 @@ const LINE_STATUS: Record<LedgerStatus, string> = {
 function lineSource(line: LedgerLine): string {
   if (line.kind === "clawback") return "Taken back";
   if (line.kind === "adjust") return "From AV Homes";
-  if (line.level === 1) return "Your deal";
-  if (line.level === 2) return "Someone you invited";
-  if (line.level === 3) return "Their team";
+  // On a payment plan each payment earns its own line: "Deposit", "Payment 2 on the plan".
+  const part = line.note ? `, ${line.note.charAt(0).toLowerCase()}${line.note.slice(1)}` : "";
+  if (line.level === 1) return `Your deal${part}`;
+  if (line.level === 2) return `Someone you invited${part}`;
+  if (line.level === 3) return `Their team${part}`;
   return "";
 }
 
@@ -203,12 +205,29 @@ function MoneyBody({ money }: { money: MoneyRead }) {
     );
   }
 
-  const { lines, payments } = money.data;
+  const { lines, payments, balance } = money.data;
   const months = groupLines(lines);
+  const toCome = balance.planToComeMinor ?? 0;
+  const plansOpen = balance.plansOpen ?? 0;
 
   return (
     <div className="px-4">
       <Totals data={money.data} />
+
+      {toCome > 0 && (
+        <Link href="/m/deals" className="m-card m-press-light mt-3 flex items-center gap-3 px-4 py-3.5">
+          <span aria-hidden className="-my-1 shrink-0">
+            <IconPayDay size={40} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold text-m-text">Still to come</span>
+            <span className="block text-[12.5px] text-m-muted">
+              On {plansOpen} payment {plansOpen === 1 ? "plan" : "plans"}, yours as each buyer pays
+            </span>
+          </span>
+          <Amount minor={toCome} currency={balance.currency} size="sm" className="shrink-0" />
+        </Link>
+      )}
 
       {/* The statement. This screen answers "what am I owed"; that one answers
           "what happened, and when", which is a different question and a
@@ -319,7 +338,7 @@ function Totals({ data }: { data: MoneyResponse }) {
   const { me } = useMarketer();
   const { balance } = data;
   // The same hook as the home figure, so "Being checked" can never say two things.
-  const checking = useIfApproved(balance, me?.rates ?? null);
+  const checking = useIfApproved(balance, me?.rates ?? null, true, me?.selfPurchasePays ?? false);
 
   const waiting = balance.waitingMinor + balance.scheduledMinor;
   const whole = (minor: number) => moneyParts(minor, balance.currency).whole;

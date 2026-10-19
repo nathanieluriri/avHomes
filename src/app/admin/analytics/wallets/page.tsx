@@ -770,7 +770,7 @@ function MonthlySection({ pool, refresh }: { pool: FundBalance; refresh: number 
   const current = monthly?.months.at(-1);
   const currency = monthly?.currency ?? pool.currency;
   const inWindow = monthly?.months.reduce((sum, m) => sum + m.inMinor - m.reversedMinor, 0) ?? 0;
-  const dealsInWindow = monthly?.months.reduce((sum, m) => sum + m.deals, 0) ?? 0;
+  const dealsInWindow = monthly?.dealsInWindow ?? monthly?.months.reduce((sum, m) => sum + m.deals, 0) ?? 0;
   const paidInWindow = monthly?.months.reduce((sum, m) => sum + m.paidMinor, 0) ?? 0;
   const money = (minor: number) => formatMoney(minor, currency);
 
@@ -794,6 +794,11 @@ function MonthlySection({ pool, refresh }: { pool: FundBalance; refresh: number 
           </span>
         </span>
       ),
+      card: (m) => (
+        <>
+          In <span className="c-num text-plum-950">{money(m.inMinor)}</span> from {m.deals} deal{m.deals === 1 ? "" : "s"}
+        </>
+      ),
     },
     {
       key: "back",
@@ -806,6 +811,12 @@ function MonthlySection({ pool, refresh }: { pool: FundBalance; refresh: number 
         ) : (
           <span className="text-slate-400">None</span>
         ),
+      card: (m) =>
+        m.reversedMinor > 0 ? (
+          <>
+            <span className="c-num text-red-700">{money(m.reversedMinor)}</span> handed back
+          </>
+        ) : null,
     },
     {
       key: "paid",
@@ -823,6 +834,14 @@ function MonthlySection({ pool, refresh }: { pool: FundBalance; refresh: number 
         ) : (
           <span className="text-slate-400">None</span>
         ),
+      card: (m) =>
+        m.paidMinor > 0 ? (
+          <>
+            Paid out <span className="c-num text-plum-950">{money(m.paidMinor)}</span>
+          </>
+        ) : (
+          "Nothing paid out"
+        ),
     },
     {
       key: "close",
@@ -830,6 +849,11 @@ function MonthlySection({ pool, refresh }: { pool: FundBalance; refresh: number 
       numeric: true,
       mobile: "keep",
       render: (m) => <span className="c-num font-semibold text-plum-950">{money(m.closingMinor)}</span>,
+      card: (m) => (
+        <>
+          Ends at <span className="c-num font-semibold text-plum-950">{money(m.closingMinor)}</span>
+        </>
+      ),
     },
   ];
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import { BottomSheet } from "./BottomSheet";
 import { IconButton, Skeleton } from "./ui";
@@ -79,6 +79,12 @@ export interface Column<T> {
    * cannot be read on its own needs one here.
    */
   mobileLabel?: string;
+  /**
+   * What the card draws instead of the cell, for a value that needs more words
+   * than a noun after it: "Paid out ₦40,000", not "₦40,000". Returning null
+   * leaves the value off the card.
+   */
+  card?: (row: T) => ReactNode;
   /**
    * Whether this column's cell draws the 36px thumbnail `IdCell` takes. Only
    * the skeleton reads it, and only from the primary column: it draws a
@@ -469,31 +475,31 @@ export function DataTable<T>({
                   {/* The meta run. The middot is what makes four values read as
                       four values rather than as one sentence, and `truncate` on
                       each of them is what stops a long unbroken token from
-                      pushing the card wider than the surface clipping it. */}
+                      pushing the card wider than the surface clipping it. Each
+                      value carries its dot in front, and the run is pulled left
+                      by one dot's width inside a clipping box, so the dot that
+                      would start a line is always the one cut off. */}
                   {cardMeta.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-slate-600">
-                      {cardMeta.map((column, index) => (
-                        <Fragment key={column.key}>
-                          {index > 0 && (
-                            <span
-                              aria-hidden="true"
-                              className={`text-mist-300 ${cardGrade(column)}`}
-                            >
-                              ·
+                    <div className="mt-1.5 overflow-hidden text-[12px] text-slate-600">
+                      <div className="-ml-4 flex flex-wrap items-center gap-y-1">
+                        {cardMeta.map((column) => {
+                          const value = column.card ? column.card(row) : column.render(row);
+                          if (value === null || value === undefined || value === false || value === "") return null;
+                          return (
+                            <span key={column.key} className={`flex min-w-0 max-w-full items-center ${cardGrade(column)}`}>
+                              <span aria-hidden="true" className="w-4 shrink-0 text-center text-mist-300">
+                                ·
+                              </span>
+                              <span className={`min-w-0 truncate ${column.numeric ? "c-num" : ""}`}>
+                                {value}
+                                {column.mobileLabel && (
+                                  <span className="ml-1 text-slate-550">{column.mobileLabel}</span>
+                                )}
+                              </span>
                             </span>
-                          )}
-                          <span
-                            className={`min-w-0 max-w-full truncate ${
-                              column.numeric ? "c-num" : ""
-                            } ${cardGrade(column)}`}
-                          >
-                            {column.render(row)}
-                            {column.mobileLabel && (
-                              <span className="ml-1 text-slate-550">{column.mobileLabel}</span>
-                            )}
-                          </span>
-                        </Fragment>
-                      ))}
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
