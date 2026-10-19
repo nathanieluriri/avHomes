@@ -50,8 +50,8 @@ describe("buyer welcome", { skip: uri ? false : "set MONGODB_URI to run" }, () =
     assert.equal(row?.source, "buyer");
     assert.equal(m.sent.length, 1);
     assert.match(m.sent[0]!.subject, /Kuje Heights/u);
-    assert.ok(m.sent[0]!.html.includes(AV_CONSTRUCTIONS_URL));
-    assert.ok(m.sent[0]!.html.includes("/unsubscribe?s="));
+    assert.ok((m.sent[0]!.html ?? "").includes(AV_CONSTRUCTIONS_URL));
+    assert.ok((m.sent[0]!.html ?? "").includes("/unsubscribe?s="));
     assert.match(m.sent[0]!.text, /Congratulations, Ngozi\./u);
 
     assert.equal(await welcomeBuyer(db, m.mailer, buyer(), CTX), false, "a second sale sends nothing");
